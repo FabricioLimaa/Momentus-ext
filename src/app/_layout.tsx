@@ -1,18 +1,92 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { useColorScheme } from 'react-native';
+import React from 'react';
+import { Tabs } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { StatusBar } from 'expo-status-bar';
+import { Platform } from 'react-native';
+import { MomentusColors } from '@/constants/theme';
+import { MomentusProvider } from '@/context/MomentusContext';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
-
-SplashScreen.preventAutoHideAsync();
-
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
+export default function RootLayout() {
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
-    </ThemeProvider>
+    <MomentusProvider>
+      <StatusBar style="light" />
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarStyle: {
+            backgroundColor: MomentusColors.navySurface,
+            borderTopColor: MomentusColors.navyOutline,
+            borderTopWidth: 1,
+            height: Platform.OS === 'ios' ? 88 : 68,
+            paddingBottom: Platform.OS === 'ios' ? 28 : 10,
+            paddingTop: 8,
+          },
+          tabBarActiveTintColor: MomentusColors.emeraldNeon,
+          tabBarInactiveTintColor: MomentusColors.textSecondary,
+          tabBarLabelStyle: {
+            fontSize: 11,
+            fontWeight: '700',
+          },
+        }}>
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: 'Hoje',
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="today" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="calendar"
+          options={{
+            title: 'Agenda',
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="calendar" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="focus"
+          options={{
+            title: 'Foco',
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="timer" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="stats"
+          options={{
+            title: 'Estatísticas',
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="stats-chart" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="more"
+          options={{
+            title: 'Mais',
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="menu" size={size} color={color} />
+            ),
+          }}
+        />
+        {/* Telas secundárias roteáveis */}
+        <Tabs.Screen
+          name="templates"
+          options={{
+            href: null,
+          }}
+        />
+        <Tabs.Screen
+          name="achievements"
+          options={{
+            href: null,
+          }}
+        />
+      </Tabs>
+    </MomentusProvider>
   );
 }

@@ -1,18 +1,21 @@
 {
   "expo": {
-    "name": "momentus-ext",
-    "slug": "momentus-ext",
-    "version": "1.0.0",
+    "name": "Momentus",
+    "slug": "momentus",
+    "version": "1.6.6",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "momentusext",
-    "userInterfaceStyle": "automatic",
+    "scheme": "momentus",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0F172A",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "supportsTablet": true,
+      "bundleIdentifier": "br.com.fabriciolima.momentus"
     },
     "android": {
+      "package": "br.com.fabriciolima.momentus",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0F172A",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -28,9 +31,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#0F172A",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 80
         }
       ]
     ],
