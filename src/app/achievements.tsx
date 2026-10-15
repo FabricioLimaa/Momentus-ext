@@ -41,7 +41,15 @@ export const getIconForAchievement = (id: string): keyof typeof Ionicons.glyphMa
 };
 
 export default function AchievementsScreen() {
-  const { achievements, marketItems, userProfile, userLevel, buyMarketItem } = useMomentus();
+  const {
+    achievements,
+    marketItems,
+    userProfile,
+    userLevel,
+    buyMarketItem,
+    theme,
+    showCelebration,
+  } = useMomentus();
   const [activeTab, setActiveTab] = useState<'achievements' | 'market'>('achievements');
   const [selectedAchievement, setSelectedAchievement] = useState<Achievement | null>(null);
 
@@ -49,7 +57,11 @@ export default function AchievementsScreen() {
     if (item.isOwned) return;
     const success = buyMarketItem(item.id);
     if (success) {
-      Alert.alert('Sucesso! 🎉', `Você adquiriu "${item.name}"!`);
+      showCelebration(
+        'Item Adquirido! 🛍️',
+        `Você comprou "${item.name}". Aproveite seu novo item!`,
+        0
+      );
     } else {
       Alert.alert(
         'XP Insuficiente! ⭐',
@@ -76,11 +88,18 @@ export default function AchievementsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor={MomentusColors.navyBackground} />
-      <View style={styles.container}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+      <StatusBar
+        barStyle={theme.isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={theme.background}
+      />
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
         {/* User Profile Card */}
-        <View style={styles.profileCard}>
+        <View
+          style={[
+            styles.profileCard,
+            { backgroundColor: theme.surface, borderColor: theme.outline },
+          ]}>
           <View style={styles.profileTopRow}>
             <View style={[styles.avatarLarge, { borderColor: userLevel.rankColor }]}>
               <Text style={styles.avatarLargeText}>
@@ -89,10 +108,18 @@ export default function AchievementsScreen() {
             </View>
 
             <View style={styles.profileDetails}>
-              <Text style={styles.profileName}>{userProfile.name || 'Usuário'}</Text>
+              <Text style={[styles.profileName, { color: theme.textPrimary }]}>
+                {userProfile.name || 'Usuário'}
+              </Text>
               <View style={styles.levelRankRow}>
-                <View style={[styles.levelBadge, { backgroundColor: `${MomentusColors.emeraldNeon}20` }]}>
-                  <Text style={styles.levelBadgeText}>Nível {userLevel.level}</Text>
+                <View
+                  style={[
+                    styles.levelBadge,
+                    { backgroundColor: `${theme.primary}20` },
+                  ]}>
+                  <Text style={[styles.levelBadgeText, { color: theme.primary }]}>
+                    Nível {userLevel.level}
+                  </Text>
                 </View>
                 <Text style={styles.rankNameText}>{userLevel.rankName}</Text>
               </View>
@@ -113,48 +140,62 @@ export default function AchievementsScreen() {
                   size={18}
                   color={getStreakColor(userProfile.currentStreak)}
                 />
-                <Text style={styles.statNumber}>{userProfile.currentStreak} dias</Text>
+                <Text style={[styles.statNumber, { color: theme.textPrimary }]}>
+                  {userProfile.currentStreak} dias
+                </Text>
               </View>
-              <Text style={styles.statLabel}>Dias seguidos</Text>
+              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Dias seguidos</Text>
             </View>
 
-            <View style={styles.statDivider} />
+            <View style={[styles.statDivider, { backgroundColor: theme.outline }]} />
 
             <View style={styles.statBox}>
               <View style={styles.statIconRow}>
                 <Ionicons name="star" size={18} color="#D4AF37" />
-                <Text style={styles.statNumber}>{userProfile.totalPoints}</Text>
+                <Text style={[styles.statNumber, { color: theme.textPrimary }]}>
+                  {userProfile.totalPoints}
+                </Text>
               </View>
-              <Text style={styles.statLabel}>Pontos totais</Text>
+              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Pontos totais</Text>
             </View>
 
-            <View style={styles.statDivider} />
+            <View style={[styles.statDivider, { backgroundColor: theme.outline }]} />
 
             <View style={styles.statBox}>
               <View style={styles.statIconRow}>
-                <Ionicons name="checkmark-done" size={18} color={MomentusColors.emeraldNeon} />
-                <Text style={styles.statNumber}>{userProfile.totalCompleted}</Text>
+                <Ionicons name="checkmark-done" size={18} color={theme.primary} />
+                <Text style={[styles.statNumber, { color: theme.textPrimary }]}>
+                  {userProfile.totalCompleted}
+                </Text>
               </View>
-              <Text style={styles.statLabel}>Hábitos concluídos</Text>
+              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Hábitos concluídos</Text>
             </View>
           </View>
         </View>
 
         {/* Tab Switcher: Conquistas / Loja */}
-        <View style={styles.tabSwitcher}>
+        <View
+          style={[
+            styles.tabSwitcher,
+            { backgroundColor: theme.surface, borderColor: theme.outline },
+          ]}>
           <TouchableOpacity
             onPress={() => setActiveTab('achievements')}
-            style={[styles.tabBtn, activeTab === 'achievements' && styles.tabBtnActive]}
+            style={[
+              styles.tabBtn,
+              activeTab === 'achievements' && { backgroundColor: theme.primary },
+            ]}
             activeOpacity={0.7}>
             <Ionicons
               name="trophy"
               size={16}
-              color={activeTab === 'achievements' ? '#0F172A' : MomentusColors.textSecondary}
+              color={activeTab === 'achievements' ? '#000000' : theme.textSecondary}
             />
             <Text
               style={[
                 styles.tabText,
-                activeTab === 'achievements' && styles.tabTextActive,
+                { color: activeTab === 'achievements' ? '#000000' : theme.textSecondary },
+                activeTab === 'achievements' && { fontWeight: '800' },
               ]}>
               Medalhas ({unlockedCount}/{achievements.length})
             </Text>
@@ -162,17 +203,21 @@ export default function AchievementsScreen() {
 
           <TouchableOpacity
             onPress={() => setActiveTab('market')}
-            style={[styles.tabBtn, activeTab === 'market' && styles.tabBtnActive]}
+            style={[
+              styles.tabBtn,
+              activeTab === 'market' && { backgroundColor: theme.primary },
+            ]}
             activeOpacity={0.7}>
             <Ionicons
               name="cart"
               size={16}
-              color={activeTab === 'market' ? '#0F172A' : MomentusColors.textSecondary}
+              color={activeTab === 'market' ? '#000000' : theme.textSecondary}
             />
             <Text
               style={[
                 styles.tabText,
-                activeTab === 'market' && styles.tabTextActive,
+                { color: activeTab === 'market' ? '#000000' : theme.textSecondary },
+                activeTab === 'market' && { fontWeight: '800' },
               ]}>
               Loja de Stickers
             </Text>

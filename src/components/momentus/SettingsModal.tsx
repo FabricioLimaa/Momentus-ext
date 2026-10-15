@@ -19,7 +19,7 @@ interface SettingsModalProps {
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }) => {
-  const { settings, updateSettings, userProfile } = useMomentus();
+  const { settings, updateSettings, userProfile, theme } = useMomentus();
 
   const handleClearData = () => {
     Alert.alert(
@@ -40,81 +40,84 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.title}>Ajustes do Aplicativo</Text>
-            <Text style={styles.subtitle}>Personalize sons, segurança e preferências</Text>
+            <Text style={[styles.title, { color: theme.textPrimary }]}>Ajustes do Aplicativo</Text>
+            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Personalize sons, segurança e preferências</Text>
           </View>
           <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-            <Ionicons name="close" size={24} color={MomentusColors.textSecondary} />
+            <Ionicons name="close" size={24} color={theme.textSecondary} />
           </TouchableOpacity>
         </View>
 
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
           {/* Som & Vibração */}
-          <Text style={styles.sectionTitle}>ÁUDIO & SENSAÇÕES</Text>
-          <View style={styles.card}>
+          <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>ÁUDIO & SENSAÇÕES</Text>
+          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
             <View style={styles.row}>
               <View style={styles.rowLeft}>
-                <Ionicons name="volume-high-outline" size={20} color={MomentusColors.emeraldNeon} />
+                <Ionicons name="volume-high-outline" size={20} color={theme.primary} />
                 <View>
-                  <Text style={styles.rowTitle}>Efeitos Sonoros</Text>
-                  <Text style={styles.rowSubtitle}>Sons de sucesso ao concluir hábitos</Text>
+                  <Text style={[styles.rowTitle, { color: theme.textPrimary }]}>Efeitos Sonoros</Text>
+                  <Text style={[styles.rowSubtitle, { color: theme.textSecondary }]}>Sons de sucesso ao concluir hábitos</Text>
                 </View>
               </View>
               <Switch
                 value={settings.soundEnabled}
                 onValueChange={(val) => updateSettings({ soundEnabled: val })}
-                trackColor={{ false: MomentusColors.navyOutline, true: MomentusColors.emeraldNeon }}
+                trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: 'rgba(52, 211, 153, 0.4)' }}
+                thumbColor={settings.soundEnabled ? theme.primary : '#94A3B8'}
               />
             </View>
 
-            <View style={styles.divider} />
+            <View style={[styles.divider, { backgroundColor: theme.outline }]} />
 
             <View style={styles.row}>
               <View style={styles.rowLeft}>
-                <Ionicons name="phone-portrait-outline" size={20} color={MomentusColors.emeraldNeon} />
+                <Ionicons name="phone-portrait-outline" size={20} color={theme.primary} />
                 <View>
-                  <Text style={styles.rowTitle}>Feedback Tátil (Haptic)</Text>
-                  <Text style={styles.rowSubtitle}>Vibrações sutis ao interagir</Text>
+                  <Text style={[styles.rowTitle, { color: theme.textPrimary }]}>Feedback Tátil (Haptic)</Text>
+                  <Text style={[styles.rowSubtitle, { color: theme.textSecondary }]}>Vibrações sutis ao interagir</Text>
                 </View>
               </View>
               <Switch
                 value={settings.hapticsEnabled}
                 onValueChange={(val) => updateSettings({ hapticsEnabled: val })}
-                trackColor={{ false: MomentusColors.navyOutline, true: MomentusColors.emeraldNeon }}
+                trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: 'rgba(52, 211, 153, 0.4)' }}
+                thumbColor={settings.hapticsEnabled ? theme.primary : '#94A3B8'}
               />
             </View>
           </View>
 
           {/* Segurança */}
-          <Text style={styles.sectionTitle}>SEGURANÇA & PRIVACIDADE</Text>
-          <View style={styles.card}>
+          <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>SEGURANÇA & PRIVACIDADE</Text>
+          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
             <View style={styles.row}>
               <View style={styles.rowLeft}>
                 <Ionicons name="finger-print-outline" size={20} color={MomentusColors.cyan} />
                 <View>
-                  <Text style={styles.rowTitle}>Bloqueio Biométrico</Text>
-                  <Text style={styles.rowSubtitle}>Exigir Face ID / Impressão Digital</Text>
+                  <Text style={[styles.rowTitle, { color: theme.textPrimary }]}>Bloqueio Biométrico</Text>
+                  <Text style={[styles.rowSubtitle, { color: theme.textSecondary }]}>Exigir Face ID / Impressão Digital</Text>
                 </View>
               </View>
               <Switch
                 value={settings.biometricLock}
                 onValueChange={(val) => updateSettings({ biometricLock: val })}
-                trackColor={{ false: MomentusColors.navyOutline, true: MomentusColors.emeraldNeon }}
+                trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: 'rgba(52, 211, 153, 0.4)' }}
+                thumbColor={settings.biometricLock ? theme.primary : '#94A3B8'}
               />
             </View>
           </View>
 
           {/* Dados & Armazenamento */}
-          <Text style={styles.sectionTitle}>DADOS & CONTA</Text>
-          <View style={styles.card}>
+          <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>DADOS & CONTA</Text>
+          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Usuário</Text>
-              <Text style={styles.infoValue}>{userProfile.email}</Text>
+              <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>Usuário</Text>
+              <Text style={[styles.infoValue, { color: theme.textPrimary }]}>{userProfile.email}</Text>
             </View>
-            <View style={styles.divider} />
+            <View style={[styles.divider, { backgroundColor: theme.outline }]} />
             <TouchableOpacity onPress={handleClearData} style={styles.dangerRow}>
               <Ionicons name="trash-bin-outline" size={18} color={MomentusColors.error} />
               <Text style={styles.dangerText}>Limpar Dados Locais</Text>
@@ -123,8 +126,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }
 
           {/* Sobre */}
           <View style={styles.aboutBox}>
-            <Text style={styles.aboutTitle}>Momentus Mobile 1.6.6</Text>
-            <Text style={styles.aboutSubtitle}>
+            <Text style={[styles.aboutTitle, { color: theme.textPrimary }]}>Momentus Mobile 1.6.6</Text>
+            <Text style={[styles.aboutSubtitle, { color: theme.textSecondary }]}>
               Desenvolvido por Fabrício Lima • Multiplataforma iOS & Android
             </Text>
           </View>

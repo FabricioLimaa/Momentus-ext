@@ -19,7 +19,7 @@ import { useMomentus } from '@/context/MomentusContext';
 type FocusMode = 'FOCUS' | 'SHORT_BREAK' | 'LONG_BREAK';
 
 export default function FocusScreen() {
-  const { addFocusMinutes, userProfile } = useMomentus();
+  const { addFocusMinutes, userProfile, theme, showCelebration } = useMomentus();
 
   // Configuração de durações (em minutos)
   const [focusDurationMinutes, setFocusDurationMinutes] = useState(25);
@@ -43,16 +43,19 @@ export default function FocusScreen() {
 
   const timerRef = useRef<any>(null);
 
-  const getDurationForMode = (targetMode: FocusMode, f = focusDurationMinutes, s = shortBreakMinutes, l = longBreakMinutes) => {
-    switch (targetMode) {
-      case 'FOCUS':
-        return f * 60;
-      case 'SHORT_BREAK':
-        return s * 60;
-      case 'LONG_BREAK':
-        return l * 60;
-    }
-  };
+  const getDurationForMode = useCallback(
+    (targetMode: FocusMode, f = focusDurationMinutes, s = shortBreakMinutes, l = longBreakMinutes) => {
+      switch (targetMode) {
+        case 'FOCUS':
+          return f * 60;
+        case 'SHORT_BREAK':
+          return s * 60;
+        case 'LONG_BREAK':
+          return l * 60;
+      }
+    },
+    [focusDurationMinutes, shortBreakMinutes, longBreakMinutes]
+  );
 
   const switchMode = useCallback(
     (newMode: FocusMode) => {
@@ -87,9 +90,10 @@ export default function FocusScreen() {
       setXpGained((prev) => prev + xpReward);
       addFocusMinutes(focusDurationMinutes);
 
-      Alert.alert(
+      showCelebration(
         'Sessão Concluída! 🎯',
-        `Parabéns! Você completou sua sessão de foco e ganhou +${xpReward} XP.`
+        `Parabéns! Você completou sua sessão de foco e ganhou +${xpReward} XP.`,
+        xpReward
       );
 
       // Auto-switch: a cada 4 sessões -> Pausa Longa
@@ -108,6 +112,7 @@ export default function FocusScreen() {
     focusDurationMinutes,
     addFocusMinutes,
     switchMode,
+    showCelebration,
   ]);
 
   useEffect(() => {
@@ -135,7 +140,7 @@ export default function FocusScreen() {
   const toggleTimer = () => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } catch (_) {}
+    } catch {}
     setIsRunning(!isRunning);
   };
 
@@ -147,7 +152,7 @@ export default function FocusScreen() {
     setTotalSeconds(secs);
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch (_) {}
+    } catch {}
   };
 
   const handleSaveSettings = () => {
@@ -180,51 +185,72 @@ export default function FocusScreen() {
   })();
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor={MomentusColors.navyBackground} />
-      <View style={styles.container}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+      <StatusBar
+        barStyle={theme.isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={theme.background}
+      />
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Modo Foco</Text>
-          <Text style={styles.subtitle}>Técnica Pomodoro com ganho contínuo de XP</Text>
+          <Text style={[styles.title, { color: theme.textPrimary }]}>Modo Foco</Text>
+          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+            Técnica Pomodoro com ganho contínuo de XP
+          </Text>
         </View>
 
         {/* Tab Switcher: Foco / Pausa Curta / Pausa Longa */}
-        <View style={styles.modeTabsRow}>
+        <View
+          style={[
+            styles.modeTabsRow,
+            { backgroundColor: theme.surface, borderColor: theme.outline },
+          ]}>
           <TouchableOpacity
-            style={[styles.modeTab, mode === 'FOCUS' && styles.modeTabActive]}
+            style={[
+              styles.modeTab,
+              mode === 'FOCUS' && { backgroundColor: theme.primary },
+            ]}
             onPress={() => switchMode('FOCUS')}
             activeOpacity={0.7}>
             <Text
               style={[
                 styles.modeTabText,
-                mode === 'FOCUS' && styles.modeTabTextActive,
+                { color: mode === 'FOCUS' ? '#000000' : theme.textSecondary },
+                mode === 'FOCUS' && { fontWeight: '800' },
               ]}>
               Foco ({focusDurationMinutes}m)
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.modeTab, mode === 'SHORT_BREAK' && styles.modeTabActive]}
+            style={[
+              styles.modeTab,
+              mode === 'SHORT_BREAK' && { backgroundColor: theme.primary },
+            ]}
             onPress={() => switchMode('SHORT_BREAK')}
             activeOpacity={0.7}>
             <Text
               style={[
                 styles.modeTabText,
-                mode === 'SHORT_BREAK' && styles.modeTabTextActive,
+                { color: mode === 'SHORT_BREAK' ? '#000000' : theme.textSecondary },
+                mode === 'SHORT_BREAK' && { fontWeight: '800' },
               ]}>
               Curta ({shortBreakMinutes}m)
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.modeTab, mode === 'LONG_BREAK' && styles.modeTabActive]}
+            style={[
+              styles.modeTab,
+              mode === 'LONG_BREAK' && { backgroundColor: theme.primary },
+            ]}
             onPress={() => switchMode('LONG_BREAK')}
             activeOpacity={0.7}>
             <Text
               style={[
                 styles.modeTabText,
-                mode === 'LONG_BREAK' && styles.modeTabTextActive,
+                { color: mode === 'LONG_BREAK' ? '#000000' : theme.textSecondary },
+                mode === 'LONG_BREAK' && { fontWeight: '800' },
               ]}>
               Longa ({longBreakMinutes}m)
             </Text>
@@ -233,16 +259,22 @@ export default function FocusScreen() {
 
         {/* Big Circular Timer Display */}
         <View style={styles.timerCenter}>
-          <View style={styles.outerCircle}>
-            <View style={styles.innerCircle}>
-              <Text style={styles.modeStatusLabel}>{modeLabel}</Text>
-              <Text style={styles.timerDisplay}>{timeFormatted}</Text>
+          <View style={[styles.outerCircle, { borderColor: theme.outline }]}>
+            <View style={[styles.innerCircle, { backgroundColor: theme.surface }]}>
+              <Text style={[styles.modeStatusLabel, { color: theme.textSecondary }]}>{modeLabel}</Text>
+              <Text style={[styles.timerDisplay, { color: theme.textPrimary }]}>{timeFormatted}</Text>
               <View
                 style={[
                   styles.statusBadge,
-                  isRunning ? styles.statusBadgeRunning : styles.statusBadgeIdle,
+                  isRunning
+                    ? { backgroundColor: `${theme.primary}20` }
+                    : { backgroundColor: theme.isDark ? '#283548' : '#F1F5F9' },
                 ]}>
-                <Text style={styles.statusBadgeText}>
+                <Text
+                  style={[
+                    styles.statusBadgeText,
+                    { color: isRunning ? theme.primary : theme.textSecondary },
+                  ]}>
                   {isRunning ? 'EM ANDAMENTO' : `${progressPercent}% PRONTO`}
                 </Text>
               </View>
@@ -254,21 +286,33 @@ export default function FocusScreen() {
         <View style={styles.controlsRow}>
           <TouchableOpacity
             onPress={resetTimer}
-            style={styles.controlIconBtn}
+            style={[
+              styles.controlIconBtn,
+              { backgroundColor: theme.surface, borderColor: theme.outline },
+            ]}
             activeOpacity={0.7}>
-            <Ionicons name="refresh" size={24} color={MomentusColors.textSecondary} />
+            <Ionicons name="refresh" size={24} color={theme.textSecondary} />
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={toggleTimer}
-            style={[styles.playBtn, isRunning && styles.pauseBtn]}
+            style={[
+              styles.playBtn,
+              { backgroundColor: isRunning ? MomentusColors.dangerRed : theme.primary },
+            ]}
             activeOpacity={0.85}>
             <Ionicons
               name={isRunning ? 'pause' : 'play'}
               size={32}
-              color="#0F172A"
+              color={isRunning ? '#FFFFFF' : '#000000'}
             />
-            <Text style={styles.playBtnText}>{isRunning ? 'PAUSAR' : 'FOCO'}</Text>
+            <Text
+              style={[
+                styles.playBtnText,
+                { color: isRunning ? '#FFFFFF' : '#000000' },
+              ]}>
+              {isRunning ? 'PAUSAR' : 'FOCO'}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -278,34 +322,41 @@ export default function FocusScreen() {
               setTempLong(longBreakMinutes);
               setShowSettingsModal(true);
             }}
-            style={styles.controlIconBtn}
+            style={[
+              styles.controlIconBtn,
+              { backgroundColor: theme.surface, borderColor: theme.outline },
+            ]}
             activeOpacity={0.7}>
-            <Ionicons name="settings-outline" size={24} color={MomentusColors.textSecondary} />
+            <Ionicons name="settings-outline" size={24} color={theme.textSecondary} />
           </TouchableOpacity>
         </View>
 
         {/* Sessão Stats Card */}
-        <View style={styles.statsCard}>
+        <View
+          style={[
+            styles.statsCard,
+            { backgroundColor: theme.surface, borderColor: theme.outline },
+          ]}>
           <View style={styles.statItem}>
-            <Ionicons name="checkmark-done-circle" size={20} color={MomentusColors.emeraldNeon} />
-            <Text style={styles.statValue}>{completedSessions}</Text>
-            <Text style={styles.statLabel}>Sessões Concluídas</Text>
+            <Ionicons name="checkmark-done-circle" size={20} color={theme.primary} />
+            <Text style={[styles.statValue, { color: theme.textPrimary }]}>{completedSessions}</Text>
+            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Sessões Concluídas</Text>
           </View>
 
-          <View style={styles.statDivider} />
+          <View style={[styles.statDivider, { backgroundColor: theme.outline }]} />
 
           <View style={styles.statItem}>
             <Ionicons name="flash" size={20} color={MomentusColors.gold} />
-            <Text style={styles.statValue}>+{xpGained} XP</Text>
-            <Text style={styles.statLabel}>XP Ganho na Sessão</Text>
+            <Text style={[styles.statValue, { color: theme.textPrimary }]}>+{xpGained} XP</Text>
+            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>XP Ganho na Sessão</Text>
           </View>
 
-          <View style={styles.statDivider} />
+          <View style={[styles.statDivider, { backgroundColor: theme.outline }]} />
 
           <View style={styles.statItem}>
-            <Ionicons name="time-outline" size={20} color={MomentusColors.emeraldNeon} />
-            <Text style={styles.statValue}>{userProfile.focusMinutesToday} min</Text>
-            <Text style={styles.statLabel}>Foco Hoje</Text>
+            <Ionicons name="time-outline" size={20} color={theme.primary} />
+            <Text style={[styles.statValue, { color: theme.textPrimary }]}>{userProfile.focusMinutesToday} min</Text>
+            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Foco Hoje</Text>
           </View>
         </View>
 
@@ -316,7 +367,11 @@ export default function FocusScreen() {
           animationType="fade"
           onRequestClose={() => setShowSettingsModal(false)}>
           <View style={styles.modalOverlay}>
-            <View style={styles.modalCard}>
+            <View
+              style={[
+                styles.modalCard,
+                { backgroundColor: theme.surface, borderColor: theme.outline },
+              ]}>
               <ScrollView showsVerticalScrollIndicator={false}>
                 <Text style={styles.modalTitle}>Configurações de Foco</Text>
                 <Text style={styles.modalSubtitle}>

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable, TouchableOpacity } from 'react-nativ
 import { Ionicons } from '@expo/vector-icons';
 import { HabitItem, Category } from '@/types';
 import { MomentusColors } from '@/constants/theme';
+import { useMomentus } from '@/context/MomentusContext';
 
 interface HabitItemCardProps {
   habit: HabitItem;
@@ -17,19 +18,26 @@ export const HabitItemCard: React.FC<HabitItemCardProps> = ({
   onToggle,
   onDelete,
 }) => {
+  const { theme } = useMomentus();
+
   return (
     <Pressable
       onPress={() => onToggle(habit.id)}
       style={({ pressed }) => [
         styles.card,
-        habit.completed && styles.cardCompleted,
+        { backgroundColor: theme.surface, borderColor: theme.outline },
+        habit.completed && { opacity: 0.7, backgroundColor: theme.surfaceElevated },
         pressed && styles.pressed,
       ]}>
       {/* Checkbox Button */}
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={() => onToggle(habit.id)}
-        style={[styles.checkbox, habit.completed && styles.checkboxCompleted]}>
+        style={[
+          styles.checkbox,
+          { borderColor: theme.outline },
+          habit.completed && { backgroundColor: theme.primary, borderColor: theme.primary },
+        ]}>
         {habit.completed && <Ionicons name="checkmark" size={16} color="#FFF" />}
       </TouchableOpacity>
 
@@ -37,7 +45,11 @@ export const HabitItemCard: React.FC<HabitItemCardProps> = ({
       <View style={styles.infoCol}>
         <View style={styles.titleRow}>
           <Text
-            style={[styles.title, habit.completed && styles.titleCompleted]}
+            style={[
+              styles.title,
+              { color: habit.completed ? theme.textSecondary : theme.textPrimary },
+              habit.completed && styles.titleCompleted,
+            ]}
             numberOfLines={1}>
             {habit.title}
           </Text>
@@ -51,7 +63,7 @@ export const HabitItemCard: React.FC<HabitItemCardProps> = ({
 
         {habit.description ? (
           <Text
-            style={[styles.description, habit.completed && styles.descCompleted]}
+            style={[styles.description, { color: theme.textSecondary }, habit.completed && styles.descCompleted]}
             numberOfLines={2}>
             {habit.description}
           </Text>
@@ -72,8 +84,8 @@ export const HabitItemCard: React.FC<HabitItemCardProps> = ({
           )}
 
           <View style={styles.timeTag}>
-            <Ionicons name="time-outline" size={12} color={MomentusColors.textSecondary} />
-            <Text style={styles.timeText}>
+            <Ionicons name="time-outline" size={12} color={theme.textSecondary} />
+            <Text style={[styles.timeText, { color: theme.textSecondary }]}>
               {habit.timeStart}
               {habit.timeEnd ? ` - ${habit.timeEnd}` : ''}
             </Text>

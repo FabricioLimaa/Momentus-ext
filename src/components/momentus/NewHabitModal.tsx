@@ -30,7 +30,7 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
   habitToEdit,
   initialDate,
 }) => {
-  const { categories, addHabit, updateHabit, selectedDate } = useMomentus();
+  const { categories, addHabit, updateHabit, selectedDate, theme } = useMomentus();
   const isEditMode = !!habitToEdit;
 
   const [title, setTitle] = useState('');
@@ -95,19 +95,19 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.overlay}>
-        <View style={styles.sheetContainer}>
+        <View style={[styles.sheetContainer, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
           <View style={styles.header}>
-            <Text style={styles.title}>{isEditMode ? 'Editar Rotina' : 'Nova Rotina'}</Text>
+            <Text style={[styles.title, { color: theme.textPrimary }]}>{isEditMode ? 'Editar Rotina' : 'Nova Rotina'}</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Ionicons name="close" size={22} color={MomentusColors.textSecondary} />
+              <Ionicons name="close" size={22} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>
 
           <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
             {/* Title */}
-            <Text style={styles.label}>Nome da rotina *</Text>
+            <Text style={[styles.label, { color: theme.textPrimary }]}>Nome da rotina *</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary }]}
               placeholder="Ex: Estudo de Redes"
               placeholderTextColor={MomentusColors.textMuted}
               value={title}
@@ -115,12 +115,12 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
             />
 
             {/* Horários */}
-            <Text style={styles.label}>Horário</Text>
+            <Text style={[styles.label, { color: theme.textPrimary }]}>Horário</Text>
             <View style={styles.timeRow}>
               <View style={styles.timeCol}>
-                <Text style={styles.subLabel}>Início</Text>
+                <Text style={[styles.subLabel, { color: theme.textSecondary }]}>Início</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary }]}
                   placeholder="08:00"
                   placeholderTextColor={MomentusColors.textMuted}
                   value={timeStart}
@@ -128,9 +128,9 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
                 />
               </View>
               <View style={styles.timeCol}>
-                <Text style={styles.subLabel}>Fim</Text>
+                <Text style={[styles.subLabel, { color: theme.textSecondary }]}>Fim</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary }]}
                   placeholder="09:00"
                   placeholderTextColor={MomentusColors.textMuted}
                   value={timeEnd}
@@ -140,7 +140,7 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
             </View>
 
             {/* Categorias */}
-            <Text style={styles.label}>Categoria</Text>
+            <Text style={[styles.label, { color: theme.textPrimary }]}>Categoria</Text>
             <View style={styles.categoryChips}>
               {categories.map((cat) => {
                 const isSelected = selectedCategoryId === cat.id;
@@ -151,15 +151,15 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
                     style={[
                       styles.categoryChip,
                       {
-                        borderColor: isSelected ? cat.color : MomentusColors.navyOutline,
-                        backgroundColor: isSelected ? `${cat.color}25` : MomentusColors.navySurface,
+                        borderColor: isSelected ? cat.color : theme.outline,
+                        backgroundColor: isSelected ? `${cat.color}25` : theme.surfaceElevated,
                       },
                     ]}>
                     <View style={[styles.catDot, { backgroundColor: cat.color }]} />
                     <Text
                       style={[
                         styles.categoryChipText,
-                        { color: isSelected ? '#FFF' : MomentusColors.textSecondary },
+                        { color: isSelected ? (theme.isDark ? '#FFF' : cat.color) : theme.textSecondary },
                       ]}>
                       {cat.name}
                     </Text>
@@ -169,9 +169,9 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
             </View>
 
             {/* Description */}
-            <Text style={styles.label}>Descrição (opcional)</Text>
+            <Text style={[styles.label, { color: theme.textPrimary }]}>Descrição (opcional)</Text>
             <TextInput
-              style={[styles.input, styles.textArea]}
+              style={[styles.input, styles.textArea, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary }]}
               placeholder="Adicione uma descrição..."
               placeholderTextColor={MomentusColors.textMuted}
               value={description}
@@ -181,28 +181,28 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
             />
 
             {/* Google Calendar Switch */}
-            <View style={styles.googleSwitchRow}>
+            <View style={[styles.googleSwitchRow, { backgroundColor: theme.surfaceElevated }]}>
               <View style={styles.googleSwitchText}>
-                <Text style={styles.googleTitle}>Google Agenda</Text>
-                <Text style={styles.googleSubtitle}>Sincronizar esta rotina</Text>
+                <Text style={[styles.googleTitle, { color: theme.textPrimary }]}>Google Agenda</Text>
+                <Text style={[styles.googleSubtitle, { color: theme.textSecondary }]}>Sincronizar esta rotina</Text>
               </View>
               <Switch
                 value={saveToGoogle}
                 onValueChange={setSaveToGoogle}
-                trackColor={{ false: '#334155', true: 'rgba(52, 211, 153, 0.4)' }}
-                thumbColor={saveToGoogle ? MomentusColors.emeraldNeon : '#94A3B8'}
+                trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: 'rgba(52, 211, 153, 0.4)' }}
+                thumbColor={saveToGoogle ? theme.primary : '#94A3B8'}
               />
             </View>
           </ScrollView>
 
           <View style={styles.footer}>
             <TouchableOpacity onPress={onClose} style={styles.cancelBtn}>
-              <Text style={styles.cancelText}>Cancelar</Text>
+              <Text style={[styles.cancelText, { color: theme.textSecondary }]}>Cancelar</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={handleSave}
-              style={[styles.saveBtn, !title.trim() && styles.disabledBtn]}
+              style={[styles.saveBtn, { backgroundColor: theme.primary }, !title.trim() && styles.disabledBtn]}
               disabled={!title.trim()}>
               <Text style={styles.saveText}>
                 {isEditMode ? 'Salvar Alterações' : 'Salvar Rotina'}

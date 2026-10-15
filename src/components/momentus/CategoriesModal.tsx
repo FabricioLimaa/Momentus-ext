@@ -22,7 +22,7 @@ interface CategoriesModalProps {
 }
 
 export const CategoriesModal: React.FC<CategoriesModalProps> = ({ visible, onClose }) => {
-  const { categories, upsertCategory, deleteCategory, marketItems } = useMomentus();
+  const { categories, upsertCategory, deleteCategory, marketItems, theme } = useMomentus();
 
   // Edit/Create Modal state
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -104,18 +104,18 @@ export const CategoriesModal: React.FC<CategoriesModalProps> = ({ visible, onClo
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.title}>Gerenciar Categorias</Text>
-            <Text style={styles.subtitle}>Cores da Agenda Google e Metas Semanais</Text>
+            <Text style={[styles.title, { color: theme.textPrimary }]}>Gerenciar Categorias</Text>
+            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Cores da Agenda Google e Metas Semanais</Text>
           </View>
           <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-            <Ionicons name="close" size={24} color={MomentusColors.textSecondary} />
+            <Ionicons name="close" size={24} color={theme.textSecondary} />
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity onPress={openCreate} style={styles.newCategoryBtn}>
+        <TouchableOpacity onPress={openCreate} style={[styles.newCategoryBtn, { backgroundColor: theme.primary }]}>
           <Ionicons name="add-circle" size={20} color="#0F172A" />
           <Text style={styles.newCategoryBtnText}>Nova Categoria</Text>
         </TouchableOpacity>
@@ -124,7 +124,7 @@ export const CategoriesModal: React.FC<CategoriesModalProps> = ({ visible, onClo
           {categories.map((cat) => {
             const meta = cat.metaMinutosSemanal || 0;
             return (
-              <View key={cat.id} style={styles.categoryCard}>
+              <View key={cat.id} style={[styles.categoryCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
                 <View style={styles.cardTopRow}>
                   <View style={styles.catLeft}>
                     <View style={[styles.catColorDot, { backgroundColor: cat.color }]}>
@@ -132,14 +132,14 @@ export const CategoriesModal: React.FC<CategoriesModalProps> = ({ visible, onClo
                         <Ionicons name="sparkles" size={12} color="#FFF" />
                       ) : null}
                     </View>
-                    <Text style={styles.catName}>{cat.name}</Text>
+                    <Text style={[styles.catName, { color: theme.textPrimary }]}>{cat.name}</Text>
                   </View>
 
                   <View style={styles.actionsRow}>
                     <TouchableOpacity
                       onPress={() => openEdit(cat)}
                       style={styles.actionIconBtn}>
-                      <Ionicons name="pencil" size={16} color={MomentusColors.emeraldNeon} />
+                      <Ionicons name="pencil" size={16} color={theme.primary} />
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => handleDelete(cat)}
@@ -150,14 +150,14 @@ export const CategoriesModal: React.FC<CategoriesModalProps> = ({ visible, onClo
                 </View>
 
                 {meta > 0 && (
-                  <View style={styles.metaRow}>
+                  <View style={[styles.metaRow, { borderTopColor: theme.outline }]}>
                     <View style={styles.metaLabelRow}>
-                      <Text style={styles.metaTitle}>
+                      <Text style={[styles.metaTitle, { color: theme.textSecondary }]}>
                         Meta Semanal: {Math.floor(meta / 60)}h {meta % 60}m
                       </Text>
-                      <Text style={styles.metaPercent}>50%</Text>
+                      <Text style={[styles.metaPercent, { color: theme.primary }]}>50%</Text>
                     </View>
-                    <View style={styles.metaProgressTrack}>
+                    <View style={[styles.metaProgressTrack, { backgroundColor: theme.outline }]}>
                       <View style={[styles.metaProgressFill, { backgroundColor: cat.color }]} />
                     </View>
                   </View>
@@ -170,27 +170,27 @@ export const CategoriesModal: React.FC<CategoriesModalProps> = ({ visible, onClo
         {/* Edit / Create Sub-Modal */}
         <Modal visible={editModalVisible} animationType="slide" transparent>
           <View style={styles.subModalOverlay}>
-            <View style={styles.subModalContent}>
+            <View style={[styles.subModalContent, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
               <View style={styles.subModalHeader}>
-                <Text style={styles.subModalTitle}>
+                <Text style={[styles.subModalTitle, { color: theme.textPrimary }]}>
                   {editingCategory ? 'Editar Categoria' : 'Nova Categoria'}
                 </Text>
                 <TouchableOpacity onPress={() => setEditModalVisible(false)}>
-                  <Ionicons name="close" size={22} color={MomentusColors.textSecondary} />
+                  <Ionicons name="close" size={22} color={theme.textSecondary} />
                 </TouchableOpacity>
               </View>
 
               <ScrollView showsVerticalScrollIndicator={false}>
-                <Text style={styles.fieldLabel}>Nome da Categoria *</Text>
+                <Text style={[styles.fieldLabel, { color: theme.textPrimary }]}>Nome da Categoria *</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary }]}
                   placeholder="Ex: Trabalho, Leitura, Corrida..."
                   placeholderTextColor={MomentusColors.textMuted}
                   value={name}
                   onChangeText={setName}
                 />
 
-                <Text style={styles.fieldLabel}>Cor da Agenda Google</Text>
+                <Text style={[styles.fieldLabel, { color: theme.textPrimary }]}>Cor da Agenda Google</Text>
                 <View style={styles.colorPaletteGrid}>
                   {GOOGLE_CALENDAR_COLORS.map((c) => {
                     const isSelected = selectedColor === c.color;
@@ -292,7 +292,7 @@ export const CategoriesModal: React.FC<CategoriesModalProps> = ({ visible, onClo
 
                 <TouchableOpacity
                   onPress={handleSave}
-                  style={[styles.saveSubBtn, !name.trim() && { opacity: 0.5 }]}
+                  style={[styles.saveSubBtn, { backgroundColor: theme.primary }, !name.trim() && { opacity: 0.5 }]}
                   disabled={!name.trim()}>
                   <Text style={styles.saveSubText}>Salvar Categoria</Text>
                 </TouchableOpacity>

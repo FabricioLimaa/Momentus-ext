@@ -24,6 +24,7 @@ export default function SettingsScreen() {
     updateSettings,
     userProfile,
     clearAllLocalData,
+    theme,
   } = useMomentus();
 
   // Estados locais para edição
@@ -83,15 +84,15 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor={MomentusColors.navyBackground} />
-      <View style={styles.container}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} backgroundColor={theme.background} />
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
         {/* TopBar */}
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={MomentusColors.textPrimary} />
+            <Ionicons name="arrow-back" size={24} color={theme.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.topBarTitle}>Ajustes</Text>
+          <Text style={[styles.topBarTitle, { color: theme.textPrimary }]}>Ajustes</Text>
           <View style={{ width: 40 }} />
         </View>
 
@@ -102,13 +103,13 @@ export default function SettingsScreen() {
           {/* Seção: Personalização */}
           <View style={styles.sectionHeader}>
             <Ionicons name="color-palette-outline" size={24} color={primaryColorHex} />
-            <Text style={styles.sectionTitle}>Personalização</Text>
+            <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Personalização</Text>
           </View>
 
           {/* Modo do Tema */}
           <View style={styles.settingBlock}>
-            <Text style={styles.settingLabel}>Modo do Tema</Text>
-            <View style={styles.themeSelectorRow}>
+            <Text style={[styles.settingLabel, { color: theme.textPrimary }]}>Modo do Tema</Text>
+            <View style={[styles.themeSelectorRow, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
               {[
                 { mode: 'system' as const, label: 'Sistema', icon: 'phone-portrait-outline' as const },
                 { mode: 'dark' as const, label: 'Escuro', icon: 'moon-outline' as const },
@@ -119,17 +120,18 @@ export default function SettingsScreen() {
                   onPress={() => setThemeMode(item.mode)}
                   style={[
                     styles.themeBtn,
-                    themeMode === item.mode && styles.themeBtnActive,
+                    themeMode === item.mode && { backgroundColor: primaryColorHex },
                   ]}
                   activeOpacity={0.7}>
                   <Ionicons
                     name={item.icon}
                     size={16}
-                    color={themeMode === item.mode ? '#0F172A' : MomentusColors.textSecondary}
+                    color={themeMode === item.mode ? '#0F172A' : theme.textSecondary}
                   />
                   <Text
                     style={[
                       styles.themeBtnText,
+                      { color: themeMode === item.mode ? '#0F172A' : theme.textSecondary },
                       themeMode === item.mode && styles.themeBtnTextActive,
                     ]}>
                     {item.label}
@@ -141,7 +143,7 @@ export default function SettingsScreen() {
 
           {/* Cor Principal */}
           <View style={styles.settingBlock}>
-            <Text style={styles.settingLabel}>Cor Principal</Text>
+            <Text style={[styles.settingLabel, { color: theme.textPrimary }]}>Cor Principal</Text>
             <View style={styles.colorsGrid}>
               {GOOGLE_CALENDAR_COLORS.map((item) => {
                 const isSelected = primaryColorHex.toLowerCase() === item.color.toLowerCase();
@@ -165,14 +167,14 @@ export default function SettingsScreen() {
           {/* Tamanho da Fonte */}
           <View style={styles.settingBlock}>
             <View style={styles.fontHeaderRow}>
-              <Text style={styles.settingLabel}>Tamanho da Fonte</Text>
+              <Text style={[styles.settingLabel, { color: theme.textPrimary }]}>Tamanho da Fonte</Text>
               <Text style={[styles.fontMultiplierText, { color: primaryColorHex }]}>
                 {Math.round(fontSizeMultiplier * 100)}%
               </Text>
             </View>
 
-            <View style={styles.sampleTextBox}>
-              <Text style={[styles.sampleText, { fontSize: 14 * fontSizeMultiplier }]}>
+            <View style={[styles.sampleTextBox, { backgroundColor: theme.surfaceElevated }]}>
+              <Text style={[styles.sampleText, { fontSize: 14 * fontSizeMultiplier, color: theme.textPrimary }]}>
                 Amostra do texto do aplicativo
               </Text>
             </View>
@@ -183,12 +185,14 @@ export default function SettingsScreen() {
                   key={val}
                   style={[
                     styles.fontSizeBtn,
+                    { backgroundColor: theme.surface, borderColor: theme.outline },
                     fontSizeMultiplier === val && { backgroundColor: `${primaryColorHex}25`, borderColor: primaryColorHex },
                   ]}
                   onPress={() => setFontSizeMultiplier(val)}>
                   <Text
                     style={[
                       styles.fontSizeBtnText,
+                      { color: theme.textSecondary },
                       fontSizeMultiplier === val && { color: primaryColorHex, fontWeight: '800' },
                     ]}>
                     {Math.round(val * 100)}%
@@ -200,47 +204,47 @@ export default function SettingsScreen() {
 
           {/* Experiência / Feedback Sensorial */}
           <View style={styles.settingBlock}>
-            <Text style={styles.settingLabel}>Experiência</Text>
-            <View style={styles.switchesCard}>
+            <Text style={[styles.settingLabel, { color: theme.textPrimary }]}>Experiência</Text>
+            <View style={[styles.switchesCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
               <View style={styles.switchRow}>
                 <View style={styles.switchCol}>
-                  <Text style={styles.switchTitle}>Efeitos Sonoros</Text>
-                  <Text style={styles.switchDesc}>Tocar sons ao completar tarefas</Text>
+                  <Text style={[styles.switchTitle, { color: theme.textPrimary }]}>Efeitos Sonoros</Text>
+                  <Text style={[styles.switchDesc, { color: theme.textSecondary }]}>Tocar sons ao completar tarefas</Text>
                 </View>
                 <Switch
                   value={soundEnabled}
                   onValueChange={setSoundEnabled}
-                  trackColor={{ false: '#334155', true: 'rgba(52, 211, 153, 0.4)' }}
+                  trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: 'rgba(52, 211, 153, 0.4)' }}
                   thumbColor={soundEnabled ? primaryColorHex : '#94A3B8'}
                 />
               </View>
 
-              <View style={styles.divider} />
+              <View style={[styles.divider, { backgroundColor: theme.outline }]} />
 
               <View style={styles.switchRow}>
                 <View style={styles.switchCol}>
-                  <Text style={styles.switchTitle}>Feedback Tátil</Text>
-                  <Text style={styles.switchDesc}>Vibrar ao interagir com o app</Text>
+                  <Text style={[styles.switchTitle, { color: theme.textPrimary }]}>Feedback Tátil</Text>
+                  <Text style={[styles.switchDesc, { color: theme.textSecondary }]}>Vibrar ao interagir com o app</Text>
                 </View>
                 <Switch
                   value={hapticsEnabled}
                   onValueChange={setHapticsEnabled}
-                  trackColor={{ false: '#334155', true: 'rgba(52, 211, 153, 0.4)' }}
+                  trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: 'rgba(52, 211, 153, 0.4)' }}
                   thumbColor={hapticsEnabled ? primaryColorHex : '#94A3B8'}
                 />
               </View>
 
-              <View style={styles.divider} />
+              <View style={[styles.divider, { backgroundColor: theme.outline }]} />
 
               <View style={styles.switchRow}>
                 <View style={styles.switchCol}>
-                  <Text style={styles.switchTitle}>Google Agenda</Text>
-                  <Text style={styles.switchDesc}>Sincronizar rotinas por padrão</Text>
+                  <Text style={[styles.switchTitle, { color: theme.textPrimary }]}>Google Agenda</Text>
+                  <Text style={[styles.switchDesc, { color: theme.textSecondary }]}>Sincronizar rotinas por padrão</Text>
                 </View>
                 <Switch
                   value={syncEnabled}
                   onValueChange={setSyncEnabled}
-                  trackColor={{ false: '#334155', true: 'rgba(52, 211, 153, 0.4)' }}
+                  trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: 'rgba(52, 211, 153, 0.4)' }}
                   thumbColor={syncEnabled ? primaryColorHex : '#94A3B8'}
                 />
               </View>
@@ -257,29 +261,29 @@ export default function SettingsScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.resetThemeBtn}
+              style={[styles.resetThemeBtn, { backgroundColor: theme.surface, borderColor: theme.outline }]}
               onPress={handleReset}
               activeOpacity={0.7}>
-              <Ionicons name="refresh" size={16} color={MomentusColors.textSecondary} />
-              <Text style={styles.resetThemeBtnText}>Resetar</Text>
+              <Ionicons name="refresh" size={16} color={theme.textSecondary} />
+              <Text style={[styles.resetThemeBtnText, { color: theme.textSecondary }]}>Resetar</Text>
             </TouchableOpacity>
           </View>
 
           {/* Divisor */}
-          <View style={styles.sectionDivider} />
+          <View style={[styles.sectionDivider, { backgroundColor: theme.outline }]} />
 
           {/* Sincronização & Nuvem */}
           <View style={styles.sectionHeader}>
             <Ionicons name="cloud-done-outline" size={24} color={primaryColorHex} />
-            <Text style={styles.sectionTitle}>Sincronização</Text>
+            <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Sincronização</Text>
           </View>
 
-          <View style={styles.cloudCard}>
+          <View style={[styles.cloudCard, { backgroundColor: theme.surfaceElevated }]}>
             <Text style={styles.cloudCardLabel}>Conta</Text>
-            <Text style={styles.cloudCardValue}>{userProfile.email || 'fabricio@momentus.app'}</Text>
+            <Text style={[styles.cloudCardValue, { color: theme.textPrimary }]}>{userProfile.email || 'fabricio@momentus.app'}</Text>
 
             <Text style={[styles.cloudCardLabel, { marginTop: 12 }]}>Último Backup</Text>
-            <Text style={styles.cloudCardValue}>Hoje às 10:45</Text>
+            <Text style={[styles.cloudCardValue, { color: theme.textPrimary }]}>Hoje às 10:45</Text>
           </View>
 
           <TouchableOpacity
@@ -302,27 +306,27 @@ export default function SettingsScreen() {
           </TouchableOpacity>
 
           {/* Links para Páginas Secundárias */}
-          <View style={styles.linksCard}>
+          <View style={[styles.linksCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
             <TouchableOpacity
               style={styles.linkRow}
               onPress={() => router.push('/updates' as any)}>
               <View style={styles.linkLeft}>
                 <Ionicons name="sparkles-outline" size={20} color={MomentusColors.emeraldNeon} />
-                <Text style={styles.linkText}>Novidades (Versão 2.1.0)</Text>
+                <Text style={[styles.linkText, { color: theme.textPrimary }]}>Novidades (Versão 2.1.0)</Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={MomentusColors.textSecondary} />
+              <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
             </TouchableOpacity>
 
-            <View style={styles.divider} />
+            <View style={[styles.divider, { backgroundColor: theme.outline }]} />
 
             <TouchableOpacity
               style={styles.linkRow}
               onPress={() => router.push('/legal' as any)}>
               <View style={styles.linkLeft}>
                 <Ionicons name="shield-checkmark-outline" size={20} color={MomentusColors.cyan} />
-                <Text style={styles.linkText}>Termos & Privacidade</Text>
+                <Text style={[styles.linkText, { color: theme.textPrimary }]}>Termos & Privacidade</Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={MomentusColors.textSecondary} />
+              <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -619,3 +623,4 @@ const styles = StyleSheet.create({
     color: MomentusColors.textPrimary,
   },
 });
+

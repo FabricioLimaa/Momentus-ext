@@ -15,7 +15,7 @@ class SoundManager {
         playsInSilentModeIOS: true,
         staysActiveInBackground: false,
       });
-    } catch (_) {}
+    } catch {}
   }
 
   public setEnabled(value: boolean) {
@@ -41,7 +41,7 @@ class SoundManager {
         this.successSound = sound;
         await sound.playAsync();
       }
-    } catch (_err) {
+    } catch {
       // Falha silenciosa para não quebrar a experiência do usuário
     }
   }
@@ -61,7 +61,7 @@ class SoundManager {
         this.achievementSound = sound;
         await sound.playAsync();
       }
-    } catch (_err) {
+    } catch {
       // Falha silenciosa
     }
   }

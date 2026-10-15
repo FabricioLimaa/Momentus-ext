@@ -19,7 +19,7 @@ import { SettingsModal } from '@/components/momentus/SettingsModal';
 
 export default function MoreScreen() {
   const router = useRouter();
-  const { userProfile, userLevel, logout } = useMomentus();
+  const { userProfile, userLevel, logout, theme } = useMomentus();
   const [categoriesModalVisible, setCategoriesModalVisible] = useState(false);
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
 
@@ -38,12 +38,12 @@ export default function MoreScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor={MomentusColors.navyBackground} />
-      <View style={styles.container}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} backgroundColor={theme.background} />
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
         <View style={styles.header}>
-          <Text style={styles.title}>Menu & Perfil</Text>
-          <Text style={styles.subtitle}>Gerencie configurações e recursos avançados</Text>
+          <Text style={[styles.title, { color: theme.textPrimary }]}>Menu & Perfil</Text>
+          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Gerencie configurações e recursos avançados</Text>
         </View>
 
         <ScrollView
@@ -51,13 +51,13 @@ export default function MoreScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}>
           {/* User Profile Card */}
-          <View style={styles.profileCard}>
+          <View style={[styles.profileCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
             <View style={[styles.avatar, { borderColor: userLevel.rankColor }]}>
               <Text style={styles.avatarText}>{userProfile.name.charAt(0)}</Text>
             </View>
             <View style={styles.profileInfo}>
-              <Text style={styles.userName}>{userProfile.name}</Text>
-              <Text style={styles.userEmail}>{userProfile.email}</Text>
+              <Text style={[styles.userName, { color: theme.textPrimary }]}>{userProfile.name}</Text>
+              <Text style={[styles.userEmail, { color: theme.textSecondary }]}>{userProfile.email}</Text>
               <View style={[styles.rankBadge, { backgroundColor: `${userLevel.rankColor}20` }]}>
                 <Ionicons name="sparkles" size={12} color={userLevel.rankColor} />
                 <Text style={[styles.rankText, { color: userLevel.rankColor }]}>
@@ -68,7 +68,7 @@ export default function MoreScreen() {
           </View>
 
           {/* Menu Items List */}
-          <View style={styles.menuGroup}>
+          <View style={[styles.menuGroup, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
             <TouchableOpacity
               onPress={() => setCategoriesModalVisible(true)}
               style={styles.menuItem}>
@@ -77,14 +77,14 @@ export default function MoreScreen() {
                   <Ionicons name="folder-outline" size={20} color="#33B679" />
                 </View>
                 <View>
-                  <Text style={styles.menuItemTitle}>Gerenciar Categorias</Text>
-                  <Text style={styles.menuItemSub}>Cores da Agenda Google e Metas</Text>
+                  <Text style={[styles.menuItemTitle, { color: theme.textPrimary }]}>Gerenciar Categorias</Text>
+                  <Text style={[styles.menuItemSub, { color: theme.textSecondary }]}>Cores da Agenda Google e Metas</Text>
                 </View>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={MomentusColors.textSecondary} />
+              <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
             </TouchableOpacity>
 
-            <View style={styles.divider} />
+            <View style={[styles.divider, { backgroundColor: theme.outline }]} />
 
             <TouchableOpacity
               onPress={() => router.push('/templates')}
@@ -94,14 +94,14 @@ export default function MoreScreen() {
                   <Ionicons name="grid-outline" size={20} color={MomentusColors.fireStreak} />
                 </View>
                 <View>
-                  <Text style={styles.menuItemTitle}>Modelos de Rotina</Text>
-                  <Text style={styles.menuItemSub}>Templates prontos para o seu dia</Text>
+                  <Text style={[styles.menuItemTitle, { color: theme.textPrimary }]}>Modelos de Rotina</Text>
+                  <Text style={[styles.menuItemSub, { color: theme.textSecondary }]}>Templates prontos para o seu dia</Text>
                 </View>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={MomentusColors.textSecondary} />
+              <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
             </TouchableOpacity>
 
-            <View style={styles.divider} />
+            <View style={[styles.divider, { backgroundColor: theme.outline }]} />
 
             <TouchableOpacity
               onPress={() => router.push('/achievements')}
@@ -111,14 +111,14 @@ export default function MoreScreen() {
                   <Ionicons name="trophy-outline" size={20} color={MomentusColors.cyan} />
                 </View>
                 <View>
-                  <Text style={styles.menuItemTitle}>Conquistas & Loja</Text>
-                  <Text style={styles.menuItemSub}>Troféus e itens virtuais</Text>
+                  <Text style={[styles.menuItemTitle, { color: theme.textPrimary }]}>Conquistas & Loja</Text>
+                  <Text style={[styles.menuItemSub, { color: theme.textSecondary }]}>Troféus e itens virtuais</Text>
                 </View>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={MomentusColors.textSecondary} />
+              <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
             </TouchableOpacity>
 
-            <View style={styles.divider} />
+            <View style={[styles.divider, { backgroundColor: theme.outline }]} />
 
             <TouchableOpacity
               onPress={() => router.push('/stats')}
@@ -128,32 +128,32 @@ export default function MoreScreen() {
                   <Ionicons name="stats-chart-outline" size={20} color="#A855F7" />
                 </View>
                 <View>
-                  <Text style={styles.menuItemTitle}>Análise de Performance</Text>
-                  <Text style={styles.menuItemSub}>Métricas semanais e evolução</Text>
+                  <Text style={[styles.menuItemTitle, { color: theme.textPrimary }]}>Análise de Performance</Text>
+                  <Text style={[styles.menuItemSub, { color: theme.textSecondary }]}>Métricas semanais e evolução</Text>
                 </View>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={MomentusColors.textSecondary} />
+              <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>
 
           {/* Preferences Group */}
-          <View style={styles.menuGroup}>
+          <View style={[styles.menuGroup, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
             <TouchableOpacity
               onPress={() => router.push('/settings' as any)}
               style={styles.menuItem}>
               <View style={styles.menuItemLeft}>
                 <View style={[styles.iconBox, { backgroundColor: 'rgba(52, 211, 153, 0.15)' }]}>
-                  <Ionicons name="settings-outline" size={20} color={MomentusColors.emeraldNeon} />
+                  <Ionicons name="settings-outline" size={20} color={theme.primary} />
                 </View>
                 <View>
-                  <Text style={styles.menuItemTitle}>Ajustes & Personalização</Text>
-                  <Text style={styles.menuItemSub}>Tema, áudio, sincronização e backup</Text>
+                  <Text style={[styles.menuItemTitle, { color: theme.textPrimary }]}>Ajustes & Personalização</Text>
+                  <Text style={[styles.menuItemSub, { color: theme.textSecondary }]}>Tema, áudio, sincronização e backup</Text>
                 </View>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={MomentusColors.textSecondary} />
+              <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
             </TouchableOpacity>
 
-            <View style={styles.divider} />
+            <View style={[styles.divider, { backgroundColor: theme.outline }]} />
 
             <TouchableOpacity
               onPress={() => router.push('/updates' as any)}
@@ -163,31 +163,30 @@ export default function MoreScreen() {
                   <Ionicons name="sparkles-outline" size={20} color={MomentusColors.gold} />
                 </View>
                 <View>
-                  <Text style={styles.menuItemTitle}>Novidades (Versão 2.1.0)</Text>
-                  <Text style={styles.menuItemSub}>O que há de novo no Momentus</Text>
+                  <Text style={[styles.menuItemTitle, { color: theme.textPrimary }]}>Novidades (Versão 2.1.0)</Text>
+                  <Text style={[styles.menuItemSub, { color: theme.textSecondary }]}>O que há de novo no Momentus</Text>
                 </View>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={MomentusColors.textSecondary} />
+              <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
             </TouchableOpacity>
 
-            <View style={styles.divider} />
+            <View style={[styles.divider, { backgroundColor: theme.outline }]} />
 
             <TouchableOpacity
               onPress={() => router.push('/legal' as any)}
               style={styles.menuItem}>
               <View style={styles.menuItemLeft}>
                 <View style={[styles.iconBox, { backgroundColor: 'rgba(100, 116, 139, 0.15)' }]}>
-                  <Ionicons name="information-circle-outline" size={20} color={MomentusColors.textSecondary} />
+                  <Ionicons name="information-circle-outline" size={20} color={theme.textSecondary} />
                 </View>
                 <View>
-                  <Text style={styles.menuItemTitle}>Termos & Privacidade</Text>
-                  <Text style={styles.menuItemSub}>Informações legais do aplicativo</Text>
+                  <Text style={[styles.menuItemTitle, { color: theme.textPrimary }]}>Termos & Privacidade</Text>
+                  <Text style={[styles.menuItemSub, { color: theme.textSecondary }]}>Informações legais do aplicativo</Text>
                 </View>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={MomentusColors.textSecondary} />
+              <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>
-
 
           {/* Logout Action */}
           <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>

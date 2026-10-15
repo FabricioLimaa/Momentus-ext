@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView } from 'rea
 import { Ionicons } from '@expo/vector-icons';
 import { HabitItem, Category } from '@/types';
 import { MomentusColors } from '@/constants/theme';
+import { useMomentus } from '@/context/MomentusContext';
 import { getIconForMarketItem } from './TimelineEventItem';
 
 interface EventDetailDialogProps {
@@ -22,6 +23,7 @@ export const EventDetailDialog: React.FC<EventDetailDialogProps> = ({
   onEditClick,
   onDeleteClick,
 }) => {
+  const { theme } = useMomentus();
   if (!event) return null;
 
   const categoryColor = category?.color || MomentusColors.emeraldNeon;
@@ -43,7 +45,7 @@ export const EventDetailDialog: React.FC<EventDetailDialogProps> = ({
       animationType="fade"
       onRequestClose={onDismiss}>
       <View style={styles.overlay}>
-        <View style={styles.dialogCard}>
+        <View style={[styles.dialogCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
           <ScrollView showsVerticalScrollIndicator={false}>
             {/* 1. Header: Ícone da Categoria + "Detalhes da Atividade" */}
             <View style={styles.headerRow}>
@@ -54,11 +56,11 @@ export const EventDetailDialog: React.FC<EventDetailDialogProps> = ({
                   color={categoryColor}
                 />
               </View>
-              <Text style={styles.headerSubtitle}>Detalhes da Atividade</Text>
+              <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>Detalhes da Atividade</Text>
             </View>
 
             {/* 2. Título da Tarefa */}
-            <Text style={styles.eventTitle}>{event.title}</Text>
+            <Text style={[styles.eventTitle, { color: theme.textPrimary }]}>{event.title}</Text>
 
             {/* 3. Categoria em Chip */}
             <View style={styles.categoryBadgeRow}>
@@ -72,26 +74,26 @@ export const EventDetailDialog: React.FC<EventDetailDialogProps> = ({
 
             {/* 4. Horário com Ícone de Relógio */}
             <View style={styles.timeRow}>
-              <View style={styles.timeIconBox}>
-                <Ionicons name="time-outline" size={18} color={MomentusColors.emeraldNeon} />
+              <View style={[styles.timeIconBox, { backgroundColor: `${theme.primary}15` }]}>
+                <Ionicons name="time-outline" size={18} color={theme.primary} />
               </View>
-              <Text style={styles.timeText}>
+              <Text style={[styles.timeText, { color: theme.textPrimary }]}>
                 {event.timeStart} às {displayEndTime}
               </Text>
             </View>
 
             {/* 5. Descrição / Notas */}
             {!!event.description && (
-              <View style={styles.descriptionBox}>
-                <Text style={styles.descriptionText}>{event.description}</Text>
+              <View style={[styles.descriptionBox, { backgroundColor: theme.surfaceElevated }]}>
+                <Text style={[styles.descriptionText, { color: theme.textSecondary }]}>{event.description}</Text>
               </View>
             )}
 
             {/* Google Calendar status se aplicável */}
             {event.saveToGoogle && (
               <View style={styles.googleSyncRow}>
-                <Ionicons name="logo-google" size={14} color={MomentusColors.emeraldNeon} />
-                <Text style={styles.googleSyncText}>Sincronizado com Google Agenda</Text>
+                <Ionicons name="logo-google" size={14} color={theme.primary} />
+                <Text style={[styles.googleSyncText, { color: theme.primary }]}>Sincronizado com Google Agenda</Text>
               </View>
             )}
 
@@ -105,14 +107,14 @@ export const EventDetailDialog: React.FC<EventDetailDialogProps> = ({
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.iconButtonPrimary}
+                style={[styles.iconButtonPrimary, { backgroundColor: `${theme.primary}15` }]}
                 onPress={onEditClick}
                 activeOpacity={0.7}>
-                <Ionicons name="pencil-outline" size={20} color={MomentusColors.emeraldNeon} />
+                <Ionicons name="pencil-outline" size={20} color={theme.primary} />
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.closeButton}
+                style={[styles.closeButton, { backgroundColor: theme.primary }]}
                 onPress={onDismiss}
                 activeOpacity={0.8}>
                 <Text style={styles.closeButtonText}>Fechar</Text>
@@ -272,3 +274,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
+

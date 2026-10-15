@@ -12,10 +12,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { MomentusColors } from '@/constants/theme';
+import { useMomentus } from '@/context/MomentusContext';
 import { TERMS_AND_CONDITIONS, PRIVACY_POLICY, LICENSE } from '@/constants/legalContent';
 
 export default function LegalScreen() {
   const router = useRouter();
+  const { theme } = useMomentus();
   const [selectedTabIndex, setSelectedTabIndex] = useState(0);
 
   const tabs = ['Termos', 'Privacidade', 'Licença'];
@@ -34,31 +36,35 @@ export default function LegalScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor={MomentusColors.navyBackground} />
-      <View style={styles.container}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} backgroundColor={theme.background} />
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
         {/* TopBar */}
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={MomentusColors.textPrimary} />
+            <Ionicons name="arrow-back" size={24} color={theme.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.topBarTitle}>Termos e Privacidade</Text>
+          <Text style={[styles.topBarTitle, { color: theme.textPrimary }]}>Termos e Privacidade</Text>
           <View style={{ width: 40 }} />
         </View>
 
         {/* Tab Row: Termos / Privacidade / Licença */}
-        <View style={styles.tabRow}>
+        <View style={[styles.tabRow, { backgroundColor: theme.surface, borderBottomColor: theme.outline }]}>
           {tabs.map((tab, idx) => {
             const isSelected = selectedTabIndex === idx;
             return (
               <TouchableOpacity
                 key={tab}
                 onPress={() => setSelectedTabIndex(idx)}
-                style={[styles.tabButton, isSelected && styles.tabButtonSelected]}
+                style={[
+                  styles.tabButton,
+                  isSelected && { borderBottomColor: theme.primary },
+                ]}
                 activeOpacity={0.7}>
                 <Text
                   style={[
                     styles.tabButtonText,
+                    { color: isSelected ? theme.primary : theme.textSecondary },
                     isSelected && styles.tabButtonTextSelected,
                   ]}>
                   {tab}
@@ -73,8 +79,8 @@ export default function LegalScreen() {
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}>
-          <View style={styles.textContainer}>
-            <Text style={styles.legalText}>{getContent()}</Text>
+          <View style={[styles.textContainer, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+            <Text style={[styles.legalText, { color: theme.textSecondary }]}>{getContent()}</Text>
           </View>
           <View style={{ height: 40 }} />
         </ScrollView>
@@ -157,3 +163,4 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
 });
+

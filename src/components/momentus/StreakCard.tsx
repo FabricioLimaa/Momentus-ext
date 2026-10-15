@@ -5,7 +5,7 @@ import { MomentusColors } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 
 export const StreakCard: React.FC = () => {
-  const { habits, userProfile } = useMomentus();
+  const { habits, userProfile, theme } = useMomentus();
 
   const totalToday = habits.length;
   const completedToday = habits.filter((h) => h.completed).length;
@@ -21,23 +21,23 @@ export const StreakCard: React.FC = () => {
   };
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
       <View style={styles.contentRow}>
         <View style={styles.leftColumn}>
-          <Text style={styles.subtitle}>SEQUÊNCIA ATUAL</Text>
+          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>SEQUÊNCIA ATUAL</Text>
           <View style={styles.streakRow}>
             <View style={styles.flameContainer}>
               <Ionicons name="flame" size={32} color={MomentusColors.fireStreak} />
             </View>
-            <Text style={styles.streakCount}>{userProfile.currentStreak} dias</Text>
+            <Text style={[styles.streakCount, { color: theme.textPrimary }]}>{userProfile.currentStreak} dias</Text>
           </View>
-          <Text style={styles.motivationText}>{getMotivationMessage()}</Text>
+          <Text style={[styles.motivationText, { color: theme.primary }]}>{getMotivationMessage()}</Text>
         </View>
 
         <View style={styles.progressCircleContainer}>
-          <View style={styles.circleBadge}>
-            <Text style={styles.percentText}>{progressPercent}%</Text>
-            <Text style={styles.ratioText}>
+          <View style={[styles.circleBadge, { backgroundColor: `${theme.primary}15`, borderColor: theme.primary }]}>
+            <Text style={[styles.percentText, { color: theme.primary }]}>{progressPercent}%</Text>
+            <Text style={[styles.ratioText, { color: theme.textSecondary }]}>
               {completedToday}/{totalToday}
             </Text>
           </View>

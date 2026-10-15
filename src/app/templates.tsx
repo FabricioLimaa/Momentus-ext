@@ -19,7 +19,7 @@ import { ApplyTemplateDialog } from '@/components/momentus/ApplyTemplateDialog';
 import { RoutineTemplate, TemplateItem } from '@/types';
 
 export default function TemplatesScreen() {
-  const { templates, categories, addTemplate, applyTemplateToDates } = useMomentus();
+  const { templates, categories, addTemplate, applyTemplateToDates, theme } = useMomentus();
 
   // Estados de modais
   const [selectedTemplateForApply, setSelectedTemplateForApply] = useState<RoutineTemplate | null>(null);
@@ -119,25 +119,25 @@ export default function TemplatesScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor={MomentusColors.navyBackground} />
-      <View style={styles.container}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} backgroundColor={theme.background} />
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.title}>Modelos de Rotina</Text>
-            <Text style={styles.subtitle}>Carregue ou crie blocos reutilizáveis</Text>
+            <Text style={[styles.title, { color: theme.textPrimary }]}>Modelos de Rotina</Text>
+            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Carregue ou crie blocos reutilizáveis</Text>
           </View>
 
           <View style={styles.headerButtonsRow}>
             <TouchableOpacity
-              style={styles.headerIconBtn}
+              style={[styles.headerIconBtn, { backgroundColor: theme.surface, borderColor: theme.outline }]}
               onPress={() => setIsImportModalOpen(true)}
               activeOpacity={0.7}>
-              <Ionicons name="download-outline" size={20} color={MomentusColors.emeraldNeon} />
+              <Ionicons name="download-outline" size={20} color={theme.primary} />
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.headerPrimaryBtn}
+              style={[styles.headerPrimaryBtn, { backgroundColor: theme.primary }]}
               onPress={() => setIsCreateModalOpen(true)}
               activeOpacity={0.8}>
               <Ionicons name="add" size={18} color="#0F172A" />
@@ -155,7 +155,7 @@ export default function TemplatesScreen() {
             const totalMinutes = template.items.reduce((acc, i) => acc + (i.durationMinutes || 30), 0);
 
             return (
-              <View key={template.id} style={styles.templateCard}>
+              <View key={template.id} style={[styles.templateCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
                 {/* Header do Card */}
                 <View style={styles.cardHeader}>
                   <View style={styles.cardHeaderLeft}>
@@ -163,14 +163,14 @@ export default function TemplatesScreen() {
                       <Ionicons name={(template.icon as any) || 'calendar'} size={24} color={template.color} />
                     </View>
                     <View style={styles.titleGroup}>
-                      <Text style={styles.cardTitle}>{template.title}</Text>
+                      <Text style={[styles.cardTitle, { color: theme.textPrimary }]}>{template.title}</Text>
                       <View style={styles.metaRow}>
                         <View style={[styles.complexityBadge, { backgroundColor: `${complexity.color}15` }]}>
                           <Text style={[styles.complexityBadgeText, { color: complexity.color }]}>
                             {complexity.label}
                           </Text>
                         </View>
-                        <Text style={styles.cardMeta}>
+                        <Text style={[styles.cardMeta, { color: theme.textSecondary }]}>
                           {template.items.length} atividades • ~{totalMinutes} min
                         </Text>
                       </View>
@@ -179,25 +179,25 @@ export default function TemplatesScreen() {
                 </View>
 
                 {/* Descrição */}
-                <Text style={styles.cardDesc}>{template.description}</Text>
+                <Text style={[styles.cardDesc, { color: theme.textSecondary }]}>{template.description}</Text>
 
                 {/* Timeline Preview (Primeiras 4 atividades) */}
-                <View style={styles.timelinePreviewBox}>
-                  <Text style={styles.timelinePreviewTitle}>Linha do tempo:</Text>
+                <View style={[styles.timelinePreviewBox, { backgroundColor: theme.surfaceElevated }]}>
+                  <Text style={[styles.timelinePreviewTitle, { color: theme.textSecondary }]}>Linha do tempo:</Text>
                   {template.items.slice(0, 4).map((item, idx) => {
                     const cat = categories.find((c) => c.id === item.categoryId);
                     return (
                       <View key={idx} style={styles.previewItemRow}>
                         <View style={[styles.previewDot, { backgroundColor: cat?.color || template.color }]} />
-                        <Text style={styles.previewTime}>{item.timeStart || '08:00'}</Text>
-                        <Text numberOfLines={1} style={styles.previewTitle}>
+                        <Text style={[styles.previewTime, { color: theme.textSecondary }]}>{item.timeStart || '08:00'}</Text>
+                        <Text numberOfLines={1} style={[styles.previewTitle, { color: theme.textPrimary }]}>
                           {item.title}
                         </Text>
                       </View>
                     );
                   })}
                   {template.items.length > 4 && (
-                    <Text style={styles.previewMoreText}>
+                    <Text style={[styles.previewMoreText, { color: theme.textSecondary }]}>
                       +{template.items.length - 4} outras atividades...
                     </Text>
                   )}
@@ -206,7 +206,7 @@ export default function TemplatesScreen() {
                 {/* Botão de Aplicação */}
                 <TouchableOpacity
                   onPress={() => setSelectedTemplateForApply(template)}
-                  style={styles.applyBtn}
+                  style={[styles.applyBtn, { backgroundColor: theme.primary }]}
                   activeOpacity={0.85}>
                   <Ionicons name="calendar-outline" size={16} color="#0F172A" />
                   <Text style={styles.applyBtnText}>Agendar em Datas (+20 XP)</Text>
@@ -233,27 +233,27 @@ export default function TemplatesScreen() {
           animationType="slide"
           onRequestClose={() => setIsCreateModalOpen(false)}>
           <View style={styles.modalOverlay}>
-            <View style={styles.modalCard}>
+            <View style={[styles.modalCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
               <ScrollView showsVerticalScrollIndicator={false}>
                 <View style={styles.modalHeaderRow}>
-                  <Text style={styles.modalTitle}>Novo Template</Text>
+                  <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Novo Template</Text>
                   <TouchableOpacity onPress={() => setIsCreateModalOpen(false)}>
-                    <Ionicons name="close" size={24} color={MomentusColors.textSecondary} />
+                    <Ionicons name="close" size={24} color={theme.textSecondary} />
                   </TouchableOpacity>
                 </View>
 
-                <Text style={styles.inputLabel}>Título do Template *</Text>
+                <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>Título do Template *</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary }]}
                   placeholder="Ex: Rotina de Estudos Foco Total"
                   placeholderTextColor={MomentusColors.textMuted}
                   value={newTitle}
                   onChangeText={setNewTitle}
                 />
 
-                <Text style={styles.inputLabel}>Descrição</Text>
+                <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>Descrição</Text>
                 <TextInput
-                  style={[styles.input, styles.textArea]}
+                  style={[styles.input, styles.textArea, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary }]}
                   placeholder="Explique o objetivo deste template..."
                   placeholderTextColor={MomentusColors.textMuted}
                   value={newDesc}
@@ -262,11 +262,11 @@ export default function TemplatesScreen() {
                   numberOfLines={2}
                 />
 
-                <Text style={styles.inputLabel}>Atividades da Rotina ({newItems.length})</Text>
+                <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>Atividades da Rotina ({newItems.length})</Text>
                 {newItems.map((item, idx) => (
                   <View key={idx} style={styles.createItemRow}>
                     <TextInput
-                      style={[styles.input, { flex: 2 }]}
+                      style={[styles.input, { flex: 2, backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary }]}
                       placeholder="Nome da atividade"
                       placeholderTextColor={MomentusColors.textMuted}
                       value={item.title}
@@ -277,7 +277,7 @@ export default function TemplatesScreen() {
                       }}
                     />
                     <TextInput
-                      style={[styles.input, { flex: 1 }]}
+                      style={[styles.input, { flex: 1, backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary }]}
                       placeholder="08:00"
                       placeholderTextColor={MomentusColors.textMuted}
                       value={item.timeStart}
@@ -298,7 +298,7 @@ export default function TemplatesScreen() {
                 ))}
 
                 <TouchableOpacity
-                  style={styles.addItemBtn}
+                  style={[styles.addItemBtn, { borderColor: theme.outline }]}
                   onPress={() =>
                     setNewItems([
                       ...newItems,
@@ -310,12 +310,12 @@ export default function TemplatesScreen() {
                       },
                     ])
                   }>
-                  <Ionicons name="add" size={16} color={MomentusColors.emeraldNeon} />
-                  <Text style={styles.addItemBtnText}>Adicionar Outra Atividade</Text>
+                  <Ionicons name="add" size={16} color={theme.primary} />
+                  <Text style={[styles.addItemBtnText, { color: theme.primary }]}>Adicionar Outra Atividade</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={styles.submitModalBtn}
+                  style={[styles.submitModalBtn, { backgroundColor: theme.primary }]}
                   onPress={handleSaveNewTemplate}
                   activeOpacity={0.85}>
                   <Text style={styles.submitModalBtnText}>Salvar Template</Text>
@@ -332,20 +332,20 @@ export default function TemplatesScreen() {
           animationType="fade"
           onRequestClose={() => setIsImportModalOpen(false)}>
           <View style={styles.modalOverlay}>
-            <View style={styles.modalCard}>
+            <View style={[styles.modalCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
               <View style={styles.modalHeaderRow}>
-                <Text style={styles.modalTitle}>Importar Template</Text>
+                <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Importar Template</Text>
                 <TouchableOpacity onPress={() => setIsImportModalOpen(false)}>
-                  <Ionicons name="close" size={24} color={MomentusColors.textSecondary} />
+                  <Ionicons name="close" size={24} color={theme.textSecondary} />
                 </TouchableOpacity>
               </View>
 
-              <Text style={styles.modalSubtitle}>
+              <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>
                 Cole o código JSON do template para adicioná-lo à sua biblioteca.
               </Text>
 
               <TextInput
-                style={[styles.input, styles.jsonInput]}
+                style={[styles.input, styles.jsonInput, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary }]}
                 placeholder='{"title": "Rotina", "items": [...]}'
                 placeholderTextColor={MomentusColors.textMuted}
                 value={importJsonText}
@@ -355,7 +355,7 @@ export default function TemplatesScreen() {
               />
 
               <TouchableOpacity
-                style={styles.submitModalBtn}
+                style={[styles.submitModalBtn, { backgroundColor: theme.primary }]}
                 onPress={handleImportJson}
                 disabled={!importJsonText.trim()}
                 activeOpacity={0.85}>

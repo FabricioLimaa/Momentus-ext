@@ -27,6 +27,7 @@ export default function HomeScreen() {
     habits,
     categories,
     userProfile,
+    theme,
     toggleHabit,
     deleteHabit,
     deleteMultipleHabits,
@@ -129,17 +130,24 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor={MomentusColors.navyBackground} />
-      <View style={styles.container}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+      <StatusBar
+        barStyle={theme.isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={theme.background}
+      />
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
         {/* TopBar no modo de seleção múltipla */}
         {isSelectionMode ? (
-          <View style={styles.selectionTopBar}>
+          <View
+            style={[
+              styles.selectionTopBar,
+              { backgroundColor: theme.surface, borderBottomColor: theme.outline },
+            ]}>
             <TouchableOpacity onPress={handleClearSelection} style={styles.iconButton}>
-              <Ionicons name="close" size={24} color={MomentusColors.textPrimary} />
+              <Ionicons name="close" size={24} color={theme.textPrimary} />
             </TouchableOpacity>
 
-            <Text style={styles.selectionCountText}>
+            <Text style={[styles.selectionCountText, { color: theme.textPrimary }]}>
               {selectedHabitIds.length} selecionada{selectedHabitIds.length === 1 ? '' : 's'}
             </Text>
 
@@ -152,7 +160,7 @@ export default function HomeScreen() {
                       : 'checkbox-outline'
                   }
                   size={22}
-                  color={MomentusColors.emeraldNeon}
+                  color={theme.primary}
                 />
               </TouchableOpacity>
 
@@ -176,15 +184,18 @@ export default function HomeScreen() {
           {/* 1. Header de Saudação (Mockup 3) */}
           <View style={styles.homeHeader}>
             <View>
-              <Text style={styles.greetingText}>{greeting}</Text>
-              <Text style={styles.userNameText}>{userName} 👋</Text>
+              <Text style={[styles.greetingText, { color: theme.textSecondary }]}>{greeting}</Text>
+              <Text style={[styles.userNameText, { color: theme.textPrimary }]}>{userName} 👋</Text>
             </View>
 
             <TouchableOpacity
               onPress={() => router.push('/updates' as any)}
-              style={styles.notificationButton}
+              style={[
+                styles.notificationButton,
+                { backgroundColor: theme.surface, borderColor: theme.outline },
+              ]}
               activeOpacity={0.7}>
-              <Ionicons name="notifications-outline" size={22} color={MomentusColors.textPrimary} />
+              <Ionicons name="notifications-outline" size={22} color={theme.textPrimary} />
             </TouchableOpacity>
           </View>
 
@@ -193,27 +204,35 @@ export default function HomeScreen() {
             activeOpacity={0.85}
             onPress={() => router.push('/achievements' as any)}
             style={styles.streakCardContainer}>
-            <GlassCard style={styles.streakGlassCard}>
+            <GlassCard
+              style={[
+                styles.streakGlassCard,
+                { backgroundColor: theme.glassCard, borderColor: theme.glassBorder },
+              ]}>
               <View style={styles.streakCardRow}>
                 <View style={styles.streakInfoCol}>
-                  <Text style={styles.streakLabel}>Sequência Atual</Text>
+                  <Text style={[styles.streakLabel, { color: theme.textSecondary }]}>
+                    Sequência Atual
+                  </Text>
                   <View style={styles.streakNumberRow}>
                     <Ionicons
                       name="flame"
                       size={28}
                       color={getStreakColor(userProfile.currentStreak)}
                     />
-                    <Text style={styles.streakNumberText}>
+                    <Text style={[styles.streakNumberText, { color: theme.textPrimary }]}>
                       {userProfile.currentStreak} dias
                     </Text>
                   </View>
-                  <Text style={styles.motivationalText}>{motivationalText}</Text>
+                  <Text style={[styles.motivationalText, { color: theme.textSecondary }]}>
+                    {motivationalText}
+                  </Text>
                 </View>
 
                 {/* Progresso circular estilizado */}
                 <View style={styles.circularProgressContainer}>
-                  <View style={styles.circularProgressRing}>
-                    <Text style={styles.progressPercentageText}>
+                  <View style={[styles.circularProgressRing, { borderColor: theme.primary }]}>
+                    <Text style={[styles.progressPercentageText, { color: theme.primary }]}>
                       {Math.round(progress * 100)}%
                     </Text>
                   </View>
@@ -224,21 +243,27 @@ export default function HomeScreen() {
 
           {/* 3. Seção "Seu dia" com Timeline Vertical */}
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Seu dia</Text>
-            <Text style={styles.sectionCountText}>
+            <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Seu dia</Text>
+            <Text style={[styles.sectionCountText, { color: theme.textSecondary }]}>
               {completionsToday}/{totalToday} concluídas
             </Text>
           </View>
 
           {todayHabits.length === 0 ? (
-            <View style={styles.emptyContainer}>
+            <View
+              style={[
+                styles.emptyContainer,
+                { backgroundColor: theme.surface, borderColor: theme.outline },
+              ]}>
               <Ionicons
                 name="calendar-outline"
                 size={48}
-                color={MomentusColors.textSecondary}
+                color={theme.textSecondary}
               />
-              <Text style={styles.emptyTitle}>Nada agendado para hoje</Text>
-              <Text style={styles.emptySubtitle}>
+              <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
+                Nada agendado para hoje
+              </Text>
+              <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
                 Toque no + para começar sua jornada.
               </Text>
             </View>
@@ -289,13 +314,13 @@ export default function HomeScreen() {
         {/* Floating Action Button (+) */}
         {!isSelectionMode && (
           <TouchableOpacity
-            style={styles.fab}
+            style={[styles.fab, { backgroundColor: theme.primary }]}
             activeOpacity={0.85}
             onPress={() => {
               setHabitToEdit(null);
               setIsAddModalVisible(true);
             }}>
-            <Ionicons name="add" size={30} color="#0F172A" />
+            <Ionicons name="add" size={30} color="#000000" />
           </TouchableOpacity>
         )}
 

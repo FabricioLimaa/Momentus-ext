@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
+import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import {
@@ -22,6 +23,22 @@ import {
 } from '@/constants/initialData';
 import { calculateUserLevel, UserLevelInfo } from '@/domain/userLevel';
 import { soundManager } from '@/util/soundManager';
+import { MomentusColors } from '@/constants/theme';
+import { CelebrationModal } from '@/components/momentus/CelebrationModal';
+
+export interface AppTheme {
+  isDark: boolean;
+  background: string;
+  surface: string;
+  surfaceElevated: string;
+  card: string;
+  outline: string;
+  textPrimary: string;
+  textSecondary: string;
+  primary: string;
+  glassCard: string;
+  glassBorder: string;
+}
 
 interface MomentusContextData {
   habits: HabitItem[];
@@ -32,8 +49,18 @@ interface MomentusContextData {
   userProfile: UserProfile;
   userLevel: UserLevelInfo;
   settings: AppSettings;
+  theme: AppTheme;
   selectedDate: string;
   setSelectedDate: (date: string) => void;
+  // Celebration Lottie Actions
+  celebration: {
+    visible: boolean;
+    title: string;
+    message: string;
+    pointsEarned?: number;
+  } | null;
+  showCelebration: (title: string, message: string, pointsEarned?: number) => void;
+  hideCelebration: () => void;
   // Habits Actions
   toggleHabit: (id: string) => void;
   addHabit: (habit: Omit<HabitItem, 'id' | 'completed' | 'streak'>) => void;
@@ -79,6 +106,50 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [userProfile, setUserProfile] = useState<UserProfile>(INITIAL_USER_PROFILE);
   const [settings, setSettings] = useState<AppSettings>(INITIAL_SETTINGS);
   const [isLoaded, setIsLoaded] = useState(false);
+
+  // Dynamic Theme (Light, Dark, System)
+  const systemColorScheme = useColorScheme();
+  const isDark = useMemo(() => {
+    const mode = (settings.themeMode || 'dark').toLowerCase();
+    if (mode === 'dark') return true;
+    if (mode === 'light') return false;
+    return systemColorScheme !== 'light';
+  }, [settings.themeMode, systemColorScheme]);
+
+  const primaryColor = settings.primaryColorHex || MomentusColors.emeraldNeon;
+
+  const theme: AppTheme = useMemo(
+    () => ({
+      isDark,
+      background: isDark ? MomentusColors.navyBackground : '#F8FAFC',
+      surface: isDark ? MomentusColors.navySurface : '#FFFFFF',
+      surfaceElevated: isDark ? MomentusColors.navyCardElevated : '#F1F5F9',
+      card: isDark ? MomentusColors.navyCard : '#FFFFFF',
+      outline: isDark ? MomentusColors.navyOutline : '#E2E8F0',
+      textPrimary: isDark ? MomentusColors.textPrimary : '#0F172A',
+      textSecondary: isDark ? MomentusColors.textSecondary : '#64748B',
+      primary: primaryColor,
+      glassCard: isDark ? 'rgba(30, 41, 59, 0.75)' : 'rgba(255, 255, 255, 0.90)',
+      glassBorder: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
+    }),
+    [isDark, primaryColor]
+  );
+
+  // Celebration state
+  const [celebration, setCelebration] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    pointsEarned?: number;
+  } | null>(null);
+
+  const showCelebration = (title: string, message: string, pointsEarned?: number) => {
+    setCelebration({ visible: true, title, message, pointsEarned });
+  };
+
+  const hideCelebration = () => {
+    setCelebration(null);
+  };
 
   // Sync sound settings with SoundManager
   useEffect(() => {
@@ -141,7 +212,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       } else {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
-    } catch (_) {}
+    } catch {}
   };
 
   const addPoints = (points: number) => {
@@ -155,11 +226,13 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     let nextCompleted = false;
     let nextTotalCompleted = userProfile.totalCompleted;
     let nextStreak = userProfile.currentStreak;
+    let targetDate = '';
 
-    setHabits((prev) =>
-      prev.map((habit) => {
+    setHabits((prev) => {
+      const updated = prev.map((habit) => {
         if (habit.id === id) {
           nextCompleted = !habit.completed;
+          targetDate = habit.date;
           if (nextCompleted) {
             soundManager.playSuccessSound();
             triggerHaptic('success');
@@ -182,8 +255,21 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           };
         }
         return habit;
-      })
-    );
+      });
+
+      if (nextCompleted && targetDate) {
+        const dayHabits = updated.filter((h) => h.date === targetDate);
+        if (dayHabits.length > 0 && dayHabits.every((h) => h.completed)) {
+          showCelebration(
+            'Dia Conquistado! 🌟',
+            'Parabéns! Você concluiu 100% das suas tarefas planejadas.',
+            25
+          );
+        }
+      }
+
+      return updated;
+    });
 
     checkAndUnlockAchievements(nextStreak, nextTotalCompleted, templates.length);
   };
@@ -409,6 +495,11 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (shouldUnlock) {
           newlyUnlocked = true;
           addPoints(ach.xpReward);
+          showCelebration(
+            'Conquista Desbloqueada! 🏆',
+            `Você desbloqueou a medalha: "${ach.title}"`,
+            ach.xpReward
+          );
           return {
             ...ach,
             progress: ach.maxProgress,
@@ -443,8 +534,12 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         userProfile,
         userLevel,
         settings,
+        theme,
         selectedDate,
         setSelectedDate,
+        celebration,
+        showCelebration,
+        hideCelebration,
         toggleHabit,
         addHabit,
         deleteHabit,
@@ -463,6 +558,15 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         logout,
       }}>
       {children}
+      {celebration?.visible && (
+        <CelebrationModal
+          visible={celebration.visible}
+          title={celebration.title}
+          message={celebration.message}
+          pointsEarned={celebration.pointsEarned}
+          onClose={hideCelebration}
+        />
+      )}
     </MomentusContext.Provider>
   );
 };

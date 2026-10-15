@@ -4,25 +4,28 @@ import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { Platform } from 'react-native';
 import { MomentusColors } from '@/constants/theme';
-import { MomentusProvider } from '@/context/MomentusContext';
+import { MomentusProvider, useMomentus } from '@/context/MomentusContext';
 
-export default function RootLayout() {
+function TabsNavigator() {
+  const { theme, settings } = useMomentus();
+  const primaryColor = settings.primaryColorHex || MomentusColors.emeraldNeon;
+
   return (
-    <MomentusProvider>
-      <StatusBar style="light" />
+    <>
+      <StatusBar style={theme.isDark ? 'light' : 'dark'} />
       <Tabs
         screenOptions={{
           headerShown: false,
           tabBarStyle: {
-            backgroundColor: MomentusColors.navySurface,
-            borderTopColor: MomentusColors.navyOutline,
+            backgroundColor: theme.surface,
+            borderTopColor: theme.outline,
             borderTopWidth: 1,
             height: Platform.OS === 'ios' ? 88 : 68,
             paddingBottom: Platform.OS === 'ios' ? 28 : 10,
             paddingTop: 8,
           },
-          tabBarActiveTintColor: MomentusColors.emeraldNeon,
-          tabBarInactiveTintColor: MomentusColors.textSecondary,
+          tabBarActiveTintColor: primaryColor,
+          tabBarInactiveTintColor: theme.textSecondary,
           tabBarLabelStyle: {
             fontSize: 11,
             fontWeight: '700',
@@ -140,6 +143,14 @@ export default function RootLayout() {
           }}
         />
       </Tabs>
+    </>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <MomentusProvider>
+      <TabsNavigator />
     </MomentusProvider>
   );
 }

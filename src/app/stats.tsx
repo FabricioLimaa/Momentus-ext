@@ -16,7 +16,7 @@ import { useMomentus } from '@/context/MomentusContext';
 type StatsFilter = 'WEEK' | 'MONTH' | 'YEAR';
 
 export default function StatsScreen() {
-  const { habits, categories } = useMomentus();
+  const { habits, categories, theme } = useMomentus();
   const [filter, setFilter] = useState<StatsFilter>('WEEK');
 
   const filterDays = useMemo(() => {
@@ -77,7 +77,7 @@ export default function StatsScreen() {
       try {
         const hour = parseInt(h.timeStart.split(':')[0], 10);
         hourCounts[hour] = (hourCounts[hour] || 0) + 1;
-      } catch (_) {}
+      } catch {}
     });
 
     let bestHour: number | null = null;
@@ -166,12 +166,17 @@ export default function StatsScreen() {
   }, [habits, categories, filter, filterDays]);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor={MomentusColors.navyBackground} />
-      <View style={styles.container}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+      <StatusBar
+        barStyle={theme.isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={theme.background}
+      />
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
         <View style={styles.header}>
-          <Text style={styles.title}>Análise de Performance</Text>
-          <Text style={styles.subtitle}>Insights de consistência e produtividade</Text>
+          <Text style={[styles.title, { color: theme.textPrimary }]}>Análise de Performance</Text>
+          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+            Insights de consistência e produtividade
+          </Text>
         </View>
 
         <ScrollView
@@ -179,7 +184,11 @@ export default function StatsScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}>
           {/* Seletor de Período */}
-          <View style={styles.filterRow}>
+          <View
+            style={[
+              styles.filterRow,
+              { backgroundColor: theme.surface, borderColor: theme.outline },
+            ]}>
             {(['WEEK', 'MONTH', 'YEAR'] as StatsFilter[]).map((f) => {
               const labels = { WEEK: 'Semana', MONTH: 'Mês', YEAR: 'Ano' };
               const isSelected = filter === f;
@@ -187,9 +196,17 @@ export default function StatsScreen() {
                 <TouchableOpacity
                   key={f}
                   onPress={() => setFilter(f)}
-                  style={[styles.filterBtn, isSelected && styles.filterBtnActive]}
+                  style={[
+                    styles.filterBtn,
+                    isSelected && { backgroundColor: theme.primary },
+                  ]}
                   activeOpacity={0.7}>
-                  <Text style={[styles.filterText, isSelected && styles.filterTextActive]}>
+                  <Text
+                    style={[
+                      styles.filterText,
+                      { color: isSelected ? '#000000' : theme.textSecondary },
+                      isSelected && { fontWeight: '800' },
+                    ]}>
                     {labels[f]}
                   </Text>
                 </TouchableOpacity>
@@ -198,29 +215,34 @@ export default function StatsScreen() {
           </View>
 
           {/* Cards de Métricas Principais */}
-          <Text style={styles.sectionTitle}>
+          <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
             Insights de {filter === 'WEEK' ? 'Semana' : filter === 'MONTH' ? 'Mês' : 'Ano'}
           </Text>
 
           <View style={styles.insightsRow}>
             {/* Card 1: Evolução / Melhoria */}
-            <View style={styles.insightCard}>
+            <View
+              style={[
+                styles.insightCard,
+                { backgroundColor: theme.surface, borderColor: theme.outline },
+              ]}>
               <View style={styles.insightHeader}>
                 <Ionicons
                   name={stats.improvement >= 0 ? 'trending-up' : 'trending-down'}
                   size={20}
-                  color={stats.improvement >= 0 ? MomentusColors.emeraldNeon : MomentusColors.errorRed}
+                  color={stats.improvement >= 0 ? theme.primary : MomentusColors.errorRed}
                 />
-                <Text style={styles.insightLabel}>Evolução</Text>
+                <Text style={[styles.insightLabel, { color: theme.textSecondary }]}>Evolução</Text>
               </View>
               <Text
                 style={[
                   styles.insightValue,
+                  { color: theme.textPrimary },
                   stats.improvement < 0 && { color: MomentusColors.errorRed },
                 ]}>
                 {stats.improvement > 0 ? `+${stats.improvement}%` : `${stats.improvement}%`}
               </Text>
-              <Text style={styles.insightSub}>Vs. período anterior</Text>
+              <Text style={[styles.insightSub, { color: theme.textSecondary }]}>Vs. período anterior</Text>
             </View>
 
             {/* Card 2: Horário Ápice */}

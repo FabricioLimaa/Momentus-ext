@@ -12,10 +12,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { MomentusColors } from '@/constants/theme';
+import { useMomentus } from '@/context/MomentusContext';
 import { GlassCard } from '@/components/momentus/GlassCard';
 
 export default function UpdateNotesScreen() {
   const router = useRouter();
+  const { theme } = useMomentus();
 
   const updates = [
     {
@@ -51,15 +53,15 @@ export default function UpdateNotesScreen() {
   ];
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor={MomentusColors.navyBackground} />
-      <View style={styles.container}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} backgroundColor={theme.background} />
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
         {/* TopBar */}
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={MomentusColors.textPrimary} />
+            <Ionicons name="arrow-back" size={24} color={theme.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.topBarTitle}>Novidades</Text>
+          <Text style={[styles.topBarTitle, { color: theme.textPrimary }]}>Novidades</Text>
           <View style={{ width: 40 }} />
         </View>
 
@@ -67,11 +69,11 @@ export default function UpdateNotesScreen() {
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}>
-          <Text style={styles.mainTitle}>O que há de novo?</Text>
+          <Text style={[styles.mainTitle, { color: theme.textPrimary }]}>O que há de novo?</Text>
 
           {/* Versão Pill */}
-          <View style={styles.versionBadge}>
-            <Text style={styles.versionBadgeText}>
+          <View style={[styles.versionBadge, { backgroundColor: `${theme.primary}15`, borderColor: theme.primary }]}>
+            <Text style={[styles.versionBadgeText, { color: theme.primary }]}>
               Versão 2.1.0 • Store & Personalização
             </Text>
           </View>
@@ -81,13 +83,13 @@ export default function UpdateNotesScreen() {
             {updates.map((item, index) => (
               <GlassCard key={index} style={styles.updateCard}>
                 <View style={styles.cardRow}>
-                  <View style={styles.iconCircle}>
-                    <Ionicons name={item.icon} size={22} color={MomentusColors.emeraldNeon} />
+                  <View style={[styles.iconCircle, { backgroundColor: `${theme.primary}15` }]}>
+                    <Ionicons name={item.icon} size={22} color={theme.primary} />
                   </View>
 
                   <View style={styles.cardContent}>
-                    <Text style={styles.updateItemTitle}>{item.title}</Text>
-                    <Text style={styles.updateItemDescription}>{item.description}</Text>
+                    <Text style={[styles.updateItemTitle, { color: theme.textPrimary }]}>{item.title}</Text>
+                    <Text style={[styles.updateItemDescription, { color: theme.textSecondary }]}>{item.description}</Text>
                   </View>
                 </View>
               </GlassCard>
@@ -96,11 +98,11 @@ export default function UpdateNotesScreen() {
 
           {/* Footer Card */}
           <GlassCard style={styles.footerCard}>
-            <View style={styles.footerLogoCircle}>
-              <Ionicons name="flame" size={32} color={MomentusColors.emeraldNeon} />
+            <View style={[styles.footerLogoCircle, { backgroundColor: `${theme.primary}15` }]}>
+              <Ionicons name="flame" size={32} color={theme.primary} />
             </View>
-            <Text style={styles.footerCardTitle}>Momentus Premium</Text>
-            <Text style={styles.footerCardSubtitle}>
+            <Text style={[styles.footerCardTitle, { color: theme.textPrimary }]}>Momentus Premium</Text>
+            <Text style={[styles.footerCardSubtitle, { color: theme.textSecondary }]}>
               Viva o presente, planeje o futuro.
             </Text>
           </GlassCard>
@@ -230,3 +232,4 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 });
+

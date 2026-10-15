@@ -43,6 +43,7 @@ export default function CalendarScreen() {
     setSelectedDate,
     toggleHabit,
     deleteHabit,
+    theme,
   } = useMomentus();
 
   const [isMonthView, setIsMonthView] = useState(false);
@@ -133,26 +134,34 @@ export default function CalendarScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor={MomentusColors.navyBackground} />
-      <View style={styles.container}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+      <StatusBar
+        barStyle={theme.isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={theme.background}
+      />
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
         {/* Header com alternância Mensal / Semanal */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.title}>Agenda & Rotinas</Text>
-            <Text style={styles.subtitle}>Sincronizado com seus blocos e metas</Text>
+            <Text style={[styles.title, { color: theme.textPrimary }]}>Agenda & Rotinas</Text>
+            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+              Sincronizado com seus blocos e metas
+            </Text>
           </View>
 
           <TouchableOpacity
-            style={styles.toggleViewBtn}
+            style={[
+              styles.toggleViewBtn,
+              { backgroundColor: theme.surface, borderColor: theme.outline },
+            ]}
             onPress={() => setIsMonthView(!isMonthView)}
             activeOpacity={0.7}>
             <Ionicons
               name={isMonthView ? 'calendar-outline' : 'grid-outline'}
               size={18}
-              color={MomentusColors.emeraldNeon}
+              color={theme.primary}
             />
-            <Text style={styles.toggleViewText}>
+            <Text style={[styles.toggleViewText, { color: theme.primary }]}>
               {isMonthView ? 'Semana' : 'Mês'}
             </Text>
           </TouchableOpacity>
@@ -160,22 +169,26 @@ export default function CalendarScreen() {
 
         {/* Visão Mensal ou Visão de Fita Semanal */}
         {isMonthView ? (
-          <View style={styles.monthCard}>
+          <View
+            style={[
+              styles.monthCard,
+              { backgroundColor: theme.surface, borderColor: theme.outline },
+            ]}>
             <View style={styles.monthHeaderRow}>
               <TouchableOpacity onPress={prevMonth} style={styles.monthNavBtn}>
-                <Ionicons name="chevron-back" size={18} color={MomentusColors.textPrimary} />
+                <Ionicons name="chevron-back" size={18} color={theme.textPrimary} />
               </TouchableOpacity>
-              <Text style={styles.monthTitle}>
+              <Text style={[styles.monthTitle, { color: theme.textPrimary }]}>
                 {MONTH_NAMES[month]} {year}
               </Text>
               <TouchableOpacity onPress={nextMonth} style={styles.monthNavBtn}>
-                <Ionicons name="chevron-forward" size={18} color={MomentusColors.textPrimary} />
+                <Ionicons name="chevron-forward" size={18} color={theme.textPrimary} />
               </TouchableOpacity>
             </View>
 
             <View style={styles.weekdaysHeader}>
               {WEEKDAYS.map((w, idx) => (
-                <Text key={idx} style={styles.weekdayHeaderText}>
+                <Text key={idx} style={[styles.weekdayHeaderText, { color: theme.textSecondary }]}>
                   {w}
                 </Text>
               ))}
@@ -196,20 +209,20 @@ export default function CalendarScreen() {
                     onPress={() => setSelectedDate(item.dateStr)}
                     style={[
                       styles.dayGridCell,
-                      isSelected && styles.dayGridCellSelected,
-                      isToday && !isSelected && styles.dayGridCellToday,
+                      isSelected && { backgroundColor: theme.primary },
+                      isToday && !isSelected && { borderColor: theme.primary, borderWidth: 1 },
                     ]}
                     activeOpacity={0.7}>
                     <Text
                       style={[
                         styles.dayGridText,
-                        isSelected && styles.dayGridTextSelected,
-                        isToday && !isSelected && styles.dayGridTextToday,
+                        { color: isSelected ? '#000000' : theme.textPrimary },
+                        isToday && !isSelected && { color: theme.primary, fontWeight: 'bold' },
                       ]}>
                       {item.dayNumber}
                     </Text>
                     {hasEvents && !isSelected && (
-                      <View style={styles.hasEventsDot} />
+                      <View style={[styles.hasEventsDot, { backgroundColor: theme.primary }]} />
                     )}
                   </TouchableOpacity>
                 );
@@ -233,22 +246,25 @@ export default function CalendarScreen() {
                     onPress={() => setSelectedDate(item.dateStr)}
                     style={[
                       styles.dateBox,
-                      isSelected && styles.dateBoxSelected,
-                      isToday && !isSelected && styles.dateBoxToday,
+                      { backgroundColor: theme.surface, borderColor: theme.outline },
+                      isSelected && { backgroundColor: theme.primary, borderColor: theme.primary },
+                      isToday && !isSelected && { borderColor: theme.primary },
                     ]}
                     activeOpacity={0.7}>
                     <Text
                       style={[
                         styles.dayName,
-                        isSelected && styles.dayNameSelected,
-                        isToday && !isSelected && { color: MomentusColors.emeraldNeon },
+                        { color: theme.textSecondary },
+                        isSelected && { color: '#000000', fontWeight: '800' },
+                        isToday && !isSelected && { color: theme.primary },
                       ]}>
                       {item.dayName.toUpperCase()}
                     </Text>
                     <Text
                       style={[
                         styles.dayNumber,
-                        isSelected && styles.dayNumberSelected,
+                        { color: theme.textPrimary },
+                        isSelected && { color: '#000000', fontWeight: '900' },
                       ]}>
                       {item.dayNumber}
                     </Text>
@@ -256,7 +272,7 @@ export default function CalendarScreen() {
                       <View
                         style={[
                           styles.todayIndicator,
-                          isSelected && { backgroundColor: '#0F172A' },
+                          isSelected && { backgroundColor: '#000000' },
                         ]}
                       />
                     )}
@@ -268,16 +284,20 @@ export default function CalendarScreen() {
         )}
 
         {/* Resumo do Dia Selecionado */}
-        <View style={styles.summaryCard}>
+        <View
+          style={[
+            styles.summaryCard,
+            { backgroundColor: theme.surface, borderColor: theme.outline },
+          ]}>
           <View style={styles.summaryLeft}>
-            <View style={styles.summaryIconBox}>
-              <Ionicons name="calendar" size={20} color={MomentusColors.emeraldNeon} />
+            <View style={[styles.summaryIconBox, { backgroundColor: `${theme.primary}20` }]}>
+              <Ionicons name="calendar" size={20} color={theme.primary} />
             </View>
             <View>
-              <Text style={styles.summaryDateText}>
+              <Text style={[styles.summaryDateText, { color: theme.textPrimary }]}>
                 {selectedDate === todayStr ? 'Hoje' : selectedDate}
               </Text>
-              <Text style={styles.summaryHabitsCount}>
+              <Text style={[styles.summaryHabitsCount, { color: theme.textSecondary }]}>
                 {completedCount} de {habitsForDate.length} atividades finalizadas
               </Text>
             </View>
@@ -346,6 +366,17 @@ export default function CalendarScreen() {
 
           <View style={{ height: 90 }} />
         </ScrollView>
+
+        {/* Floating Action Button (+) */}
+        <TouchableOpacity
+          style={[styles.fab, { backgroundColor: theme.primary }]}
+          activeOpacity={0.85}
+          onPress={() => {
+            setHabitToEdit(null);
+            setModalVisible(true);
+          }}>
+          <Ionicons name="add" size={30} color="#000000" />
+        </TouchableOpacity>
 
         {/* Diálogo de Detalhes */}
         <EventDetailDialog
@@ -659,5 +690,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: MomentusColors.navyOutline,
     paddingVertical: 12,
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 24,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 8,
   },
 });

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, ViewStyle, StyleProp } from 'react-native';
 import { MomentusColors } from '@/constants/theme';
+import { useMomentus } from '@/context/MomentusContext';
 
 interface GlassCardProps {
   children: React.ReactNode;
@@ -9,11 +10,19 @@ interface GlassCardProps {
 }
 
 export const GlassCard: React.FC<GlassCardProps> = ({ children, style, highlighted }) => {
+  const { theme } = useMomentus();
   return (
     <View
       style={[
         styles.card,
-        highlighted && styles.highlightedCard,
+        {
+          backgroundColor: theme.surface,
+          borderColor: theme.outline,
+        },
+        highlighted && {
+          borderColor: theme.primary,
+          backgroundColor: theme.surfaceElevated,
+        },
         style,
       ]}>
       {children}

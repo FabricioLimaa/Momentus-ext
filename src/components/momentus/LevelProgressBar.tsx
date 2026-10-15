@@ -5,18 +5,18 @@ import { MomentusColors } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 
 export const LevelProgressBar: React.FC = () => {
-  const { userProfile, userLevel } = useMomentus();
+  const { userProfile, userLevel, theme } = useMomentus();
   const xpPercent = Math.min(100, Math.round(userLevel.progress * 100));
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
       <View style={styles.topRow}>
         <View style={styles.userProfileGroup}>
           <View style={[styles.avatar, { borderColor: userLevel.rankColor }]}>
             <Text style={styles.avatarText}>{userProfile.name.charAt(0).toUpperCase()}</Text>
           </View>
           <View>
-            <Text style={styles.greeting}>Olá, {userProfile.name} 👋</Text>
+            <Text style={[styles.greeting, { color: theme.textPrimary }]}>Olá, {userProfile.name} 👋</Text>
             <View style={styles.badgeRow}>
               <View style={[styles.levelBadge, { backgroundColor: `${userLevel.rankColor}20` }]}>
                 <Ionicons name="sparkles" size={12} color={userLevel.rankColor} />
@@ -36,12 +36,12 @@ export const LevelProgressBar: React.FC = () => {
 
       <View style={styles.xpBarContainer}>
         <View style={styles.xpLabelsRow}>
-          <Text style={styles.xpLabel}>Progresso para o próximo nível</Text>
-          <Text style={styles.xpValues}>
+          <Text style={[styles.xpLabel, { color: theme.textSecondary }]}>Progresso para o próximo nível</Text>
+          <Text style={[styles.xpValues, { color: theme.textSecondary }]}>
             {userLevel.currentXp} / {userLevel.nextLevelXp} ({xpPercent}%)
           </Text>
         </View>
-        <View style={styles.track}>
+        <View style={[styles.track, { backgroundColor: theme.outline }]}>
           <View
             style={[
               styles.fill,

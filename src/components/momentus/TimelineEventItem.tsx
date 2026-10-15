@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Pressable } from 'react-nativ
 import { Ionicons } from '@expo/vector-icons';
 import { HabitItem, Category } from '@/types';
 import { MomentusColors } from '@/constants/theme';
+import { useMomentus } from '@/context/MomentusContext';
 
 interface TimelineEventItemProps {
   item: HabitItem;
@@ -49,7 +50,8 @@ export const TimelineEventItem: React.FC<TimelineEventItemProps> = ({
   onClick,
   onLongClick,
 }) => {
-  const categoryColor = category?.color || '#34D399';
+  const { theme } = useMomentus();
+  const categoryColor = category?.color || theme.primary;
   const stickerIcon = getIconForMarketItem(category?.stickerId);
 
   // Verifica se o evento está em andamento agora
@@ -91,14 +93,14 @@ export const TimelineEventItem: React.FC<TimelineEventItemProps> = ({
       delayLongPress={350}
       style={[
         styles.container,
-        isSelected && styles.containerSelected,
+        isSelected && { backgroundColor: `${theme.primary}20`, borderRadius: 12 },
       ]}>
       {/* 1. Horário de Início */}
       <View style={styles.timeColumn}>
         <Text
           style={[
             styles.timeText,
-            isOngoing && styles.timeTextOngoing,
+            { color: isOngoing ? theme.primary : theme.textSecondary },
           ]}>
           {item.timeStart}
         </Text>
@@ -109,14 +111,21 @@ export const TimelineEventItem: React.FC<TimelineEventItemProps> = ({
         <View
           style={[
             styles.connectorLine,
+            { backgroundColor: theme.outline },
             styles.topConnector,
             isFirst && styles.hiddenConnector,
           ]}
         />
-        <View style={[styles.timelineDot, { backgroundColor: categoryColor }]} />
+        <View
+          style={[
+            styles.timelineDot,
+            { backgroundColor: categoryColor, borderColor: theme.background },
+          ]}
+        />
         <View
           style={[
             styles.connectorLine,
+            { backgroundColor: theme.outline },
             styles.bottomConnector,
             isLast && styles.hiddenConnector,
           ]}
@@ -138,7 +147,11 @@ export const TimelineEventItem: React.FC<TimelineEventItemProps> = ({
             numberOfLines={1}
             style={[
               styles.itemTitle,
-              isChecked && styles.itemTitleChecked,
+              { color: theme.textPrimary },
+              isChecked && {
+                color: theme.isDark ? 'rgba(248, 250, 252, 0.45)' : 'rgba(15, 23, 42, 0.40)',
+                textDecorationLine: 'line-through',
+              },
             ]}>
             {item.title}
           </Text>
@@ -151,7 +164,7 @@ export const TimelineEventItem: React.FC<TimelineEventItemProps> = ({
           </View>
         </View>
 
-        <Text style={styles.timeRangeText}>
+        <Text style={[styles.timeRangeText, { color: theme.textSecondary }]}>
           {item.timeStart} - {displayEndTime}
         </Text>
       </View>
@@ -171,14 +184,15 @@ export const TimelineEventItem: React.FC<TimelineEventItemProps> = ({
           <View
             style={[
               styles.checkboxBox,
-              isSelected && styles.checkboxBoxSelected,
+              { borderColor: theme.outline },
+              isSelected && { backgroundColor: theme.primary, borderColor: theme.primary },
             ]}>
-            {isSelected && <Ionicons name="checkmark" size={16} color="#0F172A" />}
+            {isSelected && <Ionicons name="checkmark" size={16} color="#000000" />}
           </View>
         ) : isChecked ? (
-          <Ionicons name="checkmark-circle" size={24} color={MomentusColors.emeraldNeon} />
+          <Ionicons name="checkmark-circle" size={24} color={theme.primary} />
         ) : (
-          <View style={styles.uncheckCircle} />
+          <View style={[styles.uncheckCircle, { borderColor: theme.outline }]} />
         )}
       </TouchableOpacity>
     </Pressable>
@@ -300,3 +314,4 @@ const styles = StyleSheet.create({
     borderColor: MomentusColors.emeraldNeon,
   },
 });
+

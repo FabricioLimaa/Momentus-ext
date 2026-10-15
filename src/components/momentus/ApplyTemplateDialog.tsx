@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { MomentusColors } from '@/constants/theme';
+import { useMomentus } from '@/context/MomentusContext';
 
 interface ApplyTemplateDialogProps {
   visible: boolean;
@@ -40,6 +41,7 @@ export const ApplyTemplateDialog: React.FC<ApplyTemplateDialogProps> = ({
   onDismiss,
   onConfirm,
 }) => {
+  const { theme } = useMomentus();
   const [currentYearMonth, setCurrentYearMonth] = useState(() => {
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() };
@@ -101,10 +103,10 @@ export const ApplyTemplateDialog: React.FC<ApplyTemplateDialogProps> = ({
       animationType="fade"
       onRequestClose={onDismiss}>
       <View style={styles.overlay}>
-        <View style={styles.dialogCard}>
+        <View style={[styles.dialogCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
           <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={styles.dialogTitle}>Aplicar Template</Text>
-            <Text style={styles.dialogSubtitle}>
+            <Text style={[styles.dialogTitle, { color: theme.textPrimary }]}>Aplicar Template</Text>
+            <Text style={[styles.dialogSubtitle, { color: theme.textSecondary }]}>
               {templateTitle
                 ? `Agendar "${templateTitle}" nas datas selecionadas.`
                 : 'Escolha os dias para agendar esta rotina.'}
@@ -114,27 +116,27 @@ export const ApplyTemplateDialog: React.FC<ApplyTemplateDialogProps> = ({
             <View style={styles.calendarHeader}>
               <TouchableOpacity
                 onPress={prevMonth}
-                style={styles.navButton}
+                style={[styles.navButton, { backgroundColor: theme.surfaceElevated }]}
                 activeOpacity={0.7}>
-                <Ionicons name="chevron-back" size={18} color={MomentusColors.textPrimary} />
+                <Ionicons name="chevron-back" size={18} color={theme.textPrimary} />
               </TouchableOpacity>
 
-              <Text style={styles.monthTitle}>
+              <Text style={[styles.monthTitle, { color: theme.textPrimary }]}>
                 {MONTH_NAMES[month]} {year}
               </Text>
 
               <TouchableOpacity
                 onPress={nextMonth}
-                style={styles.navButton}
+                style={[styles.navButton, { backgroundColor: theme.surfaceElevated }]}
                 activeOpacity={0.7}>
-                <Ionicons name="chevron-forward" size={18} color={MomentusColors.textPrimary} />
+                <Ionicons name="chevron-forward" size={18} color={theme.textPrimary} />
               </TouchableOpacity>
             </View>
 
             {/* Dias da semana */}
             <View style={styles.weekdaysRow}>
               {WEEKDAYS.map((w, idx) => (
-                <Text key={idx} style={styles.weekdayText}>
+                <Text key={idx} style={[styles.weekdayText, { color: theme.primary }]}>
                   {w}
                 </Text>
               ))}
@@ -154,16 +156,17 @@ export const ApplyTemplateDialog: React.FC<ApplyTemplateDialogProps> = ({
                     key={item.dateStr}
                     style={[
                       styles.dayCell,
-                      isSelected && styles.dayCellSelected,
-                      isToday && !isSelected && styles.dayCellToday,
+                      isSelected && { backgroundColor: theme.primary },
+                      isToday && !isSelected && { borderWidth: 1, borderColor: theme.primary },
                     ]}
                     onPress={() => toggleDate(item.dateStr)}
                     activeOpacity={0.7}>
                     <Text
                       style={[
                         styles.dayText,
+                        { color: theme.textPrimary },
                         isSelected && styles.dayTextSelected,
-                        isToday && !isSelected && styles.dayTextToday,
+                        isToday && !isSelected && { color: theme.primary, fontWeight: '700' },
                       ]}>
                       {item.dayNumber}
                     </Text>
@@ -173,23 +176,23 @@ export const ApplyTemplateDialog: React.FC<ApplyTemplateDialogProps> = ({
             </View>
 
             {/* Contador de datas selecionadas */}
-            <Text style={styles.selectionCounter}>
+            <Text style={[styles.selectionCounter, { color: theme.primary }]}>
               {selectedDates.length === 1
                 ? '1 data selecionada'
                 : `${selectedDates.length} datas selecionadas`}
             </Text>
 
             {/* Switch Google Agenda */}
-            <View style={styles.switchContainer}>
+            <View style={[styles.switchContainer, { backgroundColor: theme.surfaceElevated }]}>
               <View style={styles.switchInfo}>
-                <Text style={styles.switchTitle}>Google Agenda</Text>
-                <Text style={styles.switchSubtitle}>Sincronizar datas</Text>
+                <Text style={[styles.switchTitle, { color: theme.textPrimary }]}>Google Agenda</Text>
+                <Text style={[styles.switchSubtitle, { color: theme.textSecondary }]}>Sincronizar datas</Text>
               </View>
               <Switch
                 value={saveToGoogle}
                 onValueChange={setSaveToGoogle}
-                trackColor={{ false: '#334155', true: 'rgba(52, 211, 153, 0.4)' }}
-                thumbColor={saveToGoogle ? MomentusColors.emeraldNeon : '#94A3B8'}
+                trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: 'rgba(52, 211, 153, 0.4)' }}
+                thumbColor={saveToGoogle ? theme.primary : '#94A3B8'}
               />
             </View>
 
@@ -199,12 +202,13 @@ export const ApplyTemplateDialog: React.FC<ApplyTemplateDialogProps> = ({
                 style={styles.cancelButton}
                 onPress={onDismiss}
                 activeOpacity={0.7}>
-                <Text style={styles.cancelButtonText}>Cancelar</Text>
+                <Text style={[styles.cancelButtonText, { color: theme.textSecondary }]}>Cancelar</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={[
                   styles.confirmButton,
+                  { backgroundColor: theme.primary },
                   selectedDates.length === 0 && styles.confirmButtonDisabled,
                 ]}
                 disabled={selectedDates.length === 0}
@@ -376,3 +380,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
+
