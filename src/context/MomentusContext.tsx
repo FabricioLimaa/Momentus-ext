@@ -38,9 +38,11 @@ interface MomentusContextData {
   toggleHabit: (id: string) => void;
   addHabit: (habit: Omit<HabitItem, 'id' | 'completed' | 'streak'>) => void;
   deleteHabit: (id: string) => void;
+  deleteMultipleHabits: (ids: string[]) => void;
   updateHabit: (habit: HabitItem) => void;
   // Templates Actions
   applyTemplateToToday: (templateId: string) => void;
+  applyTemplateToDates: (templateId: string, dates: string[], saveToGoogle?: boolean) => void;
   addTemplate: (template: Omit<RoutineTemplate, 'id'>) => void;
   // Categories Actions
   upsertCategory: (
@@ -57,6 +59,10 @@ interface MomentusContextData {
   addFocusMinutes: (minutes: number) => void;
   // Settings Actions
   updateSettings: (newSettings: Partial<AppSettings>) => void;
+  clearAllLocalData: () => void;
+  // Auth Actions
+  login: (email: string, name?: string) => void;
+  logout: () => void;
 }
 
 const STORAGE_KEY = '@momentus_state_v2';
@@ -198,33 +204,50 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     triggerHaptic('impact');
   };
 
+  const deleteMultipleHabits = (ids: string[]) => {
+    const idSet = new Set(ids);
+    setHabits((prev) => prev.filter((h) => !idSet.has(h.id)));
+    triggerHaptic('impact');
+  };
+
   const updateHabit = (updated: HabitItem) => {
     setHabits((prev) => prev.map((h) => (h.id === updated.id ? updated : h)));
     triggerHaptic('impact');
   };
 
   const applyTemplateToToday = (templateId: string) => {
-    const template = templates.find((t) => t.id === templateId);
-    if (!template) return;
+    applyTemplateToDates(templateId, [getTodayDateString()]);
+  };
 
-    const todayStr = getTodayDateString();
-    const newHabits: HabitItem[] = template.items.map((item, index) => ({
-      id: `h-tmpl-${Date.now()}-${index}`,
-      title: item.title,
-      description: `Importado de "${template.title}"`,
-      timeStart: item.timeStart || '08:00',
-      categoryId: item.categoryId,
-      completed: false,
-      date: todayStr,
-      streak: 0,
-    }));
+  const applyTemplateToDates = (templateId: string, dates: string[], saveToGoogle?: boolean) => {
+    const template = templates.find((t) => t.id === templateId);
+    if (!template || dates.length === 0) return;
+
+    const newHabits: HabitItem[] = [];
+    dates.forEach((targetDate) => {
+      template.items.forEach((item, index) => {
+        newHabits.push({
+          id: `h-tmpl-${Date.now()}-${targetDate}-${index}`,
+          title: item.title,
+          description: `Importado de "${template.title}"`,
+          timeStart: item.timeStart || '08:00',
+          timeEnd: item.timeEnd,
+          categoryId: item.categoryId,
+          completed: false,
+          date: targetDate,
+          streak: 0,
+          saveToGoogle: !!saveToGoogle,
+        });
+      });
+    });
 
     setHabits((prev) => [...newHabits, ...prev]);
-    addPoints(20);
+    addPoints(20 * dates.length);
     soundManager.playSuccessSound();
     triggerHaptic('success');
     checkAndUnlockAchievements(userProfile.currentStreak, userProfile.totalCompleted, templates.length);
   };
+
 
   const addTemplate = (templateData: Omit<RoutineTemplate, 'id'>) => {
     const newTemplate: RoutineTemplate = {
@@ -300,6 +323,36 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const updateSettings = (newSettings: Partial<AppSettings>) => {
     setSettings((prev) => ({ ...prev, ...newSettings }));
+  };
+
+  const clearAllLocalData = () => {
+    setHabits([]);
+    setCategories(INITIAL_CATEGORIES);
+    setTemplates(INITIAL_TEMPLATES);
+    setAchievements(INITIAL_ACHIEVEMENTS);
+    setMarketItems(INITIAL_MARKET_ITEMS);
+    setUserProfile(INITIAL_USER_PROFILE);
+    setSettings(INITIAL_SETTINGS);
+    AsyncStorage.removeItem(STORAGE_KEY);
+    triggerHaptic('impact');
+  };
+
+  const login = (email: string, name?: string) => {
+    setUserProfile((prev) => ({
+      ...prev,
+      email,
+      name: name || email.split('@')[0],
+      isLoggedIn: true,
+    }));
+    triggerHaptic('success');
+  };
+
+  const logout = () => {
+    setUserProfile((prev) => ({
+      ...prev,
+      isLoggedIn: false,
+    }));
+    triggerHaptic('impact');
   };
 
   /**
@@ -395,14 +448,19 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         toggleHabit,
         addHabit,
         deleteHabit,
+        deleteMultipleHabits,
         updateHabit,
         applyTemplateToToday,
+        applyTemplateToDates,
         addTemplate,
         upsertCategory,
         deleteCategory,
         buyMarketItem,
         addFocusMinutes,
         updateSettings,
+        clearAllLocalData,
+        login,
+        logout,
       }}>
       {children}
     </MomentusContext.Provider>

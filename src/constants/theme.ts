@@ -20,6 +20,9 @@ export const MomentusColors = {
   glassBorder: 'rgba(255, 255, 255, 0.12)',
   glassCard: 'rgba(30, 41, 59, 0.65)',
   error: '#EF4444',
+  errorRed: '#EF4444',
+  dangerRed: '#EF4444',
+  emeraldDark: '#047857',
   gold: '#FBBF24',
   cyan: '#38BDF8',
 };

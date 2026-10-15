@@ -19,22 +19,22 @@ import { SettingsModal } from '@/components/momentus/SettingsModal';
 
 export default function MoreScreen() {
   const router = useRouter();
-  const { userProfile, userLevel } = useMomentus();
+  const { userProfile, userLevel, logout } = useMomentus();
   const [categoriesModalVisible, setCategoriesModalVisible] = useState(false);
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
 
   const handleLogout = () => {
     Alert.alert('Sair da Conta', 'Deseja realmente sair da sua conta?', [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Sair', style: 'destructive', onPress: () => Alert.alert('Sessão encerrada.') },
+      {
+        text: 'Sair',
+        style: 'destructive',
+        onPress: () => {
+          logout();
+          router.replace('/login');
+        },
+      },
     ]);
-  };
-
-  const handleLegal = () => {
-    Alert.alert(
-      'Momentus - Termos & Privacidade',
-      'O aplicativo Momentus protege sua privacidade e armazena seus dados de rotina com segurança local e sincronização criptografada.'
-    );
   };
 
   return (
@@ -139,15 +139,15 @@ export default function MoreScreen() {
           {/* Preferences Group */}
           <View style={styles.menuGroup}>
             <TouchableOpacity
-              onPress={() => setSettingsModalVisible(true)}
+              onPress={() => router.push('/settings' as any)}
               style={styles.menuItem}>
               <View style={styles.menuItemLeft}>
                 <View style={[styles.iconBox, { backgroundColor: 'rgba(52, 211, 153, 0.15)' }]}>
                   <Ionicons name="settings-outline" size={20} color={MomentusColors.emeraldNeon} />
                 </View>
                 <View>
-                  <Text style={styles.menuItemTitle}>Ajustes & Notificações</Text>
-                  <Text style={styles.menuItemSub}>Áudio, vibrações e biometria</Text>
+                  <Text style={styles.menuItemTitle}>Ajustes & Personalização</Text>
+                  <Text style={styles.menuItemSub}>Tema, áudio, sincronização e backup</Text>
                 </View>
               </View>
               <Ionicons name="chevron-forward" size={18} color={MomentusColors.textSecondary} />
@@ -155,7 +155,26 @@ export default function MoreScreen() {
 
             <View style={styles.divider} />
 
-            <TouchableOpacity onPress={handleLegal} style={styles.menuItem}>
+            <TouchableOpacity
+              onPress={() => router.push('/updates' as any)}
+              style={styles.menuItem}>
+              <View style={styles.menuItemLeft}>
+                <View style={[styles.iconBox, { backgroundColor: 'rgba(251, 191, 36, 0.15)' }]}>
+                  <Ionicons name="sparkles-outline" size={20} color={MomentusColors.gold} />
+                </View>
+                <View>
+                  <Text style={styles.menuItemTitle}>Novidades (Versão 2.1.0)</Text>
+                  <Text style={styles.menuItemSub}>O que há de novo no Momentus</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={MomentusColors.textSecondary} />
+            </TouchableOpacity>
+
+            <View style={styles.divider} />
+
+            <TouchableOpacity
+              onPress={() => router.push('/legal' as any)}
+              style={styles.menuItem}>
               <View style={styles.menuItemLeft}>
                 <View style={[styles.iconBox, { backgroundColor: 'rgba(100, 116, 139, 0.15)' }]}>
                   <Ionicons name="information-circle-outline" size={20} color={MomentusColors.textSecondary} />
@@ -168,6 +187,7 @@ export default function MoreScreen() {
               <Ionicons name="chevron-forward" size={18} color={MomentusColors.textSecondary} />
             </TouchableOpacity>
           </View>
+
 
           {/* Logout Action */}
           <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>

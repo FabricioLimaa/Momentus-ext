@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -16,22 +16,154 @@ import { useMomentus } from '@/context/MomentusContext';
 type StatsFilter = 'WEEK' | 'MONTH' | 'YEAR';
 
 export default function StatsScreen() {
-  const { habits, categories, userProfile } = useMomentus();
+  const { habits, categories } = useMomentus();
   const [filter, setFilter] = useState<StatsFilter>('WEEK');
 
-  // Dias da semana para o gráfico de barras
-  const weekDays = [
-    { day: 'SEG', count: 4, height: 70 },
-    { day: 'TER', count: 6, height: 95 },
-    { day: 'QUA', count: 5, height: 80 },
-    { day: 'QUI', count: 7, height: 100 },
-    { day: 'SEX', count: 5, height: 80 },
-    { day: 'SÁB', count: 3, height: 50 },
-    { day: 'DOM', count: 4, height: 65 },
-  ];
+  const filterDays = useMemo(() => {
+    switch (filter) {
+      case 'WEEK':
+        return 7;
+      case 'MONTH':
+        return 30;
+      case 'YEAR':
+        return 365;
+    }
+  }, [filter]);
 
-  const totalCompletedHabits = habits.filter((h) => h.completed).length;
-  const completionRate = habits.length > 0 ? Math.round((totalCompletedHabits / habits.length) * 100) : 0;
+  // Cálculo autêntico equivalente a GetStatsUseCase.kt
+  const stats = useMemo(() => {
+    const now = new Date();
+
+    // Data de corte para o período atual
+    const sinceDate = new Date(now);
+    sinceDate.setDate(now.getDate() - filterDays + 1);
+    sinceDate.setHours(0, 0, 0, 0);
+
+    // Data de corte para o período anterior
+    const prevSinceDate = new Date(sinceDate);
+    prevSinceDate.setDate(sinceDate.getDate() - filterDays);
+
+    const parseHabitDate = (dateStr: string) => {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      return new Date(y, m - 1, d);
+    };
+
+    const currentCompleted = habits.filter((h) => {
+      if (!h.completed) return false;
+      const d = parseHabitDate(h.date);
+      return d >= sinceDate && d <= now;
+    });
+
+    const previousCompleted = habits.filter((h) => {
+      if (!h.completed) return false;
+      const d = parseHabitDate(h.date);
+      return d >= prevSinceDate && d < sinceDate;
+    });
+
+    const currentCount = currentCompleted.length;
+    const previousCount = previousCompleted.length;
+
+    // Taxa de melhoria
+    const improvement =
+      previousCount > 0
+        ? Math.round(((currentCount - previousCount) / previousCount) * 100)
+        : currentCount > 0
+        ? 100
+        : 0;
+
+    // Melhor horário (moda das horas de início)
+    const hourCounts: Record<number, number> = {};
+    currentCompleted.forEach((h) => {
+      try {
+        const hour = parseInt(h.timeStart.split(':')[0], 10);
+        hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+      } catch (_) {}
+    });
+
+    let bestHour: number | null = null;
+    let maxHourCount = 0;
+    Object.entries(hourCounts).forEach(([hourStr, count]) => {
+      if (count > maxHourCount) {
+        maxHourCount = count;
+        bestHour = parseInt(hourStr, 10);
+      }
+    });
+
+    // Dias ativos no período
+    const activeDaysSet = new Set(currentCompleted.map((h) => h.date));
+    const activeDays = Math.max(1, activeDaysSet.size);
+    const dailyAverage = (currentCount / activeDays).toFixed(1);
+
+    // Categoria destaque
+    const categoryCompletedCount: Record<string, number> = {};
+    currentCompleted.forEach((h) => {
+      categoryCompletedCount[h.categoryId] =
+        (categoryCompletedCount[h.categoryId] || 0) + 1;
+    });
+
+    let bestCategoryId: string | null = null;
+    let maxCategoryCount = 0;
+    Object.entries(categoryCompletedCount).forEach(([catId, count]) => {
+      if (count > maxCategoryCount) {
+        maxCategoryCount = count;
+        bestCategoryId = catId;
+      }
+    });
+
+    const bestCategoryObj = categories.find((c) => c.id === bestCategoryId);
+
+    // Dados do gráfico de barras para os últimos 7 dias se WEEK, ou categorias se MONTH/YEAR
+    const chartBars: { label: string; count: number; dateStr?: string; color?: string }[] = [];
+    if (filter === 'WEEK') {
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(now.getDate() - i);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const dayNum = String(d.getDate()).padStart(2, '0');
+        const dateStr = `${y}-${m}-${dayNum}`;
+        const dayLabel = d
+          .toLocaleDateString('pt-BR', { weekday: 'short' })
+          .toUpperCase()
+          .replace('.', '');
+        const count = habits.filter((h) => h.date === dateStr && h.completed).length;
+        chartBars.push({ label: dayLabel, count, dateStr });
+      }
+    } else {
+      categories.forEach((cat) => {
+        const count = categoryCompletedCount[cat.id] || 0;
+        chartBars.push({ label: cat.name.slice(0, 3).toUpperCase(), count, color: cat.color });
+      });
+    }
+
+    const maxBarCount = Math.max(1, ...chartBars.map((b) => b.count));
+
+    // Taxa de conclusão por categoria
+    const categoryRates = categories.map((cat) => {
+      const totalInCat = habits.filter((h) => h.categoryId === cat.id).length;
+      const completedInCat = habits.filter((h) => h.categoryId === cat.id && h.completed).length;
+      const rate = totalInCat > 0 ? Math.round((completedInCat / totalInCat) * 100) : 0;
+      return {
+        id: cat.id,
+        name: cat.name,
+        color: cat.color,
+        completed: completedInCat,
+        total: totalInCat,
+        rate,
+      };
+    });
+
+    return {
+      currentCount,
+      improvement,
+      bestHour: bestHour !== null ? `${bestHour}h` : '08h',
+      dailyAverage,
+      bestCategory: bestCategoryObj?.name || 'Geral',
+      chartBars,
+      maxBarCount,
+      categoryRates,
+    };
+  }, [habits, categories, filter, filterDays]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -46,7 +178,7 @@ export default function StatsScreen() {
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}>
-          {/* Period Filter Buttons */}
+          {/* Seletor de Período */}
           <View style={styles.filterRow}>
             {(['WEEK', 'MONTH', 'YEAR'] as StatsFilter[]).map((f) => {
               const labels = { WEEK: 'Semana', MONTH: 'Mês', YEAR: 'Ano' };
@@ -55,7 +187,8 @@ export default function StatsScreen() {
                 <TouchableOpacity
                   key={f}
                   onPress={() => setFilter(f)}
-                  style={[styles.filterBtn, isSelected && styles.filterBtnActive]}>
+                  style={[styles.filterBtn, isSelected && styles.filterBtnActive]}
+                  activeOpacity={0.7}>
                   <Text style={[styles.filterText, isSelected && styles.filterTextActive]}>
                     {labels[f]}
                   </Text>
@@ -64,19 +197,29 @@ export default function StatsScreen() {
             })}
           </View>
 
-          {/* Section: Insights Cards */}
+          {/* Cards de Métricas Principais */}
           <Text style={styles.sectionTitle}>
             Insights de {filter === 'WEEK' ? 'Semana' : filter === 'MONTH' ? 'Mês' : 'Ano'}
           </Text>
 
           <View style={styles.insightsRow}>
-            {/* Card 1: Evolução */}
+            {/* Card 1: Evolução / Melhoria */}
             <View style={styles.insightCard}>
               <View style={styles.insightHeader}>
-                <Ionicons name="trending-up" size={20} color={MomentusColors.emeraldNeon} />
+                <Ionicons
+                  name={stats.improvement >= 0 ? 'trending-up' : 'trending-down'}
+                  size={20}
+                  color={stats.improvement >= 0 ? MomentusColors.emeraldNeon : MomentusColors.errorRed}
+                />
                 <Text style={styles.insightLabel}>Evolução</Text>
               </View>
-              <Text style={styles.insightValue}>+24%</Text>
+              <Text
+                style={[
+                  styles.insightValue,
+                  stats.improvement < 0 && { color: MomentusColors.errorRed },
+                ]}>
+                {stats.improvement > 0 ? `+${stats.improvement}%` : `${stats.improvement}%`}
+              </Text>
               <Text style={styles.insightSub}>Vs. período anterior</Text>
             </View>
 
@@ -86,37 +229,72 @@ export default function StatsScreen() {
                 <Ionicons name="time" size={20} color={MomentusColors.cyan} />
                 <Text style={styles.insightLabel}>Horário Ápice</Text>
               </View>
-              <Text style={styles.insightValue}>18h</Text>
+              <Text style={styles.insightValue}>{stats.bestHour}</Text>
               <Text style={styles.insightSub}>Maior produtividade</Text>
             </View>
           </View>
 
-          {/* Section: Conclusões por Período (Bar Chart) */}
+          <View style={styles.insightsRow}>
+            {/* Card 3: Total Concluído */}
+            <View style={styles.insightCard}>
+              <View style={styles.insightHeader}>
+                <Ionicons name="checkmark-done-circle" size={20} color={MomentusColors.emeraldNeon} />
+                <Text style={styles.insightLabel}>Concluídos</Text>
+              </View>
+              <Text style={styles.insightValue}>{stats.currentCount}</Text>
+              <Text style={styles.insightSub}>Neste período</Text>
+            </View>
+
+            {/* Card 4: Categoria Top */}
+            <View style={styles.insightCard}>
+              <View style={styles.insightHeader}>
+                <Ionicons name="star" size={20} color={MomentusColors.gold} />
+                <Text style={styles.insightLabel}>Destaque</Text>
+              </View>
+              <Text numberOfLines={1} style={styles.insightValueSmall}>
+                {stats.bestCategory}
+              </Text>
+              <Text style={styles.insightSub}>Maior consistência</Text>
+            </View>
+          </View>
+
+          {/* Gráfico de Barras */}
           <Text style={styles.sectionTitle}>Conclusões por Período</Text>
           <View style={styles.chartCard}>
             <View style={styles.chartHeader}>
               <Text style={styles.chartTitle}>Hábitos Finalizados</Text>
-              <Text style={styles.chartAverage}>Média: 4.8 / dia</Text>
+              <Text style={styles.chartAverage}>Média: {stats.dailyAverage} / dia</Text>
             </View>
 
             <View style={styles.barsContainer}>
-              {weekDays.map((item, index) => {
-                const isPeak = item.count === 7;
+              {stats.chartBars.map((item, index) => {
+                const heightPercent = Math.max(8, Math.round((item.count / stats.maxBarCount) * 100));
+                const isPeak = item.count === stats.maxBarCount && item.count > 0;
+
                 return (
                   <View key={index} style={styles.barCol}>
+                    <Text style={styles.barCountLabel}>
+                      {item.count > 0 ? item.count : ''}
+                    </Text>
                     <View style={styles.barTrack}>
                       <View
                         style={[
                           styles.barFill,
                           {
-                            height: `${item.height}%`,
-                            backgroundColor: isPeak ? MomentusColors.emeraldNeon : MomentusColors.navyOutline,
+                            height: `${heightPercent}%`,
+                            backgroundColor: isPeak
+                              ? MomentusColors.emeraldNeon
+                              : item.color || MomentusColors.navyOutline,
                           },
                         ]}
                       />
                     </View>
-                    <Text style={[styles.barDayText, isPeak && { color: MomentusColors.emeraldNeon, fontWeight: 'bold' }]}>
-                      {item.day}
+                    <Text
+                      style={[
+                        styles.barDayText,
+                        isPeak && { color: MomentusColors.emeraldNeon, fontWeight: '800' },
+                      ]}>
+                      {item.label}
                     </Text>
                   </View>
                 );
@@ -124,38 +302,31 @@ export default function StatsScreen() {
             </View>
           </View>
 
-          {/* Section: Taxa por Categoria */}
+          {/* Taxas por Categoria */}
           <Text style={styles.sectionTitle}>Metas por Categoria</Text>
           <View style={styles.categoriesProgressCard}>
-            {categories.map((cat) => {
-              const meta = cat.metaMinutosSemanal || 120;
-              const catHabits = habits.filter((h) => h.categoryId === cat.id);
-              const catCompleted = catHabits.filter((h) => h.completed).length;
-              const percent = catHabits.length > 0 ? Math.round((catCompleted / catHabits.length) * 100) : 50;
-
-              return (
-                <View key={cat.id} style={styles.catProgressItem}>
-                  <View style={styles.catProgressHeader}>
-                    <View style={styles.catNameWithDot}>
-                      <View style={[styles.catSmallDot, { backgroundColor: cat.color }]} />
-                      <Text style={styles.catProgressTitle}>{cat.name}</Text>
-                    </View>
-                    <Text style={[styles.catProgressPercent, { color: cat.color }]}>
-                      {percent}% ({catCompleted}/{catHabits.length})
-                    </Text>
+            {stats.categoryRates.map((cat) => (
+              <View key={cat.id} style={styles.catProgressItem}>
+                <View style={styles.catProgressHeader}>
+                  <View style={styles.catNameWithDot}>
+                    <View style={[styles.catSmallDot, { backgroundColor: cat.color }]} />
+                    <Text style={styles.catProgressTitle}>{cat.name}</Text>
                   </View>
-
-                  <View style={styles.catProgressBarTrack}>
-                    <View
-                      style={[
-                        styles.catProgressBarFill,
-                        { width: `${percent}%`, backgroundColor: cat.color },
-                      ]}
-                    />
-                  </View>
+                  <Text style={[styles.catProgressPercent, { color: cat.color }]}>
+                    {cat.rate}% ({cat.completed}/{cat.total})
+                  </Text>
                 </View>
-              );
-            })}
+
+                <View style={styles.catProgressBarTrack}>
+                  <View
+                    style={[
+                      styles.catProgressBarFill,
+                      { width: `${cat.rate}%`, backgroundColor: cat.color },
+                    ]}
+                  />
+                </View>
+              </View>
+            ))}
           </View>
 
           <View style={{ height: 40 }} />
@@ -177,7 +348,7 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingTop: 16,
     marginBottom: 16,
   },
   title: {
@@ -235,7 +406,7 @@ const styles = StyleSheet.create({
   insightsRow: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 20,
+    marginBottom: 12,
   },
   insightCard: {
     flex: 1,
@@ -262,8 +433,14 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     marginBottom: 2,
   },
+  insightValueSmall: {
+    color: MomentusColors.textPrimary,
+    fontSize: 18,
+    fontWeight: '900',
+    marginBottom: 2,
+  },
   insightSub: {
-    color: MomentusColors.textMuted,
+    color: MomentusColors.textSecondary,
     fontSize: 11,
   },
   chartCard: {
@@ -300,11 +477,17 @@ const styles = StyleSheet.create({
   barCol: {
     alignItems: 'center',
     flex: 1,
-    gap: 8,
+    gap: 6,
+  },
+  barCountLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: MomentusColors.textSecondary,
+    height: 14,
   },
   barTrack: {
     width: 14,
-    height: 110,
+    height: 96,
     backgroundColor: 'rgba(51, 65, 85, 0.4)',
     borderRadius: 7,
     justifyContent: 'flex-end',
@@ -365,4 +548,3 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
 });
-

@@ -1,0 +1,47 @@
+[PORTUGUÊS-BR]
+
+Copyright (c) 2025 Fabricio Lima
+Todos os Direitos Reservados.
+
+Este software e seu código-fonte são propriedade intelectual de Fabricio Lima e
+são protegidos pela Lei de Direitos Autorais do Brasil (Lei Nº 9.610 de 19 de fevereiro de 1998),
+bem como por tratados internacionais de direitos autorais, incluindo,
+mas não se limitando à, Convenção de Berna.
+
+É expressamente proibido, sem a autorização prévia e por escrito do autor,
+usar, copiar, modificar, mesclar, publicar, distribuir, sublicenciar e/ou vender cópias
+deste software ou de qualquer parte dele.
+Qualquer uso não autorizado constitui uma violação da lei de direitos autorais e
+estará sujeito às sanções civis e criminais aplicáveis.
+
+ESTE SOFTWARE É FORNECIDO "NO ESTADO EM QUE SE ENCONTRA", SEM GARANTIA DE QUALQUER TIPO,
+EXPRESSA OU IMPLÍCITA, INCLUINDO, MAS NÃO SE LIMITANDO A, GARANTIAS DE COMERCIALIZAÇÃO,
+ADEQUAÇÃO A UM FIM ESPECÍFICO E NÃO VIOLAÇÃO.
+EM NENHUMA CIRCUNSTÂNCIA O AUTOR SERÁ RESPONSÁVEL POR QUALQUER REIVINDICAÇÃO,
+DANOS OU OUTRA RESPONSABILIDADE, SEJA EM AÇÃO DE CONTRATO, DELITO OU DE OUTRA FORMA,
+DECORRENTE DE, FORA DE OU EM CONEXÃO COM O SOFTWARE OU O USO OU OUTRAS NEGOCIAÇÕES NO SOFTWARE.
+
+----------------------------------------------------
+
+[ENGLISH]
+
+Copyright (c) 2025 Fabricio Lima
+All Rights Reserved.
+
+This software and its source code are the intellectual property of Fabricio Lima and
+are protected by the Brazilian Copyright Law (Law No. 9.610 of February 19, 1998),
+as well as by international copyright treaties, including,
+but not limited to, the Berne Convention.
+
+It is expressly prohibited, without the prior written permission of the author,
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of this software or any part thereof.
+Any unauthorized use constitutes a violation of copyright law and
+will be subject to applicable civil and criminal penalties.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

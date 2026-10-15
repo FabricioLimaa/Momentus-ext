@@ -9,45 +9,86 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { MomentusColors } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import { getTodayDateString } from '@/constants/initialData';
+import { HabitItem } from '@/types';
 
 interface NewHabitModalProps {
   visible: boolean;
   onClose: () => void;
+  habitToEdit?: HabitItem | null;
+  initialDate?: string;
 }
 
-export const NewHabitModal: React.FC<NewHabitModalProps> = ({ visible, onClose }) => {
-  const { categories, addHabit } = useMomentus();
+export const NewHabitModal: React.FC<NewHabitModalProps> = ({
+  visible,
+  onClose,
+  habitToEdit,
+  initialDate,
+}) => {
+  const { categories, addHabit, updateHabit, selectedDate } = useMomentus();
+  const isEditMode = !!habitToEdit;
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [timeStart, setTimeStart] = useState('08:00');
-  const [timeEnd, setTimeEnd] = useState('08:30');
-  const [selectedCategoryId, setSelectedCategoryId] = useState(
-    categories[0]?.id || 'cat-saude'
-  );
+  const [timeEnd, setTimeEnd] = useState('09:00');
+  const [selectedCategoryId, setSelectedCategoryId] = useState('');
+  const [saveToGoogle, setSaveToGoogle] = useState(false);
+
+  React.useEffect(() => {
+    if (habitToEdit) {
+      setTitle(habitToEdit.title);
+      setDescription(habitToEdit.description || '');
+      setTimeStart(habitToEdit.timeStart);
+      setTimeEnd(habitToEdit.timeEnd || '09:00');
+      setSelectedCategoryId(habitToEdit.categoryId);
+      setSaveToGoogle(!!habitToEdit.saveToGoogle);
+    } else {
+      setTitle('');
+      setDescription('');
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, '0');
+      const nextH = String((now.getHours() + 1) % 24).padStart(2, '0');
+      setTimeStart(`${h}:00`);
+      setTimeEnd(`${nextH}:00`);
+      setSelectedCategoryId(categories[0]?.id || 'cat-saude');
+      setSaveToGoogle(false);
+    }
+  }, [habitToEdit, visible, categories]);
 
   const handleSave = () => {
-    if (!title.trim()) return;
+    if (!title.trim() || !selectedCategoryId) return;
 
-    addHabit({
-      title: title.trim(),
-      description: description.trim() || undefined,
-      timeStart: timeStart || '08:00',
-      timeEnd: timeEnd.trim() || undefined,
-      categoryId: selectedCategoryId,
-      date: getTodayDateString(),
-    });
+    if (isEditMode && habitToEdit) {
+      updateHabit({
+        ...habitToEdit,
+        title: title.trim(),
+        description: description.trim() || undefined,
+        timeStart: timeStart.trim() || '08:00',
+        timeEnd: timeEnd.trim() || undefined,
+        categoryId: selectedCategoryId,
+        saveToGoogle,
+      });
+    } else {
+      addHabit({
+        title: title.trim(),
+        description: description.trim() || undefined,
+        timeStart: timeStart.trim() || '08:00',
+        timeEnd: timeEnd.trim() || undefined,
+        categoryId: selectedCategoryId,
+        date: initialDate || selectedDate || getTodayDateString(),
+        saveToGoogle,
+      });
+    }
 
-    setTitle('');
-    setDescription('');
-    setTimeStart('08:00');
-    setTimeEnd('08:30');
     onClose();
   };
+
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
@@ -56,7 +97,7 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({ visible, onClose }
         style={styles.overlay}>
         <View style={styles.sheetContainer}>
           <View style={styles.header}>
-            <Text style={styles.title}>Nova Rotina / Hábito</Text>
+            <Text style={styles.title}>{isEditMode ? 'Editar Rotina' : 'Nova Rotina'}</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
               <Ionicons name="close" size={22} color={MomentusColors.textSecondary} />
             </TouchableOpacity>
@@ -64,31 +105,20 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({ visible, onClose }
 
           <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
             {/* Title */}
-            <Text style={styles.label}>Título da Atividade *</Text>
+            <Text style={styles.label}>Nome da rotina *</Text>
             <TextInput
               style={styles.input}
-              placeholder="Ex: Treino de pernas, Leitura..."
+              placeholder="Ex: Estudo de Redes"
               placeholderTextColor={MomentusColors.textMuted}
               value={title}
               onChangeText={setTitle}
             />
 
-            {/* Description */}
-            <Text style={styles.label}>Descrição / Notas (Opcional)</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Ex: 3 séries até a falha, focar na técnica"
-              placeholderTextColor={MomentusColors.textMuted}
-              value={description}
-              onChangeText={setDescription}
-              multiline
-              numberOfLines={3}
-            />
-
             {/* Horários */}
+            <Text style={styles.label}>Horário</Text>
             <View style={styles.timeRow}>
               <View style={styles.timeCol}>
-                <Text style={styles.label}>Início</Text>
+                <Text style={styles.subLabel}>Início</Text>
                 <TextInput
                   style={styles.input}
                   placeholder="08:00"
@@ -98,10 +128,10 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({ visible, onClose }
                 />
               </View>
               <View style={styles.timeCol}>
-                <Text style={styles.label}>Término</Text>
+                <Text style={styles.subLabel}>Fim</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="08:30"
+                  placeholder="09:00"
                   placeholderTextColor={MomentusColors.textMuted}
                   value={timeEnd}
                   onChangeText={setTimeEnd}
@@ -137,6 +167,32 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({ visible, onClose }
                 );
               })}
             </View>
+
+            {/* Description */}
+            <Text style={styles.label}>Descrição (opcional)</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              placeholder="Adicione uma descrição..."
+              placeholderTextColor={MomentusColors.textMuted}
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              numberOfLines={3}
+            />
+
+            {/* Google Calendar Switch */}
+            <View style={styles.googleSwitchRow}>
+              <View style={styles.googleSwitchText}>
+                <Text style={styles.googleTitle}>Google Agenda</Text>
+                <Text style={styles.googleSubtitle}>Sincronizar esta rotina</Text>
+              </View>
+              <Switch
+                value={saveToGoogle}
+                onValueChange={setSaveToGoogle}
+                trackColor={{ false: '#334155', true: 'rgba(52, 211, 153, 0.4)' }}
+                thumbColor={saveToGoogle ? MomentusColors.emeraldNeon : '#94A3B8'}
+              />
+            </View>
           </ScrollView>
 
           <View style={styles.footer}>
@@ -148,9 +204,12 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({ visible, onClose }
               onPress={handleSave}
               style={[styles.saveBtn, !title.trim() && styles.disabledBtn]}
               disabled={!title.trim()}>
-              <Text style={styles.saveText}>Criar Hábito</Text>
+              <Text style={styles.saveText}>
+                {isEditMode ? 'Salvar Alterações' : 'Salvar Rotina'}
+              </Text>
             </TouchableOpacity>
           </View>
+
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -244,6 +303,35 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
   },
+  subLabel: {
+    color: MomentusColors.textSecondary,
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  googleSwitchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(51, 65, 85, 0.3)',
+    borderRadius: 16,
+    padding: 14,
+    marginTop: 14,
+    marginBottom: 8,
+  },
+  googleSwitchText: {
+    flex: 1,
+  },
+  googleTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: MomentusColors.textPrimary,
+  },
+  googleSubtitle: {
+    fontSize: 12,
+    color: MomentusColors.textSecondary,
+    marginTop: 2,
+  },
   footer: {
     flexDirection: 'row',
     gap: 12,
@@ -279,4 +367,5 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
+
 

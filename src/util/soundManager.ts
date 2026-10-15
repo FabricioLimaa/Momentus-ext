@@ -41,7 +41,7 @@ class SoundManager {
         this.successSound = sound;
         await sound.playAsync();
       }
-    } catch (e) {
+    } catch (_err) {
       // Falha silenciosa para não quebrar a experiência do usuário
     }
   }
@@ -61,7 +61,7 @@ class SoundManager {
         this.achievementSound = sound;
         await sound.playAsync();
       }
-    } catch (e) {
+    } catch (_err) {
       // Falha silenciosa
     }
   }

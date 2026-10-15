@@ -323,4 +323,15 @@ export const INITIAL_SETTINGS: AppSettings = {
   hapticsEnabled: true,
   biometricLock: false,
   themeMode: 'dark',
+  fontSizeMultiplier: 1.0,
+  primaryColorHex: '#34D399',
+  googleCalendarSyncEnabled: true,
 };
+
+export function getStreakColor(streakCount: number): string {
+  if (streakCount >= 30) return '#6A1B9A';
+  if (streakCount >= 7) return '#D32F2F';
+  if (streakCount >= 3) return '#FFA000';
+  return '#94A3B8';
+}
+

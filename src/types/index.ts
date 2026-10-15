@@ -17,6 +17,8 @@ export interface HabitItem {
   completed: boolean;
   date: string; // "YYYY-MM-DD"
   streak: number;
+  googleCalendarEventId?: string | null;
+  saveToGoogle?: boolean;
 }
 
 export interface TemplateItem {
@@ -24,6 +26,7 @@ export interface TemplateItem {
   title: string;
   durationMinutes: number;
   timeStart: string;
+  timeEnd?: string;
   categoryId: string;
 }
 
@@ -66,11 +69,13 @@ export interface MarketItem {
 export interface UserProfile {
   name: string;
   email: string;
+  photoUrl?: string | null;
   totalPoints: number; // XP total que dita o nível e é usado como saldo na loja
   currentStreak: number;
   bestStreak: number;
   totalCompleted: number;
   focusMinutesToday: number;
+  isLoggedIn?: boolean;
 }
 
 export interface AppSettings {
@@ -78,4 +83,8 @@ export interface AppSettings {
   hapticsEnabled: boolean;
   biometricLock: boolean;
   themeMode: 'system' | 'dark' | 'light';
+  fontSizeMultiplier: number;
+  primaryColorHex: string;
+  googleCalendarSyncEnabled: boolean;
 }
+

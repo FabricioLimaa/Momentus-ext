@@ -8,16 +8,42 @@ import {
   SafeAreaView,
   Platform,
   StatusBar,
+  Modal,
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { MomentusColors } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
-import { MarketItem } from '@/types';
+import { getStreakColor } from '@/constants/initialData';
+import { Achievement, MarketItem } from '@/types';
+
+export const getIconForAchievement = (id: string): keyof typeof Ionicons.glyphMap => {
+  switch (id) {
+    case 'FIRST_HABIT':
+      return 'rocket';
+    case 'FIRST_TEMPLATE':
+      return 'sparkles';
+    case 'STREAK_3':
+      return 'flash';
+    case 'STREAK_7':
+      return 'star';
+    case 'STREAK_30':
+      return 'trophy';
+    case 'COMPLETED_10':
+      return 'checkmark-done';
+    case 'COMPLETED_50':
+      return 'ribbon';
+    case 'COMPLETED_100':
+      return 'diamond';
+    default:
+      return 'star';
+  }
+};
 
 export default function AchievementsScreen() {
   const { achievements, marketItems, userProfile, userLevel, buyMarketItem } = useMomentus();
   const [activeTab, setActiveTab] = useState<'achievements' | 'market'>('achievements');
+  const [selectedAchievement, setSelectedAchievement] = useState<Achievement | null>(null);
 
   const handleBuy = (item: MarketItem) => {
     if (item.isOwned) return;
@@ -26,7 +52,7 @@ export default function AchievementsScreen() {
       Alert.alert('Sucesso! 🎉', `Você adquiriu "${item.name}"!`);
     } else {
       Alert.alert(
-        'Pontos de XP insuficientes! ⭐',
+        'XP Insuficiente! ⭐',
         `Você precisa de ${item.finalPrice} XP para adquirir este item. Complete mais hábitos e blocos de foco para acumular pontos!`
       );
     }
@@ -34,7 +60,7 @@ export default function AchievementsScreen() {
 
   const unlockedCount = achievements.filter((a) => a.unlocked).length;
 
-  const getRarityBadgeColor = (rarity: string) => {
+  const getRarityColor = (rarity: string) => {
     switch (rarity) {
       case 'COMMON':
         return '#94A3B8';
@@ -57,52 +83,69 @@ export default function AchievementsScreen() {
         <View style={styles.profileCard}>
           <View style={styles.profileTopRow}>
             <View style={[styles.avatarLarge, { borderColor: userLevel.rankColor }]}>
-              <Text style={styles.avatarLargeText}>{userProfile.name.charAt(0)}</Text>
-            </View>
-            <View style={styles.profileDetails}>
-              <View style={styles.nameRow}>
-                <Text style={styles.profileName}>{userProfile.name}</Text>
-                <View style={[styles.titleBadge, { backgroundColor: `${userLevel.rankColor}20` }]}>
-                  <Text style={[styles.titleBadgeText, { color: userLevel.rankColor }]}>
-                    {userLevel.rankName}
-                  </Text>
-                </View>
-              </View>
-              <Text style={styles.profileLevelText}>
-                Nível {userLevel.level} • {userLevel.currentXp}/{userLevel.nextLevelXp} XP
+              <Text style={styles.avatarLargeText}>
+                {userProfile.name ? userProfile.name.charAt(0).toUpperCase() : 'U'}
               </Text>
             </View>
-            <View style={styles.coinsHeaderBox}>
-              <Ionicons name="sparkles" size={16} color={MomentusColors.gold} />
-              <Text style={styles.coinsHeaderText}>{userProfile.totalPoints} XP</Text>
+
+            <View style={styles.profileDetails}>
+              <Text style={styles.profileName}>{userProfile.name || 'Usuário'}</Text>
+              <View style={styles.levelRankRow}>
+                <View style={[styles.levelBadge, { backgroundColor: `${MomentusColors.emeraldNeon}20` }]}>
+                  <Text style={styles.levelBadgeText}>Nível {userLevel.level}</Text>
+                </View>
+                <Text style={styles.rankNameText}>{userLevel.rankName}</Text>
+              </View>
+            </View>
+
+            <View style={styles.xpBadgeBox}>
+              <Ionicons name="sparkles" size={15} color={MomentusColors.gold} />
+              <Text style={styles.xpBadgeText}>{userProfile.totalPoints} XP</Text>
             </View>
           </View>
 
           {/* Quick Stats Grid */}
           <View style={styles.statsGrid}>
             <View style={styles.statBox}>
-              <Text style={styles.statNumber}>{userProfile.currentStreak}d</Text>
-              <Text style={styles.statLabel}>Ofensiva Atual</Text>
+              <View style={styles.statIconRow}>
+                <Ionicons
+                  name="flame"
+                  size={18}
+                  color={getStreakColor(userProfile.currentStreak)}
+                />
+                <Text style={styles.statNumber}>{userProfile.currentStreak} dias</Text>
+              </View>
+              <Text style={styles.statLabel}>Dias seguidos</Text>
             </View>
+
+            <View style={styles.statDivider} />
+
             <View style={styles.statBox}>
-              <Text style={styles.statNumber}>{userProfile.bestStreak}d</Text>
-              <Text style={styles.statLabel}>Melhor Sequência</Text>
+              <View style={styles.statIconRow}>
+                <Ionicons name="star" size={18} color="#D4AF37" />
+                <Text style={styles.statNumber}>{userProfile.totalPoints}</Text>
+              </View>
+              <Text style={styles.statLabel}>Pontos totais</Text>
             </View>
+
+            <View style={styles.statDivider} />
+
             <View style={styles.statBox}>
-              <Text style={styles.statNumber}>{userProfile.totalCompleted}</Text>
-              <Text style={styles.statLabel}>Hábitos Feitos</Text>
+              <View style={styles.statIconRow}>
+                <Ionicons name="checkmark-done" size={18} color={MomentusColors.emeraldNeon} />
+                <Text style={styles.statNumber}>{userProfile.totalCompleted}</Text>
+              </View>
+              <Text style={styles.statLabel}>Hábitos concluídos</Text>
             </View>
           </View>
         </View>
 
-        {/* Tab Switcher */}
+        {/* Tab Switcher: Conquistas / Loja */}
         <View style={styles.tabSwitcher}>
           <TouchableOpacity
             onPress={() => setActiveTab('achievements')}
-            style={[
-              styles.tabBtn,
-              activeTab === 'achievements' && styles.tabBtnActive,
-            ]}>
+            style={[styles.tabBtn, activeTab === 'achievements' && styles.tabBtnActive]}
+            activeOpacity={0.7}>
             <Ionicons
               name="trophy"
               size={16}
@@ -113,16 +156,14 @@ export default function AchievementsScreen() {
                 styles.tabText,
                 activeTab === 'achievements' && styles.tabTextActive,
               ]}>
-              Conquistas ({unlockedCount}/{achievements.length})
+              Medalhas ({unlockedCount}/{achievements.length})
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={() => setActiveTab('market')}
-            style={[
-              styles.tabBtn,
-              activeTab === 'market' && styles.tabBtnActive,
-            ]}>
+            style={[styles.tabBtn, activeTab === 'market' && styles.tabBtnActive]}
+            activeOpacity={0.7}>
             <Ionicons
               name="cart"
               size={16}
@@ -133,56 +174,57 @@ export default function AchievementsScreen() {
                 styles.tabText,
                 activeTab === 'market' && styles.tabTextActive,
               ]}>
-              Loja Momentus
+              Loja de Stickers
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Tab Content */}
+        {/* Conteúdo das Abas */}
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}>
           {activeTab === 'achievements' ? (
-            /* Conquistas Tab */
+            /* Lista de Medalhas */
             achievements.map((ach) => {
-              const percent = Math.min(
-                100,
-                Math.round((ach.progress / ach.maxProgress) * 100)
-              );
+              const icon = getIconForAchievement(ach.id);
+              const percent = Math.min(100, Math.round((ach.progress / ach.maxProgress) * 100));
+
               return (
-                <View
+                <TouchableOpacity
                   key={ach.id}
-                  style={[
-                    styles.itemCard,
-                    ach.unlocked && styles.itemCardUnlocked,
-                  ]}>
+                  onPress={() => setSelectedAchievement(ach)}
+                  style={[styles.itemCard, ach.unlocked && styles.itemCardUnlocked]}
+                  activeOpacity={0.75}>
                   <View
                     style={[
                       styles.iconCircle,
                       ach.unlocked
-                        ? { backgroundColor: 'rgba(52, 211, 153, 0.2)' }
-                        : { backgroundColor: MomentusColors.navyOutline },
+                        ? { backgroundColor: 'rgba(52, 211, 153, 0.2)', borderColor: MomentusColors.emeraldNeon }
+                        : { backgroundColor: MomentusColors.navyOutline, borderColor: 'transparent' },
                     ]}>
                     <Ionicons
-                      name={ach.unlocked ? (ach.icon as any) : 'lock-closed'}
+                      name={ach.unlocked ? icon : 'lock-closed'}
                       size={24}
-                      color={ach.unlocked ? MomentusColors.emeraldNeon : MomentusColors.textMuted}
+                      color={ach.unlocked ? MomentusColors.emeraldNeon : MomentusColors.textSecondary}
                     />
                   </View>
 
                   <View style={styles.itemInfo}>
                     <View style={styles.itemTitleRow}>
                       <Text style={styles.itemTitle}>{ach.title}</Text>
-                      {ach.unlocked && (
+                      {ach.unlocked ? (
                         <View style={styles.unlockedTag}>
                           <Text style={styles.unlockedTagText}>Desbloqueado</Text>
                         </View>
+                      ) : (
+                        <Text style={styles.lockedRewardText}>+{ach.xpReward} XP</Text>
                       )}
                     </View>
+
                     <Text style={styles.itemDesc}>{ach.description}</Text>
 
-                    {/* Progress */}
+                    {/* Progress Bar */}
                     <View style={styles.progressRow}>
                       <View style={styles.progressBarTrack}>
                         <View style={[styles.progressBarFill, { width: `${percent}%` }]} />
@@ -191,25 +233,21 @@ export default function AchievementsScreen() {
                         {ach.progress}/{ach.maxProgress}
                       </Text>
                     </View>
-
-                    {/* Rewards */}
-                    <View style={styles.rewardsRow}>
-                      <Text style={styles.rewardText}>+{ach.xpReward} XP</Text>
-                    </View>
                   </View>
-                </View>
+                </TouchableOpacity>
               );
             })
           ) : (
-            /* Loja Tab */
+            /* Loja de Stickers / Badges */
             marketItems.map((item) => {
-              const rarityColor = getRarityBadgeColor(item.rarity);
+              const rarityColor = getRarityColor(item.rarity);
+
               return (
                 <View key={item.id} style={styles.itemCard}>
                   <View
                     style={[
                       styles.iconCircle,
-                      { backgroundColor: `${rarityColor}20` },
+                      { backgroundColor: `${rarityColor}20`, borderColor: rarityColor },
                     ]}>
                     <Ionicons name={item.iconName as any} size={24} color={rarityColor} />
                   </View>
@@ -223,6 +261,7 @@ export default function AchievementsScreen() {
                         </Text>
                       </View>
                     </View>
+
                     <Text style={styles.itemDesc}>{item.description}</Text>
 
                     <View style={styles.marketActionRow}>
@@ -237,7 +276,8 @@ export default function AchievementsScreen() {
                         style={[
                           styles.buyBtn,
                           item.isOwned && styles.purchasedBtn,
-                        ]}>
+                        ]}
+                        activeOpacity={0.8}>
                         <Text
                           style={[
                             styles.buyBtnText,
@@ -252,8 +292,63 @@ export default function AchievementsScreen() {
               );
             })
           )}
+
           <View style={{ height: 40 }} />
         </ScrollView>
+
+        {/* Diálogo de Detalhes da Conquista */}
+        <Modal
+          visible={!!selectedAchievement}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setSelectedAchievement(null)}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              {selectedAchievement && (
+                <>
+                  <View style={styles.modalIconWrap}>
+                    <View
+                      style={[
+                        styles.modalIconCircle,
+                        selectedAchievement.unlocked
+                          ? { backgroundColor: 'rgba(52, 211, 153, 0.2)', borderColor: MomentusColors.emeraldNeon }
+                          : { backgroundColor: MomentusColors.navyOutline, borderColor: 'transparent' },
+                      ]}>
+                      <Ionicons
+                        name={selectedAchievement.unlocked ? getIconForAchievement(selectedAchievement.id) : 'lock-closed'}
+                        size={36}
+                        color={selectedAchievement.unlocked ? MomentusColors.emeraldNeon : MomentusColors.textSecondary}
+                      />
+                    </View>
+                  </View>
+
+                  <Text style={styles.modalTitle}>{selectedAchievement.title}</Text>
+                  <Text style={styles.modalSubtitle}>{selectedAchievement.description}</Text>
+
+                  <View style={styles.modalRewardBox}>
+                    <Text style={styles.modalRewardLabel}>Recompensa</Text>
+                    <Text style={styles.modalRewardValue}>+{selectedAchievement.xpReward} XP</Text>
+                  </View>
+
+                  <View style={styles.modalStatusBox}>
+                    <Text style={styles.modalStatusText}>
+                      {selectedAchievement.unlocked
+                        ? `Conquistada em ${selectedAchievement.unlockedAt || 'Recentemente'}`
+                        : `Progresso: ${selectedAchievement.progress} de ${selectedAchievement.maxProgress}`}
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.modalCloseBtn}
+                    onPress={() => setSelectedAchievement(null)}
+                    activeOpacity={0.85}>
+                    <Text style={styles.modalCloseBtnText}>Fechar</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          </View>
+        </Modal>
       </View>
     </SafeAreaView>
   );
@@ -302,31 +397,32 @@ const styles = StyleSheet.create({
   profileDetails: {
     flex: 1,
   },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
   profileName: {
     color: MomentusColors.textPrimary,
     fontSize: 18,
     fontWeight: 'bold',
   },
-  titleBadge: {
+  levelRankRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  levelBadge: {
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 10,
+    borderRadius: 8,
   },
-  titleBadgeText: {
+  levelBadgeText: {
+    color: MomentusColors.emeraldNeon,
     fontSize: 11,
-    fontWeight: 'bold',
+    fontWeight: '800',
   },
-  profileLevelText: {
+  rankNameText: {
     color: MomentusColors.textSecondary,
-    fontSize: 13,
-    marginTop: 2,
+    fontSize: 12,
   },
-  coinsHeaderBox: {
+  xpBadgeBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
@@ -337,30 +433,41 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(251, 191, 36, 0.3)',
   },
-  coinsHeaderText: {
+  xpBadgeText: {
     color: MomentusColors.gold,
-    fontWeight: 'bold',
+    fontWeight: '800',
     fontSize: 13,
   },
   statsGrid: {
     flexDirection: 'row',
     borderTopWidth: 1,
     borderTopColor: MomentusColors.navyOutline,
-    paddingTop: 12,
+    paddingTop: 14,
+    alignItems: 'center',
   },
   statBox: {
     flex: 1,
     alignItems: 'center',
   },
+  statIconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   statNumber: {
     color: MomentusColors.textPrimary,
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '800',
   },
   statLabel: {
     color: MomentusColors.textSecondary,
     fontSize: 11,
     marginTop: 2,
+  },
+  statDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: MomentusColors.navyOutline,
   },
   tabSwitcher: {
     flexDirection: 'row',
@@ -417,6 +524,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -455,6 +563,11 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: 'bold',
   },
+  lockedRewardText: {
+    color: MomentusColors.gold,
+    fontSize: 11,
+    fontWeight: '700',
+  },
   itemDesc: {
     color: MomentusColors.textSecondary,
     fontSize: 12,
@@ -465,7 +578,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 6,
   },
   progressBarTrack: {
     flex: 1,
@@ -482,16 +594,6 @@ const styles = StyleSheet.create({
     color: MomentusColors.textSecondary,
     fontSize: 11,
     fontWeight: '600',
-  },
-  rewardsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  rewardText: {
-    color: MomentusColors.emeraldNeon,
-    fontSize: 11,
-    fontWeight: 'bold',
   },
   marketActionRow: {
     flexDirection: 'row',
@@ -525,5 +627,89 @@ const styles = StyleSheet.create({
   },
   purchasedBtnText: {
     color: MomentusColors.textSecondary,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: MomentusColors.navySurface,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: MomentusColors.navyOutline,
+    padding: 24,
+    alignItems: 'center',
+  },
+  modalIconWrap: {
+    marginBottom: 16,
+  },
+  modalIconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: MomentusColors.textPrimary,
+    textAlign: 'center',
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    color: MomentusColors.textSecondary,
+    textAlign: 'center',
+    marginTop: 6,
+    marginBottom: 20,
+  },
+  modalRewardBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    backgroundColor: 'rgba(51, 65, 85, 0.3)',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 12,
+  },
+  modalRewardLabel: {
+    fontSize: 13,
+    color: MomentusColors.textSecondary,
+    fontWeight: '600',
+  },
+  modalRewardValue: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: MomentusColors.gold,
+  },
+  modalStatusBox: {
+    width: '100%',
+    padding: 10,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalStatusText: {
+    fontSize: 12,
+    color: MomentusColors.emeraldNeon,
+    fontWeight: '600',
+  },
+  modalCloseBtn: {
+    backgroundColor: MomentusColors.emeraldNeon,
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  modalCloseBtnText: {
+    color: '#0F172A',
+    fontWeight: '800',
+    fontSize: 14,
   },
 });

@@ -28,6 +28,7 @@ export default function RootLayout() {
             fontWeight: '700',
           },
         }}>
+        {/* Telas Principais da Barra Inferior */}
         <Tabs.Screen
           name="index"
           options={{
@@ -73,17 +74,69 @@ export default function RootLayout() {
             ),
           }}
         />
-        {/* Telas secundárias roteáveis */}
+
+        {/* Telas Secundárias e Modais de Fluxo */}
         <Tabs.Screen
           name="templates"
           options={{
             href: null,
+            tabBarStyle: { display: 'none' },
           }}
         />
         <Tabs.Screen
           name="achievements"
           options={{
             href: null,
+            tabBarStyle: { display: 'none' },
+          }}
+        />
+        <Tabs.Screen
+          name="settings"
+          options={{
+            href: null,
+            tabBarStyle: { display: 'none' },
+          }}
+        />
+        <Tabs.Screen
+          name="updates"
+          options={{
+            href: null,
+            tabBarStyle: { display: 'none' },
+          }}
+        />
+        <Tabs.Screen
+          name="legal"
+          options={{
+            href: null,
+            tabBarStyle: { display: 'none' },
+          }}
+        />
+        <Tabs.Screen
+          name="onboarding"
+          options={{
+            href: null,
+            tabBarStyle: { display: 'none' },
+          }}
+        />
+        <Tabs.Screen
+          name="login"
+          options={{
+            href: null,
+            tabBarStyle: { display: 'none' },
+          }}
+        />
+        <Tabs.Screen
+          name="signup"
+          options={{
+            href: null,
+            tabBarStyle: { display: 'none' },
+          }}
+        />
+        <Tabs.Screen
+          name="forgot-password"
+          options={{
+            href: null,
+            tabBarStyle: { display: 'none' },
           }}
         />
       </Tabs>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,97 +8,271 @@ import {
   SafeAreaView,
   Platform,
   StatusBar,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { MomentusColors } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
-import { HabitItemCard } from '@/components/momentus/HabitItemCard';
+import { TimelineEventItem } from '@/components/momentus/TimelineEventItem';
+import { EventDetailDialog } from '@/components/momentus/EventDetailDialog';
 import { NewHabitModal } from '@/components/momentus/NewHabitModal';
 import { getTodayDateString } from '@/constants/initialData';
+import { HabitItem } from '@/types';
+
+const WEEKDAYS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
+const MONTH_NAMES = [
+  'Janeiro',
+  'Fevereiro',
+  'Março',
+  'Abril',
+  'Maio',
+  'Junho',
+  'Julho',
+  'Agosto',
+  'Setembro',
+  'Outubro',
+  'Novembro',
+  'Dezembro',
+];
 
 export default function CalendarScreen() {
-  const { habits, categories, toggleHabit, deleteHabit, selectedDate, setSelectedDate } = useMomentus();
+  const {
+    habits,
+    categories,
+    selectedDate,
+    setSelectedDate,
+    toggleHabit,
+    deleteHabit,
+  } = useMomentus();
+
+  const [isMonthView, setIsMonthView] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  const [habitToEdit, setHabitToEdit] = useState<HabitItem | null>(null);
+  const [selectedDetailHabit, setSelectedDetailHabit] = useState<HabitItem | null>(null);
 
-  // Generate 14 days around today (7 days before, 7 days after)
-  const generateDatesStrip = () => {
-    const list = [];
-    const base = new Date();
-    for (let i = -3; i <= 6; i++) {
-      const d = new Date(base);
-      d.setDate(base.getDate() + i);
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`;
-      const dayName = d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
-      const dayNumber = d.getDate();
-      list.push({ dateStr, dayName, dayNumber });
-    }
-    return list;
-  };
+  const [currentYearMonth, setCurrentYearMonth] = useState(() => {
+    const d = new Date();
+    return { year: d.getFullYear(), month: d.getMonth() };
+  });
 
-  const dates = generateDatesStrip();
   const todayStr = getTodayDateString();
 
-  const habitsForDate = habits.filter((h) => h.date === selectedDate);
+  // Rotinas da data selecionada ordenadas por horário
+  const habitsForDate = useMemo(() => {
+    return habits
+      .filter((h) => h.date === selectedDate)
+      .sort((a, b) => a.timeStart.localeCompare(b.timeStart));
+  }, [habits, selectedDate]);
+
   const completedCount = habitsForDate.filter((h) => h.completed).length;
+
+  // Fita de datas (14 dias em torno de hoje)
+  const stripDates = useMemo(() => {
+    const list = [];
+    const base = new Date();
+    for (let i = -4; i <= 9; i++) {
+      const d = new Date(base);
+      d.setDate(base.getDate() + i);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dayNum = String(d.getDate()).padStart(2, '0');
+      const dateStr = `${y}-${m}-${dayNum}`;
+      const dayName = d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
+      list.push({ dateStr, dayName, dayNumber: d.getDate() });
+    }
+    return list;
+  }, []);
+
+  // Grid mensal
+  const { year, month } = currentYearMonth;
+  const firstDayOfWeek = new Date(year, month, 1).getDay();
+  const totalDays = new Date(year, month + 1, 0).getDate();
+
+  const calendarDays = useMemo(() => {
+    const days = [];
+    for (let i = 0; i < firstDayOfWeek; i++) {
+      days.push(null);
+    }
+    for (let d = 1; d <= totalDays; d++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      days.push({ dayNumber: d, dateStr });
+    }
+    return days;
+  }, [year, month, firstDayOfWeek, totalDays]);
+
+  const prevMonth = () => {
+    setCurrentYearMonth((prev) => {
+      if (prev.month === 0) return { year: prev.year - 1, month: 11 };
+      return { year: prev.year, month: prev.month - 1 };
+    });
+  };
+
+  const nextMonth = () => {
+    setCurrentYearMonth((prev) => {
+      if (prev.month === 11) return { year: prev.year + 1, month: 0 };
+      return { year: prev.year, month: prev.month + 1 };
+    });
+  };
+
+  const handleDeleteSingle = (habit: HabitItem) => {
+    Alert.alert(
+      'Excluir Rotina',
+      'Deseja realmente remover esta rotina? Esta ação não poderá ser desfeita.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: () => {
+            deleteHabit(habit.id);
+            setSelectedDetailHabit(null);
+          },
+        },
+      ]
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor={MomentusColors.navyBackground} />
       <View style={styles.container}>
+        {/* Header com alternância Mensal / Semanal */}
         <View style={styles.header}>
-          <Text style={styles.title}>Agenda & Rotinas</Text>
-          <Text style={styles.subtitle}>
-            Sincronizado com seus blocos e metas
-          </Text>
+          <View>
+            <Text style={styles.title}>Agenda & Rotinas</Text>
+            <Text style={styles.subtitle}>Sincronizado com seus blocos e metas</Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.toggleViewBtn}
+            onPress={() => setIsMonthView(!isMonthView)}
+            activeOpacity={0.7}>
+            <Ionicons
+              name={isMonthView ? 'calendar-outline' : 'grid-outline'}
+              size={18}
+              color={MomentusColors.emeraldNeon}
+            />
+            <Text style={styles.toggleViewText}>
+              {isMonthView ? 'Semana' : 'Mês'}
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Horizontal Calendar Strip */}
-        <View style={styles.stripContainer}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.stripScroll}>
-            {dates.map((item) => {
-              const isSelected = selectedDate === item.dateStr;
-              const isToday = todayStr === item.dateStr;
-              return (
-                <TouchableOpacity
-                  key={item.dateStr}
-                  onPress={() => setSelectedDate(item.dateStr)}
-                  style={[
-                    styles.dateBox,
-                    isSelected && styles.dateBoxSelected,
-                    isToday && !isSelected && styles.dateBoxToday,
-                  ]}>
-                  <Text
-                    style={[
-                      styles.dayName,
-                      isSelected && styles.dayNameSelected,
-                      isToday && !isSelected && { color: MomentusColors.emeraldNeon },
-                    ]}>
-                    {item.dayName.toUpperCase()}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.dayNumber,
-                      isSelected && styles.dayNumberSelected,
-                    ]}>
-                    {item.dayNumber}
-                  </Text>
-                  {isToday && <View style={styles.todayIndicator} />}
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
+        {/* Visão Mensal ou Visão de Fita Semanal */}
+        {isMonthView ? (
+          <View style={styles.monthCard}>
+            <View style={styles.monthHeaderRow}>
+              <TouchableOpacity onPress={prevMonth} style={styles.monthNavBtn}>
+                <Ionicons name="chevron-back" size={18} color={MomentusColors.textPrimary} />
+              </TouchableOpacity>
+              <Text style={styles.monthTitle}>
+                {MONTH_NAMES[month]} {year}
+              </Text>
+              <TouchableOpacity onPress={nextMonth} style={styles.monthNavBtn}>
+                <Ionicons name="chevron-forward" size={18} color={MomentusColors.textPrimary} />
+              </TouchableOpacity>
+            </View>
 
-        {/* Selected Date Summary Card */}
+            <View style={styles.weekdaysHeader}>
+              {WEEKDAYS.map((w, idx) => (
+                <Text key={idx} style={styles.weekdayHeaderText}>
+                  {w}
+                </Text>
+              ))}
+            </View>
+
+            <View style={styles.daysGrid}>
+              {calendarDays.map((item, index) => {
+                if (!item) {
+                  return <View key={`blank-${index}`} style={styles.dayGridCell} />;
+                }
+                const isSelected = selectedDate === item.dateStr;
+                const isToday = todayStr === item.dateStr;
+                const hasEvents = habits.some((h) => h.date === item.dateStr);
+
+                return (
+                  <TouchableOpacity
+                    key={item.dateStr}
+                    onPress={() => setSelectedDate(item.dateStr)}
+                    style={[
+                      styles.dayGridCell,
+                      isSelected && styles.dayGridCellSelected,
+                      isToday && !isSelected && styles.dayGridCellToday,
+                    ]}
+                    activeOpacity={0.7}>
+                    <Text
+                      style={[
+                        styles.dayGridText,
+                        isSelected && styles.dayGridTextSelected,
+                        isToday && !isSelected && styles.dayGridTextToday,
+                      ]}>
+                      {item.dayNumber}
+                    </Text>
+                    {hasEvents && !isSelected && (
+                      <View style={styles.hasEventsDot} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        ) : (
+          <View style={styles.stripContainer}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.stripScroll}>
+              {stripDates.map((item) => {
+                const isSelected = selectedDate === item.dateStr;
+                const isToday = todayStr === item.dateStr;
+                const hasEvents = habits.some((h) => h.date === item.dateStr);
+
+                return (
+                  <TouchableOpacity
+                    key={item.dateStr}
+                    onPress={() => setSelectedDate(item.dateStr)}
+                    style={[
+                      styles.dateBox,
+                      isSelected && styles.dateBoxSelected,
+                      isToday && !isSelected && styles.dateBoxToday,
+                    ]}
+                    activeOpacity={0.7}>
+                    <Text
+                      style={[
+                        styles.dayName,
+                        isSelected && styles.dayNameSelected,
+                        isToday && !isSelected && { color: MomentusColors.emeraldNeon },
+                      ]}>
+                      {item.dayName.toUpperCase()}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.dayNumber,
+                        isSelected && styles.dayNumberSelected,
+                      ]}>
+                      {item.dayNumber}
+                    </Text>
+                    {hasEvents && (
+                      <View
+                        style={[
+                          styles.todayIndicator,
+                          isSelected && { backgroundColor: '#0F172A' },
+                        ]}
+                      />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Resumo do Dia Selecionado */}
         <View style={styles.summaryCard}>
           <View style={styles.summaryLeft}>
-            <Ionicons name="calendar" size={24} color={MomentusColors.emeraldNeon} />
+            <View style={styles.summaryIconBox}>
+              <Ionicons name="calendar" size={20} color={MomentusColors.emeraldNeon} />
+            </View>
             <View>
               <Text style={styles.summaryDateText}>
                 {selectedDate === todayStr ? 'Hoje' : selectedDate}
@@ -110,52 +284,101 @@ export default function CalendarScreen() {
           </View>
 
           <TouchableOpacity
-            onPress={() => setModalVisible(true)}
-            style={styles.addBtn}>
+            onPress={() => {
+              setHabitToEdit(null);
+              setModalVisible(true);
+            }}
+            style={styles.addBtn}
+            activeOpacity={0.8}>
             <Ionicons name="add" size={18} color="#0F172A" />
             <Text style={styles.addBtnText}>Adicionar</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Habit List for Date */}
+        {/* Timeline Vertical para a data */}
         <ScrollView
           style={styles.habitsScroll}
           contentContainerStyle={styles.habitsContent}
           showsVerticalScrollIndicator={false}>
           {habitsForDate.length === 0 ? (
             <View style={styles.emptyView}>
-              <Ionicons name="sparkles-outline" size={42} color={MomentusColors.textMuted} />
+              <Ionicons name="sparkles-outline" size={42} color={MomentusColors.textSecondary} />
               <Text style={styles.emptyTitle}>Nenhum evento neste dia</Text>
               <Text style={styles.emptySubtitle}>
-                Aproveite o tempo livre ou adicione uma nova rotina.
+                Aproveite o tempo livre ou planeje uma nova rotina.
               </Text>
               <TouchableOpacity
-                onPress={() => setModalVisible(true)}
-                style={styles.emptyActionBtn}>
+                onPress={() => {
+                  setHabitToEdit(null);
+                  setModalVisible(true);
+                }}
+                style={styles.emptyActionBtn}
+                activeOpacity={0.8}>
                 <Ionicons name="add-circle" size={18} color={MomentusColors.emeraldNeon} />
                 <Text style={styles.emptyActionText}>Criar para esta data</Text>
               </TouchableOpacity>
             </View>
           ) : (
-            habitsForDate.map((habit) => {
-              const category = categories.find((c) => c.id === habit.categoryId);
-              return (
-                <HabitItemCard
-                  key={habit.id}
-                  habit={habit}
-                  category={category}
-                  onToggle={toggleHabit}
-                  onDelete={deleteHabit}
-                />
-              );
-            })
+            <View style={styles.timelineList}>
+              {habitsForDate.map((habit, index) => {
+                const category = categories.find((c) => c.id === habit.categoryId) || {
+                  id: 'default',
+                  name: 'Geral',
+                  color: '#34D399',
+                };
+
+                return (
+                  <TimelineEventItem
+                    key={habit.id}
+                    item={habit}
+                    category={category}
+                    isChecked={habit.completed}
+                    isFirst={index === 0}
+                    isLast={index === habitsForDate.length - 1}
+                    onCheckedChange={() => toggleHabit(habit.id)}
+                    onClick={() => setSelectedDetailHabit(habit)}
+                    onLongClick={() => {}}
+                  />
+                );
+              })}
+            </View>
           )}
-          <View style={{ height: 40 }} />
+
+          <View style={{ height: 90 }} />
         </ScrollView>
 
+        {/* Diálogo de Detalhes */}
+        <EventDetailDialog
+          visible={!!selectedDetailHabit}
+          event={selectedDetailHabit}
+          category={
+            selectedDetailHabit
+              ? categories.find((c) => c.id === selectedDetailHabit.categoryId)
+              : undefined
+          }
+          onDismiss={() => setSelectedDetailHabit(null)}
+          onEditClick={() => {
+            const h = selectedDetailHabit;
+            setSelectedDetailHabit(null);
+            setHabitToEdit(h);
+            setModalVisible(true);
+          }}
+          onDeleteClick={() => {
+            if (selectedDetailHabit) {
+              handleDeleteSingle(selectedDetailHabit);
+            }
+          }}
+        />
+
+        {/* Diálogo de Nova / Editar Rotina */}
         <NewHabitModal
           visible={modalVisible}
-          onClose={() => setModalVisible(false)}
+          habitToEdit={habitToEdit}
+          initialDate={selectedDate}
+          onClose={() => {
+            setModalVisible(false);
+            setHabitToEdit(null);
+          }}
         />
       </View>
     </SafeAreaView>
@@ -174,8 +397,11 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingTop: 16,
     marginBottom: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   title: {
     color: MomentusColors.textPrimary,
@@ -186,6 +412,102 @@ const styles = StyleSheet.create({
     color: MomentusColors.textSecondary,
     fontSize: 13,
     marginTop: 2,
+  },
+  toggleViewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(52, 211, 153, 0.12)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(52, 211, 153, 0.3)',
+  },
+  toggleViewText: {
+    color: MomentusColors.emeraldNeon,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  monthCard: {
+    marginHorizontal: 20,
+    marginBottom: 16,
+    backgroundColor: MomentusColors.navySurface,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: MomentusColors.navyOutline,
+    padding: 16,
+  },
+  monthHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  monthNavBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  monthTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: MomentusColors.textPrimary,
+  },
+  weekdaysHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+  },
+  weekdayHeaderText: {
+    width: `${100 / 7}%`,
+    textAlign: 'center',
+    fontSize: 11,
+    fontWeight: '700',
+    color: 'rgba(52, 211, 153, 0.7)',
+  },
+  daysGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  dayGridCell: {
+    width: `${100 / 7}%`,
+    aspectRatio: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 16,
+    position: 'relative',
+  },
+  dayGridCellSelected: {
+    backgroundColor: MomentusColors.emeraldNeon,
+  },
+  dayGridCellToday: {
+    borderWidth: 1,
+    borderColor: MomentusColors.emeraldNeon,
+  },
+  dayGridText: {
+    fontSize: 13,
+    color: MomentusColors.textPrimary,
+    fontWeight: '500',
+  },
+  dayGridTextSelected: {
+    color: '#0F172A',
+    fontWeight: '800',
+  },
+  dayGridTextToday: {
+    color: MomentusColors.emeraldNeon,
+    fontWeight: '700',
+  },
+  hasEventsDot: {
+    position: 'absolute',
+    bottom: 4,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: MomentusColors.emeraldNeon,
   },
   stripContainer: {
     marginBottom: 16,
@@ -241,10 +563,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginBottom: 16,
     backgroundColor: MomentusColors.navySurface,
-    borderRadius: 18,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: MomentusColors.navyOutline,
-    padding: 14,
+    padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -253,6 +575,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+  },
+  summaryIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(52, 211, 153, 0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   summaryDateText: {
     color: MomentusColors.textPrimary,
@@ -268,15 +598,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: MomentusColors.emeraldNeon,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 14,
     gap: 4,
   },
   addBtnText: {
     color: '#0F172A',
     fontWeight: 'bold',
-    fontSize: 12,
+    fontSize: 13,
   },
   habitsScroll: {
     flex: 1,
@@ -286,42 +616,48 @@ const styles = StyleSheet.create({
   },
   emptyView: {
     backgroundColor: MomentusColors.navySurface,
-    borderRadius: 20,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: MomentusColors.navyOutline,
-    padding: 32,
+    padding: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 20,
+    marginTop: 10,
   },
   emptyTitle: {
     color: MomentusColors.textPrimary,
     fontSize: 16,
     fontWeight: 'bold',
-    marginTop: 12,
+    marginTop: 14,
     marginBottom: 4,
   },
   emptySubtitle: {
     color: MomentusColors.textSecondary,
     fontSize: 13,
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 18,
   },
   emptyActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(52, 211, 153, 0.15)',
+    backgroundColor: 'rgba(52, 211, 153, 0.12)',
     borderWidth: 1,
     borderColor: MomentusColors.emeraldNeon,
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 14,
   },
   emptyActionText: {
     color: MomentusColors.emeraldNeon,
-    fontWeight: '600',
+    fontWeight: '700',
     fontSize: 13,
   },
+  timelineList: {
+    backgroundColor: MomentusColors.navySurface,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: MomentusColors.navyOutline,
+    paddingVertical: 12,
+  },
 });
-

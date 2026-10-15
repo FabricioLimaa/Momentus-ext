@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,151 +8,329 @@ import {
   SafeAreaView,
   Platform,
   StatusBar,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { MomentusColors } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
-import { LevelProgressBar } from '@/components/momentus/LevelProgressBar';
-import { StreakCard } from '@/components/momentus/StreakCard';
-import { HabitItemCard } from '@/components/momentus/HabitItemCard';
+import { GlassCard } from '@/components/momentus/GlassCard';
+import { TimelineEventItem } from '@/components/momentus/TimelineEventItem';
+import { EventDetailDialog } from '@/components/momentus/EventDetailDialog';
 import { NewHabitModal } from '@/components/momentus/NewHabitModal';
-import { getTodayDateString } from '@/constants/initialData';
+import { getTodayDateString, getStreakColor } from '@/constants/initialData';
+import { HabitItem } from '@/types';
 
 export default function HomeScreen() {
-  const { habits, categories, toggleHabit, deleteHabit } = useMomentus();
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectedFilterCategory, setSelectedFilterCategory] = useState<string | null>(null);
+  const router = useRouter();
+  const {
+    habits,
+    categories,
+    userProfile,
+    toggleHabit,
+    deleteHabit,
+    deleteMultipleHabits,
+  } = useMomentus();
+
+  // Estados de modais
+  const [isAddModalVisible, setIsAddModalVisible] = useState(false);
+  const [habitToEdit, setHabitToEdit] = useState<HabitItem | null>(null);
+  const [selectedDetailHabit, setSelectedDetailHabit] = useState<HabitItem | null>(null);
+
+  // Estados de seleção múltipla
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedHabitIds, setSelectedHabitIds] = useState<string[]>([]);
 
   const todayStr = getTodayDateString();
-  const todayHabits = habits.filter((h) => h.date === todayStr);
+  const todayHabits = useMemo(() => {
+    return habits
+      .filter((h) => h.date === todayStr)
+      .sort((a, b) => a.timeStart.localeCompare(b.timeStart));
+  }, [habits, todayStr]);
 
-  const filteredHabits = selectedFilterCategory
-    ? todayHabits.filter((h) => h.categoryId === selectedFilterCategory)
-    : todayHabits;
+  const totalToday = todayHabits.length;
+  const completionsToday = todayHabits.filter((h) => h.completed).length;
+  const progress = totalToday > 0 ? completionsToday / totalToday : 0;
+
+  // Frase motivacional idêntica ao Jetpack Compose HomeScreen.kt
+  const motivationalText = useMemo(() => {
+    if (totalToday === 0) return 'Dia livre! Que tal planejar algo novo? ✨';
+    if (completionsToday === 0) return 'Vamos começar? O primeiro passo! 🚀';
+    if (progress < 0.5) return 'Ótimo começo! Continue focado. 💪';
+    if (progress < 1.0) return 'Mais da metade concluído! Você está quase lá. ⚡';
+    return 'Dia perfeito! Você conquistou todas as suas metas! 🏆';
+  }, [totalToday, completionsToday, progress]);
+
+  // Saudação por horário
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Bom dia,';
+    if (hour < 18) return 'Boa tarde,';
+    return 'Boa noite,';
+  }, []);
+
+  const userName = userProfile.name ? userProfile.name.split(' ')[0] : 'Explorador';
+
+  // Toggle seleção múltipla
+  const handleToggleSelectHabit = (id: string) => {
+    setSelectedHabitIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedHabitIds.length === todayHabits.length) {
+      setSelectedHabitIds([]);
+    } else {
+      setSelectedHabitIds(todayHabits.map((h) => h.id));
+    }
+  };
+
+  const handleClearSelection = () => {
+    setIsSelectionMode(false);
+    setSelectedHabitIds([]);
+  };
+
+  const handleConfirmDeleteSelected = () => {
+    if (selectedHabitIds.length === 0) return;
+    Alert.alert(
+      'Excluir Selecionadas',
+      `Tem certeza que deseja excluir as ${selectedHabitIds.length} rotinas selecionadas?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir Todas',
+          style: 'destructive',
+          onPress: () => {
+            deleteMultipleHabits(selectedHabitIds);
+            handleClearSelection();
+          },
+        },
+      ]
+    );
+  };
+
+  const handleConfirmDeleteSingle = (habit: HabitItem) => {
+    Alert.alert(
+      'Excluir Rotina',
+      'Deseja realmente remover esta rotina? Esta ação não poderá ser desfeita.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: () => {
+            deleteHabit(habit.id);
+            setSelectedDetailHabit(null);
+          },
+        },
+      ]
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor={MomentusColors.navyBackground} />
       <View style={styles.container}>
+        {/* TopBar no modo de seleção múltipla */}
+        {isSelectionMode ? (
+          <View style={styles.selectionTopBar}>
+            <TouchableOpacity onPress={handleClearSelection} style={styles.iconButton}>
+              <Ionicons name="close" size={24} color={MomentusColors.textPrimary} />
+            </TouchableOpacity>
+
+            <Text style={styles.selectionCountText}>
+              {selectedHabitIds.length} selecionada{selectedHabitIds.length === 1 ? '' : 's'}
+            </Text>
+
+            <View style={styles.selectionActions}>
+              <TouchableOpacity onPress={handleSelectAll} style={styles.iconButton}>
+                <Ionicons
+                  name={
+                    selectedHabitIds.length === todayHabits.length && todayHabits.length > 0
+                      ? 'checkbox'
+                      : 'checkbox-outline'
+                  }
+                  size={22}
+                  color={MomentusColors.emeraldNeon}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleConfirmDeleteSelected}
+                disabled={selectedHabitIds.length === 0}
+                style={[
+                  styles.iconButton,
+                  selectedHabitIds.length === 0 && { opacity: 0.4 },
+                ]}>
+                <Ionicons name="trash-outline" size={22} color={MomentusColors.errorRed} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : null}
+
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}>
-          {/* Header & Level Info */}
-          <LevelProgressBar />
-
-          {/* Streak & Today Motivation Card */}
-          <StreakCard />
-
-          {/* Category Filter Pills */}
-          <View style={styles.filterSection}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
-              <TouchableOpacity
-                onPress={() => setSelectedFilterCategory(null)}
-                style={[
-                  styles.filterPill,
-                  selectedFilterCategory === null && styles.filterPillActive,
-                ]}>
-                <Text
-                  style={[
-                    styles.filterPillText,
-                    selectedFilterCategory === null && styles.filterPillTextActive,
-                  ]}>
-                  Todas ({todayHabits.length})
-                </Text>
-              </TouchableOpacity>
-
-              {categories.map((cat) => {
-                const count = todayHabits.filter((h) => h.categoryId === cat.id).length;
-                const isActive = selectedFilterCategory === cat.id;
-                return (
-                  <TouchableOpacity
-                    key={cat.id}
-                    onPress={() => setSelectedFilterCategory(isActive ? null : cat.id)}
-                    style={[
-                      styles.filterPill,
-                      isActive && {
-                        backgroundColor: `${cat.color}25`,
-                        borderColor: cat.color,
-                      },
-                    ]}>
-                    <View style={[styles.filterDot, { backgroundColor: cat.color }]} />
-                    <Text
-                      style={[
-                        styles.filterPillText,
-                        isActive && { color: cat.color, fontWeight: '700' },
-                      ]}>
-                      {cat.name} ({count})
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-
-          {/* Habit List Header */}
-          <View style={styles.listHeaderRow}>
+          {/* 1. Header de Saudação (Mockup 3) */}
+          <View style={styles.homeHeader}>
             <View>
-              <Text style={styles.sectionTitle}>Rotinas de Hoje</Text>
-              <Text style={styles.sectionSubtitle}>
-                {todayHabits.filter((h) => h.completed).length} de {todayHabits.length} concluídas
-              </Text>
+              <Text style={styles.greetingText}>{greeting}</Text>
+              <Text style={styles.userNameText}>{userName} 👋</Text>
             </View>
 
             <TouchableOpacity
-              onPress={() => setModalVisible(true)}
-              style={styles.quickAddBtn}>
-              <Ionicons name="add" size={18} color="#0F172A" />
-              <Text style={styles.quickAddText}>Novo</Text>
+              onPress={() => router.push('/updates' as any)}
+              style={styles.notificationButton}
+              activeOpacity={0.7}>
+              <Ionicons name="notifications-outline" size={22} color={MomentusColors.textPrimary} />
             </TouchableOpacity>
           </View>
 
-          {/* Habit Items */}
-          {filteredHabits.length === 0 ? (
+          {/* 2. Card de Streak & Progresso Circular (Mockup 3) */}
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => router.push('/achievements' as any)}
+            style={styles.streakCardContainer}>
+            <GlassCard style={styles.streakGlassCard}>
+              <View style={styles.streakCardRow}>
+                <View style={styles.streakInfoCol}>
+                  <Text style={styles.streakLabel}>Sequência Atual</Text>
+                  <View style={styles.streakNumberRow}>
+                    <Ionicons
+                      name="flame"
+                      size={28}
+                      color={getStreakColor(userProfile.currentStreak)}
+                    />
+                    <Text style={styles.streakNumberText}>
+                      {userProfile.currentStreak} dias
+                    </Text>
+                  </View>
+                  <Text style={styles.motivationalText}>{motivationalText}</Text>
+                </View>
+
+                {/* Progresso circular estilizado */}
+                <View style={styles.circularProgressContainer}>
+                  <View style={styles.circularProgressRing}>
+                    <Text style={styles.progressPercentageText}>
+                      {Math.round(progress * 100)}%
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </GlassCard>
+          </TouchableOpacity>
+
+          {/* 3. Seção "Seu dia" com Timeline Vertical */}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Seu dia</Text>
+            <Text style={styles.sectionCountText}>
+              {completionsToday}/{totalToday} concluídas
+            </Text>
+          </View>
+
+          {todayHabits.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Ionicons name="calendar-outline" size={48} color={MomentusColors.textMuted} />
-              <Text style={styles.emptyTitle}>Nenhuma rotina encontrada</Text>
-              <Text style={styles.emptyText}>
-                Toque no botão &quot;Novo&quot; ou aplique um modelo na aba de Templates.
+              <Ionicons
+                name="calendar-outline"
+                size={48}
+                color={MomentusColors.textSecondary}
+              />
+              <Text style={styles.emptyTitle}>Nada agendado para hoje</Text>
+              <Text style={styles.emptySubtitle}>
+                Toque no + para começar sua jornada.
               </Text>
-              <TouchableOpacity
-                onPress={() => setModalVisible(true)}
-                style={styles.emptyAddBtn}>
-                <Ionicons name="add-circle-outline" size={20} color={MomentusColors.emeraldNeon} />
-                <Text style={styles.emptyAddBtnText}>Adicionar Rotina</Text>
-              </TouchableOpacity>
             </View>
           ) : (
-            filteredHabits.map((habit) => {
-              const category = categories.find((c) => c.id === habit.categoryId);
-              return (
-                <HabitItemCard
-                  key={habit.id}
-                  habit={habit}
-                  category={category}
-                  onToggle={toggleHabit}
-                  onDelete={deleteHabit}
-                />
-              );
-            })
+            <View style={styles.timelineList}>
+              {todayHabits.map((habit, index) => {
+                const category = categories.find((c) => c.id === habit.categoryId) || {
+                  id: 'default',
+                  name: 'Geral',
+                  color: '#34D399',
+                };
+
+                const isSelected = selectedHabitIds.includes(habit.id);
+
+                return (
+                  <TimelineEventItem
+                    key={habit.id}
+                    item={habit}
+                    category={category}
+                    isChecked={habit.completed}
+                    isFirst={index === 0}
+                    isLast={index === todayHabits.length - 1}
+                    isSelected={isSelected}
+                    isSelectionMode={isSelectionMode}
+                    onCheckedChange={() => toggleHabit(habit.id)}
+                    onClick={() => {
+                      if (isSelectionMode) {
+                        handleToggleSelectHabit(habit.id);
+                      } else {
+                        setSelectedDetailHabit(habit);
+                      }
+                    }}
+                    onLongClick={() => {
+                      if (!isSelectionMode) {
+                        setIsSelectionMode(true);
+                        setSelectedHabitIds([habit.id]);
+                      }
+                    }}
+                  />
+                );
+              })}
+            </View>
           )}
 
-          {/* Bottom spacing */}
-          <View style={{ height: 40 }} />
+          <View style={{ height: 90 }} />
         </ScrollView>
 
-        {/* Floating Action Button */}
-        <TouchableOpacity
-          onPress={() => setModalVisible(true)}
-          style={styles.fab}
-          activeOpacity={0.8}>
-          <Ionicons name="add" size={30} color="#0F172A" />
-        </TouchableOpacity>
+        {/* Floating Action Button (+) */}
+        {!isSelectionMode && (
+          <TouchableOpacity
+            style={styles.fab}
+            activeOpacity={0.85}
+            onPress={() => {
+              setHabitToEdit(null);
+              setIsAddModalVisible(true);
+            }}>
+            <Ionicons name="add" size={30} color="#0F172A" />
+          </TouchableOpacity>
+        )}
 
-        {/* Modal for adding new habit */}
+        {/* Modal de Detalhes do Evento */}
+        <EventDetailDialog
+          visible={!!selectedDetailHabit}
+          event={selectedDetailHabit}
+          category={
+            selectedDetailHabit
+              ? categories.find((c) => c.id === selectedDetailHabit.categoryId)
+              : undefined
+          }
+          onDismiss={() => setSelectedDetailHabit(null)}
+          onEditClick={() => {
+            const h = selectedDetailHabit;
+            setSelectedDetailHabit(null);
+            setHabitToEdit(h);
+            setIsAddModalVisible(true);
+          }}
+          onDeleteClick={() => {
+            if (selectedDetailHabit) {
+              handleConfirmDeleteSingle(selectedDetailHabit);
+            }
+          }}
+        />
+
+        {/* Modal de Criação / Edição de Rotina */}
         <NewHabitModal
-          visible={modalVisible}
-          onClose={() => setModalVisible(false)}
+          visible={isAddModalVisible}
+          habitToEdit={habitToEdit}
+          initialDate={todayStr}
+          onClose={() => {
+            setIsAddModalVisible(false);
+            setHabitToEdit(null);
+          }}
         />
       </View>
     </SafeAreaView>
@@ -169,118 +347,168 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: MomentusColors.navyBackground,
   },
+  selectionTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: MomentusColors.navySurface,
+    borderBottomWidth: 1,
+    borderBottomColor: MomentusColors.navyOutline,
+  },
+  selectionCountText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: MomentusColors.textPrimary,
+  },
+  selectionActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  iconButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 80,
+    paddingTop: 16,
   },
-  filterSection: {
-    marginBottom: 16,
-  },
-  filterScroll: {
-    gap: 8,
-  },
-  filterPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: MomentusColors.navySurface,
-    borderWidth: 1,
-    borderColor: MomentusColors.navyOutline,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 14,
-    gap: 6,
-  },
-  filterPillActive: {
-    backgroundColor: 'rgba(52, 211, 153, 0.15)',
-    borderColor: MomentusColors.emeraldNeon,
-  },
-  filterDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  filterPillText: {
-    color: MomentusColors.textSecondary,
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  filterPillTextActive: {
-    color: MomentusColors.emeraldNeon,
-    fontWeight: '700',
-  },
-  listHeaderRow: {
+  homeHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 24,
   },
-  sectionTitle: {
-    color: MomentusColors.textPrimary,
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  sectionSubtitle: {
+  greetingText: {
+    fontSize: 14,
     color: MomentusColors.textSecondary,
-    fontSize: 12,
+    fontWeight: '600',
+  },
+  userNameText: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: MomentusColors.textPrimary,
     marginTop: 2,
   },
-  quickAddBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: MomentusColors.emeraldNeon,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    gap: 4,
-  },
-  quickAddText: {
-    color: '#0F172A',
-    fontWeight: 'bold',
-    fontSize: 13,
-  },
-  emptyContainer: {
+  notificationButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: MomentusColors.navySurface,
-    borderRadius: 20,
     borderWidth: 1,
     borderColor: MomentusColors.navyOutline,
-    padding: 32,
-    alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 10,
+    alignItems: 'center',
   },
-  emptyTitle: {
-    color: MomentusColors.textPrimary,
-    fontSize: 16,
-    fontWeight: '700',
-    marginTop: 12,
-    marginBottom: 6,
+  streakCardContainer: {
+    marginBottom: 32,
   },
-  emptyText: {
-    color: MomentusColors.textSecondary,
+  streakGlassCard: {
+    padding: 20,
+  },
+  streakCardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  streakInfoCol: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  streakLabel: {
     fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 18,
-    marginBottom: 16,
+    color: MomentusColors.textSecondary,
+    fontWeight: '600',
   },
-  emptyAddBtn: {
+  streakNumberRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    backgroundColor: 'rgba(52, 211, 153, 0.12)',
-    borderWidth: 1,
-    borderColor: MomentusColors.emeraldNeon,
+    marginVertical: 4,
   },
-  emptyAddBtnText: {
-    color: MomentusColors.emeraldNeon,
-    fontWeight: '600',
+  streakNumberText: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: MomentusColors.textPrimary,
+  },
+  motivationalText: {
     fontSize: 13,
+    fontWeight: '700',
+    color: MomentusColors.emeraldNeon,
+    marginTop: 2,
+    lineHeight: 18,
+  },
+  circularProgressContainer: {
+    width: 80,
+    height: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  circularProgressRing: {
+    width: 74,
+    height: 74,
+    borderRadius: 37,
+    borderWidth: 6,
+    borderColor: MomentusColors.emeraldNeon,
+    backgroundColor: 'rgba(52, 211, 153, 0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  progressPercentageText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: MomentusColors.textPrimary,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: MomentusColors.textPrimary,
+  },
+  sectionCountText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: MomentusColors.textSecondary,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 48,
+    backgroundColor: MomentusColors.navySurface,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: MomentusColors.navyOutline,
+    marginTop: 8,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: MomentusColors.textPrimary,
+    marginTop: 12,
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    color: MomentusColors.textSecondary,
+    marginTop: 4,
+  },
+  timelineList: {
+    backgroundColor: MomentusColors.navySurface,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: MomentusColors.navyOutline,
+    paddingVertical: 12,
   },
   fab: {
     position: 'absolute',
@@ -290,11 +518,11 @@ const styles = StyleSheet.create({
     height: 58,
     borderRadius: 29,
     backgroundColor: MomentusColors.emeraldNeon,
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
     shadowColor: MomentusColors.emeraldNeon,
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.45,
     shadowRadius: 10,
     elevation: 8,
   },
