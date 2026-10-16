@@ -18,13 +18,15 @@ import { auth } from '@/config/firebase';
 const WEB_CLIENT_ID =
   '809975381863-j908mdo3bdrf1falefo4ttivaqd60lji.apps.googleusercontent.com';
 
-try {
-  GoogleSignin.configure({
-    webClientId: WEB_CLIENT_ID,
-    offlineAccess: true,
-  });
-} catch (e) {
-  console.warn('Erro ao configurar GoogleSignin:', e);
+if (Platform.OS !== 'web') {
+  try {
+    GoogleSignin.configure({
+      webClientId: WEB_CLIENT_ID,
+      offlineAccess: true,
+    });
+  } catch (e) {
+    console.warn('Erro ao configurar GoogleSignin:', e);
+  }
 }
 
 /**

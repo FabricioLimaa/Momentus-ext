@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useMemo, useRef } from 'react';
-import { useColorScheme, Alert } from 'react-native';
+import { useColorScheme, Alert, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
@@ -889,6 +889,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Escuta interações com notificações (botões "Concluir" e "Adiar 15 min" ou toque para abrir ReminderModal)
   useEffect(() => {
+    if (Platform.OS === 'web') return;
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
       const actionId = response.actionIdentifier;
       const data = response.notification.request.content.data as {

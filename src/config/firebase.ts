@@ -1,10 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import {
-  initializeAuth,
-  getAuth,
-} from 'firebase/auth';
-// @ts-expect-error react-native persistence entrypoint
-import { getReactNativePersistence } from '@firebase/auth/dist/rn/index.rn';
+import * as firebaseAuth from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -25,14 +20,18 @@ const firebaseConfig = {
 export const firebaseApp =
   getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Inicializa o Firebase Auth com persistência assíncrona no React Native
+// Inicializa o Firebase Auth com persistência assíncrona no React Native e fallback seguro para Web
 export const auth = (() => {
   try {
-    return initializeAuth(firebaseApp, {
-      persistence: getReactNativePersistence(AsyncStorage),
-    });
+    const getRnPersistence = (firebaseAuth as any).getReactNativePersistence;
+    if (typeof getRnPersistence === 'function') {
+      return firebaseAuth.initializeAuth(firebaseApp, {
+        persistence: getRnPersistence(AsyncStorage),
+      });
+    }
+    return firebaseAuth.getAuth(firebaseApp);
   } catch {
-    return getAuth(firebaseApp);
+    return firebaseAuth.getAuth(firebaseApp);
   }
 })();
 

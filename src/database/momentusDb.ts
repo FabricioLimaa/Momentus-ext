@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import { Platform } from 'react-native';
 import {
   Category,
   HabitItem,
@@ -12,9 +13,12 @@ const DB_NAME = 'momentus.db';
 let dbInstance: SQLite.SQLiteDatabase | null = null;
 
 /**
- * Obtém ou inicializa a conexão com o banco SQLite.
+ * Obtém ou inicializa a conexão com o banco SQLite (Android / iOS).
  */
-export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
+export async function getDatabase(): Promise<SQLite.SQLiteDatabase | null> {
+  if (Platform.OS === 'web') {
+    return null;
+  }
   if (dbInstance) {
     return dbInstance;
   }
@@ -103,6 +107,7 @@ async function initDatabaseSchema(db: SQLite.SQLiteDatabase): Promise<void> {
 
 export async function getAllCategories(): Promise<Category[]> {
   const db = await getDatabase();
+  if (!db) return [];
   const rows = await db.getAllAsync<{
     id: string;
     name: string;
@@ -124,6 +129,7 @@ export async function getAllCategories(): Promise<Category[]> {
 
 export async function upsertCategoryDb(category: Category): Promise<void> {
   const db = await getDatabase();
+  if (!db) return;
   await db.runAsync(
     `INSERT OR REPLACE INTO categories (id, name, color, icon, stickerId, metaMinutosSemanal)
      VALUES (?, ?, ?, ?, ?, ?)`,
@@ -140,11 +146,13 @@ export async function upsertCategoryDb(category: Category): Promise<void> {
 
 export async function deleteCategoryDb(id: string): Promise<void> {
   const db = await getDatabase();
+  if (!db) return;
   await db.runAsync('DELETE FROM categories WHERE id = ?', [id]);
 }
 
 export async function setAllCategoriesDb(categories: Category[]): Promise<void> {
   const db = await getDatabase();
+  if (!db) return;
   await db.withExclusiveTransactionAsync(async (txn) => {
     await txn.runAsync('DELETE FROM categories');
     for (const cat of categories) {
@@ -170,6 +178,7 @@ export async function setAllCategoriesDb(categories: Category[]): Promise<void> 
 
 export async function getAllHabits(): Promise<HabitItem[]> {
   const db = await getDatabase();
+  if (!db) return [];
   const rows = await db.getAllAsync<{
     id: string;
     title: string;
@@ -201,6 +210,7 @@ export async function getAllHabits(): Promise<HabitItem[]> {
 
 export async function upsertHabitDb(habit: HabitItem): Promise<void> {
   const db = await getDatabase();
+  if (!db) return;
   await db.runAsync(
     `INSERT OR REPLACE INTO habits 
      (id, title, description, timeStart, timeEnd, categoryId, completed, date, streak, googleCalendarEventId, saveToGoogle)
@@ -223,18 +233,21 @@ export async function upsertHabitDb(habit: HabitItem): Promise<void> {
 
 export async function deleteHabitDb(id: string): Promise<void> {
   const db = await getDatabase();
+  if (!db) return;
   await db.runAsync('DELETE FROM habits WHERE id = ?', [id]);
 }
 
 export async function deleteMultipleHabitsDb(ids: string[]): Promise<void> {
   if (ids.length === 0) return;
   const db = await getDatabase();
+  if (!db) return;
   const placeholders = ids.map(() => '?').join(',');
   await db.runAsync(`DELETE FROM habits WHERE id IN (${placeholders})`, ids);
 }
 
 export async function setAllHabitsDb(habits: HabitItem[]): Promise<void> {
   const db = await getDatabase();
+  if (!db) return;
   await db.withExclusiveTransactionAsync(async (txn) => {
     await txn.runAsync('DELETE FROM habits');
     for (const habit of habits) {
@@ -266,6 +279,7 @@ export async function setAllHabitsDb(habits: HabitItem[]): Promise<void> {
 
 export async function getAllTemplates(): Promise<RoutineTemplate[]> {
   const db = await getDatabase();
+  if (!db) return [];
   const rows = await db.getAllAsync<{
     id: string;
     title: string;
@@ -293,6 +307,7 @@ export async function getAllTemplates(): Promise<RoutineTemplate[]> {
 
 export async function upsertTemplateDb(template: RoutineTemplate): Promise<void> {
   const db = await getDatabase();
+  if (!db) return;
   await db.runAsync(
     `INSERT OR REPLACE INTO templates (id, title, description, icon, color, itemsJson)
      VALUES (?, ?, ?, ?, ?, ?)`,
@@ -309,11 +324,13 @@ export async function upsertTemplateDb(template: RoutineTemplate): Promise<void>
 
 export async function deleteTemplateDb(id: string): Promise<void> {
   const db = await getDatabase();
+  if (!db) return;
   await db.runAsync('DELETE FROM templates WHERE id = ?', [id]);
 }
 
 export async function setAllTemplatesDb(templates: RoutineTemplate[]): Promise<void> {
   const db = await getDatabase();
+  if (!db) return;
   await db.withExclusiveTransactionAsync(async (txn) => {
     await txn.runAsync('DELETE FROM templates');
     for (const t of templates) {
@@ -332,6 +349,7 @@ export async function setAllTemplatesDb(templates: RoutineTemplate[]): Promise<v
 
 export async function getAllAchievements(): Promise<Achievement[]> {
   const db = await getDatabase();
+  if (!db) return [];
   const rows = await db.getAllAsync<{
     id: string;
     title: string;
@@ -359,6 +377,7 @@ export async function getAllAchievements(): Promise<Achievement[]> {
 
 export async function setAllAchievementsDb(achievements: Achievement[]): Promise<void> {
   const db = await getDatabase();
+  if (!db) return;
   await db.withExclusiveTransactionAsync(async (txn) => {
     await txn.runAsync('DELETE FROM achievements');
     for (const a of achievements) {
@@ -383,6 +402,7 @@ export async function setAllAchievementsDb(achievements: Achievement[]): Promise
 
 export async function getAllMarketItems(): Promise<MarketItem[]> {
   const db = await getDatabase();
+  if (!db) return [];
   const rows = await db.getAllAsync<{
     id: string;
     name: string;
@@ -410,6 +430,7 @@ export async function getAllMarketItems(): Promise<MarketItem[]> {
 
 export async function setAllMarketItemsDb(items: MarketItem[]): Promise<void> {
   const db = await getDatabase();
+  if (!db) return;
   await db.withExclusiveTransactionAsync(async (txn) => {
     await txn.runAsync('DELETE FROM market_items');
     for (const item of items) {
@@ -438,6 +459,7 @@ export async function setAllMarketItemsDb(items: MarketItem[]): Promise<void> {
 
 export async function getAppKv<T>(key: string): Promise<T | null> {
   const db = await getDatabase();
+  if (!db) return null;
   const row = await db.getFirstAsync<{ value: string }>(
     'SELECT value FROM app_kv WHERE key = ?',
     [key]
@@ -452,6 +474,7 @@ export async function getAppKv<T>(key: string): Promise<T | null> {
 
 export async function setAppKv<T>(key: string, value: T): Promise<void> {
   const db = await getDatabase();
+  if (!db) return;
   await db.runAsync(
     'INSERT OR REPLACE INTO app_kv (key, value) VALUES (?, ?)',
     [key, JSON.stringify(value)]
@@ -464,6 +487,7 @@ export async function setAppKv<T>(key: string, value: T): Promise<void> {
 
 export async function clearEntireDatabase(): Promise<void> {
   const db = await getDatabase();
+  if (!db) return;
   await db.withExclusiveTransactionAsync(async (txn) => {
     await txn.runAsync('DELETE FROM habits');
     await txn.runAsync('DELETE FROM categories');

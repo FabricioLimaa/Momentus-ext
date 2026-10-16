@@ -3,14 +3,16 @@ import { Platform } from 'react-native';
 import { HabitItem } from '@/types';
 
 // Configuração do comportamento da notificação enquanto o app estiver em primeiro plano
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+}
 
 export const CHANNEL_INICIO = 'CHANNEL_INICIO';
 export const CHANNEL_TERMINO = 'CHANNEL_TERMINO';
@@ -26,6 +28,8 @@ export const ACTION_SNOOZE_15 = 'ACTION_SNOOZE_15';
  * equivalentes ao AlarmReceiver.kt e NotificationActionReceiver.kt do projeto nativo.
  */
 export async function setupNotificationChannels(): Promise<void> {
+  if (Platform.OS === 'web') return;
+
   try {
     // Registra categorias de ações rápidas (iOS & Android)
     await Notifications.setNotificationCategoryAsync(CATEGORY_HABIT_START, [
@@ -91,6 +95,8 @@ export async function setupNotificationChannels(): Promise<void> {
  * Solicita permissões de notificação ao usuário.
  */
 export async function requestNotificationPermissions(): Promise<boolean> {
+  if (Platform.OS === 'web') return false;
+
   try {
     const settings = await Notifications.getPermissionsAsync();
     let granted =
@@ -149,8 +155,7 @@ function parseLocalDateTime(dateStr: string, timeStr: string): Date | null {
 export async function scheduleHabitNotifications(
   habit: HabitItem
 ): Promise<{ startNotificationId?: string; endNotificationId?: string }> {
-  // Se o hábito já foi concluído, não deve agendar
-  if (habit.completed) {
+  if (Platform.OS === 'web' || habit.completed) {
     return {};
   }
 
@@ -230,6 +235,8 @@ export async function snoozeHabitNotification(
   habitTitle: string,
   minutes: number = 15
 ): Promise<string | undefined> {
+  if (Platform.OS === 'web') return undefined;
+
   try {
     const snoozeDate = new Date(Date.now() + minutes * 60 * 1000);
     return await Notifications.scheduleNotificationAsync({
@@ -260,6 +267,8 @@ export async function snoozeHabitNotification(
  * Cancela notificações agendadas vinculadas a um hábito (via ID ou payload).
  */
 export async function cancelHabitNotifications(habitId: string): Promise<void> {
+  if (Platform.OS === 'web') return;
+
   try {
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
     for (const item of scheduled) {
@@ -276,6 +285,8 @@ export async function cancelHabitNotifications(habitId: string): Promise<void> {
  * Cancela todas as notificações agendadas no aplicativo.
  */
 export async function cancelAllNotifications(): Promise<void> {
+  if (Platform.OS === 'web') return;
+
   try {
     await Notifications.cancelAllScheduledNotificationsAsync();
   } catch (error) {
