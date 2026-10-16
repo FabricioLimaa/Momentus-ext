@@ -8,9 +8,10 @@ import {
   GoogleAuthProvider,
   OAuthProvider,
   signInWithCredential,
+  signInWithPopup,
 } from 'firebase/auth';
 import type { GoogleSignin as GoogleSigninType } from '@react-native-google-signin/google-signin';
-import { Platform } from 'react-native';
+import { Platform, TurboModuleRegistry } from 'react-native';
 import { auth } from '@/config/firebase';
 
 // Web Client ID configurado no google-services.json do Momentus
@@ -20,14 +21,21 @@ const WEB_CLIENT_ID =
 let cachedGoogleSignin: typeof GoogleSigninType | null | undefined;
 
 /**
- * Carrega o módulo nativo do Google Sign-In sob demanda para evitar que o
- * TurboModuleRegistry.getEnforcing('RNGoogleSignin') cause crash no Expo Go ou na Web.
+ * Verifica previamente via TurboModuleRegistry.get('RNGoogleSignin') se o binário nativo
+ * possui o módulo registrado ANTES de chamar require('@react-native-google-signin/google-signin').
+ * Isso impede que o getEnforcing('RNGoogleSignin') interno da biblioteca dispare RedBox no Expo Go.
  */
 function getGoogleSignin(): typeof GoogleSigninType | null {
   if (Platform.OS === 'web') return null;
   if (cachedGoogleSignin !== undefined) return cachedGoogleSignin;
 
   try {
+    const hasNativeModule = TurboModuleRegistry.get('RNGoogleSignin') != null;
+    if (!hasNativeModule) {
+      cachedGoogleSignin = null;
+      return null;
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { GoogleSignin } = require('@react-native-google-signin/google-signin');
     GoogleSignin.configure({
@@ -36,8 +44,7 @@ function getGoogleSignin(): typeof GoogleSigninType | null {
     });
     cachedGoogleSignin = GoogleSignin;
     return cachedGoogleSignin ?? null;
-  } catch (e) {
-    console.warn('Módulo nativo RNGoogleSignin indisponível neste ambiente (ex: Expo Go):', e);
+  } catch {
     cachedGoogleSignin = null;
     return null;
   }
@@ -67,13 +74,19 @@ export async function registerWithEmail(
 }
 
 /**
- * Realiza login nativo com o Google (Android / iOS).
+ * Realiza login com o Google (Popup na Web / Nativo no Android e iOS).
  */
 export async function loginWithGoogle(): Promise<User> {
+  if (Platform.OS === 'web') {
+    const provider = new GoogleAuthProvider();
+    const userCredential = await signInWithPopup(auth, provider);
+    return userCredential.user;
+  }
+
   const GoogleSignin = getGoogleSignin();
   if (!GoogleSignin) {
     throw new Error(
-      'O Login nativo com Google requer um Development Build (EAS/APK). No Expo Go ou Web, utilize o login com E-mail e Senha.'
+      'O Login nativo com Google requer um Development Build (EAS/APK). No Expo Go, utilize o login com E-mail e Senha.'
     );
   }
 
@@ -139,5 +152,7 @@ export async function logoutUser(): Promise<void> {
       await GoogleSignin.signOut().catch(() => {});
     }
   } catch {}
-  await signOut(auth);
+  try {
+    await signOut(auth);
+  } catch {}
 }

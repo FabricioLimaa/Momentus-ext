@@ -41,6 +41,13 @@ function getNotifications(): LocalNotificationsApi | null {
   if (cachedNotifications !== undefined) return cachedNotifications;
 
   try {
+    // No Expo Go Android (SDK 53+), o NotificationsChannelsProvider nativo foi desativado pelo Expo
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { isRunningInExpoGo } = require('expo');
+    if (Platform.OS === 'android' && typeof isRunningInExpoGo === 'function' && isRunningInExpoGo()) {
+      cachedNotifications = null;
+      return null;
+    }
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { setNotificationHandler } = require('expo-notifications/build/NotificationsHandler');
     // eslint-disable-next-line @typescript-eslint/no-require-imports

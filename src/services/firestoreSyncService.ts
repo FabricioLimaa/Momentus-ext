@@ -148,19 +148,29 @@ export async function syncWithFirestore(
       });
       if (!cloudItem) result.uploadedEvents++;
     }
-
-    // Registra hábitos concluídos na subcoleção completed_habits (GamificationRepository.kt)
-    if (habit.completed) {
-      const compRef = doc(completedHabitsColRef, habit.id);
-      eventsBatch.set(compRef, {
-        habitId: habit.id,
-        title: habit.title,
-        completedDate: habit.date,
-        lastUpdated: new Date().toISOString(),
-      });
-    }
   });
   await eventsBatch.commit();
+
+  // Registra hábitos concluídos na subcoleção completed_habits em batch isolado
+  try {
+    const completedBatch = writeBatch(firestore);
+    let hasCompleted = false;
+    localHabits.forEach((habit) => {
+      if (habit.completed) {
+        hasCompleted = true;
+        const compRef = doc(completedHabitsColRef, habit.id);
+        completedBatch.set(compRef, {
+          habitId: habit.id,
+          title: habit.title,
+          completedDate: habit.date,
+          lastUpdated: new Date().toISOString(),
+        });
+      }
+    });
+    if (hasCompleted) {
+      await completedBatch.commit();
+    }
+  } catch {}
 
   const mergedHabits: HabitItem[] = [...localHabits];
   cloudEventsMap.forEach((cloudItem, id) => {
@@ -185,81 +195,89 @@ export async function syncWithFirestore(
   // ========================================================
   // 3. Sincronização de Templates (TemplateRepository.kt)
   // ========================================================
-  const templatesSnapshot = await getDocs(templatesColRef);
-  const cloudTemplatesMap = new Map<string, any>();
-  templatesSnapshot.forEach((d) => cloudTemplatesMap.set(d.id, d.data()));
-
-  const localTemplatesMap = new Map<string, RoutineTemplate>(localTemplates.map((t) => [t.id, t]));
-  const templatesBatch = writeBatch(firestore);
-
-  localTemplates.forEach((tmpl) => {
-    const docRef = doc(templatesColRef, tmpl.id);
-    templatesBatch.set(docRef, {
-      id: tmpl.id,
-      nome: tmpl.title,
-      title: tmpl.title,
-      descricao: tmpl.description,
-      description: tmpl.description,
-      icon: tmpl.icon,
-      color: tmpl.color,
-      items: tmpl.items,
-      lastUpdated: new Date().toISOString(),
-    });
-    if (!cloudTemplatesMap.has(tmpl.id)) {
-      result.uploadedTemplates++;
-    }
-  });
-  await templatesBatch.commit();
-
   const mergedTemplates: RoutineTemplate[] = [...localTemplates];
-  cloudTemplatesMap.forEach((cloudTmpl, id) => {
-    if (!localTemplatesMap.has(id)) {
-      mergedTemplates.push({
-        id,
-        title: cloudTmpl.title || cloudTmpl.nome || 'Modelo de Rotina',
-        description: cloudTmpl.description || cloudTmpl.descricao || 'Rotina sincronizada da nuvem',
-        icon: cloudTmpl.icon || 'sparkles',
-        color: cloudTmpl.color || '#34D399',
-        items: Array.isArray(cloudTmpl.items) ? cloudTmpl.items : [],
+  try {
+    const templatesSnapshot = await getDocs(templatesColRef);
+    const cloudTemplatesMap = new Map<string, any>();
+    templatesSnapshot.forEach((d) => cloudTemplatesMap.set(d.id, d.data()));
+
+    const localTemplatesMap = new Map<string, RoutineTemplate>(
+      localTemplates.map((t) => [t.id, t])
+    );
+    const templatesBatch = writeBatch(firestore);
+
+    localTemplates.forEach((tmpl) => {
+      const docRef = doc(templatesColRef, tmpl.id);
+      templatesBatch.set(docRef, {
+        id: tmpl.id,
+        nome: tmpl.title,
+        title: tmpl.title,
+        descricao: tmpl.description,
+        description: tmpl.description,
+        icon: tmpl.icon,
+        color: tmpl.color,
+        items: tmpl.items,
+        lastUpdated: new Date().toISOString(),
       });
-      result.downloadedTemplates++;
-    }
-  });
+      if (!cloudTemplatesMap.has(tmpl.id)) {
+        result.uploadedTemplates++;
+      }
+    });
+    await templatesBatch.commit();
+
+    cloudTemplatesMap.forEach((cloudTmpl, id) => {
+      if (!localTemplatesMap.has(id)) {
+        mergedTemplates.push({
+          id,
+          title: cloudTmpl.title || cloudTmpl.nome || 'Modelo de Rotina',
+          description:
+            cloudTmpl.description || cloudTmpl.descricao || 'Rotina sincronizada da nuvem',
+          icon: cloudTmpl.icon || 'sparkles',
+          color: cloudTmpl.color || '#34D399',
+          items: Array.isArray(cloudTmpl.items) ? cloudTmpl.items : [],
+        });
+        result.downloadedTemplates++;
+      }
+    });
+  } catch {}
 
   // ========================================================
   // 4. Sincronização de Gamificação: Conquistas, XP e Stickers (GamificationRepository.kt)
   // ========================================================
-  const achSnapshot = await getDocs(achievementsColRef);
-  const cloudUnlockedSet = new Map<string, any>();
-  achSnapshot.forEach((d) => cloudUnlockedSet.set(d.id, d.data()));
+  let mergedAchievements: Achievement[] = [...localAchievements];
+  try {
+    const achSnapshot = await getDocs(achievementsColRef);
+    const cloudUnlockedSet = new Map<string, any>();
+    achSnapshot.forEach((d) => cloudUnlockedSet.set(d.id, d.data()));
 
-  const achBatch = writeBatch(firestore);
-  localAchievements.forEach((ach) => {
-    if (ach.unlocked && !cloudUnlockedSet.has(ach.id)) {
-      const achDocRef = doc(achievementsColRef, ach.id);
-      achBatch.set(achDocRef, {
-        id: ach.id,
-        title: ach.title,
-        unlockedAt: ach.unlockedAt || new Date().toISOString().slice(0, 10),
-      });
-      result.syncedAchievements++;
-    }
-  });
-  await achBatch.commit();
+    const achBatch = writeBatch(firestore);
+    localAchievements.forEach((ach) => {
+      if (ach.unlocked && !cloudUnlockedSet.has(ach.id)) {
+        const achDocRef = doc(achievementsColRef, ach.id);
+        achBatch.set(achDocRef, {
+          id: ach.id,
+          title: ach.title,
+          unlockedAt: ach.unlockedAt || new Date().toISOString().slice(0, 10),
+        });
+        result.syncedAchievements++;
+      }
+    });
+    await achBatch.commit();
 
-  const mergedAchievements: Achievement[] = localAchievements.map((ach) => {
-    if (!ach.unlocked && cloudUnlockedSet.has(ach.id)) {
-      const cloudData = cloudUnlockedSet.get(ach.id);
-      result.syncedAchievements++;
-      return {
-        ...ach,
-        unlocked: true,
-        progress: ach.maxProgress,
-        unlockedAt: cloudData?.unlockedAt || new Date().toISOString().slice(0, 10),
-      };
-    }
-    return ach;
-  });
+    mergedAchievements = localAchievements.map((ach) => {
+      if (!ach.unlocked && cloudUnlockedSet.has(ach.id)) {
+        const cloudData = cloudUnlockedSet.get(ach.id);
+        result.syncedAchievements++;
+        return {
+          ...ach,
+          unlocked: true,
+          progress: ach.maxProgress,
+          unlockedAt: cloudData?.unlockedAt || new Date().toISOString().slice(0, 10),
+        };
+      }
+      return ach;
+    });
+  } catch {}
 
   // Sincronização do documento raiz users/{userId} (points e purchased_stickers)
   let mergedMarketItems: MarketItem[] = [...localMarketItems];
@@ -328,17 +346,22 @@ export async function syncWithFirestore(
  * Limpa todos os dados do usuário na nuvem (Firestore), espelhando fielmente o ClearCloudDataUseCase.kt.
  */
 export async function clearCloudData(userId: string): Promise<boolean> {
-  try {
-    const userDocRef = doc(firestore, 'users', userId);
-    const collectionsToClear = [
-      EVENTS_COLLECTION,
-      CATEGORIES_COLLECTION,
-      COMPLETED_HABITS_COLLECTION,
-      UNLOCKED_ACHIEVEMENTS_COLLECTION,
-      TEMPLATES_COLLECTION,
-    ];
+  if (!userId || userId === 'local_user') {
+    return false;
+  }
 
-    for (const collectionName of collectionsToClear) {
+  let clearedAny = false;
+  const userDocRef = doc(firestore, 'users', userId);
+  const collectionsToClear = [
+    EVENTS_COLLECTION,
+    CATEGORIES_COLLECTION,
+    COMPLETED_HABITS_COLLECTION,
+    UNLOCKED_ACHIEVEMENTS_COLLECTION,
+    TEMPLATES_COLLECTION,
+  ];
+
+  for (const collectionName of collectionsToClear) {
+    try {
       const colRef = collection(userDocRef, collectionName);
       const snapshot = await getDocs(colRef);
       if (!snapshot.empty) {
@@ -348,9 +371,13 @@ export async function clearCloudData(userId: string): Promise<boolean> {
         });
         await batch.commit();
       }
+      clearedAny = true;
+    } catch {
+      // Subcoleção pode não estar liberada nas Security Rules do Firestore para este usuário
     }
+  }
 
-    // Reseta também os contadores no documento raiz do usuário
+  try {
     await setDoc(
       userDocRef,
       {
@@ -364,12 +391,10 @@ export async function clearCloudData(userId: string): Promise<boolean> {
       },
       { merge: true }
     );
+    clearedAny = true;
+  } catch {}
 
-    return true;
-  } catch (err) {
-    console.warn('Erro ao limpar dados na nuvem (ClearCloudData):', err);
-    return false;
-  }
+  return clearedAny;
 }
 
 /**

@@ -90,8 +90,32 @@ export async function exportMomentusBackup(backupData: MomentusBackupPayload['da
  */
 export async function importMomentusBackup(): Promise<MomentusBackupPayload['data'] | null> {
   try {
-    if (Platform.OS === 'web') {
-      throw new Error('Importação de arquivo local não suportada no navegador.');
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      return await new Promise<MomentusBackupPayload['data'] | null>((resolve, reject) => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json,application/json';
+        input.onchange = async () => {
+          try {
+            const file = input.files?.[0];
+            if (!file) {
+              resolve(null);
+              return;
+            }
+            const text = await file.text();
+            const parsed = JSON.parse(text) as MomentusBackupPayload;
+            if (!parsed?.data || !Array.isArray(parsed.data.habits) || !Array.isArray(parsed.data.categories)) {
+              reject(new Error('Estrutura de dados do backup incompatível.'));
+              return;
+            }
+            resolve(parsed.data);
+          } catch (err) {
+            reject(err);
+          }
+        };
+        input.oncancel = () => resolve(null);
+        input.click();
+      });
     }
 
     // eslint-disable-next-line @typescript-eslint/no-require-imports

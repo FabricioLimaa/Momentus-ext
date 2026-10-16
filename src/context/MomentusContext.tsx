@@ -26,6 +26,7 @@ import { soundManager } from '@/util/soundManager';
 import { MomentusColors } from '@/constants/theme';
 import { CelebrationModal } from '@/components/momentus/CelebrationModal';
 import { ReminderModal } from '@/components/momentus/ReminderModal';
+import { WebAlertModal } from '@/components/momentus/WebAlertModal';
 import {
   scheduleHabitNotifications,
   cancelHabitNotifications,
@@ -738,8 +739,10 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const clearCloudDataAction = async (): Promise<boolean> => {
     const currentUser = firebaseAuth.currentUser;
-    const uid = currentUser?.uid || userProfile.email || 'local_user';
-    const ok = await clearCloudData(uid);
+    if (!currentUser?.uid) {
+      return false;
+    }
+    const ok = await clearCloudData(currentUser.uid);
     if (ok) {
       triggerHaptic('impact');
     }
@@ -834,7 +837,10 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const syncCloudAction = async (): Promise<void> => {
     const currentUser = firebaseAuth.currentUser;
-    const uid = currentUser?.uid || userProfile.email || 'local_user';
+    if (!currentUser?.uid) {
+      throw new Error('Faça login com sua conta Momentus para sincronizar os dados na nuvem.');
+    }
+    const uid = currentUser.uid;
 
     const {
       mergedHabits,
@@ -949,6 +955,10 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         syncCloudAction,
       }}>
       {children}
+      <WebAlertModal
+        isDark={theme.isDark}
+        primaryColor={settings.primaryColorHex || MomentusColors.emeraldNeon}
+      />
       {celebration?.visible && (
         <CelebrationModal
           visible={celebration.visible}

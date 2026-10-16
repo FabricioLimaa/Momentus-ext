@@ -1,18 +1,23 @@
-import type { ExpoCalendar } from 'expo-calendar';
+import type * as LegacyCalendarTypes from 'expo-calendar/legacy';
 import { Platform } from 'react-native';
 import { HabitItem, Category } from '@/types';
 
 export const MOMENTUS_CALENDAR_TITLE = 'Momentus - Rotinas';
 
-type ExpoCalendarModule = typeof import('expo-calendar');
-let cachedCalendarModule: ExpoCalendarModule | null | undefined;
+type LegacyCalendarModule = typeof LegacyCalendarTypes;
+let cachedCalendarModule: LegacyCalendarModule | null | undefined;
 
-function getCalendarModule(): ExpoCalendarModule | null {
+/**
+ * Utiliza a API estável 'expo-calendar/legacy' ('ExpoCalendar'),
+ * que funciona tanto em Development Builds quanto no Expo Go (diferente do CalendarNext,
+ * que possui apenas um stub inativo no Expo Go).
+ */
+function getCalendarModule(): LegacyCalendarModule | null {
   if (Platform.OS === 'web') return null;
   if (cachedCalendarModule !== undefined) return cachedCalendarModule;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    cachedCalendarModule = require('expo-calendar') as ExpoCalendarModule;
+    cachedCalendarModule = require('expo-calendar/legacy') as LegacyCalendarModule;
     return cachedCalendarModule;
   } catch (err) {
     console.warn('Módulo nativo expo-calendar indisponível neste ambiente:', err);
@@ -26,9 +31,9 @@ function getCalendarModule(): ExpoCalendarModule | null {
  */
 export async function requestDeviceCalendarPermissions(): Promise<boolean> {
   const Calendar = getCalendarModule();
-  if (!Calendar) return false;
+  if (!Calendar?.requestCalendarPermissionsAsync) return false;
   try {
-    const res = await Calendar.requestCalendarPermissions();
+    const res = await Calendar.requestCalendarPermissionsAsync();
     return res.granted;
   } catch (error) {
     console.warn('Erro ao solicitar permissões de calendário:', error);
@@ -37,14 +42,14 @@ export async function requestDeviceCalendarPermissions(): Promise<boolean> {
 }
 
 /**
- * Obtém ou cria o calendário exclusivo do Momentus ou local padrão que aceite modificações.
+ * Obtém o ID do calendário exclusivo do Momentus ou local padrão que aceite modificações.
  */
-export async function getOrCreateMomentusCalendar(): Promise<ExpoCalendar | null> {
+export async function getOrCreateMomentusCalendarId(): Promise<string | null> {
   const Calendar = getCalendarModule();
-  if (!Calendar) return null;
+  if (!Calendar?.getCalendarsAsync) return null;
 
   try {
-    const calendars = await Calendar.getCalendars(Calendar.EntityTypes.EVENT);
+    const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes?.EVENT);
     if (!calendars || calendars.length === 0) {
       return null;
     }
@@ -54,40 +59,37 @@ export async function getOrCreateMomentusCalendar(): Promise<ExpoCalendar | null
       (c) => c.title === MOMENTUS_CALENDAR_TITLE && c.allowsModifications
     );
     if (existingMomentus) {
-      return existingMomentus;
+      return existingMomentus.id;
     }
 
-    // 2. Se for Android, tentamos criar um calendário local ou usar o primário gravável
+    // 2. Se for Android, tentamos usar o primário gravável ou criar um calendário local
     if (Platform.OS === 'android') {
       const primaryWritable = calendars.find((c) => c.isPrimary && c.allowsModifications);
       if (primaryWritable) {
-        return primaryWritable;
+        return primaryWritable.id;
       }
 
-      // Tenta criar um calendário local para o Momentus
       try {
-        const created = await Calendar.createCalendar({
+        const createdId = await Calendar.createCalendarAsync({
           title: MOMENTUS_CALENDAR_TITLE,
           color: '#34D399',
-          entityType: Calendar.EntityTypes.EVENT,
+          entityType: Calendar.EntityTypes?.EVENT,
           name: 'MomentusCalendar',
           ownerAccount: 'personal',
-          accessLevel: Calendar.CalendarAccessLevel.OWNER,
+          accessLevel: Calendar.CalendarAccessLevel?.OWNER,
           source: {
             isLocalAccount: true,
             name: 'Momentus',
             type: 'LOCAL',
           },
         });
-        if (created) return created;
-      } catch (e) {
-        console.warn('Não foi possível criar calendário dedicado no Android, usando fallback:', e);
-      }
+        if (createdId) return createdId;
+      } catch {}
     }
 
     // 3. Fallback: qualquer calendário gravável no dispositivo
     const anyWritable = calendars.find((c) => c.allowsModifications);
-    return anyWritable || calendars[0] || null;
+    return anyWritable?.id || calendars[0]?.id || null;
   } catch (error) {
     console.warn('Erro ao obter calendário:', error);
     return null;
@@ -101,6 +103,17 @@ function parseLocalDateTime(dateStr: string, timeStr: string): Date {
   const [year, month, day] = dateStr.split('-').map(Number);
   const [hour, minute] = (timeStr || '08:00').split(':').map(Number);
   return new Date(year, month - 1, day, hour || 0, minute || 0, 0, 0);
+}
+
+/**
+ * Formata Date para padrão iCalendar UTC/Local (YYYYMMDDTHHMMSS) para exportação Web (.ics).
+ */
+function formatIcsDate(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return (
+    `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T` +
+    `${pad(d.getHours())}${pad(d.getMinutes())}00`
+  );
 }
 
 /**
@@ -118,8 +131,8 @@ export async function syncHabitToDeviceCalendar(
     const hasPermission = await requestDeviceCalendarPermissions();
     if (!hasPermission) return null;
 
-    const calendar = await getOrCreateMomentusCalendar();
-    if (!calendar) return null;
+    const calendarId = await getOrCreateMomentusCalendarId();
+    if (!calendarId) return null;
 
     const startDate = parseLocalDateTime(habit.date, habit.timeStart);
     let endDate = parseLocalDateTime(habit.date, habit.timeEnd || habit.timeStart);
@@ -140,23 +153,20 @@ export async function syncHabitToDeviceCalendar(
     // Se já possui googleCalendarEventId, tenta atualizar o evento existente
     if (habit.googleCalendarEventId) {
       try {
-        const existingEvent = await Calendar.ExpoCalendarEvent.get(habit.googleCalendarEventId);
-        if (existingEvent) {
-          await existingEvent.update({
-            title: habit.title,
-            startDate,
-            endDate,
-            notes,
-          });
-          return existingEvent.id;
-        }
+        const updatedId = await Calendar.updateEventAsync(habit.googleCalendarEventId, {
+          title: habit.title,
+          startDate,
+          endDate,
+          notes,
+        });
+        if (updatedId) return updatedId;
       } catch {
         // Evento pode ter sido apagado no app de calendário externo, criará um novo a seguir
       }
     }
 
     // Cria novo evento
-    const newEvent = await calendar.createEvent({
+    const newEventId = await Calendar.createEventAsync(calendarId, {
       title: habit.title,
       startDate,
       endDate,
@@ -164,7 +174,7 @@ export async function syncHabitToDeviceCalendar(
       allDay: false,
     });
 
-    return newEvent.id;
+    return newEventId;
   } catch (error) {
     console.warn(`Erro ao sincronizar hábito "${habit.title}" com o calendário nativo:`, error);
     return null;
@@ -175,42 +185,93 @@ export async function syncHabitToDeviceCalendar(
  * Remove um evento do calendário nativo do dispositivo.
  */
 export async function deleteHabitFromDeviceCalendar(calendarEventId: string): Promise<void> {
-  if (!calendarEventId) return;
+  if (!calendarEventId || Platform.OS === 'web') return;
   const Calendar = getCalendarModule();
-  if (!Calendar) return;
+  if (!Calendar?.deleteEventAsync) return;
 
   try {
     const hasPermission = await requestDeviceCalendarPermissions();
     if (!hasPermission) return;
 
-    const event = await Calendar.ExpoCalendarEvent.get(calendarEventId);
-    if (event) {
-      await event.delete();
-    }
-  } catch (error) {
-    console.warn(`Erro ao remover evento ${calendarEventId} do calendário:`, error);
-  }
+    await Calendar.deleteEventAsync(calendarEventId);
+  } catch {}
 }
 
 /**
  * Sincroniza em lote todos os hábitos marcados com saveToGoogle ou todos os hábitos ativos.
+ * Na Web, exporta automaticamente um arquivo .ics compatível com Google Calendar / Apple Calendar / Outlook.
  */
 export async function syncAllHabitsToCalendar(
   habits: HabitItem[],
   categories: Category[]
 ): Promise<{ syncedCount: number; updatedHabits: HabitItem[] }> {
+  const categoryMap = new Map<string, Category>(categories.map((c) => [c.id, c]));
+
+  // Suporte Web: gera e baixa arquivo .ics padrão para importação direta no Google/Apple Calendar
+  if (Platform.OS === 'web' && typeof document !== 'undefined') {
+    const activeHabits = habits.filter((h) => h.saveToGoogle || !h.completed);
+    if (activeHabits.length === 0) {
+      return { syncedCount: 0, updatedHabits: habits };
+    }
+
+    const lines: string[] = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Momentus//Rotinas//PT',
+      'CALSCALE:GREGORIAN',
+    ];
+
+    for (const habit of activeHabits) {
+      const startDate = parseLocalDateTime(habit.date, habit.timeStart);
+      let endDate = parseLocalDateTime(habit.date, habit.timeEnd || habit.timeStart);
+      if (endDate.getTime() <= startDate.getTime()) {
+        endDate = new Date(startDate.getTime() + 30 * 60 * 1000);
+      }
+      const cat = categoryMap.get(habit.categoryId);
+      const desc = [habit.description || '', cat ? `Categoria: ${cat.name}` : '']
+        .filter(Boolean)
+        .join(' - ');
+
+      lines.push(
+        'BEGIN:VEVENT',
+        `UID:${habit.id}@momentus.app`,
+        `DTSTAMP:${formatIcsDate(new Date())}`,
+        `DTSTART:${formatIcsDate(startDate)}`,
+        `DTEND:${formatIcsDate(endDate)}`,
+        `SUMMARY:${habit.title}`,
+        `DESCRIPTION:${desc}`,
+        'END:VEVENT'
+      );
+    }
+
+    lines.push('END:VCALENDAR');
+    const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'momentus_agenda.ics';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    return {
+      syncedCount: activeHabits.length,
+      updatedHabits: habits.map((h) =>
+        h.saveToGoogle || !h.completed ? { ...h, saveToGoogle: true } : h
+      ),
+    };
+  }
+
   const hasPermission = await requestDeviceCalendarPermissions();
   if (!hasPermission) {
     return { syncedCount: 0, updatedHabits: habits };
   }
 
-  const categoryMap = new Map<string, Category>(categories.map((c) => [c.id, c]));
   let count = 0;
-
   const updatedHabits: HabitItem[] = [];
 
   for (const habit of habits) {
-    // Sincroniza hábitos com saveToGoogle ativado ou tarefas pendentes
     if (habit.saveToGoogle || !habit.completed) {
       const eventId = await syncHabitToDeviceCalendar(habit, categoryMap.get(habit.categoryId));
       if (eventId) {
