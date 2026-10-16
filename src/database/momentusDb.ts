@@ -1,4 +1,4 @@
-import * as SQLite from 'expo-sqlite';
+import type * as SQLite from 'expo-sqlite';
 import { Platform } from 'react-native';
 import {
   Category,
@@ -22,9 +22,16 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase | null> {
   if (dbInstance) {
     return dbInstance;
   }
-  dbInstance = await SQLite.openDatabaseAsync(DB_NAME);
-  await initDatabaseSchema(dbInstance);
-  return dbInstance;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const SQLiteModule = require('expo-sqlite') as typeof SQLite;
+    dbInstance = await SQLiteModule.openDatabaseAsync(DB_NAME);
+    await initDatabaseSchema(dbInstance);
+    return dbInstance;
+  } catch (err) {
+    console.warn('Falha ao inicializar SQLite nativo, usando fallback em memória/AsyncStorage:', err);
+    return null;
+  }
 }
 
 /**

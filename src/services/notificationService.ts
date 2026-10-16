@@ -1,18 +1,6 @@
-import * as Notifications from 'expo-notifications';
+import type * as NotificationsTypes from 'expo-notifications';
 import { Platform } from 'react-native';
 import { HabitItem } from '@/types';
-
-// Configuração do comportamento da notificação enquanto o app estiver em primeiro plano
-if (Platform.OS !== 'web') {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowBanner: true,
-      shouldShowList: true,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-    }),
-  });
-}
 
 export const CHANNEL_INICIO = 'CHANNEL_INICIO';
 export const CHANNEL_TERMINO = 'CHANNEL_TERMINO';
@@ -23,15 +11,158 @@ export const CATEGORY_HABIT_END = 'CATEGORY_HABIT_END';
 export const ACTION_MARK_COMPLETED = 'ACTION_MARK_COMPLETED';
 export const ACTION_SNOOZE_15 = 'ACTION_SNOOZE_15';
 
+type LocalNotificationsApi = {
+  setNotificationHandler: typeof NotificationsTypes.setNotificationHandler;
+  getPermissionsAsync: typeof NotificationsTypes.getPermissionsAsync;
+  requestPermissionsAsync: typeof NotificationsTypes.requestPermissionsAsync;
+  setNotificationCategoryAsync: typeof NotificationsTypes.setNotificationCategoryAsync;
+  setNotificationChannelAsync: typeof NotificationsTypes.setNotificationChannelAsync;
+  scheduleNotificationAsync: typeof NotificationsTypes.scheduleNotificationAsync;
+  getAllScheduledNotificationsAsync: typeof NotificationsTypes.getAllScheduledNotificationsAsync;
+  cancelScheduledNotificationAsync: typeof NotificationsTypes.cancelScheduledNotificationAsync;
+  cancelAllScheduledNotificationsAsync: typeof NotificationsTypes.cancelAllScheduledNotificationsAsync;
+  addNotificationResponseReceivedListener: typeof NotificationsTypes.addNotificationResponseReceivedListener;
+  DEFAULT_ACTION_IDENTIFIER: string;
+  AndroidImportance: typeof NotificationsTypes.AndroidImportance;
+  IosAuthorizationStatus: typeof NotificationsTypes.IosAuthorizationStatus;
+  SchedulableTriggerInputTypes: typeof NotificationsTypes.SchedulableTriggerInputTypes;
+};
+
+let cachedNotifications: LocalNotificationsApi | null | undefined;
+let handlerConfigured = false;
+
+/**
+ * Carrega apenas os submódulos de notificações locais sob demanda e dentro de try/catch.
+ * Isso evita carregar o barrel raiz 'expo-notifications/build/index.js', que importa
+ * 'TopicSubscriptionModule.android.js' ('ExpoTopicSubscriptionModule') e causa crash no Expo Go.
+ */
+function getNotifications(): LocalNotificationsApi | null {
+  if (Platform.OS === 'web') return null;
+  if (cachedNotifications !== undefined) return cachedNotifications;
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { setNotificationHandler } = require('expo-notifications/build/NotificationsHandler');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getPermissionsAsync, requestPermissionsAsync } = require('expo-notifications/build/NotificationPermissions');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { setNotificationCategoryAsync } = require('expo-notifications/build/setNotificationCategoryAsync');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { setNotificationChannelAsync } = require('expo-notifications/build/setNotificationChannelAsync');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { scheduleNotificationAsync } = require('expo-notifications/build/scheduleNotificationAsync');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getAllScheduledNotificationsAsync } = require('expo-notifications/build/getAllScheduledNotificationsAsync');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { cancelScheduledNotificationAsync } = require('expo-notifications/build/cancelScheduledNotificationAsync');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { cancelAllScheduledNotificationsAsync } = require('expo-notifications/build/cancelAllScheduledNotificationsAsync');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { addNotificationResponseReceivedListener, DEFAULT_ACTION_IDENTIFIER } = require('expo-notifications/build/NotificationsEmitter');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { AndroidImportance } = require('expo-notifications/build/NotificationChannelManager.types');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { IosAuthorizationStatus } = require('expo-notifications/build/NotificationPermissions.types');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { SchedulableTriggerInputTypes } = require('expo-notifications/build/Notifications.types');
+
+    cachedNotifications = {
+      setNotificationHandler,
+      getPermissionsAsync,
+      requestPermissionsAsync,
+      setNotificationCategoryAsync,
+      setNotificationChannelAsync,
+      scheduleNotificationAsync,
+      getAllScheduledNotificationsAsync,
+      cancelScheduledNotificationAsync,
+      cancelAllScheduledNotificationsAsync,
+      addNotificationResponseReceivedListener,
+      DEFAULT_ACTION_IDENTIFIER:
+        DEFAULT_ACTION_IDENTIFIER || 'expo.modules.notifications.actions.DEFAULT',
+      AndroidImportance,
+      IosAuthorizationStatus,
+      SchedulableTriggerInputTypes,
+    };
+
+    if (!handlerConfigured && cachedNotifications.setNotificationHandler) {
+      handlerConfigured = true;
+      try {
+        cachedNotifications.setNotificationHandler({
+          handleNotification: async () => ({
+            shouldShowBanner: true,
+            shouldShowList: true,
+            shouldPlaySound: true,
+            shouldSetBadge: false,
+          }),
+        });
+      } catch {}
+    }
+
+    return cachedNotifications;
+  } catch (err) {
+    console.warn('Módulo nativo de notificações indisponível neste ambiente:', err);
+    cachedNotifications = null;
+    return null;
+  }
+}
+
+/**
+ * Inscreve listener para interações com notificações locais ("Concluir", "Adiar 15 min" ou toque padrão)
+ * com fallback seguro caso o ambiente (Web ou Expo Go restrito) não suporte o módulo nativo.
+ */
+export function subscribeToHabitNotificationResponses(handlers: {
+  onMarkCompleted: (habitId: string) => void;
+  onSnooze15: (habitId: string, habitTitle: string) => void;
+  onDefaultTap: (habitId: string, habitTitle: string) => void;
+}): () => void {
+  const Notifications = getNotifications();
+  if (!Notifications?.addNotificationResponseReceivedListener) {
+    return () => {};
+  }
+
+  try {
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const actionId = response.actionIdentifier;
+      const data = response.notification.request.content.data as {
+        habitId?: string;
+        habitTitle?: string;
+      };
+      const habitId = data?.habitId;
+      const habitTitle =
+        data?.habitTitle ||
+        response.notification.request.content.title?.replace(/^(Início|Término):\s*/i, '') ||
+        'Sua Rotina';
+
+      if (!habitId) return;
+
+      if (actionId === ACTION_MARK_COMPLETED) {
+        handlers.onMarkCompleted(habitId);
+      } else if (actionId === ACTION_SNOOZE_15) {
+        handlers.onSnooze15(habitId, habitTitle);
+      } else if (actionId === Notifications.DEFAULT_ACTION_IDENTIFIER) {
+        handlers.onDefaultTap(habitId, habitTitle);
+      }
+    });
+
+    return () => {
+      try {
+        subscription.remove();
+      } catch {}
+    };
+  } catch {
+    return () => {};
+  }
+}
+
 /**
  * Configura categorias interativas ("Concluir" e "Adiar 15 min") e canais no Android
  * equivalentes ao AlarmReceiver.kt e NotificationActionReceiver.kt do projeto nativo.
  */
 export async function setupNotificationChannels(): Promise<void> {
-  if (Platform.OS === 'web') return;
+  const Notifications = getNotifications();
+  if (!Notifications) return;
 
   try {
-    // Registra categorias de ações rápidas (iOS & Android)
     await Notifications.setNotificationCategoryAsync(CATEGORY_HABIT_START, [
       {
         identifier: ACTION_MARK_COMPLETED,
@@ -95,7 +226,8 @@ export async function setupNotificationChannels(): Promise<void> {
  * Solicita permissões de notificação ao usuário.
  */
 export async function requestNotificationPermissions(): Promise<boolean> {
-  if (Platform.OS === 'web') return false;
+  const Notifications = getNotifications();
+  if (!Notifications) return false;
 
   try {
     const settings = await Notifications.getPermissionsAsync();
@@ -155,7 +287,8 @@ function parseLocalDateTime(dateStr: string, timeStr: string): Date | null {
 export async function scheduleHabitNotifications(
   habit: HabitItem
 ): Promise<{ startNotificationId?: string; endNotificationId?: string }> {
-  if (Platform.OS === 'web' || habit.completed) {
+  const Notifications = getNotifications();
+  if (!Notifications || habit.completed) {
     return {};
   }
 
@@ -235,7 +368,8 @@ export async function snoozeHabitNotification(
   habitTitle: string,
   minutes: number = 15
 ): Promise<string | undefined> {
-  if (Platform.OS === 'web') return undefined;
+  const Notifications = getNotifications();
+  if (!Notifications) return undefined;
 
   try {
     const snoozeDate = new Date(Date.now() + minutes * 60 * 1000);
@@ -267,7 +401,8 @@ export async function snoozeHabitNotification(
  * Cancela notificações agendadas vinculadas a um hábito (via ID ou payload).
  */
 export async function cancelHabitNotifications(habitId: string): Promise<void> {
-  if (Platform.OS === 'web') return;
+  const Notifications = getNotifications();
+  if (!Notifications) return;
 
   try {
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
@@ -285,7 +420,8 @@ export async function cancelHabitNotifications(habitId: string): Promise<void> {
  * Cancela todas as notificações agendadas no aplicativo.
  */
 export async function cancelAllNotifications(): Promise<void> {
-  if (Platform.OS === 'web') return;
+  const Notifications = getNotifications();
+  if (!Notifications) return;
 
   try {
     await Notifications.cancelAllScheduledNotificationsAsync();
@@ -293,4 +429,3 @@ export async function cancelAllNotifications(): Promise<void> {
     console.warn('Erro ao cancelar todas as notificações:', error);
   }
 }
-

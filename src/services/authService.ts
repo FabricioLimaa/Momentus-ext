@@ -9,7 +9,7 @@ import {
   OAuthProvider,
   signInWithCredential,
 } from 'firebase/auth';
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import type { GoogleSignin as GoogleSigninType } from '@react-native-google-signin/google-signin';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { Platform } from 'react-native';
 import { auth } from '@/config/firebase';
@@ -18,14 +18,29 @@ import { auth } from '@/config/firebase';
 const WEB_CLIENT_ID =
   '809975381863-j908mdo3bdrf1falefo4ttivaqd60lji.apps.googleusercontent.com';
 
-if (Platform.OS !== 'web') {
+let cachedGoogleSignin: typeof GoogleSigninType | null | undefined;
+
+/**
+ * Carrega o módulo nativo do Google Sign-In sob demanda para evitar que o
+ * TurboModuleRegistry.getEnforcing('RNGoogleSignin') cause crash no Expo Go ou na Web.
+ */
+function getGoogleSignin(): typeof GoogleSigninType | null {
+  if (Platform.OS === 'web') return null;
+  if (cachedGoogleSignin !== undefined) return cachedGoogleSignin;
+
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { GoogleSignin } = require('@react-native-google-signin/google-signin');
     GoogleSignin.configure({
       webClientId: WEB_CLIENT_ID,
       offlineAccess: true,
     });
+    cachedGoogleSignin = GoogleSignin;
+    return cachedGoogleSignin ?? null;
   } catch (e) {
-    console.warn('Erro ao configurar GoogleSignin:', e);
+    console.warn('Módulo nativo RNGoogleSignin indisponível neste ambiente (ex: Expo Go):', e);
+    cachedGoogleSignin = null;
+    return null;
   }
 }
 
@@ -56,6 +71,13 @@ export async function registerWithEmail(
  * Realiza login nativo com o Google (Android / iOS).
  */
 export async function loginWithGoogle(): Promise<User> {
+  const GoogleSignin = getGoogleSignin();
+  if (!GoogleSignin) {
+    throw new Error(
+      'O Login nativo com Google requer um Development Build (EAS/APK). No Expo Go ou Web, utilize o login com E-mail e Senha.'
+    );
+  }
+
   await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
   const signInResult = await GoogleSignin.signIn();
   const idToken = signInResult.data?.idToken;
@@ -110,8 +132,10 @@ export async function sendPasswordReset(email: string): Promise<void> {
  */
 export async function logoutUser(): Promise<void> {
   try {
-    await GoogleSignin.signOut().catch(() => {});
+    const GoogleSignin = getGoogleSignin();
+    if (GoogleSignin) {
+      await GoogleSignin.signOut().catch(() => {});
+    }
   } catch {}
   await signOut(auth);
 }
-
