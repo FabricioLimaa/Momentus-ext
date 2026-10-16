@@ -127,6 +127,13 @@ export async function loginWithEmail(email: string, pass: string): Promise<Momen
       );
       return createLocalFallbackUser(email);
     }
+    const code = (err as any)?.code || '';
+    if (code === 'auth/invalid-credential' || code === 'auth/user-not-found' || code === 'auth/wrong-password') {
+      throw new Error('E-mail ou senha incorretos, ou a conta ainda não foi cadastrada. Caso ainda não tenha conta, toque em "Cadastre-se".');
+    }
+    if (code === 'auth/too-many-requests') {
+      throw new Error('Muitas tentativas sem sucesso. Por favor, aguarde alguns instantes e tente novamente.');
+    }
     throw err;
   }
 }
@@ -162,6 +169,16 @@ export async function registerWithEmail(
         email
       );
       return createLocalFallbackUser(email, displayName);
+    }
+    const code = (err as any)?.code || '';
+    if (code === 'auth/email-already-in-use') {
+      throw new Error('Este e-mail já está cadastrado. Volte e faça login ou recupere sua senha.');
+    }
+    if (code === 'auth/weak-password') {
+      throw new Error('A senha informada é muito fraca. Escolha uma senha com pelo menos 6 caracteres.');
+    }
+    if (code === 'auth/invalid-email') {
+      throw new Error('O formato do e-mail informado é inválido.');
     }
     throw err;
   }
