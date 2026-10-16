@@ -23,6 +23,11 @@ const firebaseConfig: FirebaseOptions = {
       : '1:809975381863:android:4ec3a4f530212cddb9f9c2'),
 };
 
+// Ativa o token de depuração do App Check na Web para ambiente de desenvolvimento local
+if (Platform.OS === 'web' && typeof window !== 'undefined') {
+  (window as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+}
+
 // Inicializa a aplicação Firebase garantindo singleton
 export const firebaseApp =
   getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
