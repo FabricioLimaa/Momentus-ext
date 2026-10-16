@@ -255,10 +255,9 @@ export async function loginWithGoogle(): Promise<MomentusAuthUser> {
         throw new Error('SIGN_IN_CANCELLED');
       }
       if (isAndroidKeyBlockedError(err)) {
-        console.warn(
-          'API Key do Firebase bloqueou requisição Web. Acionando fluxo direto do Google OAuth.'
+        throw new Error(
+          'A chave de API atual é restrita a aplicativos Android no Google Cloud. No Firebase Console (Configurações do Projeto > Geral), copie a "Chave de API da Web" e configure em EXPO_PUBLIC_FIREBASE_API_KEY no .env, ou aguarde a propagação da Opção A.'
         );
-        return await loginWithGoogleBrowserFlow();
       }
       throw err;
     }
