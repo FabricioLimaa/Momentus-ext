@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   SafeAreaView,
   Platform,
   StatusBar,
+  Modal,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -18,6 +20,7 @@ import { GlassCard } from '@/components/momentus/GlassCard';
 export default function UpdateNotesScreen() {
   const router = useRouter();
   const { theme } = useMomentus();
+  const [showUpdateDialog, setShowUpdateDialog] = useState(false);
 
   const updates = [
     {
@@ -28,21 +31,21 @@ export default function UpdateNotesScreen() {
     },
     {
       icon: 'notifications' as const,
-      title: 'Feedback Visual Refinado',
+      title: 'Notificações Interativas & Lembretes',
       description:
-        'Todas as suas ações agora têm confirmações visuais imediatas com o novo PremiumSnackbar, garantindo que você nunca perca o status de uma tarefa ou compra.',
+        'Agora você pode concluir ou adiar uma rotina em 15 minutos diretamente pela notificação ou pelo diálogo rápido de lembrete.',
+    },
+    {
+      icon: 'cloud-done' as const,
+      title: 'Sincronização Cloud Firestore & SQLite',
+      description:
+        'Seus hábitos, categorias, templates, conquistas e saldo de XP ficam seguros localmente em SQLite e sincronizados na nuvem.',
     },
     {
       icon: 'git-network' as const,
       title: 'Timeline Vertical Conectada',
       description:
         'Visualize sua rotina diária como um fluxo contínuo. Melhoramos a legibilidade da agenda com conexões visuais inteligentes.',
-    },
-    {
-      icon: 'phone-portrait' as const,
-      title: 'Layout Universal',
-      description:
-        'O Momentus agora se adapta perfeitamente a qualquer tamanho de tela, de smartphones compactos a tablets e telas dobráveis.',
     },
     {
       icon: 'bag-handle' as const,
@@ -62,7 +65,11 @@ export default function UpdateNotesScreen() {
             <Ionicons name="arrow-back" size={24} color={theme.textPrimary} />
           </TouchableOpacity>
           <Text style={[styles.topBarTitle, { color: theme.textPrimary }]}>Novidades</Text>
-          <View style={{ width: 40 }} />
+          <TouchableOpacity
+            onPress={() => setShowUpdateDialog(true)}
+            style={[styles.checkUpdateBtn, { backgroundColor: `${theme.primary}15` }]}>
+            <Ionicons name="cloud-download-outline" size={18} color={theme.primary} />
+          </TouchableOpacity>
         </View>
 
         <ScrollView
@@ -72,10 +79,20 @@ export default function UpdateNotesScreen() {
           <Text style={[styles.mainTitle, { color: theme.textPrimary }]}>O que há de novo?</Text>
 
           {/* Versão Pill */}
-          <View style={[styles.versionBadge, { backgroundColor: `${theme.primary}15`, borderColor: theme.primary }]}>
-            <Text style={[styles.versionBadgeText, { color: theme.primary }]}>
-              Versão 2.1.0 • Store & Personalização
-            </Text>
+          <View style={styles.versionRow}>
+            <View style={[styles.versionBadge, { backgroundColor: `${theme.primary}15`, borderColor: theme.primary }]}>
+              <Text style={[styles.versionBadgeText, { color: theme.primary }]}>
+                Versão 2.1.0 • Paridade Completa
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => setShowUpdateDialog(true)}
+              style={[styles.verifyBtn, { borderColor: theme.outline, backgroundColor: theme.surface }]}
+              activeOpacity={0.8}>
+              <Ionicons name="refresh-outline" size={14} color={theme.textPrimary} />
+              <Text style={[styles.verifyBtnText, { color: theme.textPrimary }]}>Verificar Versão</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Lista de Novidades */}
@@ -109,6 +126,45 @@ export default function UpdateNotesScreen() {
 
           <View style={{ height: 40 }} />
         </ScrollView>
+
+        {/* Modal: UpdateAvailableDialog (espelhando UpdateAvailableDialog.kt) */}
+        <Modal
+          visible={showUpdateDialog}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowUpdateDialog(false)}>
+          <View style={styles.dialogOverlay}>
+            <View style={[styles.dialogCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+              <View style={[styles.dialogIconBox, { backgroundColor: `${theme.primary}20` }]}>
+                <Ionicons name="sparkles" size={30} color={theme.primary} />
+              </View>
+
+              <Text style={[styles.dialogTitle, { color: theme.textPrimary }]}>
+                Momentus 2.1.0 Ativo!
+              </Text>
+
+              <Text style={[styles.dialogDesc, { color: theme.textSecondary }]}>
+                O Momentus evoluiu! Você já está utilizando a versão multiplataforma mais recente com sincronização em nuvem, SQLite e notificações interativas.
+              </Text>
+
+              <TouchableOpacity
+                style={[styles.dialogPrimaryBtn, { backgroundColor: theme.primary }]}
+                onPress={() => {
+                  setShowUpdateDialog(false);
+                  Alert.alert('Tudo Atualizado! ✨', 'Nenhuma atualização pendente no momento.');
+                }}
+                activeOpacity={0.85}>
+                <Text style={styles.dialogPrimaryBtnText}>EXCELENTE</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.dialogDismissBtn}
+                onPress={() => setShowUpdateDialog(false)}>
+                <Text style={[styles.dialogDismissText, { color: theme.textSecondary }]}>Fechar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </View>
     </SafeAreaView>
   );
@@ -138,6 +194,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  checkUpdateBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   topBarTitle: {
     fontSize: 18,
     fontWeight: '800',
@@ -156,20 +219,38 @@ const styles = StyleSheet.create({
     color: MomentusColors.textPrimary,
     marginBottom: 10,
   },
+  versionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+    gap: 10,
+  },
   versionBadge: {
-    alignSelf: 'flex-start',
     backgroundColor: 'rgba(52, 211, 153, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(52, 211, 153, 0.25)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 10,
-    marginBottom: 24,
   },
   versionBadgeText: {
     color: MomentusColors.emeraldNeon,
     fontSize: 13,
     fontWeight: '800',
+  },
+  verifyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  verifyBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   updatesList: {
     gap: 12,
@@ -231,5 +312,59 @@ const styles = StyleSheet.create({
     color: MomentusColors.textSecondary,
     marginTop: 4,
   },
+  dialogOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.78)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  dialogCard: {
+    width: '100%',
+    maxWidth: 380,
+    borderRadius: 32,
+    borderWidth: 1,
+    padding: 24,
+    alignItems: 'center',
+  },
+  dialogIconBox: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  dialogTitle: {
+    fontSize: 21,
+    fontWeight: '900',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  dialogDesc: {
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  dialogPrimaryBtn: {
+    width: '100%',
+    height: 48,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  dialogPrimaryBtnText: {
+    color: '#0F172A',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  dialogDismissBtn: {
+    paddingVertical: 8,
+  },
+  dialogDismissText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
 });
-

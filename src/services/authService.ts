@@ -112,3 +112,4 @@ export async function logoutUser(): Promise<void> {
   } catch {}
   await signOut(auth);
 }
+

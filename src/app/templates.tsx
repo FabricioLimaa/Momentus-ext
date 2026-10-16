@@ -19,23 +19,103 @@ import { ApplyTemplateDialog } from '@/components/momentus/ApplyTemplateDialog';
 import { RoutineTemplate, TemplateItem } from '@/types';
 
 export default function TemplatesScreen() {
-  const { templates, categories, addTemplate, applyTemplateToDates, theme } = useMomentus();
+  const {
+    templates,
+    categories,
+    addTemplate,
+    updateTemplate,
+    deleteTemplate,
+    applyTemplateToDates,
+    theme,
+  } = useMomentus();
 
   // Estados de modais
   const [selectedTemplateForApply, setSelectedTemplateForApply] = useState<RoutineTemplate | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<RoutineTemplate | null>(null);
 
   // Formulário de Criação de Template
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const newColor = '#34D399';
-  const [newItems, setNewItems] = useState<{ title: string; timeStart: string; durationMinutes: number; categoryId: string }[]>([
-    { title: 'Primeira atividade', timeStart: '08:00', durationMinutes: 30, categoryId: categories[0]?.id || 'cat-saude' },
+  const [newItems, setNewItems] = useState<
+    { title: string; timeStart: string; durationMinutes: number; categoryId: string }[]
+  >([
+    {
+      title: 'Primeira atividade',
+      timeStart: '08:00',
+      durationMinutes: 30,
+      categoryId: categories[0]?.id || 'cat-saude',
+    },
   ]);
+
+  // Estados do Modal de Detalhes / Edição (espelhando TemplateDetailScreen.kt)
+  const [editTitle, setEditTitle] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+  const [editItems, setEditItems] = useState<TemplateItem[]>([]);
 
   // Formulário de Importação
   const [importJsonText, setImportJsonText] = useState('');
+
+  const handleOpenEditModal = (template: RoutineTemplate) => {
+    setEditingTemplate(template);
+    setEditTitle(template.title);
+    setEditDesc(template.description);
+    setEditItems(template.items.map((item) => ({ ...item })));
+  };
+
+  const handleSaveEditedTemplate = () => {
+    if (!editingTemplate) return;
+    if (!editTitle.trim()) {
+      Alert.alert('Atenção', 'Informe o título do template.');
+      return;
+    }
+    if (editItems.length === 0) {
+      Alert.alert('Atenção', 'O template precisa ter pelo menos 1 atividade.');
+      return;
+    }
+
+    updateTemplate({
+      ...editingTemplate,
+      title: editTitle.trim(),
+      description: editDesc.trim() || 'Template personalizado de rotina',
+      items: editItems,
+    });
+
+    setEditingTemplate(null);
+    Alert.alert('Atualizado! ✨', 'As alterações no template foram salvas com sucesso.');
+  };
+
+  const handleMoveEditItem = (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= editItems.length) return;
+    const copy = [...editItems];
+    const temp = copy[index];
+    copy[index] = copy[targetIndex];
+    copy[targetIndex] = temp;
+    setEditItems(copy);
+  };
+
+  const handleDeleteTemplateConfirm = (template: RoutineTemplate) => {
+    Alert.alert(
+      'Excluir Template',
+      `Deseja realmente excluir o modelo "${template.title}"?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: () => {
+            deleteTemplate(template.id);
+            if (editingTemplate?.id === template.id) {
+              setEditingTemplate(null);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const handleApplyConfirm = (dates: string[], saveToGoogle: boolean) => {
     if (!selectedTemplateForApply) return;
@@ -77,7 +157,12 @@ export default function TemplatesScreen() {
     setNewTitle('');
     setNewDesc('');
     setNewItems([
-      { title: 'Primeira atividade', timeStart: '08:00', durationMinutes: 30, categoryId: categories[0]?.id || 'cat-saude' },
+      {
+        title: 'Primeira atividade',
+        timeStart: '08:00',
+        durationMinutes: 30,
+        categoryId: categories[0]?.id || 'cat-saude',
+      },
     ]);
 
     Alert.alert('Sucesso!', 'Seu novo template de rotina foi criado.');
@@ -125,7 +210,7 @@ export default function TemplatesScreen() {
         <View style={styles.header}>
           <View>
             <Text style={[styles.title, { color: theme.textPrimary }]}>Modelos de Rotina</Text>
-            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Carregue ou crie blocos reutilizáveis</Text>
+            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Carregue, edite ou crie blocos reutilizáveis</Text>
           </View>
 
           <View style={styles.headerButtonsRow}>
@@ -176,20 +261,44 @@ export default function TemplatesScreen() {
                       </View>
                     </View>
                   </View>
+
+                  {/* Botões de Ação (Editar Detalhes / Excluir) */}
+                  <View style={styles.cardActionsRight}>
+                    <TouchableOpacity
+                      style={[styles.cardActionBtn, { backgroundColor: theme.surfaceElevated }]}
+                      onPress={() => handleOpenEditModal(template)}
+                      activeOpacity={0.7}>
+                      <Ionicons name="create-outline" size={18} color={theme.primary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.cardActionBtn, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}
+                      onPress={() => handleDeleteTemplateConfirm(template)}
+                      activeOpacity={0.7}>
+                      <Ionicons name="trash-outline" size={18} color={MomentusColors.errorRed} />
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
                 {/* Descrição */}
                 <Text style={[styles.cardDesc, { color: theme.textSecondary }]}>{template.description}</Text>
 
                 {/* Timeline Preview (Primeiras 4 atividades) */}
-                <View style={[styles.timelinePreviewBox, { backgroundColor: theme.surfaceElevated }]}>
-                  <Text style={[styles.timelinePreviewTitle, { color: theme.textSecondary }]}>Linha do tempo:</Text>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => handleOpenEditModal(template)}
+                  style={[styles.timelinePreviewBox, { backgroundColor: theme.surfaceElevated }]}>
+                  <View style={styles.timelinePreviewHeader}>
+                    <Text style={[styles.timelinePreviewTitle, { color: theme.textSecondary }]}>
+                      Linha do tempo (toque para editar):
+                    </Text>
+                    <Ionicons name="reorder-three-outline" size={16} color={theme.textSecondary} />
+                  </View>
                   {template.items.slice(0, 4).map((item, idx) => {
                     const cat = categories.find((c) => c.id === item.categoryId);
                     return (
                       <View key={idx} style={styles.previewItemRow}>
                         <View style={[styles.previewDot, { backgroundColor: cat?.color || template.color }]} />
-                        <Text style={[styles.previewTime, { color: theme.textSecondary }]}>{item.timeStart || '08:00'}</Text>
+                        <Text style={[styles.previewTime, { color: theme.primary }]}>{item.timeStart || '08:00'}</Text>
                         <Text numberOfLines={1} style={[styles.previewTitle, { color: theme.textPrimary }]}>
                           {item.title}
                         </Text>
@@ -201,7 +310,7 @@ export default function TemplatesScreen() {
                       +{template.items.length - 4} outras atividades...
                     </Text>
                   )}
-                </View>
+                </TouchableOpacity>
 
                 {/* Botão de Aplicação */}
                 <TouchableOpacity
@@ -225,6 +334,168 @@ export default function TemplatesScreen() {
           onDismiss={() => setSelectedTemplateForApply(null)}
           onConfirm={handleApplyConfirm}
         />
+
+        {/* Modal: Detalhes e Edição do Template (equivalente a TemplateDetailScreen.kt) */}
+        <Modal
+          visible={!!editingTemplate}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setEditingTemplate(null)}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <View style={styles.modalHeaderRow}>
+                  <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Detalhes do Template</Text>
+                  <TouchableOpacity onPress={() => setEditingTemplate(null)}>
+                    <Ionicons name="close" size={24} color={theme.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>Título do Template *</Text>
+                <TextInput
+                  style={[styles.input, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary }]}
+                  value={editTitle}
+                  onChangeText={setEditTitle}
+                  placeholder="Nome do Template"
+                  placeholderTextColor={MomentusColors.textMuted}
+                />
+
+                <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>Descrição</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary }]}
+                  value={editDesc}
+                  onChangeText={setEditDesc}
+                  multiline
+                  numberOfLines={2}
+                  placeholder="Descrição da rotina"
+                  placeholderTextColor={MomentusColors.textMuted}
+                />
+
+                <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>
+                  Eventos do Template ({editItems.length}) • Reordene ou edite
+                </Text>
+
+                {editItems.map((item, idx) => (
+                  <View
+                    key={item.id || idx}
+                    style={[styles.editItemCard, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}>
+                    <View style={styles.createItemRow}>
+                      <View style={styles.reorderCol}>
+                        <TouchableOpacity
+                          disabled={idx === 0}
+                          onPress={() => handleMoveEditItem(idx, 'up')}
+                          style={styles.reorderBtn}>
+                          <Ionicons
+                            name="chevron-up"
+                            size={16}
+                            color={idx === 0 ? theme.outline : theme.primary}
+                          />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          disabled={idx === editItems.length - 1}
+                          onPress={() => handleMoveEditItem(idx, 'down')}
+                          style={styles.reorderBtn}>
+                          <Ionicons
+                            name="chevron-down"
+                            size={16}
+                            color={idx === editItems.length - 1 ? theme.outline : theme.primary}
+                          />
+                        </TouchableOpacity>
+                      </View>
+
+                      <TextInput
+                        style={[styles.input, { flex: 2, backgroundColor: theme.surface, borderColor: theme.outline, color: theme.textPrimary }]}
+                        placeholder="Atividade"
+                        placeholderTextColor={MomentusColors.textMuted}
+                        value={item.title}
+                        onChangeText={(val) => {
+                          const copy = [...editItems];
+                          copy[idx] = { ...copy[idx], title: val };
+                          setEditItems(copy);
+                        }}
+                      />
+
+                      <TextInput
+                        style={[styles.input, { flex: 1, backgroundColor: theme.surface, borderColor: theme.outline, color: theme.textPrimary }]}
+                        placeholder="08:00"
+                        placeholderTextColor={MomentusColors.textMuted}
+                        value={item.timeStart}
+                        onChangeText={(val) => {
+                          const copy = [...editItems];
+                          copy[idx] = { ...copy[idx], timeStart: val };
+                          setEditItems(copy);
+                        }}
+                      />
+
+                      {editItems.length > 1 && (
+                        <TouchableOpacity
+                          onPress={() => setEditItems(editItems.filter((_, i) => i !== idx))}
+                          style={styles.removeItemBtn}>
+                          <Ionicons name="trash-outline" size={18} color={MomentusColors.errorRed} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    {/* Seletor rápido de categoria para o item */}
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryPillsScroll}>
+                      {categories.map((cat) => {
+                        const isSelected = item.categoryId === cat.id;
+                        return (
+                          <TouchableOpacity
+                            key={cat.id}
+                            onPress={() => {
+                              const copy = [...editItems];
+                              copy[idx] = { ...copy[idx], categoryId: cat.id };
+                              setEditItems(copy);
+                            }}
+                            style={[
+                              styles.categoryMiniPill,
+                              { borderColor: cat.color },
+                              isSelected && { backgroundColor: `${cat.color}25` },
+                            ]}>
+                            <View style={[styles.previewDot, { backgroundColor: cat.color }]} />
+                            <Text
+                              style={[
+                                styles.categoryMiniPillText,
+                                { color: isSelected ? cat.color : theme.textSecondary },
+                              ]}>
+                              {cat.name}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                ))}
+
+                <TouchableOpacity
+                  style={[styles.addItemBtn, { borderColor: theme.outline }]}
+                  onPress={() =>
+                    setEditItems([
+                      ...editItems,
+                      {
+                        id: `ti-edit-${Date.now()}`,
+                        title: `Nova Atividade ${editItems.length + 1}`,
+                        timeStart: '09:00',
+                        durationMinutes: 30,
+                        categoryId: categories[0]?.id || 'cat-saude',
+                      },
+                    ])
+                  }>
+                  <Ionicons name="add" size={16} color={theme.primary} />
+                  <Text style={[styles.addItemBtnText, { color: theme.primary }]}>Adicionar Evento ao Template</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.submitModalBtn, { backgroundColor: theme.primary }]}
+                  onPress={handleSaveEditedTemplate}
+                  activeOpacity={0.85}>
+                  <Text style={styles.submitModalBtnText}>Salvar Alterações</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
 
         {/* Modal: Criar Template */}
         <Modal
@@ -458,6 +729,18 @@ const styles = StyleSheet.create({
     gap: 12,
     flex: 1,
   },
+  cardActionsRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  cardActionBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   iconBox: {
     width: 44,
     height: 44,
@@ -505,13 +788,18 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     gap: 8,
   },
+  timelinePreviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
   timelinePreviewTitle: {
     fontSize: 11,
     fontWeight: '700',
     color: MomentusColors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 2,
   },
   previewItemRow: {
     flexDirection: 'row',
@@ -564,7 +852,7 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 440,
-    maxHeight: '85%',
+    maxHeight: '88%',
     backgroundColor: MomentusColors.navySurface,
     borderRadius: 28,
     borderWidth: 1,
@@ -614,11 +902,42 @@ const styles = StyleSheet.create({
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     fontSize: 12,
   },
+  editItemCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 10,
+    marginBottom: 10,
+  },
   createItemRow: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 8,
+    marginBottom: 6,
     alignItems: 'center',
+  },
+  reorderCol: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 2,
+  },
+  reorderBtn: {
+    padding: 2,
+  },
+  categoryPillsScroll: {
+    marginTop: 4,
+  },
+  categoryMiniPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginRight: 6,
+  },
+  categoryMiniPillText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   removeItemBtn: {
     padding: 8,

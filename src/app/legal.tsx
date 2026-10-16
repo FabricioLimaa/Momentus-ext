@@ -8,6 +8,7 @@ import {
   SafeAreaView,
   Platform,
   StatusBar,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -17,8 +18,9 @@ import { TERMS_AND_CONDITIONS, PRIVACY_POLICY, LICENSE } from '@/constants/legal
 
 export default function LegalScreen() {
   const router = useRouter();
-  const { theme } = useMomentus();
+  const { theme, settings, updateSettings } = useMomentus();
   const [selectedTabIndex, setSelectedTabIndex] = useState(0);
+  const [isChecked, setIsChecked] = useState<boolean>(!!settings.termsAccepted);
 
   const tabs = ['Termos', 'Privacidade', 'Licença'];
 
@@ -33,6 +35,24 @@ export default function LegalScreen() {
       default:
         return '';
     }
+  };
+
+  const handleAcceptTerms = () => {
+    const now = new Date();
+    const formattedDate = `${String(now.getDate()).padStart(2, '0')}/${String(
+      now.getMonth() + 1
+    ).padStart(2, '0')}/${now.getFullYear()}`;
+
+    updateSettings({
+      termsAccepted: true,
+      termsAcceptedAt: formattedDate,
+    });
+
+    Alert.alert(
+      'Termos Aceitos ✅',
+      'Obrigado! Sua concordância com os Termos de Uso e Política de Privacidade foi registrada.',
+      [{ text: 'Continuar', onPress: () => router.back() }]
+    );
   };
 
   return (
@@ -82,8 +102,61 @@ export default function LegalScreen() {
           <View style={[styles.textContainer, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
             <Text style={[styles.legalText, { color: theme.textSecondary }]}>{getContent()}</Text>
           </View>
-          <View style={{ height: 40 }} />
+          <View style={{ height: 24 }} />
         </ScrollView>
+
+        {/* Bottom Acceptance Bar (equivalente ao TermsScreen.kt) */}
+        <View style={[styles.bottomBar, { backgroundColor: theme.surface, borderTopColor: theme.outline }]}>
+          {settings.termsAccepted ? (
+            <View style={styles.acceptedRow}>
+              <Ionicons name="shield-checkmark" size={22} color={theme.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.acceptedTitle, { color: theme.textPrimary }]}>
+                  Termos e Privacidade Aceitos
+                </Text>
+                <Text style={[styles.acceptedSub, { color: theme.textSecondary }]}>
+                  Confirmado em {settings.termsAcceptedAt || 'dispositivo'}
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <>
+              <TouchableOpacity
+                style={styles.checkboxRow}
+                onPress={() => setIsChecked(!isChecked)}
+                activeOpacity={0.7}>
+                <View
+                  style={[
+                    styles.checkboxBox,
+                    { borderColor: isChecked ? theme.primary : theme.textSecondary },
+                    isChecked && { backgroundColor: theme.primary },
+                  ]}>
+                  {isChecked && <Ionicons name="checkmark" size={14} color="#0F172A" />}
+                </View>
+                <Text style={[styles.checkboxLabel, { color: theme.textPrimary }]}>
+                  Eu li e concordo com os Termos de Uso e a Política de Privacidade.
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.acceptBtn,
+                  { backgroundColor: isChecked ? theme.primary : theme.surfaceElevated },
+                ]}
+                disabled={!isChecked}
+                onPress={handleAcceptTerms}
+                activeOpacity={0.85}>
+                <Text
+                  style={[
+                    styles.acceptBtnText,
+                    { color: isChecked ? '#0F172A' : theme.textSecondary },
+                  ]}>
+                  Aceitar e Continuar
+                </Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -162,5 +235,52 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 22,
   },
+  bottomBar: {
+    borderTopWidth: 1,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    gap: 12,
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  checkboxBox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxLabel: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
+  },
+  acceptBtn: {
+    height: 48,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  acceptBtnText: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  acceptedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  acceptedTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  acceptedSub: {
+    fontSize: 12,
+    marginTop: 2,
+  },
 });
-

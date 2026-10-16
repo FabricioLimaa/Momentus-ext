@@ -1,34 +1,62 @@
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
+  setDoc,
   writeBatch,
   onSnapshot,
   Unsubscribe,
 } from 'firebase/firestore';
 import { firestore } from '@/config/firebase';
-import { HabitItem, Category } from '@/types';
+import {
+  HabitItem,
+  Category,
+  RoutineTemplate,
+  Achievement,
+  MarketItem,
+  UserProfile,
+} from '@/types';
 
 const EVENTS_COLLECTION = 'eventos';
 const CATEGORIES_COLLECTION = 'categories';
+const TEMPLATES_COLLECTION = 'templates';
+const UNLOCKED_ACHIEVEMENTS_COLLECTION = 'unlocked_achievements';
+const COMPLETED_HABITS_COLLECTION = 'completed_habits';
 
 export interface SyncResult {
   uploadedEvents: number;
   downloadedEvents: number;
   uploadedCategories: number;
   downloadedCategories: number;
+  uploadedTemplates: number;
+  downloadedTemplates: number;
+  syncedAchievements: number;
 }
 
 /**
- * Executa a sincronização bidirecional do Firestore espelhando a lógica de SyncWorker.kt e ScheduleRepository.kt.
+ * Executa a sincronização bidirecional completa do Firestore espelhando a lógica de:
+ * - SyncWorker.kt
+ * - ScheduleRepository.kt (eventos)
+ * - CategoryRepository.kt (categories)
+ * - TemplateRepository.kt (templates)
+ * - GamificationRepository.kt (unlocked_achievements, completed_habits, points & purchased_stickers)
  */
 export async function syncWithFirestore(
   userId: string,
   localHabits: HabitItem[],
-  localCategories: Category[]
+  localCategories: Category[],
+  localTemplates: RoutineTemplate[] = [],
+  localAchievements: Achievement[] = [],
+  localMarketItems: MarketItem[] = [],
+  localUserProfile?: UserProfile
 ): Promise<{
   mergedHabits: HabitItem[];
   mergedCategories: Category[];
+  mergedTemplates: RoutineTemplate[];
+  mergedAchievements: Achievement[];
+  mergedMarketItems: MarketItem[];
+  mergedUserProfile?: UserProfile;
   result: SyncResult;
 }> {
   const result: SyncResult = {
@@ -36,13 +64,21 @@ export async function syncWithFirestore(
     downloadedEvents: 0,
     uploadedCategories: 0,
     downloadedCategories: 0,
+    uploadedTemplates: 0,
+    downloadedTemplates: 0,
+    syncedAchievements: 0,
   };
 
   const userDocRef = doc(firestore, 'users', userId);
   const eventsColRef = collection(userDocRef, EVENTS_COLLECTION);
   const categoriesColRef = collection(userDocRef, CATEGORIES_COLLECTION);
+  const templatesColRef = collection(userDocRef, TEMPLATES_COLLECTION);
+  const achievementsColRef = collection(userDocRef, UNLOCKED_ACHIEVEMENTS_COLLECTION);
+  const completedHabitsColRef = collection(userDocRef, COMPLETED_HABITS_COLLECTION);
 
-  // 1. Sincronização de Categorias
+  // ========================================================
+  // 1. Sincronização de Categorias (CategoryRepository.kt)
+  // ========================================================
   const categoriesSnapshot = await getDocs(categoriesColRef);
   const cloudCategoriesMap = new Map<string, any>();
   categoriesSnapshot.forEach((d) => cloudCategoriesMap.set(d.id, d.data()));
@@ -50,7 +86,6 @@ export async function syncWithFirestore(
   const localCategoriesMap = new Map<string, Category>(localCategories.map((c) => [c.id, c]));
   const categoriesBatch = writeBatch(firestore);
 
-  // Upload de categorias novas locais para nuvem
   localCategories.forEach((cat) => {
     if (!cloudCategoriesMap.has(cat.id)) {
       const docRef = doc(categoriesColRef, cat.id);
@@ -68,7 +103,6 @@ export async function syncWithFirestore(
   });
   await categoriesBatch.commit();
 
-  // Merge de categorias da nuvem para o local
   const mergedCategories: Category[] = [...localCategories];
   cloudCategoriesMap.forEach((cloudCat, id) => {
     if (!localCategoriesMap.has(id)) {
@@ -84,7 +118,9 @@ export async function syncWithFirestore(
     }
   });
 
-  // 2. Sincronização de Eventos/Hábitos
+  // ========================================================
+  // 2. Sincronização de Eventos/Hábitos (ScheduleRepository.kt)
+  // ========================================================
   const eventsSnapshot = await getDocs(eventsColRef);
   const cloudEventsMap = new Map<string, any>();
   eventsSnapshot.forEach((d) => cloudEventsMap.set(d.id, d.data()));
@@ -92,10 +128,9 @@ export async function syncWithFirestore(
   const localEventsMap = new Map<string, HabitItem>(localHabits.map((h) => [h.id, h]));
   const eventsBatch = writeBatch(firestore);
 
-  // Upload de hábitos locais para a nuvem
   localHabits.forEach((habit) => {
     const cloudItem = cloudEventsMap.get(habit.id);
-    if (!cloudItem) {
+    if (!cloudItem || cloudItem.completed !== habit.completed) {
       const docRef = doc(eventsColRef, habit.id);
       eventsBatch.set(docRef, {
         id: habit.id,
@@ -111,12 +146,22 @@ export async function syncWithFirestore(
         saveToGoogle: habit.saveToGoogle || false,
         lastUpdated: new Date().toISOString(),
       });
-      result.uploadedEvents++;
+      if (!cloudItem) result.uploadedEvents++;
+    }
+
+    // Registra hábitos concluídos na subcoleção completed_habits (GamificationRepository.kt)
+    if (habit.completed) {
+      const compRef = doc(completedHabitsColRef, habit.id);
+      eventsBatch.set(compRef, {
+        habitId: habit.id,
+        title: habit.title,
+        completedDate: habit.date,
+        lastUpdated: new Date().toISOString(),
+      });
     }
   });
   await eventsBatch.commit();
 
-  // Merge de hábitos da nuvem para o local
   const mergedHabits: HabitItem[] = [...localHabits];
   cloudEventsMap.forEach((cloudItem, id) => {
     if (!localEventsMap.has(id)) {
@@ -137,7 +182,194 @@ export async function syncWithFirestore(
     }
   });
 
-  return { mergedHabits, mergedCategories, result };
+  // ========================================================
+  // 3. Sincronização de Templates (TemplateRepository.kt)
+  // ========================================================
+  const templatesSnapshot = await getDocs(templatesColRef);
+  const cloudTemplatesMap = new Map<string, any>();
+  templatesSnapshot.forEach((d) => cloudTemplatesMap.set(d.id, d.data()));
+
+  const localTemplatesMap = new Map<string, RoutineTemplate>(localTemplates.map((t) => [t.id, t]));
+  const templatesBatch = writeBatch(firestore);
+
+  localTemplates.forEach((tmpl) => {
+    const docRef = doc(templatesColRef, tmpl.id);
+    templatesBatch.set(docRef, {
+      id: tmpl.id,
+      nome: tmpl.title,
+      title: tmpl.title,
+      descricao: tmpl.description,
+      description: tmpl.description,
+      icon: tmpl.icon,
+      color: tmpl.color,
+      items: tmpl.items,
+      lastUpdated: new Date().toISOString(),
+    });
+    if (!cloudTemplatesMap.has(tmpl.id)) {
+      result.uploadedTemplates++;
+    }
+  });
+  await templatesBatch.commit();
+
+  const mergedTemplates: RoutineTemplate[] = [...localTemplates];
+  cloudTemplatesMap.forEach((cloudTmpl, id) => {
+    if (!localTemplatesMap.has(id)) {
+      mergedTemplates.push({
+        id,
+        title: cloudTmpl.title || cloudTmpl.nome || 'Modelo de Rotina',
+        description: cloudTmpl.description || cloudTmpl.descricao || 'Rotina sincronizada da nuvem',
+        icon: cloudTmpl.icon || 'sparkles',
+        color: cloudTmpl.color || '#34D399',
+        items: Array.isArray(cloudTmpl.items) ? cloudTmpl.items : [],
+      });
+      result.downloadedTemplates++;
+    }
+  });
+
+  // ========================================================
+  // 4. Sincronização de Gamificação: Conquistas, XP e Stickers (GamificationRepository.kt)
+  // ========================================================
+  const achSnapshot = await getDocs(achievementsColRef);
+  const cloudUnlockedSet = new Map<string, any>();
+  achSnapshot.forEach((d) => cloudUnlockedSet.set(d.id, d.data()));
+
+  const achBatch = writeBatch(firestore);
+  localAchievements.forEach((ach) => {
+    if (ach.unlocked && !cloudUnlockedSet.has(ach.id)) {
+      const achDocRef = doc(achievementsColRef, ach.id);
+      achBatch.set(achDocRef, {
+        id: ach.id,
+        title: ach.title,
+        unlockedAt: ach.unlockedAt || new Date().toISOString().slice(0, 10),
+      });
+      result.syncedAchievements++;
+    }
+  });
+  await achBatch.commit();
+
+  const mergedAchievements: Achievement[] = localAchievements.map((ach) => {
+    if (!ach.unlocked && cloudUnlockedSet.has(ach.id)) {
+      const cloudData = cloudUnlockedSet.get(ach.id);
+      result.syncedAchievements++;
+      return {
+        ...ach,
+        unlocked: true,
+        progress: ach.maxProgress,
+        unlockedAt: cloudData?.unlockedAt || new Date().toISOString().slice(0, 10),
+      };
+    }
+    return ach;
+  });
+
+  // Sincronização do documento raiz users/{userId} (points e purchased_stickers)
+  let mergedMarketItems: MarketItem[] = [...localMarketItems];
+  let mergedUserProfile: UserProfile | undefined = localUserProfile
+    ? { ...localUserProfile }
+    : undefined;
+
+  try {
+    const userDocSnap = await getDoc(userDocRef);
+    const cloudUserData = userDocSnap.exists() ? userDocSnap.data() : {};
+
+    const localOwnedIds = localMarketItems.filter((i) => i.isOwned).map((i) => i.id);
+    const cloudOwnedIds: string[] = Array.isArray(cloudUserData?.purchased_stickers)
+      ? cloudUserData.purchased_stickers
+      : [];
+    const combinedOwnedSet = new Set<string>([...localOwnedIds, ...cloudOwnedIds]);
+
+    mergedMarketItems = localMarketItems.map((item) => ({
+      ...item,
+      isOwned: combinedOwnedSet.has(item.id),
+    }));
+
+    if (mergedUserProfile) {
+      const cloudPoints = typeof cloudUserData?.points === 'number' ? cloudUserData.points : 0;
+      const cloudBestStreak =
+        typeof cloudUserData?.bestStreak === 'number' ? cloudUserData.bestStreak : 0;
+      const mergedPoints = Math.max(mergedUserProfile.totalPoints, cloudPoints);
+      const mergedBestStreak = Math.max(mergedUserProfile.bestStreak, cloudBestStreak);
+
+      mergedUserProfile = {
+        ...mergedUserProfile,
+        totalPoints: mergedPoints,
+        bestStreak: mergedBestStreak,
+      };
+
+      await setDoc(
+        userDocRef,
+        {
+          points: mergedPoints,
+          purchased_stickers: Array.from(combinedOwnedSet),
+          currentStreak: mergedUserProfile.currentStreak,
+          bestStreak: mergedBestStreak,
+          totalCompleted: mergedUserProfile.totalCompleted,
+          focusMinutesToday: mergedUserProfile.focusMinutesToday,
+          lastSyncAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+    }
+  } catch (err) {
+    console.warn('Aviso ao sincronizar perfil de gamificação no Firestore:', err);
+  }
+
+  return {
+    mergedHabits,
+    mergedCategories,
+    mergedTemplates,
+    mergedAchievements,
+    mergedMarketItems,
+    mergedUserProfile,
+    result,
+  };
+}
+
+/**
+ * Limpa todos os dados do usuário na nuvem (Firestore), espelhando fielmente o ClearCloudDataUseCase.kt.
+ */
+export async function clearCloudData(userId: string): Promise<boolean> {
+  try {
+    const userDocRef = doc(firestore, 'users', userId);
+    const collectionsToClear = [
+      EVENTS_COLLECTION,
+      CATEGORIES_COLLECTION,
+      COMPLETED_HABITS_COLLECTION,
+      UNLOCKED_ACHIEVEMENTS_COLLECTION,
+      TEMPLATES_COLLECTION,
+    ];
+
+    for (const collectionName of collectionsToClear) {
+      const colRef = collection(userDocRef, collectionName);
+      const snapshot = await getDocs(colRef);
+      if (!snapshot.empty) {
+        const batch = writeBatch(firestore);
+        snapshot.forEach((docSnap) => {
+          batch.delete(docSnap.ref);
+        });
+        await batch.commit();
+      }
+    }
+
+    // Reseta também os contadores no documento raiz do usuário
+    await setDoc(
+      userDocRef,
+      {
+        points: 0,
+        purchased_stickers: [],
+        currentStreak: 0,
+        bestStreak: 0,
+        totalCompleted: 0,
+        focusMinutesToday: 0,
+        clearedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+
+    return true;
+  } catch (err) {
+    console.warn('Erro ao limpar dados na nuvem (ClearCloudData):', err);
+    return false;
+  }
 }
 
 /**

@@ -307,6 +307,11 @@ export async function upsertTemplateDb(template: RoutineTemplate): Promise<void>
   );
 }
 
+export async function deleteTemplateDb(id: string): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync('DELETE FROM templates WHERE id = ?', [id]);
+}
+
 export async function setAllTemplatesDb(templates: RoutineTemplate[]): Promise<void> {
   const db = await getDatabase();
   await db.withExclusiveTransactionAsync(async (txn) => {

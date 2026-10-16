@@ -24,6 +24,7 @@ export default function SettingsScreen() {
     updateSettings,
     userProfile,
     clearAllLocalData,
+    clearCloudDataAction,
     syncAllHabitsToCalendarAction,
     syncCloudAction,
     exportBackupAction,
@@ -115,16 +116,28 @@ export default function SettingsScreen() {
 
   const handleConfirmClearData = () => {
     Alert.alert(
-      'Limpar Dados Locais',
-      'Isso removerá permanentemente suas rotinas locais e restaurará os padrões de fábrica. Deseja continuar?',
+      'Limpar Dados do Aplicativo',
+      'Escolha se deseja restaurar apenas os dados deste dispositivo ou também apagar seus dados armazenados na nuvem (Firestore):',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
-          text: 'Limpar Tudo',
+          text: 'Apenas Local',
           style: 'destructive',
           onPress: () => {
             clearAllLocalData();
-            Alert.alert('Dados limpos', 'Todos os dados locais foram resetados com sucesso.');
+            Alert.alert('Dados Locais Limpos', 'Todos os dados locais foram resetados com sucesso.');
+          },
+        },
+        {
+          text: 'Local + Nuvem',
+          style: 'destructive',
+          onPress: async () => {
+            clearAllLocalData();
+            await clearCloudDataAction().catch(() => false);
+            Alert.alert(
+              'Limpeza Completa Concluída',
+              'Seus dados locais e da nuvem foram completamente removidos.'
+            );
           },
         },
       ]
@@ -330,8 +343,10 @@ export default function SettingsScreen() {
             <Text style={styles.cloudCardLabel}>Conta</Text>
             <Text style={[styles.cloudCardValue, { color: theme.textPrimary }]}>{userProfile.email || 'fabricio@momentus.app'}</Text>
 
-            <Text style={[styles.cloudCardLabel, { marginTop: 12 }]}>Último Backup</Text>
-            <Text style={[styles.cloudCardValue, { color: theme.textPrimary }]}>Hoje às 10:45</Text>
+            <Text style={[styles.cloudCardLabel, { marginTop: 12 }]}>Último Backup / Sincronização</Text>
+            <Text style={[styles.cloudCardValue, { color: theme.textPrimary }]}>
+              {settings.lastBackupAt || 'Sincronização Automática Ativa'}
+            </Text>
           </View>
 
           <TouchableOpacity
@@ -341,7 +356,7 @@ export default function SettingsScreen() {
             activeOpacity={0.85}>
             <Ionicons name="sync" size={18} color="#0F172A" />
             <Text style={styles.syncNowBtnText}>
-              {isSyncing ? 'Sincronizando...' : 'Sincronizar Agenda Agora'}
+              {isSyncing ? 'Sincronizando...' : 'Sincronizar Agenda e Nuvem Agora'}
             </Text>
           </TouchableOpacity>
 
@@ -369,7 +384,7 @@ export default function SettingsScreen() {
             onPress={handleConfirmClearData}
             activeOpacity={0.8}>
             <Ionicons name="trash-bin-outline" size={18} color={MomentusColors.errorRed} />
-            <Text style={styles.clearCloudBtnText}>Limpar Dados Locais</Text>
+            <Text style={styles.clearCloudBtnText}>Limpar Dados (Local / Nuvem)</Text>
           </TouchableOpacity>
 
           {/* Links para Páginas Secundárias */}

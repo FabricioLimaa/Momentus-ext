@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
-import { useColorScheme } from 'react-native';
+import React, { createContext, useContext, useEffect, useState, useMemo, useRef } from 'react';
+import { useColorScheme, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
+import * as Notifications from 'expo-notifications';
 import {
   HabitItem,
   Category,
@@ -25,11 +26,15 @@ import { calculateUserLevel, UserLevelInfo } from '@/domain/userLevel';
 import { soundManager } from '@/util/soundManager';
 import { MomentusColors } from '@/constants/theme';
 import { CelebrationModal } from '@/components/momentus/CelebrationModal';
+import { ReminderModal } from '@/components/momentus/ReminderModal';
 import {
   scheduleHabitNotifications,
   cancelHabitNotifications,
   cancelAllNotifications,
   requestNotificationPermissions,
+  snoozeHabitNotification,
+  ACTION_MARK_COMPLETED,
+  ACTION_SNOOZE_15,
 } from '@/services/notificationService';
 import {
   syncHabitToDeviceCalendar,
@@ -43,6 +48,7 @@ import {
   setAllHabitsDb,
   getAllTemplates,
   setAllTemplatesDb,
+  deleteTemplateDb,
   getAllAchievements,
   setAllAchievementsDb,
   getAllMarketItems,
@@ -57,7 +63,7 @@ import {
 } from '@/services/backupService';
 import { auth as firebaseAuth } from '@/config/firebase';
 import { logoutUser } from '@/services/authService';
-import { syncWithFirestore } from '@/services/firestoreSyncService';
+import { syncWithFirestore, clearCloudData } from '@/services/firestoreSyncService';
 import { onAuthStateChanged } from 'firebase/auth';
 
 export interface AppTheme {
@@ -105,6 +111,8 @@ interface MomentusContextData {
   applyTemplateToToday: (templateId: string) => void;
   applyTemplateToDates: (templateId: string, dates: string[], saveToGoogle?: boolean) => void;
   addTemplate: (template: Omit<RoutineTemplate, 'id'>) => void;
+  updateTemplate: (template: RoutineTemplate) => void;
+  deleteTemplate: (id: string) => void;
   // Categories Actions
   upsertCategory: (
     id: string | null,
@@ -121,6 +129,7 @@ interface MomentusContextData {
   // Settings Actions
   updateSettings: (newSettings: Partial<AppSettings>) => void;
   clearAllLocalData: () => void;
+  clearCloudDataAction: () => Promise<boolean>;
   syncAllHabitsToCalendarAction: () => Promise<number>;
   exportBackupAction: () => Promise<boolean>;
   importBackupAction: () => Promise<boolean>;
@@ -181,12 +190,26 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     pointsEarned?: number;
   } | null>(null);
 
+  // Reminder Modal state (equivalente ao ReminderActivity.kt)
+  const [reminderPrompt, setReminderPrompt] = useState<{
+    visible: boolean;
+    habitId: string;
+    habitTitle: string;
+  } | null>(null);
+
   const showCelebration = (title: string, message: string, pointsEarned?: number) => {
     setCelebration({ visible: true, title, message, pointsEarned });
   };
 
   const hideCelebration = () => {
     setCelebration(null);
+  };
+
+  const formatBackupTimestamp = (): string => {
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const mins = String(now.getMinutes()).padStart(2, '0');
+    return `Hoje às ${hours}:${mins}`;
   };
 
   // Sync sound settings with SoundManager
@@ -337,6 +360,88 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       ...prev,
       totalPoints: prev.totalPoints + points,
     }));
+  };
+
+  /**
+   * Implementação exata das regras de CheckAndUnlockAchievementsUseCase.kt
+   */
+  const checkAndUnlockAchievements = (
+    streakCount: number,
+    totalCompleted: number,
+    totalTemplates: number
+  ) => {
+    setAchievements((prev) => {
+      let newlyUnlocked = false;
+      const updated = prev.map((ach) => {
+        if (ach.unlocked) return ach;
+
+        let shouldUnlock = false;
+        let progress = ach.progress;
+
+        switch (ach.id) {
+          case 'FIRST_HABIT':
+            progress = totalCompleted;
+            if (totalCompleted >= 1) shouldUnlock = true;
+            break;
+          case 'COMPLETED_10':
+            progress = totalCompleted;
+            if (totalCompleted >= 10) shouldUnlock = true;
+            break;
+          case 'COMPLETED_50':
+            progress = totalCompleted;
+            if (totalCompleted >= 50) shouldUnlock = true;
+            break;
+          case 'COMPLETED_100':
+            progress = totalCompleted;
+            if (totalCompleted >= 100) shouldUnlock = true;
+            break;
+          case 'STREAK_3':
+            progress = streakCount;
+            if (streakCount >= 3) shouldUnlock = true;
+            break;
+          case 'STREAK_7':
+            progress = streakCount;
+            if (streakCount >= 7) shouldUnlock = true;
+            break;
+          case 'STREAK_30':
+            progress = streakCount;
+            if (streakCount >= 30) shouldUnlock = true;
+            break;
+          case 'FIRST_TEMPLATE':
+            progress = totalTemplates;
+            if (totalTemplates >= 1) shouldUnlock = true;
+            break;
+        }
+
+        if (shouldUnlock) {
+          newlyUnlocked = true;
+          addPoints(ach.xpReward);
+          showCelebration(
+            'Conquista Desbloqueada! 🏆',
+            `Você desbloqueou a medalha: "${ach.title}"`,
+            ach.xpReward
+          );
+          return {
+            ...ach,
+            progress: ach.maxProgress,
+            unlocked: true,
+            unlockedAt: getTodayDateString(),
+          };
+        }
+
+        return {
+          ...ach,
+          progress: Math.min(ach.maxProgress, progress),
+        };
+      });
+
+      if (newlyUnlocked) {
+        soundManager.playAchievementSound();
+        triggerHaptic('success');
+      }
+
+      return updated;
+    });
   };
 
   const toggleHabit = (id: string) => {
@@ -542,6 +647,17 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     checkAndUnlockAchievements(userProfile.currentStreak, userProfile.totalCompleted, nextTemplates.length);
   };
 
+  const updateTemplate = (updatedTemplate: RoutineTemplate) => {
+    setTemplates((prev) => prev.map((t) => (t.id === updatedTemplate.id ? updatedTemplate : t)));
+    triggerHaptic('success');
+  };
+
+  const deleteTemplate = (id: string) => {
+    setTemplates((prev) => prev.filter((t) => t.id !== id));
+    deleteTemplateDb(id).catch(() => {});
+    triggerHaptic('impact');
+  };
+
   const upsertCategory = (
     id: string | null,
     name: string,
@@ -622,7 +738,20 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     triggerHaptic('impact');
   };
 
+  const clearCloudDataAction = async (): Promise<boolean> => {
+    const currentUser = firebaseAuth.currentUser;
+    const uid = currentUser?.uid || userProfile.email || 'local_user';
+    const ok = await clearCloudData(uid);
+    if (ok) {
+      triggerHaptic('impact');
+    }
+    return ok;
+  };
+
   const exportBackupAction = async (): Promise<boolean> => {
+    const backupTimestamp = formatBackupTimestamp();
+    const updatedSettings = { ...settings, lastBackupAt: backupTimestamp };
+    setSettings(updatedSettings);
     return exportMomentusBackup({
       habits,
       categories,
@@ -630,7 +759,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       achievements,
       marketItems,
       userProfile,
-      settings,
+      settings: updatedSettings,
     });
   };
 
@@ -638,13 +767,19 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const data = await importMomentusBackup();
     if (!data) return false;
 
+    const backupTimestamp = formatBackupTimestamp();
+    const nextSettings: AppSettings = {
+      ...(data.settings || INITIAL_SETTINGS),
+      lastBackupAt: backupTimestamp,
+    };
+
     setHabits(data.habits || []);
     setCategories(data.categories || INITIAL_CATEGORIES);
     setTemplates(data.templates || INITIAL_TEMPLATES);
     setAchievements(data.achievements || INITIAL_ACHIEVEMENTS);
     setMarketItems(data.marketItems || INITIAL_MARKET_ITEMS);
     setUserProfile(data.userProfile || INITIAL_USER_PROFILE);
-    setSettings(data.settings || INITIAL_SETTINGS);
+    setSettings(nextSettings);
 
     // Persiste imediatamente no SQLite e AsyncStorage
     await setAllCategoriesDb(data.categories || INITIAL_CATEGORIES);
@@ -653,8 +788,8 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     await setAllAchievementsDb(data.achievements || INITIAL_ACHIEVEMENTS);
     await setAllMarketItemsDb(data.marketItems || INITIAL_MARKET_ITEMS);
     await setAppKv('user_profile', data.userProfile || INITIAL_USER_PROFILE);
-    await setAppKv('app_settings', data.settings || INITIAL_SETTINGS);
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    await setAppKv('app_settings', nextSettings);
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ ...data, settings: nextSettings }));
 
     // Reagenda notificações para os novos hábitos importados
     cancelAllNotifications()
@@ -703,100 +838,89 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const currentUser = firebaseAuth.currentUser;
     const uid = currentUser?.uid || userProfile.email || 'local_user';
 
-    const { mergedHabits, mergedCategories } = await syncWithFirestore(
+    const {
+      mergedHabits,
+      mergedCategories,
+      mergedTemplates,
+      mergedAchievements,
+      mergedMarketItems,
+      mergedUserProfile,
+    } = await syncWithFirestore(
       uid,
       habits,
-      categories
+      categories,
+      templates,
+      achievements,
+      marketItems,
+      userProfile
     );
+
+    const backupTimestamp = formatBackupTimestamp();
+    const updatedSettings: AppSettings = {
+      ...settings,
+      lastBackupAt: backupTimestamp,
+    };
 
     setHabits(mergedHabits);
     setCategories(mergedCategories);
+    setTemplates(mergedTemplates);
+    setAchievements(mergedAchievements);
+    setMarketItems(mergedMarketItems);
+    if (mergedUserProfile) {
+      setUserProfile(mergedUserProfile);
+    }
+    setSettings(updatedSettings);
 
     await setAllHabitsDb(mergedHabits);
     await setAllCategoriesDb(mergedCategories);
+    await setAllTemplatesDb(mergedTemplates);
+    await setAllAchievementsDb(mergedAchievements);
+    await setAllMarketItemsDb(mergedMarketItems);
+    if (mergedUserProfile) {
+      await setAppKv('user_profile', mergedUserProfile);
+    }
+    await setAppKv('app_settings', updatedSettings);
   };
 
-  /**
-   * Implementação exata das regras de CheckAndUnlockAchievementsUseCase.kt
-   */
-  const checkAndUnlockAchievements = (
-    streakCount: number,
-    totalCompleted: number,
-    totalTemplates: number
-  ) => {
-    setAchievements((prev) => {
-      let newlyUnlocked = false;
-      const updated = prev.map((ach) => {
-        if (ach.unlocked) return ach;
+  const toggleHabitRef = useRef(toggleHabit);
+  useEffect(() => {
+    toggleHabitRef.current = toggleHabit;
+  });
 
-        let shouldUnlock = false;
-        let progress = ach.progress;
+  // Escuta interações com notificações (botões "Concluir" e "Adiar 15 min" ou toque para abrir ReminderModal)
+  useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const actionId = response.actionIdentifier;
+      const data = response.notification.request.content.data as {
+        habitId?: string;
+        habitTitle?: string;
+      };
+      const habitId = data?.habitId;
+      const habitTitle =
+        data?.habitTitle ||
+        response.notification.request.content.title?.replace(/^(Início|Término):\s*/i, '') ||
+        'Sua Rotina';
 
-        switch (ach.id) {
-          case 'FIRST_HABIT':
-            progress = totalCompleted;
-            if (totalCompleted >= 1) shouldUnlock = true;
-            break;
-          case 'COMPLETED_10':
-            progress = totalCompleted;
-            if (totalCompleted >= 10) shouldUnlock = true;
-            break;
-          case 'COMPLETED_50':
-            progress = totalCompleted;
-            if (totalCompleted >= 50) shouldUnlock = true;
-            break;
-          case 'COMPLETED_100':
-            progress = totalCompleted;
-            if (totalCompleted >= 100) shouldUnlock = true;
-            break;
-          case 'STREAK_3':
-            progress = streakCount;
-            if (streakCount >= 3) shouldUnlock = true;
-            break;
-          case 'STREAK_7':
-            progress = streakCount;
-            if (streakCount >= 7) shouldUnlock = true;
-            break;
-          case 'STREAK_30':
-            progress = streakCount;
-            if (streakCount >= 30) shouldUnlock = true;
-            break;
-          case 'FIRST_TEMPLATE':
-            progress = totalTemplates;
-            if (totalTemplates >= 1) shouldUnlock = true;
-            break;
+      if (!habitId) return;
+
+      if (actionId === ACTION_MARK_COMPLETED) {
+        const target = habits.find((h) => h.id === habitId);
+        if (target && !target.completed) {
+          toggleHabitRef.current(habitId);
         }
-
-        if (shouldUnlock) {
-          newlyUnlocked = true;
-          addPoints(ach.xpReward);
-          showCelebration(
-            'Conquista Desbloqueada! 🏆',
-            `Você desbloqueou a medalha: "${ach.title}"`,
-            ach.xpReward
-          );
-          return {
-            ...ach,
-            progress: ach.maxProgress,
-            unlocked: true,
-            unlockedAt: getTodayDateString(),
-          };
-        }
-
-        return {
-          ...ach,
-          progress: Math.min(ach.maxProgress, progress),
-        };
-      });
-
-      if (newlyUnlocked) {
-        soundManager.playAchievementSound();
-        triggerHaptic('success');
+      } else if (actionId === ACTION_SNOOZE_15) {
+        snoozeHabitNotification(habitId, habitTitle, 15).catch(() => {});
+      } else if (actionId === Notifications.DEFAULT_ACTION_IDENTIFIER) {
+        setReminderPrompt({
+          visible: true,
+          habitId,
+          habitTitle,
+        });
       }
-
-      return updated;
     });
-  };
+
+    return () => subscription.remove();
+  }, [habits]);
 
   return (
     <MomentusContext.Provider
@@ -823,12 +947,15 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         applyTemplateToToday,
         applyTemplateToDates,
         addTemplate,
+        updateTemplate,
+        deleteTemplate,
         upsertCategory,
         deleteCategory,
         buyMarketItem,
         addFocusMinutes,
         updateSettings,
         clearAllLocalData,
+        clearCloudDataAction,
         syncAllHabitsToCalendarAction,
         exportBackupAction,
         importBackupAction,
@@ -846,6 +973,28 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           onClose={hideCelebration}
         />
       )}
+      {reminderPrompt?.visible && (
+        <ReminderModal
+          visible={reminderPrompt.visible}
+          habitTitle={reminderPrompt.habitTitle}
+          theme={theme}
+          onComplete={() => {
+            const target = habits.find((h) => h.id === reminderPrompt.habitId);
+            if (target && !target.completed) {
+              toggleHabit(reminderPrompt.habitId);
+            }
+            setReminderPrompt(null);
+          }}
+          onSnooze={() => {
+            snoozeHabitNotification(reminderPrompt.habitId, reminderPrompt.habitTitle, 15).catch(
+              () => {}
+            );
+            setReminderPrompt(null);
+            Alert.alert('Lembrete Adiado ⏰', `"${reminderPrompt.habitTitle}" foi adiado em 15 minutos.`);
+          }}
+          onDismiss={() => setReminderPrompt(null)}
+        />
+      )}
     </MomentusContext.Provider>
   );
 };
@@ -857,3 +1006,4 @@ export const useMomentus = () => {
   }
   return context;
 };
+

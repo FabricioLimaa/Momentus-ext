@@ -86,5 +86,9 @@ export interface AppSettings {
   fontSizeMultiplier: number;
   primaryColorHex: string;
   googleCalendarSyncEnabled: boolean;
+  lastBackupAt?: string | null;
+  termsAccepted?: boolean;
+  termsAcceptedAt?: string | null;
 }
+
 

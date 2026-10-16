@@ -15,11 +15,49 @@ Notifications.setNotificationHandler({
 export const CHANNEL_INICIO = 'CHANNEL_INICIO';
 export const CHANNEL_TERMINO = 'CHANNEL_TERMINO';
 
+export const CATEGORY_HABIT_START = 'CATEGORY_HABIT_START';
+export const CATEGORY_HABIT_END = 'CATEGORY_HABIT_END';
+
+export const ACTION_MARK_COMPLETED = 'ACTION_MARK_COMPLETED';
+export const ACTION_SNOOZE_15 = 'ACTION_SNOOZE_15';
+
 /**
- * Configura canais de notificação no Android com alta prioridade e luzes customizadas
- * equivalentes ao AlarmReceiver.kt do projeto nativo.
+ * Configura categorias interativas ("Concluir" e "Adiar 15 min") e canais no Android
+ * equivalentes ao AlarmReceiver.kt e NotificationActionReceiver.kt do projeto nativo.
  */
 export async function setupNotificationChannels(): Promise<void> {
+  try {
+    // Registra categorias de ações rápidas (iOS & Android)
+    await Notifications.setNotificationCategoryAsync(CATEGORY_HABIT_START, [
+      {
+        identifier: ACTION_MARK_COMPLETED,
+        buttonTitle: 'Concluir ✅',
+        options: {
+          opensAppToForeground: true,
+        },
+      },
+      {
+        identifier: ACTION_SNOOZE_15,
+        buttonTitle: 'Adiar 15 min ⏰',
+        options: {
+          opensAppToForeground: false,
+        },
+      },
+    ]);
+
+    await Notifications.setNotificationCategoryAsync(CATEGORY_HABIT_END, [
+      {
+        identifier: ACTION_MARK_COMPLETED,
+        buttonTitle: 'Concluir ✅',
+        options: {
+          opensAppToForeground: true,
+        },
+      },
+    ]);
+  } catch (err) {
+    console.warn('Erro ao configurar categorias interativas de notificação:', err);
+  }
+
   if (Platform.OS !== 'android') return;
 
   try {
@@ -129,9 +167,11 @@ export async function scheduleHabitNotifications(
         startNotificationId = await Notifications.scheduleNotificationAsync({
           content: {
             title: `Início: ${habit.title}`,
-            body: 'Sua rotina começou! 🚀',
+            body: 'Sua rotina começou! Toque para ver opções ou use os botões abaixo. 🚀',
+            categoryIdentifier: CATEGORY_HABIT_START,
             data: {
               habitId: habit.id,
+              habitTitle: habit.title,
               type: 'START',
             },
             sound: 'default',
@@ -158,8 +198,10 @@ export async function scheduleHabitNotifications(
           content: {
             title: `Término: ${habit.title}`,
             body: 'Hora de finalizar sua rotina. Como foi seu progresso? ✅',
+            categoryIdentifier: CATEGORY_HABIT_END,
             data: {
               habitId: habit.id,
+              habitTitle: habit.title,
               type: 'END',
             },
             sound: 'default',
@@ -177,6 +219,41 @@ export async function scheduleHabitNotifications(
   }
 
   return { startNotificationId, endNotificationId };
+}
+
+/**
+ * Adia o lembrete de uma rotina por X minutos (padrão: 15 min),
+ * espelhando a ação ACTION_SNOOZE do NotificationActionReceiver.kt e ReminderActivity.kt.
+ */
+export async function snoozeHabitNotification(
+  habitId: string,
+  habitTitle: string,
+  minutes: number = 15
+): Promise<string | undefined> {
+  try {
+    const snoozeDate = new Date(Date.now() + minutes * 60 * 1000);
+    return await Notifications.scheduleNotificationAsync({
+      content: {
+        title: `Início: ${habitTitle}`,
+        body: `Lembrete adiado (${minutes} min). Sua rotina começa agora! 🚀`,
+        categoryIdentifier: CATEGORY_HABIT_START,
+        data: {
+          habitId,
+          habitTitle,
+          type: 'START',
+        },
+        sound: 'default',
+        ...(Platform.OS === 'android' ? { channelId: CHANNEL_INICIO } : {}),
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: snoozeDate,
+      },
+    });
+  } catch (error) {
+    console.warn(`Erro ao adiar notificação do hábito ${habitId}:`, error);
+    return undefined;
+  }
 }
 
 /**
@@ -205,3 +282,4 @@ export async function cancelAllNotifications(): Promise<void> {
     console.warn('Erro ao cancelar todas as notificações:', error);
   }
 }
+
