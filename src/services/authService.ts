@@ -197,13 +197,16 @@ async function loginWithGoogleBrowserFlow(): Promise<MomentusAuthUser> {
  * Realiza login com E-mail e Senha no Firebase Auth.
  */
 export async function loginWithEmail(email: string, pass: string): Promise<MomentusAuthUser> {
+  console.log('[AUTH] Autenticando com e-mail:', email.trim());
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email.trim(), pass);
+    console.log('[AUTH] Login com e-mail bem-sucedido:', userCredential.user.uid);
     return userCredential.user;
   } catch (err) {
+    console.error('[AUTH ERROR] Falha no login com e-mail:', err);
     if (isAndroidKeyBlockedError(err)) {
       console.warn(
-        'API Key do Firebase restrita a Android nativo. Autenticando em sessão local para:',
+        '[AUTH WARN] API Key do Firebase restrita a Android nativo. Autenticando em sessão local para:',
         email
       );
       return createLocalFallbackUser(email);
@@ -220,16 +223,19 @@ export async function registerWithEmail(
   pass: string,
   displayName?: string
 ): Promise<MomentusAuthUser> {
+  console.log('[AUTH] Criando nova conta para:', email.trim());
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), pass);
     if (displayName && userCredential.user) {
       await updateProfile(userCredential.user, { displayName });
     }
+    console.log('[AUTH] Conta criada com sucesso:', userCredential.user.uid);
     return userCredential.user;
   } catch (err) {
+    console.error('[AUTH ERROR] Falha ao criar conta:', err);
     if (isAndroidKeyBlockedError(err)) {
       console.warn(
-        'API Key do Firebase restrita a Android nativo. Criando conta em sessão local para:',
+        '[AUTH WARN] API Key do Firebase restrita a Android nativo. Criando conta em sessão local para:',
         email
       );
       return createLocalFallbackUser(email, displayName);
@@ -244,15 +250,33 @@ export async function registerWithEmail(
 export async function loginWithGoogle(): Promise<MomentusAuthUser> {
   if (Platform.OS === 'web') {
     try {
+      console.log('[AUTH] Iniciando login com Google na Web...');
       const provider = new GoogleAuthProvider();
       provider.addScope('profile');
       provider.addScope('email');
       provider.setCustomParameters({ prompt: 'select_account' });
       const userCredential = await signInWithPopup(auth, provider);
+      console.log('[AUTH] Login com Google concluído com sucesso:', userCredential.user.email);
       return userCredential.user;
     } catch (err: any) {
+      console.error('[AUTH ERROR] Falha no login Google Web:', {
+        code: err?.code,
+        message: err?.message,
+        customData: err?.customData,
+      });
+
       if (err.code === 'auth/popup-closed-by-user') {
         throw new Error('SIGN_IN_CANCELLED');
+      }
+      if (err.code === 'auth/internal-error') {
+        throw new Error(
+          'Erro interno no provedor Google (auth/internal-error). Acesse o Firebase Console > Authentication > Sign-in method > Google e certifique-se de que está ATIVADO com o "E-mail de suporte do projeto" selecionado.'
+        );
+      }
+      if (err.code === 'auth/unauthorized-domain') {
+        throw new Error(
+          'Domínio não autorizado (auth/unauthorized-domain). Adicione o domínio local em Firebase Console > Authentication > Settings > Authorized domains.'
+        );
       }
       if (isAndroidKeyBlockedError(err)) {
         throw new Error(
