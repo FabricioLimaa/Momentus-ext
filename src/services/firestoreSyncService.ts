@@ -1,28 +1,28 @@
+import { firestore } from "@/config/firebase";
+import {
+  Achievement,
+  Category,
+  HabitItem,
+  MarketItem,
+  RoutineTemplate,
+  UserProfile,
+} from "@/types";
 import {
   collection,
   doc,
   getDoc,
   getDocs,
-  setDoc,
-  writeBatch,
   onSnapshot,
+  setDoc,
   Unsubscribe,
-} from 'firebase/firestore';
-import { firestore } from '@/config/firebase';
-import {
-  HabitItem,
-  Category,
-  RoutineTemplate,
-  Achievement,
-  MarketItem,
-  UserProfile,
-} from '@/types';
+  writeBatch,
+} from "firebase/firestore";
 
-const EVENTS_COLLECTION = 'eventos';
-const CATEGORIES_COLLECTION = 'categories';
-const TEMPLATES_COLLECTION = 'templates';
-const UNLOCKED_ACHIEVEMENTS_COLLECTION = 'unlocked_achievements';
-const COMPLETED_HABITS_COLLECTION = 'completed_habits';
+const EVENTS_COLLECTION = "eventos";
+const CATEGORIES_COLLECTION = "categories";
+const TEMPLATES_COLLECTION = "templates";
+const UNLOCKED_ACHIEVEMENTS_COLLECTION = "unlocked_achievements";
+const COMPLETED_HABITS_COLLECTION = "completed_habits";
 
 export interface SyncResult {
   uploadedEvents: number;
@@ -49,7 +49,7 @@ export async function syncWithFirestore(
   localTemplates: RoutineTemplate[] = [],
   localAchievements: Achievement[] = [],
   localMarketItems: MarketItem[] = [],
-  localUserProfile?: UserProfile
+  localUserProfile?: UserProfile,
 ): Promise<{
   mergedHabits: HabitItem[];
   mergedCategories: Category[];
@@ -69,12 +69,18 @@ export async function syncWithFirestore(
     syncedAchievements: 0,
   };
 
-  const userDocRef = doc(firestore, 'users', userId);
+  const userDocRef = doc(firestore, "users", userId);
   const eventsColRef = collection(userDocRef, EVENTS_COLLECTION);
   const categoriesColRef = collection(userDocRef, CATEGORIES_COLLECTION);
   const templatesColRef = collection(userDocRef, TEMPLATES_COLLECTION);
-  const achievementsColRef = collection(userDocRef, UNLOCKED_ACHIEVEMENTS_COLLECTION);
-  const completedHabitsColRef = collection(userDocRef, COMPLETED_HABITS_COLLECTION);
+  const achievementsColRef = collection(
+    userDocRef,
+    UNLOCKED_ACHIEVEMENTS_COLLECTION,
+  );
+  const completedHabitsColRef = collection(
+    userDocRef,
+    COMPLETED_HABITS_COLLECTION,
+  );
 
   // ========================================================
   // 1. Sincronização de Categorias (CategoryRepository.kt)
@@ -83,7 +89,9 @@ export async function syncWithFirestore(
   const cloudCategoriesMap = new Map<string, any>();
   categoriesSnapshot.forEach((d) => cloudCategoriesMap.set(d.id, d.data()));
 
-  const localCategoriesMap = new Map<string, Category>(localCategories.map((c) => [c.id, c]));
+  const localCategoriesMap = new Map<string, Category>(
+    localCategories.map((c) => [c.id, c]),
+  );
   const categoriesBatch = writeBatch(firestore);
 
   localCategories.forEach((cat) => {
@@ -108,8 +116,8 @@ export async function syncWithFirestore(
     if (!localCategoriesMap.has(id)) {
       mergedCategories.push({
         id,
-        name: cloudCat.nome || cloudCat.name || 'Geral',
-        color: cloudCat.cor || cloudCat.color || '#34D399',
+        name: cloudCat.nome || cloudCat.name || "Geral",
+        color: cloudCat.cor || cloudCat.color || "#34D399",
         icon: cloudCat.icon || undefined,
         stickerId: cloudCat.stickerId || null,
         metaMinutosSemanal: cloudCat.metaMinutosSemanal || null,
@@ -125,7 +133,9 @@ export async function syncWithFirestore(
   const cloudEventsMap = new Map<string, any>();
   eventsSnapshot.forEach((d) => cloudEventsMap.set(d.id, d.data()));
 
-  const localEventsMap = new Map<string, HabitItem>(localHabits.map((h) => [h.id, h]));
+  const localEventsMap = new Map<string, HabitItem>(
+    localHabits.map((h) => [h.id, h]),
+  );
   const eventsBatch = writeBatch(firestore);
 
   localHabits.forEach((habit) => {
@@ -177,12 +187,15 @@ export async function syncWithFirestore(
     if (!localEventsMap.has(id)) {
       mergedHabits.push({
         id,
-        title: cloudItem.titulo || cloudItem.title || 'Rotina',
+        title: cloudItem.titulo || cloudItem.title || "Rotina",
         description: cloudItem.descricao || cloudItem.description || undefined,
-        date: cloudItem.data || cloudItem.date || new Date().toISOString().slice(0, 10),
-        timeStart: cloudItem.horarioInicio || cloudItem.timeStart || '08:00',
+        date:
+          cloudItem.data ||
+          cloudItem.date ||
+          new Date().toISOString().slice(0, 10),
+        timeStart: cloudItem.horarioInicio || cloudItem.timeStart || "08:00",
         timeEnd: cloudItem.horarioTermino || cloudItem.timeEnd || undefined,
-        categoryId: cloudItem.categoryId || mergedCategories[0]?.id || 'cat-1',
+        categoryId: cloudItem.categoryId || mergedCategories[0]?.id || "cat-1",
         completed: !!cloudItem.completed,
         streak: cloudItem.streak || 0,
         googleCalendarEventId: cloudItem.googleCalendarEventId || null,
@@ -202,7 +215,7 @@ export async function syncWithFirestore(
     templatesSnapshot.forEach((d) => cloudTemplatesMap.set(d.id, d.data()));
 
     const localTemplatesMap = new Map<string, RoutineTemplate>(
-      localTemplates.map((t) => [t.id, t])
+      localTemplates.map((t) => [t.id, t]),
     );
     const templatesBatch = writeBatch(firestore);
 
@@ -229,11 +242,13 @@ export async function syncWithFirestore(
       if (!localTemplatesMap.has(id)) {
         mergedTemplates.push({
           id,
-          title: cloudTmpl.title || cloudTmpl.nome || 'Modelo de Rotina',
+          title: cloudTmpl.title || cloudTmpl.nome || "Modelo de Rotina",
           description:
-            cloudTmpl.description || cloudTmpl.descricao || 'Rotina sincronizada da nuvem',
-          icon: cloudTmpl.icon || 'sparkles',
-          color: cloudTmpl.color || '#34D399',
+            cloudTmpl.description ||
+            cloudTmpl.descricao ||
+            "Rotina sincronizada da nuvem",
+          icon: cloudTmpl.icon || "sparkles",
+          color: cloudTmpl.color || "#34D399",
           items: Array.isArray(cloudTmpl.items) ? cloudTmpl.items : [],
         });
         result.downloadedTemplates++;
@@ -272,7 +287,8 @@ export async function syncWithFirestore(
           ...ach,
           unlocked: true,
           progress: ach.maxProgress,
-          unlockedAt: cloudData?.unlockedAt || new Date().toISOString().slice(0, 10),
+          unlockedAt:
+            cloudData?.unlockedAt || new Date().toISOString().slice(0, 10),
         };
       }
       return ach;
@@ -289,11 +305,18 @@ export async function syncWithFirestore(
     const userDocSnap = await getDoc(userDocRef);
     const cloudUserData = userDocSnap.exists() ? userDocSnap.data() : {};
 
-    const localOwnedIds = localMarketItems.filter((i) => i.isOwned).map((i) => i.id);
-    const cloudOwnedIds: string[] = Array.isArray(cloudUserData?.purchased_stickers)
+    const localOwnedIds = localMarketItems
+      .filter((i) => i.isOwned)
+      .map((i) => i.id);
+    const cloudOwnedIds: string[] = Array.isArray(
+      cloudUserData?.purchased_stickers,
+    )
       ? cloudUserData.purchased_stickers
       : [];
-    const combinedOwnedSet = new Set<string>([...localOwnedIds, ...cloudOwnedIds]);
+    const combinedOwnedSet = new Set<string>([
+      ...localOwnedIds,
+      ...cloudOwnedIds,
+    ]);
 
     mergedMarketItems = localMarketItems.map((item) => ({
       ...item,
@@ -301,11 +324,17 @@ export async function syncWithFirestore(
     }));
 
     if (mergedUserProfile) {
-      const cloudPoints = typeof cloudUserData?.points === 'number' ? cloudUserData.points : 0;
+      const cloudPoints =
+        typeof cloudUserData?.points === "number" ? cloudUserData.points : 0;
       const cloudBestStreak =
-        typeof cloudUserData?.bestStreak === 'number' ? cloudUserData.bestStreak : 0;
+        typeof cloudUserData?.bestStreak === "number"
+          ? cloudUserData.bestStreak
+          : 0;
       const mergedPoints = Math.max(mergedUserProfile.totalPoints, cloudPoints);
-      const mergedBestStreak = Math.max(mergedUserProfile.bestStreak, cloudBestStreak);
+      const mergedBestStreak = Math.max(
+        mergedUserProfile.bestStreak,
+        cloudBestStreak,
+      );
 
       mergedUserProfile = {
         ...mergedUserProfile,
@@ -324,11 +353,14 @@ export async function syncWithFirestore(
           focusMinutesToday: mergedUserProfile.focusMinutesToday,
           lastSyncAt: new Date().toISOString(),
         },
-        { merge: true }
+        { merge: true },
       );
     }
   } catch (err) {
-    console.warn('Aviso ao sincronizar perfil de gamificação no Firestore:', err);
+    console.warn(
+      "Aviso ao sincronizar perfil de gamificação no Firestore:",
+      err,
+    );
   }
 
   return {
@@ -346,12 +378,12 @@ export async function syncWithFirestore(
  * Limpa todos os dados do usuário na nuvem (Firestore), espelhando fielmente o ClearCloudDataUseCase.kt.
  */
 export async function clearCloudData(userId: string): Promise<boolean> {
-  if (!userId || userId === 'local_user') {
+  if (!userId || userId === "local_user") {
     return false;
   }
 
   let clearedAny = false;
-  const userDocRef = doc(firestore, 'users', userId);
+  const userDocRef = doc(firestore, "users", userId);
   const collectionsToClear = [
     EVENTS_COLLECTION,
     CATEGORIES_COLLECTION,
@@ -389,7 +421,7 @@ export async function clearCloudData(userId: string): Promise<boolean> {
         focusMinutesToday: 0,
         clearedAt: new Date().toISOString(),
       },
-      { merge: true }
+      { merge: true },
     );
     clearedAny = true;
   } catch {}
@@ -402,16 +434,21 @@ export async function clearCloudData(userId: string): Promise<boolean> {
  */
 export function listenToFirestoreSync(
   userId: string,
-  onRemoteChange: () => void
+  onRemoteChange: () => void,
 ): Unsubscribe {
-  const eventsColRef = collection(firestore, 'users', userId, EVENTS_COLLECTION);
+  const eventsColRef = collection(
+    firestore,
+    "users",
+    userId,
+    EVENTS_COLLECTION,
+  );
   return onSnapshot(
     eventsColRef,
     () => {
       onRemoteChange();
     },
     (err) => {
-      console.warn('Erro no SnapshotListener do Firestore:', err);
-    }
+      console.warn("Erro no SnapshotListener do Firestore:", err);
+    },
   );
 }

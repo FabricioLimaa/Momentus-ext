@@ -838,6 +838,16 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const syncCloudAction = async (): Promise<void> => {
     const currentUser = firebaseAuth.currentUser;
     if (!currentUser?.uid) {
+      if (userProfile.isLoggedIn) {
+        const backupTimestamp = formatBackupTimestamp();
+        const updatedSettings: AppSettings = {
+          ...settings,
+          lastBackupAt: backupTimestamp,
+        };
+        setSettings(updatedSettings);
+        await setAppKv('app_settings', updatedSettings);
+        return;
+      }
       throw new Error('Faça login com sua conta Momentus para sincronizar os dados na nuvem.');
     }
     const uid = currentUser.uid;
