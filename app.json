@@ -11,6 +11,10 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "br.com.fabriciolima.momentus",
+      "associatedDomains": [
+        "applinks:www.momentusapp.com.br",
+        "applinks:momentusapp.com.br"
+      ],
       "infoPlist": {
         "NSCalendarsUsageDescription": "O Momentus precisa de acesso ao seu calendário para sincronizar suas rotinas e hábitos.",
         "NSRemindersUsageDescription": "O Momentus precisa de permissão para lembretes de rotinas."
@@ -24,6 +28,25 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "www.momentusapp.com.br",
+              "pathPrefix": "/"
+            },
+            {
+              "scheme": "https",
+              "host": "momentusapp.com.br",
+              "pathPrefix": "/"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ],
       "permissions": [
         "NOTIFICATIONS",
         "RECEIVE_BOOT_COMPLETED",
@@ -34,6 +57,7 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
+      "bundler": "metro",
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },

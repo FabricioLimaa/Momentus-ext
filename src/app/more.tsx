@@ -9,6 +9,7 @@ import {
   StatusBar,
   Alert,
   Image,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -194,6 +195,23 @@ export default function MoreScreen() {
                 </View>
               </View>
               <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
+            </TouchableOpacity>
+
+            <View style={[styles.divider, { backgroundColor: theme.outline }]} />
+
+            <TouchableOpacity
+              onPress={() => Linking.openURL('https://www.momentusapp.com.br/')}
+              style={styles.menuItem}>
+              <View style={styles.menuItemLeft}>
+                <View style={[styles.iconBox, { backgroundColor: 'rgba(52, 211, 153, 0.15)' }]}>
+                  <Ionicons name="globe-outline" size={20} color={theme.primary} />
+                </View>
+                <View>
+                  <Text style={[styles.menuItemTitle, { color: theme.textPrimary }]}>Conheça Nosso Site</Text>
+                  <Text style={[styles.menuItemSub, { color: theme.textSecondary }]}>www.momentusapp.com.br</Text>
+                </View>
+              </View>
+              <Ionicons name="open-outline" size={18} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>
 

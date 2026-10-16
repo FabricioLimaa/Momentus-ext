@@ -9,6 +9,7 @@ import {
   StatusBar,
   Switch,
   Alert,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -409,6 +410,18 @@ export default function SettingsScreen() {
                 <Text style={[styles.linkText, { color: theme.textPrimary }]}>Termos & Privacidade</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
+            </TouchableOpacity>
+
+            <View style={[styles.divider, { backgroundColor: theme.outline }]} />
+
+            <TouchableOpacity
+              style={styles.linkRow}
+              onPress={() => Linking.openURL('https://www.momentusapp.com.br/')}>
+              <View style={styles.linkLeft}>
+                <Ionicons name="globe-outline" size={20} color={theme.primary} />
+                <Text style={[styles.linkText, { color: theme.textPrimary }]}>Site Oficial (momentusapp.com.br)</Text>
+              </View>
+              <Ionicons name="open-outline" size={18} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>
 
