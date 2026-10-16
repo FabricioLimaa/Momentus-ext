@@ -196,6 +196,9 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     habitTitle: string;
   } | null>(null);
 
+  // Ref para permitir chamada segura de syncCloudAction a partir de callbacks externos
+  const syncCloudActionRef = useRef<(targetUid?: string) => Promise<void>>(async () => {});
+
   const showCelebration = (title: string, message: string, pointsEarned?: number) => {
     setCelebration({ visible: true, title, message, pointsEarned });
   };
@@ -293,16 +296,30 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     // Solicita permissões de notificação e configura os canais no início
     requestNotificationPermissions().catch(() => {});
 
-    // Observa mudanças de autenticação do Firebase
-    const unsubAuth = onAuthStateChanged(firebaseAuth, (user) => {
+    // Observa mudanças de autenticação do Firebase e sincroniza automaticamente
+    const unsubAuth = onAuthStateChanged(firebaseAuth, async (user) => {
       if (user) {
+        console.log('[AUTH] Usuário detectado no onAuthStateChanged:', {
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL,
+        });
+
         setUserProfile((prev) => ({
           ...prev,
           email: user.email || prev.email,
-          name: user.displayName || prev.name,
-          photoUrl: user.photoURL || prev.photoUrl,
+          name: user.displayName || (user.email ? user.email.split('@')[0] : prev.name),
+          photoUrl: user.photoURL ?? prev.photoUrl,
           isLoggedIn: true,
         }));
+
+        try {
+          // Sincroniza dados da nuvem (Firestore) do usuário recém-autenticado
+          await syncCloudActionRef.current(user.uid);
+        } catch (syncErr) {
+          console.warn('[AUTH] Aviso ao sincronizar nuvem no onAuthStateChanged:', syncErr);
+        }
       }
     });
 
@@ -899,6 +916,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const toggleHabitRef = useRef(toggleHabit);
   useEffect(() => {
     toggleHabitRef.current = toggleHabit;
+    syncCloudActionRef.current = syncCloudAction;
   });
 
   // Escuta interações com notificações (botões "Concluir" e "Adiar 15 min" ou toque para abrir ReminderModal)

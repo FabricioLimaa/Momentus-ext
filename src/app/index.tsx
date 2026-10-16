@@ -8,6 +8,7 @@ import {
   Platform,
   StatusBar,
   Alert,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -183,10 +184,28 @@ export default function HomeScreen() {
           showsVerticalScrollIndicator={false}>
           {/* 1. Header de Saudação (Mockup 3) */}
           <View style={styles.homeHeader}>
-            <View>
-              <Text style={[styles.greetingText, { color: theme.textSecondary }]}>{greeting}</Text>
-              <Text style={[styles.userNameText, { color: theme.textPrimary }]}>{userName} 👋</Text>
-            </View>
+            <TouchableOpacity
+              onPress={() => router.push('/more' as any)}
+              style={styles.userProfileGreetingRow}
+              activeOpacity={0.8}>
+              <View style={[styles.homeAvatar, { borderColor: theme.primary }]}>
+                {userProfile.photoUrl ? (
+                  <Image
+                    source={{ uri: userProfile.photoUrl }}
+                    style={styles.homeAvatarImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <Text style={[styles.homeAvatarText, { color: theme.primary }]}>
+                    {userProfile.name ? userProfile.name.charAt(0).toUpperCase() : 'U'}
+                  </Text>
+                )}
+              </View>
+              <View>
+                <Text style={[styles.greetingText, { color: theme.textSecondary }]}>{greeting}</Text>
+                <Text style={[styles.userNameText, { color: theme.textPrimary }]}>{userName} 👋</Text>
+              </View>
+            </TouchableOpacity>
 
             <TouchableOpacity
               onPress={() => router.push('/updates' as any)}
@@ -410,6 +429,29 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 24,
+  },
+  userProfileGreetingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  homeAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2,
+    backgroundColor: 'rgba(52, 211, 153, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  homeAvatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  homeAvatarText: {
+    fontSize: 20,
+    fontWeight: '800',
   },
   greetingText: {
     fontSize: 14,

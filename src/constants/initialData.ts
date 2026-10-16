@@ -309,13 +309,15 @@ export const INITIAL_MARKET_ITEMS: MarketItem[] = [
 ];
 
 export const INITIAL_USER_PROFILE: UserProfile = {
-  name: 'Fabrício Lima',
-  email: 'fabricio@momentus.app',
-  totalPoints: 480, // Focado (Nível 3)
-  currentStreak: 5,
-  bestStreak: 12,
-  totalCompleted: 28,
-  focusMinutesToday: 25,
+  name: 'Usuário',
+  email: '',
+  photoUrl: null,
+  totalPoints: 0,
+  currentStreak: 0,
+  bestStreak: 0,
+  totalCompleted: 0,
+  focusMinutesToday: 0,
+  isLoggedIn: false,
 };
 
 export const INITIAL_SETTINGS: AppSettings = {

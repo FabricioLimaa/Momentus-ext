@@ -336,25 +336,54 @@ export async function syncWithFirestore(
         cloudBestStreak,
       );
 
+      // Prioriza dados da nuvem se existirem e não forem o fallback inicial
+      const cloudDisplayName =
+        cloudUserData?.display_name || cloudUserData?.displayName || cloudUserData?.name;
+      const cloudEmail = cloudUserData?.email;
+      const cloudPhoto = cloudUserData?.photo_url || cloudUserData?.photoUrl;
+
+      const mergedName =
+        (mergedUserProfile.name && mergedUserProfile.name !== 'Fabrício Lima' && mergedUserProfile.name !== 'Usuário')
+          ? mergedUserProfile.name
+          : (cloudDisplayName || mergedUserProfile.name);
+
+      const mergedEmail =
+        (mergedUserProfile.email && mergedUserProfile.email !== 'fabricio@momentus.app')
+          ? mergedUserProfile.email
+          : (cloudEmail || mergedUserProfile.email);
+
+      const mergedPhoto = mergedUserProfile.photoUrl || cloudPhoto || null;
+
       mergedUserProfile = {
         ...mergedUserProfile,
+        name: mergedName,
+        email: mergedEmail,
+        photoUrl: mergedPhoto,
         totalPoints: mergedPoints,
         bestStreak: mergedBestStreak,
       };
 
-      await setDoc(
-        userDocRef,
-        {
-          points: mergedPoints,
-          purchased_stickers: Array.from(combinedOwnedSet),
-          currentStreak: mergedUserProfile.currentStreak,
-          bestStreak: mergedBestStreak,
-          totalCompleted: mergedUserProfile.totalCompleted,
-          focusMinutesToday: mergedUserProfile.focusMinutesToday,
-          lastSyncAt: new Date().toISOString(),
-        },
-        { merge: true },
-      );
+      const userProfilePayload: Record<string, any> = {
+        points: mergedPoints,
+        purchased_stickers: Array.from(combinedOwnedSet),
+        currentStreak: mergedUserProfile.currentStreak,
+        bestStreak: mergedBestStreak,
+        totalCompleted: mergedUserProfile.totalCompleted,
+        focusMinutesToday: mergedUserProfile.focusMinutesToday,
+        lastSyncAt: new Date().toISOString(),
+      };
+
+      if (mergedName) {
+        userProfilePayload.display_name = mergedName;
+      }
+      if (mergedEmail) {
+        userProfilePayload.email = mergedEmail;
+      }
+      if (mergedPhoto) {
+        userProfilePayload.photo_url = mergedPhoto;
+      }
+
+      await setDoc(userDocRef, userProfilePayload, { merge: true });
     }
   } catch (err) {
     console.warn(
