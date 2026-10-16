@@ -25,6 +25,8 @@ export default function SettingsScreen() {
     userProfile,
     clearAllLocalData,
     syncAllHabitsToCalendarAction,
+    exportBackupAction,
+    importBackupAction,
     theme,
   } = useMomentus();
 
@@ -73,6 +75,37 @@ export default function SettingsScreen() {
       setIsSyncing(false);
       Alert.alert('Aviso', 'Não foi possível sincronizar no momento. Verifique as permissões de calendário.');
     }
+  };
+
+  const handleExportBackup = async () => {
+    try {
+      await exportBackupAction();
+    } catch {
+      Alert.alert('Erro', 'Não foi possível exportar o backup. Tente novamente.');
+    }
+  };
+
+  const handleImportBackup = () => {
+    Alert.alert(
+      'Restaurar Backup',
+      'Ao restaurar um arquivo de backup, suas rotinas e categorias atuais serão mescladas com os dados do arquivo. Deseja selecionar um arquivo .json?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Escolher Arquivo',
+          onPress: async () => {
+            try {
+              const success = await importBackupAction();
+              if (success) {
+                Alert.alert('Backup Restaurado! 🚀', 'Todos os seus hábitos, categorias e progresso foram restaurados com sucesso.');
+              }
+            } catch {
+              Alert.alert('Erro', 'Arquivo de backup corrompido ou formato incompatível.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleConfirmClearData = () => {
@@ -303,9 +336,28 @@ export default function SettingsScreen() {
             activeOpacity={0.85}>
             <Ionicons name="sync" size={18} color="#0F172A" />
             <Text style={styles.syncNowBtnText}>
-              {isSyncing ? 'Sincronizando...' : 'Sincronizar Agora'}
+              {isSyncing ? 'Sincronizando...' : 'Sincronizar Agenda Agora'}
             </Text>
           </TouchableOpacity>
+
+          {/* Seção: Backup & Restauração JSON */}
+          <View style={styles.backupActionsRow}>
+            <TouchableOpacity
+              style={[styles.backupBtn, { backgroundColor: theme.surface, borderColor: theme.outline }]}
+              onPress={handleExportBackup}
+              activeOpacity={0.8}>
+              <Ionicons name="share-outline" size={18} color={primaryColorHex} />
+              <Text style={[styles.backupBtnText, { color: theme.textPrimary }]}>Exportar Backup</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.backupBtn, { backgroundColor: theme.surface, borderColor: theme.outline }]}
+              onPress={handleImportBackup}
+              activeOpacity={0.8}>
+              <Ionicons name="download-outline" size={18} color={primaryColorHex} />
+              <Text style={[styles.backupBtnText, { color: theme.textPrimary }]}>Restaurar</Text>
+            </TouchableOpacity>
+          </View>
 
           <TouchableOpacity
             style={styles.clearCloudBtn}
@@ -590,6 +642,25 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     fontWeight: '800',
     fontSize: 14,
+  },
+  backupActionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  backupBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    paddingVertical: 13,
+    borderRadius: 16,
+  },
+  backupBtnText: {
+    fontWeight: '700',
+    fontSize: 13,
   },
   clearCloudBtn: {
     flexDirection: 'row',

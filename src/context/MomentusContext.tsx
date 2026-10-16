@@ -36,6 +36,25 @@ import {
   deleteHabitFromDeviceCalendar,
   syncAllHabitsToCalendar,
 } from '@/services/calendarService';
+import {
+  getAllCategories,
+  setAllCategoriesDb,
+  getAllHabits,
+  setAllHabitsDb,
+  getAllTemplates,
+  setAllTemplatesDb,
+  getAllAchievements,
+  setAllAchievementsDb,
+  getAllMarketItems,
+  setAllMarketItemsDb,
+  getAppKv,
+  setAppKv,
+  clearEntireDatabase,
+} from '@/database/momentusDb';
+import {
+  exportMomentusBackup,
+  importMomentusBackup,
+} from '@/services/backupService';
 
 export interface AppTheme {
   isDark: boolean;
@@ -99,6 +118,8 @@ interface MomentusContextData {
   updateSettings: (newSettings: Partial<AppSettings>) => void;
   clearAllLocalData: () => void;
   syncAllHabitsToCalendarAction: () => Promise<number>;
+  exportBackupAction: () => Promise<boolean>;
+  importBackupAction: () => Promise<boolean>;
   // Auth Actions
   login: (email: string, name?: string) => void;
   logout: () => void;
@@ -168,23 +189,75 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     soundManager.setEnabled(settings.soundEnabled);
   }, [settings.soundEnabled]);
 
-  // Load from AsyncStorage
+  // Load state: SQLite first, with seamless migration from legacy AsyncStorage
   useEffect(() => {
     async function loadState() {
       try {
-        const saved = await AsyncStorage.getItem(STORAGE_KEY);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed.habits) setHabits(parsed.habits);
-          if (parsed.categories) setCategories(parsed.categories);
-          if (parsed.templates) setTemplates(parsed.templates);
-          if (parsed.achievements) setAchievements(parsed.achievements);
-          if (parsed.marketItems) setMarketItems(parsed.marketItems);
-          if (parsed.userProfile) setUserProfile(parsed.userProfile);
-          if (parsed.settings) setSettings(parsed.settings);
+        // 1. Tenta carregar do SQLite
+        const dbCategories = await getAllCategories();
+        const dbHabits = await getAllHabits();
+        const dbTemplates = await getAllTemplates();
+        const dbAchievements = await getAllAchievements();
+        const dbMarketItems = await getAllMarketItems();
+        const dbUserProfile = await getAppKv<UserProfile>('user_profile');
+        const dbSettings = await getAppKv<AppSettings>('app_settings');
+
+        const hasDbData =
+          dbCategories.length > 0 ||
+          dbHabits.length > 0 ||
+          dbTemplates.length > 0 ||
+          dbAchievements.length > 0;
+
+        if (hasDbData) {
+          if (dbCategories.length > 0) setCategories(dbCategories);
+          if (dbHabits.length > 0) setHabits(dbHabits);
+          if (dbTemplates.length > 0) setTemplates(dbTemplates);
+          if (dbAchievements.length > 0) setAchievements(dbAchievements);
+          if (dbMarketItems.length > 0) setMarketItems(dbMarketItems);
+          if (dbUserProfile) setUserProfile(dbUserProfile);
+          if (dbSettings) setSettings(dbSettings);
+        } else {
+          // 2. Se o SQLite estiver vazio, verifica se há dados antigos no AsyncStorage para migrar
+          const savedAsync = await AsyncStorage.getItem(STORAGE_KEY);
+          if (savedAsync) {
+            const parsed = JSON.parse(savedAsync);
+            const initialCats = parsed.categories || INITIAL_CATEGORIES;
+            const initialHab = parsed.habits || INITIAL_HABITS;
+            const initialTmpl = parsed.templates || INITIAL_TEMPLATES;
+            const initialAch = parsed.achievements || INITIAL_ACHIEVEMENTS;
+            const initialMkt = parsed.marketItems || INITIAL_MARKET_ITEMS;
+            const initialProf = parsed.userProfile || INITIAL_USER_PROFILE;
+            const initialSett = parsed.settings || INITIAL_SETTINGS;
+
+            setCategories(initialCats);
+            setHabits(initialHab);
+            setTemplates(initialTmpl);
+            setAchievements(initialAch);
+            setMarketItems(initialMkt);
+            setUserProfile(initialProf);
+            setSettings(initialSett);
+
+            // Grava no SQLite imediatamente para consolidar a migração
+            await setAllCategoriesDb(initialCats);
+            await setAllHabitsDb(initialHab);
+            await setAllTemplatesDb(initialTmpl);
+            await setAllAchievementsDb(initialAch);
+            await setAllMarketItemsDb(initialMkt);
+            await setAppKv('user_profile', initialProf);
+            await setAppKv('app_settings', initialSett);
+          } else {
+            // Inicializa o banco SQLite com os dados padrão do Momentus
+            await setAllCategoriesDb(INITIAL_CATEGORIES);
+            await setAllHabitsDb(INITIAL_HABITS);
+            await setAllTemplatesDb(INITIAL_TEMPLATES);
+            await setAllAchievementsDb(INITIAL_ACHIEVEMENTS);
+            await setAllMarketItemsDb(INITIAL_MARKET_ITEMS);
+            await setAppKv('user_profile', INITIAL_USER_PROFILE);
+            await setAppKv('app_settings', INITIAL_SETTINGS);
+          }
         }
       } catch (e) {
-        console.warn('Erro ao carregar dados do Momentus:', e);
+        console.warn('Erro ao carregar dados do SQLite:', e);
       } finally {
         setIsLoaded(true);
       }
@@ -194,11 +267,21 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     requestNotificationPermissions().catch(() => {});
   }, []);
 
-  // Save to AsyncStorage
+  // Persistência contínua: grava no SQLite e mantém AsyncStorage sincronizado
   useEffect(() => {
     if (!isLoaded) return;
     async function saveState() {
       try {
+        // Grava no SQLite
+        await setAllCategoriesDb(categories);
+        await setAllHabitsDb(habits);
+        await setAllTemplatesDb(templates);
+        await setAllAchievementsDb(achievements);
+        await setAllMarketItemsDb(marketItems);
+        await setAppKv('user_profile', userProfile);
+        await setAppKv('app_settings', settings);
+
+        // Mantém backup de contingência no AsyncStorage
         const data = {
           habits,
           categories,
@@ -210,7 +293,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         };
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       } catch (e) {
-        console.warn('Erro ao salvar dados do Momentus:', e);
+        console.warn('Erro ao persistir dados do Momentus:', e);
       }
     }
     saveState();
@@ -515,7 +598,58 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setUserProfile(INITIAL_USER_PROFILE);
     setSettings(INITIAL_SETTINGS);
     AsyncStorage.removeItem(STORAGE_KEY);
+    clearEntireDatabase().catch(() => {});
     triggerHaptic('impact');
+  };
+
+  const exportBackupAction = async (): Promise<boolean> => {
+    return exportMomentusBackup({
+      habits,
+      categories,
+      templates,
+      achievements,
+      marketItems,
+      userProfile,
+      settings,
+    });
+  };
+
+  const importBackupAction = async (): Promise<boolean> => {
+    const data = await importMomentusBackup();
+    if (!data) return false;
+
+    setHabits(data.habits || []);
+    setCategories(data.categories || INITIAL_CATEGORIES);
+    setTemplates(data.templates || INITIAL_TEMPLATES);
+    setAchievements(data.achievements || INITIAL_ACHIEVEMENTS);
+    setMarketItems(data.marketItems || INITIAL_MARKET_ITEMS);
+    setUserProfile(data.userProfile || INITIAL_USER_PROFILE);
+    setSettings(data.settings || INITIAL_SETTINGS);
+
+    // Persiste imediatamente no SQLite e AsyncStorage
+    await setAllCategoriesDb(data.categories || INITIAL_CATEGORIES);
+    await setAllHabitsDb(data.habits || []);
+    await setAllTemplatesDb(data.templates || INITIAL_TEMPLATES);
+    await setAllAchievementsDb(data.achievements || INITIAL_ACHIEVEMENTS);
+    await setAllMarketItemsDb(data.marketItems || INITIAL_MARKET_ITEMS);
+    await setAppKv('user_profile', data.userProfile || INITIAL_USER_PROFILE);
+    await setAppKv('app_settings', data.settings || INITIAL_SETTINGS);
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+
+    // Reagenda notificações para os novos hábitos importados
+    cancelAllNotifications()
+      .then(() => {
+        (data.habits || []).forEach((h) => {
+          if (!h.completed) {
+            scheduleHabitNotifications(h).catch(() => {});
+          }
+        });
+      })
+      .catch(() => {});
+
+    soundManager.playAchievementSound();
+    triggerHaptic('success');
+    return true;
   };
 
   const syncAllHabitsToCalendarAction = async (): Promise<number> => {
@@ -658,6 +792,8 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         updateSettings,
         clearAllLocalData,
         syncAllHabitsToCalendarAction,
+        exportBackupAction,
+        importBackupAction,
         login,
         logout,
       }}>

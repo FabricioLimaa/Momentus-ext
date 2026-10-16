@@ -53,7 +53,9 @@
         {
           "calendarPermission": "O Momentus sincroniza suas tarefas diretamente na agenda do dispositivo."
         }
-      ]
+      ],
+      "expo-sqlite",
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,
