@@ -5,27 +5,22 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
 /**
- * Configuração do Firebase espelhando os parâmetros do google-services.json
- * do projeto Momentus (momentus-b267f).
- *
- * Nota sobre a API Key:
- * A chave padrão do google-services.json possui restrição de aplicativo Android no Google Cloud Console.
- * Para uso irrestrito no Firebase JS SDK (Web / Expo Go), defina EXPO_PUBLIC_FIREBASE_API_KEY
- * com uma chave Web ou remova a restrição "Apps para Android" dessa chave no Google Cloud Console.
+ * Configuração oficial do Firebase (momentus-b267f).
+ * Utiliza a Chave de API da Web e os parâmetros oficiais do app Web e Android.
  */
 const firebaseConfig: FirebaseOptions = {
   apiKey:
     process.env.EXPO_PUBLIC_FIREBASE_API_KEY ||
-    'AIzaSyC1y2TLkdhYsHCnfcur_t__k_H3BbKrfQM',
+    'AIzaSyA8I7es6orwW-Lvrb2rTqIA03GCahHPZg8',
   authDomain: 'momentus-b267f.firebaseapp.com',
   projectId: 'momentus-b267f',
   storageBucket: 'momentus-b267f.firebasestorage.app',
   messagingSenderId: '809975381863',
-  ...(process.env.EXPO_PUBLIC_FIREBASE_APP_ID
-    ? { appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID }
-    : Platform.OS !== 'web'
-      ? { appId: '1:809975381863:android:4ec3a4f530212cddb9f9c2' }
-      : {}),
+  appId:
+    process.env.EXPO_PUBLIC_FIREBASE_APP_ID ||
+    (Platform.OS === 'web'
+      ? '1:809975381863:web:c4db0a9428acc6e7b9f9c2'
+      : '1:809975381863:android:4ec3a4f530212cddb9f9c2'),
 };
 
 // Inicializa a aplicação Firebase garantindo singleton
