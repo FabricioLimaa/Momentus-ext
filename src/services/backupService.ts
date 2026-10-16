@@ -1,5 +1,4 @@
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
+import { Platform } from 'react-native';
 import {
   Category,
   HabitItem,
@@ -27,15 +26,10 @@ export interface MomentusBackupPayload {
 
 /**
  * Cria um arquivo JSON com todos os dados do Momentus e abre a folha de compartilhamento nativa
- * (Google Drive, iCloud, E-mail, WhatsApp, Arquivos locais, etc.)
+ * (Google Drive, iCloud, E-mail, WhatsApp, Arquivos locais, etc.) ou faz download na Web.
  */
 export async function exportMomentusBackup(backupData: MomentusBackupPayload['data']): Promise<boolean> {
   try {
-    const isSharingAvailable = await Sharing.isAvailableAsync();
-    if (!isSharingAvailable) {
-      throw new Error('Compartilhamento não disponível neste dispositivo.');
-    }
-
     const payload: MomentusBackupPayload = {
       version: 1,
       appName: 'Momentus',
@@ -46,6 +40,29 @@ export async function exportMomentusBackup(backupData: MomentusBackupPayload['da
     const jsonString = JSON.stringify(payload, null, 2);
     const dateFormatted = new Date().toISOString().slice(0, 10);
     const fileName = `momentus_backup_${dateFormatted}.json`;
+
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      return true;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const FileSystem = require('expo-file-system') as typeof import('expo-file-system');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Sharing = require('expo-sharing') as typeof import('expo-sharing');
+
+    const isSharingAvailable = await Sharing.isAvailableAsync();
+    if (!isSharingAvailable) {
+      throw new Error('Compartilhamento não disponível neste dispositivo.');
+    }
 
     // Cria o arquivo temporário no diretório de cache
     const targetFile = new FileSystem.File(FileSystem.Paths.cache, fileName);
@@ -73,6 +90,13 @@ export async function exportMomentusBackup(backupData: MomentusBackupPayload['da
  */
 export async function importMomentusBackup(): Promise<MomentusBackupPayload['data'] | null> {
   try {
+    if (Platform.OS === 'web') {
+      throw new Error('Importação de arquivo local não suportada no navegador.');
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const FileSystem = require('expo-file-system') as typeof import('expo-file-system');
+
     const pickResult = await FileSystem.File.pickFileAsync({
       mimeTypes: ['application/json', 'text/plain', '*/*'],
       multipleFiles: false,
@@ -100,4 +124,3 @@ export async function importMomentusBackup(): Promise<MomentusBackupPayload['dat
     throw error;
   }
 }
-

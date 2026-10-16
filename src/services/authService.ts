@@ -10,7 +10,6 @@ import {
   signInWithCredential,
 } from 'firebase/auth';
 import type { GoogleSignin as GoogleSigninType } from '@react-native-google-signin/google-signin';
-import * as AppleAuthentication from 'expo-apple-authentication';
 import { Platform } from 'react-native';
 import { auth } from '@/config/firebase';
 
@@ -98,6 +97,9 @@ export async function loginWithApple(): Promise<User> {
   if (Platform.OS !== 'ios') {
     throw new Error('Apple Sign-In só está disponível no iOS.');
   }
+
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const AppleAuthentication = require('expo-apple-authentication') as typeof import('expo-apple-authentication');
 
   const appleCredential = await AppleAuthentication.signInAsync({
     requestedScopes: [

@@ -1,23 +1,34 @@
-import {
-  getCalendars,
-  requestCalendarPermissions,
-  createCalendar,
-  ExpoCalendar,
-  ExpoCalendarEvent,
-  EntityTypes,
-  CalendarAccessLevel,
-} from 'expo-calendar';
+import type { ExpoCalendar } from 'expo-calendar';
 import { Platform } from 'react-native';
 import { HabitItem, Category } from '@/types';
 
 export const MOMENTUS_CALENDAR_TITLE = 'Momentus - Rotinas';
 
+type ExpoCalendarModule = typeof import('expo-calendar');
+let cachedCalendarModule: ExpoCalendarModule | null | undefined;
+
+function getCalendarModule(): ExpoCalendarModule | null {
+  if (Platform.OS === 'web') return null;
+  if (cachedCalendarModule !== undefined) return cachedCalendarModule;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    cachedCalendarModule = require('expo-calendar') as ExpoCalendarModule;
+    return cachedCalendarModule;
+  } catch (err) {
+    console.warn('Módulo nativo expo-calendar indisponível neste ambiente:', err);
+    cachedCalendarModule = null;
+    return null;
+  }
+}
+
 /**
  * Solicita permissões de leitura e gravação no calendário do sistema.
  */
 export async function requestDeviceCalendarPermissions(): Promise<boolean> {
+  const Calendar = getCalendarModule();
+  if (!Calendar) return false;
   try {
-    const res = await requestCalendarPermissions();
+    const res = await Calendar.requestCalendarPermissions();
     return res.granted;
   } catch (error) {
     console.warn('Erro ao solicitar permissões de calendário:', error);
@@ -29,8 +40,11 @@ export async function requestDeviceCalendarPermissions(): Promise<boolean> {
  * Obtém ou cria o calendário exclusivo do Momentus ou local padrão que aceite modificações.
  */
 export async function getOrCreateMomentusCalendar(): Promise<ExpoCalendar | null> {
+  const Calendar = getCalendarModule();
+  if (!Calendar) return null;
+
   try {
-    const calendars = await getCalendars(EntityTypes.EVENT);
+    const calendars = await Calendar.getCalendars(Calendar.EntityTypes.EVENT);
     if (!calendars || calendars.length === 0) {
       return null;
     }
@@ -52,13 +66,13 @@ export async function getOrCreateMomentusCalendar(): Promise<ExpoCalendar | null
 
       // Tenta criar um calendário local para o Momentus
       try {
-        const created = await createCalendar({
+        const created = await Calendar.createCalendar({
           title: MOMENTUS_CALENDAR_TITLE,
           color: '#34D399',
-          entityType: EntityTypes.EVENT,
+          entityType: Calendar.EntityTypes.EVENT,
           name: 'MomentusCalendar',
           ownerAccount: 'personal',
-          accessLevel: CalendarAccessLevel.OWNER,
+          accessLevel: Calendar.CalendarAccessLevel.OWNER,
           source: {
             isLocalAccount: true,
             name: 'Momentus',
@@ -97,6 +111,9 @@ export async function syncHabitToDeviceCalendar(
   habit: HabitItem,
   category?: Category
 ): Promise<string | null> {
+  const Calendar = getCalendarModule();
+  if (!Calendar) return null;
+
   try {
     const hasPermission = await requestDeviceCalendarPermissions();
     if (!hasPermission) return null;
@@ -123,7 +140,7 @@ export async function syncHabitToDeviceCalendar(
     // Se já possui googleCalendarEventId, tenta atualizar o evento existente
     if (habit.googleCalendarEventId) {
       try {
-        const existingEvent = await ExpoCalendarEvent.get(habit.googleCalendarEventId);
+        const existingEvent = await Calendar.ExpoCalendarEvent.get(habit.googleCalendarEventId);
         if (existingEvent) {
           await existingEvent.update({
             title: habit.title,
@@ -159,11 +176,14 @@ export async function syncHabitToDeviceCalendar(
  */
 export async function deleteHabitFromDeviceCalendar(calendarEventId: string): Promise<void> {
   if (!calendarEventId) return;
+  const Calendar = getCalendarModule();
+  if (!Calendar) return;
+
   try {
     const hasPermission = await requestDeviceCalendarPermissions();
     if (!hasPermission) return;
 
-    const event = await ExpoCalendarEvent.get(calendarEventId);
+    const event = await Calendar.ExpoCalendarEvent.get(calendarEventId);
     if (event) {
       await event.delete();
     }

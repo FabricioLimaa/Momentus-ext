@@ -1,21 +1,40 @@
-import { Audio } from 'expo-av';
+import type { AudioPlayer } from 'expo-audio';
+
+type ExpoAudioModule = typeof import('expo-audio');
 
 class SoundManager {
-  private successSound: Audio.Sound | null = null;
-  private achievementSound: Audio.Sound | null = null;
+  private successPlayer: AudioPlayer | null = null;
+  private achievementPlayer: AudioPlayer | null = null;
   private enabled: boolean = true;
+  private audioModule: ExpoAudioModule | null | undefined = undefined;
+  private modeConfigured: boolean = false;
 
-  constructor() {
-    this.initAudio();
-  }
-
-  private async initAudio() {
+  /**
+   * Carrega o módulo 'expo-audio' sob demanda (lazy) dentro de try/catch
+   * para nunca falhar durante a avaliação inicial do bundle no Expo Go ou Web.
+   */
+  private getAudioModule(): ExpoAudioModule | null {
+    if (this.audioModule !== undefined) {
+      return this.audioModule;
+    }
     try {
-      await Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-      });
-    } catch {}
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const mod = require('expo-audio') as ExpoAudioModule;
+      this.audioModule = mod;
+      if (!this.modeConfigured && mod.setAudioModeAsync) {
+        this.modeConfigured = true;
+        mod
+          .setAudioModeAsync({
+            playsInSilentMode: true,
+            shouldPlayInBackground: false,
+          })
+          .catch(() => {});
+      }
+      return this.audioModule;
+    } catch {
+      this.audioModule = null;
+      return null;
+    }
   }
 
   public setEnabled(value: boolean) {
@@ -32,17 +51,19 @@ class SoundManager {
   public async playSuccessSound() {
     if (!this.enabled) return;
     try {
-      if (this.successSound) {
-        await this.successSound.replayAsync();
-      } else {
-        const { sound } = await Audio.Sound.createAsync(
+      const Audio = this.getAudioModule();
+      if (!Audio?.createAudioPlayer) return;
+
+      if (!this.successPlayer) {
+        this.successPlayer = Audio.createAudioPlayer(
           require('@/assets/sounds/inicio_som.mp3')
         );
-        this.successSound = sound;
-        await sound.playAsync();
+      } else {
+        await this.successPlayer.seekTo(0).catch(() => {});
       }
+      this.successPlayer.play();
     } catch {
-      // Falha silenciosa para não quebrar a experiência do usuário
+      // Falha silenciosa para não interromper a experiência do usuário
     }
   }
 
@@ -52,15 +73,17 @@ class SoundManager {
   public async playAchievementSound() {
     if (!this.enabled) return;
     try {
-      if (this.achievementSound) {
-        await this.achievementSound.replayAsync();
-      } else {
-        const { sound } = await Audio.Sound.createAsync(
+      const Audio = this.getAudioModule();
+      if (!Audio?.createAudioPlayer) return;
+
+      if (!this.achievementPlayer) {
+        this.achievementPlayer = Audio.createAudioPlayer(
           require('@/assets/sounds/termino_som.mp3')
         );
-        this.achievementSound = sound;
-        await sound.playAsync();
+      } else {
+        await this.achievementPlayer.seekTo(0).catch(() => {});
       }
+      this.achievementPlayer.play();
     } catch {
       // Falha silenciosa
     }
@@ -68,4 +91,3 @@ class SoundManager {
 }
 
 export const soundManager = new SoundManager();
-

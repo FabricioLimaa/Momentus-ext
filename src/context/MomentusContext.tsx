@@ -955,6 +955,8 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           title={celebration.title}
           message={celebration.message}
           pointsEarned={celebration.pointsEarned}
+          isDark={theme.isDark}
+          primaryColor={settings.primaryColorHex || MomentusColors.emeraldNeon}
           onClose={hideCelebration}
         />
       )}

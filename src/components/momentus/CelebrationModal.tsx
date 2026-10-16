@@ -10,7 +10,6 @@ import {
 import LottieView from 'lottie-react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { MomentusColors } from '@/constants/theme';
-import { useMomentus } from '@/context/MomentusContext';
 import { soundManager } from '@/util/soundManager';
 
 interface CelebrationModalProps {
@@ -18,6 +17,8 @@ interface CelebrationModalProps {
   title: string;
   message: string;
   pointsEarned?: number;
+  isDark?: boolean;
+  primaryColor?: string;
   onClose: () => void;
 }
 
@@ -26,13 +27,11 @@ export const CelebrationModal: React.FC<CelebrationModalProps> = ({
   title,
   message,
   pointsEarned,
+  isDark = true,
+  primaryColor = MomentusColors.emeraldNeon,
   onClose,
 }) => {
-  const { settings, theme } = useMomentus();
   const animationRef = useRef<LottieView>(null);
-
-  const isDark = theme ? theme.isDark : true;
-  const primaryColor = settings.primaryColorHex || MomentusColors.emeraldNeon;
 
   useEffect(() => {
     if (visible) {
