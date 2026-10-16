@@ -12,13 +12,7 @@ import {
 } from 'firebase/auth';
 import type { GoogleSignin as GoogleSigninType } from '@react-native-google-signin/google-signin';
 import { Platform, TurboModuleRegistry } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
-import * as AuthSession from 'expo-auth-session';
-import * as Crypto from 'expo-crypto';
 import { auth } from '@/config/firebase';
-
-// Permite que o WebBrowser capture os redirecionamentos de autenticação OAuth
-WebBrowser.maybeCompleteAuthSession();
 
 // Web Client ID configurado no google-services.json do Momentus
 const WEB_CLIENT_ID =
@@ -93,105 +87,7 @@ function createLocalFallbackUser(email: string, displayName?: string): MomentusA
   } as unknown as MomentusAuthUser;
 }
 
-/**
- * Executa o fluxo padrão Google OAuth 2.0 via navegador seguro (WebBrowser / Chrome Custom Tabs).
- * Funciona no Expo Go sem requerer Development Build nativo e funciona na Web como fallback.
- * Obtém os dados reais do usuário (nome, e-mail, foto e id) e tenta autenticar no Firebase.
- */
-async function loginWithGoogleBrowserFlow(): Promise<MomentusAuthUser> {
-  const redirectUri = AuthSession.makeRedirectUri({
-    scheme: 'momentus',
-    preferLocalhost: false,
-  });
 
-  const nonce = await Crypto.digestStringAsync(
-    Crypto.CryptoDigestAlgorithm.SHA256,
-    Math.random().toString()
-  );
-
-  const authUrl =
-    `https://accounts.google.com/o/oauth2/v2/auth?` +
-    `client_id=${encodeURIComponent(WEB_CLIENT_ID)}` +
-    `&response_type=${encodeURIComponent('token id_token')}` +
-    `&scope=${encodeURIComponent('openid profile email')}` +
-    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-    `&nonce=${encodeURIComponent(nonce)}` +
-    `&prompt=select_account`;
-
-  const authResult = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
-
-  if (authResult.type !== 'success' || !authResult.url) {
-    throw new Error('SIGN_IN_CANCELLED');
-  }
-
-  // Extrai parâmetros do fragmento (#) ou query (?)
-  const url = authResult.url;
-  const hashPart = url.includes('#')
-    ? url.split('#')[1]
-    : url.includes('?')
-      ? url.split('?')[1]
-      : '';
-  const params = new URLSearchParams(hashPart);
-  const accessToken = params.get('access_token');
-  const idToken = params.get('id_token');
-
-  if (!accessToken && !idToken) {
-    throw new Error('Não foi possível obter credenciais do Google.');
-  }
-
-  let googleProfile: {
-    sub?: string;
-    name?: string;
-    given_name?: string;
-    picture?: string;
-    email?: string;
-    email_verified?: boolean;
-  } | null = null;
-
-  if (accessToken) {
-    try {
-      const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      if (res.ok) {
-        googleProfile = await res.json();
-      }
-    } catch (e) {
-      console.warn('Erro ao obter perfil do Google via access_token:', e);
-    }
-  }
-
-  // Tenta autenticar no Firebase Auth com o idToken para obter sessão real na nuvem
-  if (idToken) {
-    try {
-      const credential = GoogleAuthProvider.credential(idToken);
-      const userCredential = await signInWithCredential(auth, credential);
-      if (userCredential.user) {
-        return userCredential.user;
-      }
-    } catch (firebaseErr) {
-      console.warn(
-        'Firebase rejeitou credencial do Google (verificando restrição de chave):',
-        firebaseErr
-      );
-    }
-  }
-
-  // Se o Firebase Auth recusou por restrição de API Key, usamos com fidelidade os dados reais do Google
-  if (googleProfile?.email) {
-    return {
-      uid: googleProfile.sub || `google-${googleProfile.email}`,
-      email: googleProfile.email,
-      displayName: googleProfile.name || googleProfile.given_name || 'Usuário Google',
-      photoURL: googleProfile.picture || null,
-      emailVerified: !!googleProfile.email_verified,
-      isAnonymous: false,
-      isLocalFallback: false,
-    } as unknown as MomentusAuthUser;
-  }
-
-  throw new Error('Falha ao processar autenticação com Google.');
-}
 
 /**
  * Realiza login com E-mail e Senha no Firebase Auth.
@@ -318,8 +214,10 @@ export async function loginWithGoogle(): Promise<MomentusAuthUser> {
     }
   }
 
-  // No Expo Go, utiliza o fluxo Google OAuth via Chrome Custom Tabs
-  return await loginWithGoogleBrowserFlow();
+  // No Expo Go, o Google bloqueia URLs de redirecionamento exp:// (Erro 400: invalid_request)
+  throw new Error(
+    'O Google bloqueia autenticação via navegador no Expo Go (Erro 400: invalid_request). Para testar no Expo Go, utilize o login por E-mail e Senha. O login oficial com Google requer um build nativo do app (APK ou npx expo run:android).'
+  );
 }
 
 /**
