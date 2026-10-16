@@ -28,15 +28,18 @@ let showWebAlertHandler:
   | ((title: string, message?: string, buttons?: AlertButton[]) => void)
   | null = null;
 
-// Instala polyfill imediato para Alert.alert na Web
-if (Platform.OS === 'web') {
-  Alert.alert = (title: string, message?: string, buttons?: AlertButton[]) => {
-    if (showWebAlertHandler) {
-      showWebAlertHandler(title, message, buttons);
-      return;
-    }
+// Guarda referência ao Alert.alert original nativo
+const originalAlert = Alert.alert.bind(Alert);
 
-    // Fallback caso seja chamado antes da montagem do modal
+// Intercepta Alert.alert para exibir a caixa de diálogo padronizada do Momentus em todas as plataformas
+Alert.alert = (title: string, message?: string, buttons?: AlertButton[]) => {
+  if (showWebAlertHandler) {
+    showWebAlertHandler(title, message, buttons);
+    return;
+  }
+
+  // Fallback seguro caso chamado antes do modal ser montado
+  if (Platform.OS === 'web') {
     if (typeof window !== 'undefined') {
       const fullText = message ? `${title}\n\n${message}` : title;
       if (buttons && buttons.length > 1) {
@@ -53,8 +56,10 @@ if (Platform.OS === 'web') {
         buttons?.[0]?.onPress?.();
       }
     }
-  };
-}
+  } else {
+    originalAlert(title, message, buttons);
+  }
+};
 
 export const WebAlertModal: React.FC<WebAlertModalProps> = ({ isDark, primaryColor }) => {
   const [alertState, setAlertState] = useState<WebAlertState>({
@@ -65,8 +70,6 @@ export const WebAlertModal: React.FC<WebAlertModalProps> = ({ isDark, primaryCol
   });
 
   useEffect(() => {
-    if (Platform.OS !== 'web') return;
-
     showWebAlertHandler = (title: string, message?: string, buttons?: AlertButton[]) => {
       setAlertState({
         visible: true,
@@ -84,7 +87,7 @@ export const WebAlertModal: React.FC<WebAlertModalProps> = ({ isDark, primaryCol
     };
   }, []);
 
-  if (Platform.OS !== 'web' || !alertState.visible) {
+  if (!alertState.visible) {
     return null;
   }
 

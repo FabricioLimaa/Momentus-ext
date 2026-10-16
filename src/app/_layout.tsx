@@ -20,15 +20,22 @@ function TabsNavigator() {
             backgroundColor: theme.surface,
             borderTopColor: theme.outline,
             borderTopWidth: 1,
-            height: Platform.OS === 'ios' ? 88 : 68,
-            paddingBottom: Platform.OS === 'ios' ? 28 : 10,
+            height: Platform.OS === 'ios' ? 88 : Platform.OS === 'web' ? 76 : 68,
+            paddingBottom: Platform.OS === 'ios' ? 28 : Platform.OS === 'web' ? 12 : 10,
             paddingTop: 8,
+          },
+          tabBarItemStyle: {
+            paddingHorizontal: 2,
+            justifyContent: 'center',
+            alignItems: 'center',
           },
           tabBarActiveTintColor: primaryColor,
           tabBarInactiveTintColor: theme.textSecondary,
           tabBarLabelStyle: {
             fontSize: 11,
             fontWeight: '700',
+            lineHeight: 14,
+            textAlign: 'center',
           },
         }}>
         {/* Telas Principais da Barra Inferior */}

@@ -12,7 +12,13 @@ import {
 } from 'firebase/auth';
 import type { GoogleSignin as GoogleSigninType } from '@react-native-google-signin/google-signin';
 import { Platform, TurboModuleRegistry } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import * as AuthSession from 'expo-auth-session';
+import * as Crypto from 'expo-crypto';
 import { auth } from '@/config/firebase';
+
+// Permite que o WebBrowser capture os redirecionamentos de autenticação OAuth
+WebBrowser.maybeCompleteAuthSession();
 
 // Web Client ID configurado no google-services.json do Momentus
 const WEB_CLIENT_ID =
@@ -71,7 +77,7 @@ export function isAndroidKeyBlockedError(err: unknown): boolean {
 
 /**
  * Cria um objeto compatível com User do Firebase para manter a sessão local funcional
- * na Web ou no Expo Go enquanto a API Key do Firebase ainda estiver restrita ao cabeçalho Android nativo.
+ * caso o Firebase rejeite requisições de e-mail e senha.
  */
 function createLocalFallbackUser(email: string, displayName?: string): MomentusAuthUser {
   const cleanEmail = email.trim() || 'usuario@momentus.app';
@@ -85,6 +91,106 @@ function createLocalFallbackUser(email: string, displayName?: string): MomentusA
     isAnonymous: false,
     isLocalFallback: true,
   } as unknown as MomentusAuthUser;
+}
+
+/**
+ * Executa o fluxo padrão Google OAuth 2.0 via navegador seguro (WebBrowser / Chrome Custom Tabs).
+ * Funciona no Expo Go sem requerer Development Build nativo e funciona na Web como fallback.
+ * Obtém os dados reais do usuário (nome, e-mail, foto e id) e tenta autenticar no Firebase.
+ */
+async function loginWithGoogleBrowserFlow(): Promise<MomentusAuthUser> {
+  const redirectUri = AuthSession.makeRedirectUri({
+    scheme: 'momentus',
+    preferLocalhost: false,
+  });
+
+  const nonce = await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    Math.random().toString()
+  );
+
+  const authUrl =
+    `https://accounts.google.com/o/oauth2/v2/auth?` +
+    `client_id=${encodeURIComponent(WEB_CLIENT_ID)}` +
+    `&response_type=${encodeURIComponent('token id_token')}` +
+    `&scope=${encodeURIComponent('openid profile email')}` +
+    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+    `&nonce=${encodeURIComponent(nonce)}` +
+    `&prompt=select_account`;
+
+  const authResult = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
+
+  if (authResult.type !== 'success' || !authResult.url) {
+    throw new Error('SIGN_IN_CANCELLED');
+  }
+
+  // Extrai parâmetros do fragmento (#) ou query (?)
+  const url = authResult.url;
+  const hashPart = url.includes('#')
+    ? url.split('#')[1]
+    : url.includes('?')
+      ? url.split('?')[1]
+      : '';
+  const params = new URLSearchParams(hashPart);
+  const accessToken = params.get('access_token');
+  const idToken = params.get('id_token');
+
+  if (!accessToken && !idToken) {
+    throw new Error('Não foi possível obter credenciais do Google.');
+  }
+
+  let googleProfile: {
+    sub?: string;
+    name?: string;
+    given_name?: string;
+    picture?: string;
+    email?: string;
+    email_verified?: boolean;
+  } | null = null;
+
+  if (accessToken) {
+    try {
+      const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (res.ok) {
+        googleProfile = await res.json();
+      }
+    } catch (e) {
+      console.warn('Erro ao obter perfil do Google via access_token:', e);
+    }
+  }
+
+  // Tenta autenticar no Firebase Auth com o idToken para obter sessão real na nuvem
+  if (idToken) {
+    try {
+      const credential = GoogleAuthProvider.credential(idToken);
+      const userCredential = await signInWithCredential(auth, credential);
+      if (userCredential.user) {
+        return userCredential.user;
+      }
+    } catch (firebaseErr) {
+      console.warn(
+        'Firebase rejeitou credencial do Google (verificando restrição de chave):',
+        firebaseErr
+      );
+    }
+  }
+
+  // Se o Firebase Auth recusou por restrição de API Key, usamos com fidelidade os dados reais do Google
+  if (googleProfile?.email) {
+    return {
+      uid: googleProfile.sub || `google-${googleProfile.email}`,
+      email: googleProfile.email,
+      displayName: googleProfile.name || googleProfile.given_name || 'Usuário Google',
+      photoURL: googleProfile.picture || null,
+      emailVerified: !!googleProfile.email_verified,
+      isAnonymous: false,
+      isLocalFallback: false,
+    } as unknown as MomentusAuthUser;
+  }
+
+  throw new Error('Falha ao processar autenticação com Google.');
 }
 
 /**
@@ -133,55 +239,64 @@ export async function registerWithEmail(
 }
 
 /**
- * Realiza login com o Google (Popup na Web / Nativo no Android e iOS).
+ * Realiza login com o Google (Popup na Web / Nativo no Android e iOS ou OAuth no Expo Go).
  */
 export async function loginWithGoogle(): Promise<MomentusAuthUser> {
   if (Platform.OS === 'web') {
     try {
       const provider = new GoogleAuthProvider();
+      provider.addScope('profile');
+      provider.addScope('email');
+      provider.setCustomParameters({ prompt: 'select_account' });
       const userCredential = await signInWithPopup(auth, provider);
       return userCredential.user;
-    } catch (err) {
+    } catch (err: any) {
+      if (err.code === 'auth/popup-closed-by-user') {
+        throw new Error('SIGN_IN_CANCELLED');
+      }
       if (isAndroidKeyBlockedError(err)) {
         console.warn(
-          'API Key do Firebase bloqueou requisição Web (restrita a pacotes Android). Entrando em modo local.'
+          'API Key do Firebase bloqueou requisição Web. Acionando fluxo direto do Google OAuth.'
         );
-        return createLocalFallbackUser('usuario@gmail.com', 'Usuário Google');
+        return await loginWithGoogleBrowserFlow();
       }
       throw err;
     }
   }
 
   const GoogleSignin = getGoogleSignin();
-  if (!GoogleSignin) {
-    // No Expo Go o módulo nativo RNGoogleSignin não está presente no binário
-    return createLocalFallbackUser('usuario@gmail.com', 'Usuário Google');
-  }
+  if (GoogleSignin) {
+    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+    const signInResult = await GoogleSignin.signIn();
+    const idToken = signInResult.data?.idToken;
+    const googleUser = signInResult.data?.user;
 
-  await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-  const signInResult = await GoogleSignin.signIn();
-  const idToken = signInResult.data?.idToken;
-  const googleUser = signInResult.data?.user;
-
-  if (!idToken) {
-    throw new Error('Não foi possível obter o token do Google.');
-  }
-
-  try {
-    const credential = GoogleAuthProvider.credential(idToken);
-    const userCredential = await signInWithCredential(auth, credential);
-    return userCredential.user;
-  } catch (err) {
-    if (isAndroidKeyBlockedError(err)) {
-      // O usuário já autenticou com sucesso no Google Sign-In nativo, mas o endpoint JS do Firebase
-      // rejeitou a chamada por ausência do header X-Android-Package no fetch do React Native.
-      return createLocalFallbackUser(
-        googleUser?.email || 'usuario@gmail.com',
-        googleUser?.name || 'Usuário Google'
-      );
+    if (!idToken) {
+      throw new Error('Não foi possível obter o token do Google.');
     }
-    throw err;
+
+    try {
+      const credential = GoogleAuthProvider.credential(idToken);
+      const userCredential = await signInWithCredential(auth, credential);
+      return userCredential.user;
+    } catch (err) {
+      if (isAndroidKeyBlockedError(err)) {
+        return {
+          uid: googleUser?.id || `google-${googleUser?.email}`,
+          email: googleUser?.email || '',
+          displayName: googleUser?.name || 'Usuário Google',
+          photoURL: googleUser?.photo || null,
+          emailVerified: true,
+          isAnonymous: false,
+          isLocalFallback: false,
+        } as unknown as MomentusAuthUser;
+      }
+      throw err;
+    }
   }
+
+  // No Expo Go, utiliza o fluxo Google OAuth via Chrome Custom Tabs
+  return await loginWithGoogleBrowserFlow();
 }
 
 /**

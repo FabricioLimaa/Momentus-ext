@@ -133,9 +133,9 @@ interface MomentusContextData {
   exportBackupAction: () => Promise<boolean>;
   importBackupAction: () => Promise<boolean>;
   // Auth Actions
-  login: (email: string, name?: string) => void;
+  login: (email: string, name?: string, photoUrl?: string | null) => void;
   logout: () => void;
-  syncCloudAction: () => Promise<void>;
+  syncCloudAction: (targetUid?: string) => Promise<void>;
 }
 
 const STORAGE_KEY = '@momentus_state_v2';
@@ -816,11 +816,12 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return syncedCount;
   };
 
-  const login = (email: string, name?: string) => {
+  const login = (email: string, name?: string, photoUrl?: string | null) => {
     setUserProfile((prev) => ({
       ...prev,
       email,
       name: name || email.split('@')[0],
+      photoUrl: photoUrl !== undefined ? photoUrl : prev.photoUrl,
       isLoggedIn: true,
     }));
     triggerHaptic('success');
@@ -835,9 +836,9 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     triggerHaptic('impact');
   };
 
-  const syncCloudAction = async (): Promise<void> => {
-    const currentUser = firebaseAuth.currentUser;
-    if (!currentUser?.uid) {
+  const syncCloudAction = async (targetUid?: string): Promise<void> => {
+    const uid = targetUid || firebaseAuth.currentUser?.uid;
+    if (!uid) {
       if (userProfile.isLoggedIn) {
         const backupTimestamp = formatBackupTimestamp();
         const updatedSettings: AppSettings = {
@@ -850,7 +851,6 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
       throw new Error('Faça login com sua conta Momentus para sincronizar os dados na nuvem.');
     }
-    const uid = currentUser.uid;
 
     const {
       mergedHabits,

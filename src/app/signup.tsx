@@ -51,8 +51,16 @@ export default function SignUpScreen() {
     setLoading(true);
     try {
       const user = await registerWithEmail(email, password, name.trim());
-      login(user.email || email, user.displayName || name.trim());
-      syncCloudAction().catch(() => {});
+      login(
+        user.email || email,
+        user.displayName || name.trim(),
+        user.photoURL || undefined
+      );
+      try {
+        await syncCloudAction(user.uid);
+      } catch (syncErr) {
+        console.warn('Erro ao sincronizar dados na nuvem:', syncErr);
+      }
       setLoading(false);
       Alert.alert('Sucesso! 🎉', 'Conta criada com sucesso!', [
         {

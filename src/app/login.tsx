@@ -42,15 +42,26 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       const user = await loginWithGoogle();
-      login(user.email || 'usuario@gmail.com', user.displayName || undefined);
-      syncCloudAction().catch(() => {});
+      login(
+        user.email || 'usuario@gmail.com',
+        user.displayName || undefined,
+        user.photoURL || undefined
+      );
+      try {
+        await syncCloudAction(user.uid);
+      } catch (syncErr) {
+        console.warn('Erro ao sincronizar dados do Firestore após login:', syncErr);
+      }
       setLoading(false);
       Alert.alert('Sucesso! ✨', `Bem-vindo(a), ${user.displayName || 'Usuário'}!`);
       router.replace('/');
     } catch (err: any) {
       setLoading(false);
-      if (err.code !== 'SIGN_IN_CANCELLED') {
-        Alert.alert('Erro ao entrar com Google', err.message || 'Verifique sua conexão ou tente novamente.');
+      if (err.message !== 'SIGN_IN_CANCELLED' && err.code !== 'SIGN_IN_CANCELLED') {
+        Alert.alert(
+          'Erro ao entrar com Google',
+          err.message || 'Verifique sua conexão ou tente novamente.'
+        );
       }
     }
   };
@@ -59,8 +70,16 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       const user = await loginWithApple();
-      login(user.email || 'usuario@apple.com', user.displayName || undefined);
-      syncCloudAction().catch(() => {});
+      login(
+        user.email || 'usuario@apple.com',
+        user.displayName || undefined,
+        user.photoURL || undefined
+      );
+      try {
+        await syncCloudAction(user.uid);
+      } catch (syncErr) {
+        console.warn('Erro ao sincronizar dados do Firestore após login Apple:', syncErr);
+      }
       setLoading(false);
       Alert.alert('Sucesso! 🍏', 'Login realizado com a Apple.');
       router.replace('/');
@@ -85,13 +104,21 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       const user = await loginWithEmail(email, password);
-      login(user.email || email, user.displayName || undefined);
-      syncCloudAction().catch(() => {});
+      login(
+        user.email || email,
+        user.displayName || undefined,
+        user.photoURL || undefined
+      );
+      try {
+        await syncCloudAction(user.uid);
+      } catch (syncErr) {
+        console.warn('Erro ao sincronizar dados na nuvem:', syncErr);
+      }
       setLoading(false);
       router.replace('/');
-    } catch {
+    } catch (err: any) {
       setLoading(false);
-      Alert.alert('Erro no login', 'E-mail ou senha incorretos.');
+      Alert.alert('Erro no login', err.message || 'E-mail ou senha incorretos.');
     }
   };
 

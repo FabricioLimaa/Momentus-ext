@@ -8,6 +8,7 @@ import {
   Platform,
   StatusBar,
   Alert,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -52,8 +53,16 @@ export default function MoreScreen() {
           showsVerticalScrollIndicator={false}>
           {/* User Profile Card */}
           <View style={[styles.profileCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
-            <View style={[styles.avatar, { borderColor: userLevel.rankColor }]}>
-              <Text style={styles.avatarText}>{userProfile.name.charAt(0)}</Text>
+            <View style={[styles.avatar, { borderColor: userLevel.rankColor, overflow: 'hidden' }]}>
+              {userProfile.photoUrl ? (
+                <Image
+                  source={{ uri: userProfile.photoUrl }}
+                  style={styles.avatarImage}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Text style={styles.avatarText}>{userProfile.name.charAt(0)}</Text>
+              )}
             </View>
             <View style={styles.profileInfo}>
               <Text style={[styles.userName, { color: theme.textPrimary }]}>{userProfile.name}</Text>
@@ -267,6 +276,10 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 24,
     fontWeight: 'bold',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   profileInfo: {
     flex: 1,
