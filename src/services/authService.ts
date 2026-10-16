@@ -70,6 +70,21 @@ export function isAndroidKeyBlockedError(err: unknown): boolean {
 }
 
 /**
+ * Detecta se o erro retornado pelo Firebase decorre do bloqueio do Firebase App Check
+ * (`auth/firebase-app-check-token-is-invalid`).
+ */
+export function isAppCheckBlockedError(err: unknown): boolean {
+  const code = (err as any)?.code ? String((err as any).code) : '';
+  const message = (err as any)?.message ? String((err as any).message) : '';
+  return (
+    code.includes('app-check') ||
+    message.includes('app-check') ||
+    code.includes('firebase-app-check-token-is-invalid') ||
+    message.includes('firebase-app-check-token-is-invalid')
+  );
+}
+
+/**
  * Cria um objeto compatível com User do Firebase para manter a sessão local funcional
  * caso o Firebase rejeite requisições de e-mail e senha.
  */
@@ -87,8 +102,6 @@ function createLocalFallbackUser(email: string, displayName?: string): MomentusA
   } as unknown as MomentusAuthUser;
 }
 
-
-
 /**
  * Realiza login com E-mail e Senha no Firebase Auth.
  */
@@ -100,6 +113,11 @@ export async function loginWithEmail(email: string, pass: string): Promise<Momen
     return userCredential.user;
   } catch (err) {
     console.error('[AUTH ERROR] Falha no login com e-mail:', err);
+    if (isAppCheckBlockedError(err)) {
+      throw new Error(
+        'O Firebase App Check está bloqueando chamadas sem token de integridade (auth/firebase-app-check-token-is-invalid). No Firebase Console > App Check > APIs, desative a Imposição (Unenforce) do "Firebase Authentication" para desenvolvimento.'
+      );
+    }
     if (isAndroidKeyBlockedError(err)) {
       console.warn(
         '[AUTH WARN] API Key do Firebase restrita a Android nativo. Autenticando em sessão local para:',
@@ -129,6 +147,11 @@ export async function registerWithEmail(
     return userCredential.user;
   } catch (err) {
     console.error('[AUTH ERROR] Falha ao criar conta:', err);
+    if (isAppCheckBlockedError(err)) {
+      throw new Error(
+        'O Firebase App Check está bloqueando chamadas sem token de integridade (auth/firebase-app-check-token-is-invalid). No Firebase Console > App Check > APIs, desative a Imposição (Unenforce) do "Firebase Authentication" para desenvolvimento.'
+      );
+    }
     if (isAndroidKeyBlockedError(err)) {
       console.warn(
         '[AUTH WARN] API Key do Firebase restrita a Android nativo. Criando conta em sessão local para:',
