@@ -24,6 +24,7 @@ export default function SettingsScreen() {
     updateSettings,
     userProfile,
     clearAllLocalData,
+    syncAllHabitsToCalendarAction,
     theme,
   } = useMomentus();
 
@@ -57,12 +58,21 @@ export default function SettingsScreen() {
     setSyncEnabled(true);
   };
 
-  const handleSyncNow = () => {
+  const handleSyncNow = async () => {
     setIsSyncing(true);
-    setTimeout(() => {
+    try {
+      const count = await syncAllHabitsToCalendarAction();
       setIsSyncing(false);
-      Alert.alert('Sincronizado! ☁️', 'Seus dados locais estão sincronizados com a nuvem.');
-    }, 1200);
+      Alert.alert(
+        'Sincronização Concluída! 📅✨',
+        count > 0
+          ? `${count} evento(s) sincronizado(s) com a agenda do dispositivo!`
+          : 'Suas rotinas já estão atualizadas com a agenda do dispositivo.'
+      );
+    } catch {
+      setIsSyncing(false);
+      Alert.alert('Aviso', 'Não foi possível sincronizar no momento. Verifique as permissões de calendário.');
+    }
   };
 
   const handleConfirmClearData = () => {

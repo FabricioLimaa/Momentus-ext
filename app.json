@@ -10,7 +10,11 @@
     "backgroundColor": "#0F172A",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "br.com.fabriciolima.momentus"
+      "bundleIdentifier": "br.com.fabriciolima.momentus",
+      "infoPlist": {
+        "NSCalendarsUsageDescription": "O Momentus precisa de acesso ao seu calendário para sincronizar suas rotinas e hábitos.",
+        "NSRemindersUsageDescription": "O Momentus precisa de permissão para lembretes de rotinas."
+      }
     },
     "android": {
       "package": "br.com.fabriciolima.momentus",
@@ -20,6 +24,13 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
+      "permissions": [
+        "NOTIFICATIONS",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "READ_CALENDAR",
+        "WRITE_CALENDAR"
+      ],
       "predictiveBackGestureEnabled": false
     },
     "web": {
@@ -34,6 +45,13 @@
           "backgroundColor": "#0F172A",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 80
+        }
+      ],
+      "expo-notifications",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "O Momentus sincroniza suas tarefas diretamente na agenda do dispositivo."
         }
       ]
     ],

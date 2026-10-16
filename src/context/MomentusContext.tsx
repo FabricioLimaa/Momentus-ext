@@ -25,6 +25,17 @@ import { calculateUserLevel, UserLevelInfo } from '@/domain/userLevel';
 import { soundManager } from '@/util/soundManager';
 import { MomentusColors } from '@/constants/theme';
 import { CelebrationModal } from '@/components/momentus/CelebrationModal';
+import {
+  scheduleHabitNotifications,
+  cancelHabitNotifications,
+  cancelAllNotifications,
+  requestNotificationPermissions,
+} from '@/services/notificationService';
+import {
+  syncHabitToDeviceCalendar,
+  deleteHabitFromDeviceCalendar,
+  syncAllHabitsToCalendar,
+} from '@/services/calendarService';
 
 export interface AppTheme {
   isDark: boolean;
@@ -87,6 +98,7 @@ interface MomentusContextData {
   // Settings Actions
   updateSettings: (newSettings: Partial<AppSettings>) => void;
   clearAllLocalData: () => void;
+  syncAllHabitsToCalendarAction: () => Promise<number>;
   // Auth Actions
   login: (email: string, name?: string) => void;
   logout: () => void;
@@ -178,6 +190,8 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
     }
     loadState();
+    // Solicita permissões de notificação e configura os canais no início
+    requestNotificationPermissions().catch(() => {});
   }, []);
 
   // Save to AsyncStorage
@@ -245,8 +259,12 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               currentStreak: nextStreak,
               bestStreak: Math.max(p.bestStreak, nextStreak),
             }));
+            // Cancela os alarmes pendentes se o hábito foi concluído
+            cancelHabitNotifications(habit.id).catch(() => {});
           } else {
             triggerHaptic('impact');
+            // Reagenda os alarmes se desmarcou
+            scheduleHabitNotifications({ ...habit, completed: false }).catch(() => {});
           }
           return {
             ...habit,
@@ -281,17 +299,50 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       completed: false,
       streak: 0,
     };
+
     setHabits((prev) => [newHabit, ...prev]);
     triggerHaptic('success');
+
+    // 1. Agendar notificações locais (início e término)
+    scheduleHabitNotifications(newHabit).catch(() => {});
+
+    // 2. Sincronizar com calendário nativo se solicitado
+    const shouldSyncCalendar = newHabit.saveToGoogle ?? settings.googleCalendarSyncEnabled;
+    if (shouldSyncCalendar) {
+      const category = categories.find((c) => c.id === newHabit.categoryId);
+      syncHabitToDeviceCalendar(newHabit, category)
+        .then((eventId) => {
+          if (eventId) {
+            setHabits((prev) =>
+              prev.map((h) => (h.id === newHabit.id ? { ...h, googleCalendarEventId: eventId, saveToGoogle: true } : h))
+            );
+          }
+        })
+        .catch(() => {});
+    }
   };
 
   const deleteHabit = (id: string) => {
+    const habitToDelete = habits.find((h) => h.id === id);
+    if (habitToDelete) {
+      cancelHabitNotifications(id).catch(() => {});
+      if (habitToDelete.googleCalendarEventId) {
+        deleteHabitFromDeviceCalendar(habitToDelete.googleCalendarEventId).catch(() => {});
+      }
+    }
     setHabits((prev) => prev.filter((h) => h.id !== id));
     triggerHaptic('impact');
   };
 
   const deleteMultipleHabits = (ids: string[]) => {
     const idSet = new Set(ids);
+    const toDelete = habits.filter((h) => idSet.has(h.id));
+    toDelete.forEach((h) => {
+      cancelHabitNotifications(h.id).catch(() => {});
+      if (h.googleCalendarEventId) {
+        deleteHabitFromDeviceCalendar(h.googleCalendarEventId).catch(() => {});
+      }
+    });
     setHabits((prev) => prev.filter((h) => !idSet.has(h.id)));
     triggerHaptic('impact');
   };
@@ -299,6 +350,29 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const updateHabit = (updated: HabitItem) => {
     setHabits((prev) => prev.map((h) => (h.id === updated.id ? updated : h)));
     triggerHaptic('impact');
+
+    // Atualiza notificações agendadas
+    cancelHabitNotifications(updated.id)
+      .then(() => {
+        if (!updated.completed) {
+          return scheduleHabitNotifications(updated);
+        }
+      })
+      .catch(() => {});
+
+    // Atualiza evento no calendário se aplicável
+    if (updated.saveToGoogle || updated.googleCalendarEventId) {
+      const category = categories.find((c) => c.id === updated.categoryId);
+      syncHabitToDeviceCalendar(updated, category)
+        .then((eventId) => {
+          if (eventId && eventId !== updated.googleCalendarEventId) {
+            setHabits((prev) =>
+              prev.map((h) => (h.id === updated.id ? { ...h, googleCalendarEventId: eventId } : h))
+            );
+          }
+        })
+        .catch(() => {});
+    }
   };
 
   const applyTemplateToToday = (templateId: string) => {
@@ -309,7 +383,9 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const template = templates.find((t) => t.id === templateId);
     if (!template || dates.length === 0) return;
 
+    const willSaveToCalendar = saveToGoogle ?? settings.googleCalendarSyncEnabled ?? false;
     const newHabits: HabitItem[] = [];
+
     dates.forEach((targetDate) => {
       template.items.forEach((item, index) => {
         newHabits.push({
@@ -322,7 +398,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           completed: false,
           date: targetDate,
           streak: 0,
-          saveToGoogle: !!saveToGoogle,
+          saveToGoogle: willSaveToCalendar,
         });
       });
     });
@@ -332,6 +408,23 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     soundManager.playSuccessSound();
     triggerHaptic('success');
     checkAndUnlockAchievements(userProfile.currentStreak, userProfile.totalCompleted, templates.length);
+
+    // Agenda notificações para os novos hábitos
+    newHabits.forEach((h) => {
+      scheduleHabitNotifications(h).catch(() => {});
+      if (willSaveToCalendar) {
+        const cat = categories.find((c) => c.id === h.categoryId);
+        syncHabitToDeviceCalendar(h, cat)
+          .then((eventId) => {
+            if (eventId) {
+              setHabits((prev) =>
+                prev.map((item) => (item.id === h.id ? { ...item, googleCalendarEventId: eventId } : item))
+              );
+            }
+          })
+          .catch(() => {});
+      }
+    });
   };
 
 
@@ -412,6 +505,8 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const clearAllLocalData = () => {
+    // Cancela todas as notificações locais agendadas
+    cancelAllNotifications().catch(() => {});
     setHabits([]);
     setCategories(INITIAL_CATEGORIES);
     setTemplates(INITIAL_TEMPLATES);
@@ -421,6 +516,14 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setSettings(INITIAL_SETTINGS);
     AsyncStorage.removeItem(STORAGE_KEY);
     triggerHaptic('impact');
+  };
+
+  const syncAllHabitsToCalendarAction = async (): Promise<number> => {
+    const { syncedCount, updatedHabits } = await syncAllHabitsToCalendar(habits, categories);
+    if (syncedCount > 0) {
+      setHabits(updatedHabits);
+    }
+    return syncedCount;
   };
 
   const login = (email: string, name?: string) => {
@@ -554,6 +657,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         addFocusMinutes,
         updateSettings,
         clearAllLocalData,
+        syncAllHabitsToCalendarAction,
         login,
         logout,
       }}>
