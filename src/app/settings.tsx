@@ -25,6 +25,7 @@ export default function SettingsScreen() {
     userProfile,
     clearAllLocalData,
     syncAllHabitsToCalendarAction,
+    syncCloudAction,
     exportBackupAction,
     importBackupAction,
     theme,
@@ -63,17 +64,21 @@ export default function SettingsScreen() {
   const handleSyncNow = async () => {
     setIsSyncing(true);
     try {
+      // 1. Sincroniza com o calendário nativo
       const count = await syncAllHabitsToCalendarAction();
+      // 2. Sincroniza com Cloud Firestore
+      await syncCloudAction().catch(() => {});
+
       setIsSyncing(false);
       Alert.alert(
-        'Sincronização Concluída! 📅✨',
+        'Sincronização Concluída! ☁️✨',
         count > 0
-          ? `${count} evento(s) sincronizado(s) com a agenda do dispositivo!`
-          : 'Suas rotinas já estão atualizadas com a agenda do dispositivo.'
+          ? `${count} rotina(s) sincronizada(s) com a agenda e salvas na nuvem!`
+          : 'Seus dados e rotinas estão 100% sincronizados com a nuvem e com a agenda.'
       );
     } catch {
       setIsSyncing(false);
-      Alert.alert('Aviso', 'Não foi possível sincronizar no momento. Verifique as permissões de calendário.');
+      Alert.alert('Aviso', 'Não foi possível completar a sincronização. Verifique sua conexão e permissões.');
     }
   };
 

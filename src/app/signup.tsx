@@ -16,10 +16,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MomentusColors } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
+import { registerWithEmail } from '@/services/authService';
 
 export default function SignUpScreen() {
   const insets = useSafeAreaInsets();
-  const { login, settings } = useMomentus();
+  const { login, settings, syncCloudAction } = useMomentus();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -41,23 +42,28 @@ export default function SignUpScreen() {
 
   const passwordsMatch = !confirmPassword || password === confirmPassword;
 
-  const handleSignUp = () => {
+  const handleSignUp = async () => {
     if (!isFormValid) {
       Alert.alert('Atenção', 'Verifique os dados informados antes de prosseguir.');
       return;
     }
 
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const user = await registerWithEmail(email, password, name.trim());
+      login(user.email || email, user.displayName || name.trim());
+      syncCloudAction().catch(() => {});
       setLoading(false);
-      login(email, name);
-      Alert.alert('Sucesso', 'Conta criada com sucesso!', [
+      Alert.alert('Sucesso! 🎉', 'Conta criada com sucesso!', [
         {
           text: 'Continuar',
           onPress: () => router.replace('/'),
         },
       ]);
-    }, 1000);
+    } catch (err: any) {
+      setLoading(false);
+      Alert.alert('Erro ao criar conta', err.message || 'Verifique seus dados e tente novamente.');
+    }
   };
 
   return (

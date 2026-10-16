@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MomentusColors } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
+import { sendPasswordReset } from '@/services/authService';
 
 export default function ForgotPasswordScreen() {
   const insets = useSafeAreaInsets();
@@ -27,18 +28,19 @@ export default function ForgotPasswordScreen() {
   const primaryColor = settings.primaryColorHex || MomentusColors.emeraldNeon;
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-  const handleSendResetLink = () => {
+  const handleSendResetLink = async () => {
     if (!isEmailValid) {
       Alert.alert('Erro', 'Por favor, insira um e-mail válido.');
       return;
     }
 
     setLoading(true);
-    setTimeout(() => {
+    try {
+      await sendPasswordReset(email);
       setLoading(false);
       Alert.alert(
-        'E-mail Enviado!',
-        'Enviamos um link de redefinição para o seu e-mail com as instruções.',
+        'E-mail Enviado! 📬',
+        'Enviamos as instruções de redefinição para a sua caixa de entrada.',
         [
           {
             text: 'OK',
@@ -46,7 +48,10 @@ export default function ForgotPasswordScreen() {
           },
         ]
       );
-    }, 1000);
+    } catch (err: any) {
+      setLoading(false);
+      Alert.alert('Erro', err.message || 'Não foi possível enviar o e-mail de redefinição.');
+    }
   };
 
   return (

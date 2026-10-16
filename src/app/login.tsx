@@ -17,10 +17,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MomentusColors } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
+import {
+  loginWithGoogle,
+  loginWithApple,
+  loginWithEmail,
+} from '@/services/authService';
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
-  const { login, settings } = useMomentus();
+  const { login, settings, syncCloudAction } = useMomentus();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -33,17 +38,41 @@ export default function LoginScreen() {
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const isPasswordValid = password.length >= 6;
 
-  const handleGoogleSignIn = () => {
+  const handleGoogleSignIn = async () => {
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const user = await loginWithGoogle();
+      login(user.email || 'usuario@gmail.com', user.displayName || undefined);
+      syncCloudAction().catch(() => {});
       setLoading(false);
-      login('usuario.google@momentus.app', 'Usuário Google');
-      Alert.alert('Sucesso', 'Login realizado com o Google!');
+      Alert.alert('Sucesso! ✨', `Bem-vindo(a), ${user.displayName || 'Usuário'}!`);
       router.replace('/');
-    }, 1000);
+    } catch (err: any) {
+      setLoading(false);
+      if (err.code !== 'SIGN_IN_CANCELLED') {
+        Alert.alert('Erro ao entrar com Google', err.message || 'Verifique sua conexão ou tente novamente.');
+      }
+    }
   };
 
-  const handleEmailSignIn = () => {
+  const handleAppleSignIn = async () => {
+    setLoading(true);
+    try {
+      const user = await loginWithApple();
+      login(user.email || 'usuario@apple.com', user.displayName || undefined);
+      syncCloudAction().catch(() => {});
+      setLoading(false);
+      Alert.alert('Sucesso! 🍏', 'Login realizado com a Apple.');
+      router.replace('/');
+    } catch (err: any) {
+      setLoading(false);
+      if (err.code !== 'ERR_REQUEST_CANCELED') {
+        Alert.alert('Erro ao entrar com Apple', err.message || 'Não foi possível autenticar.');
+      }
+    }
+  };
+
+  const handleEmailSignIn = async () => {
     if (!isEmailValid) {
       Alert.alert('Erro', 'Por favor, insira um e-mail válido.');
       return;
@@ -54,11 +83,16 @@ export default function LoginScreen() {
     }
 
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const user = await loginWithEmail(email, password);
+      login(user.email || email, user.displayName || undefined);
+      syncCloudAction().catch(() => {});
       setLoading(false);
-      login(email);
       router.replace('/');
-    }, 800);
+    } catch {
+      setLoading(false);
+      Alert.alert('Erro no login', 'E-mail ou senha incorretos.');
+    }
   };
 
   return (
@@ -108,6 +142,18 @@ export default function LoginScreen() {
               )}
             </LinearGradient>
           </TouchableOpacity>
+
+          {/* Botão Apple no iOS */}
+          {Platform.OS === 'ios' && (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={handleAppleSignIn}
+              disabled={loading}
+              style={[styles.emailOutlineButton, { backgroundColor: '#000000', borderColor: '#334155', marginBottom: 12 }]}>
+              <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
+              <Text style={[styles.emailOutlineButtonText, { color: '#FFFFFF' }]}>Continuar com Apple</Text>
+            </TouchableOpacity>
+          )}
 
           {/* Botão Alternar E-mail */}
           <TouchableOpacity

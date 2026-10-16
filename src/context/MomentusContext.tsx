@@ -55,6 +55,10 @@ import {
   exportMomentusBackup,
   importMomentusBackup,
 } from '@/services/backupService';
+import { auth as firebaseAuth } from '@/config/firebase';
+import { logoutUser } from '@/services/authService';
+import { syncWithFirestore } from '@/services/firestoreSyncService';
+import { onAuthStateChanged } from 'firebase/auth';
 
 export interface AppTheme {
   isDark: boolean;
@@ -123,6 +127,7 @@ interface MomentusContextData {
   // Auth Actions
   login: (email: string, name?: string) => void;
   logout: () => void;
+  syncCloudAction: () => Promise<void>;
 }
 
 const STORAGE_KEY = '@momentus_state_v2';
@@ -265,6 +270,21 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     loadState();
     // Solicita permissões de notificação e configura os canais no início
     requestNotificationPermissions().catch(() => {});
+
+    // Observa mudanças de autenticação do Firebase
+    const unsubAuth = onAuthStateChanged(firebaseAuth, (user) => {
+      if (user) {
+        setUserProfile((prev) => ({
+          ...prev,
+          email: user.email || prev.email,
+          name: user.displayName || prev.name,
+          photoUrl: user.photoURL || prev.photoUrl,
+          isLoggedIn: true,
+        }));
+      }
+    });
+
+    return () => unsubAuth();
   }, []);
 
   // Persistência contínua: grava no SQLite e mantém AsyncStorage sincronizado
@@ -671,11 +691,29 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const logout = () => {
+    logoutUser().catch(() => {});
     setUserProfile((prev) => ({
       ...prev,
       isLoggedIn: false,
     }));
     triggerHaptic('impact');
+  };
+
+  const syncCloudAction = async (): Promise<void> => {
+    const currentUser = firebaseAuth.currentUser;
+    const uid = currentUser?.uid || userProfile.email || 'local_user';
+
+    const { mergedHabits, mergedCategories } = await syncWithFirestore(
+      uid,
+      habits,
+      categories
+    );
+
+    setHabits(mergedHabits);
+    setCategories(mergedCategories);
+
+    await setAllHabitsDb(mergedHabits);
+    await setAllCategoriesDb(mergedCategories);
   };
 
   /**
@@ -796,6 +834,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         importBackupAction,
         login,
         logout,
+        syncCloudAction,
       }}>
       {children}
       {celebration?.visible && (
