@@ -342,7 +342,7 @@ export default function SettingsScreen() {
 
           <View style={[styles.cloudCard, { backgroundColor: theme.surfaceElevated }]}>
             <Text style={styles.cloudCardLabel}>Conta</Text>
-            <Text style={[styles.cloudCardValue, { color: theme.textPrimary }]}>{userProfile.email || 'fabricio@momentus.app'}</Text>
+            <Text style={[styles.cloudCardValue, { color: theme.textPrimary }]}>{userProfile.email || 'contato@momentusapp.com.br'}</Text>
 
             <Text style={[styles.cloudCardLabel, { marginTop: 12 }]}>Último Backup / Sincronização</Text>
             <Text style={[styles.cloudCardValue, { color: theme.textPrimary }]}>

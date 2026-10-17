@@ -348,7 +348,7 @@ export async function syncWithFirestore(
           : (cloudDisplayName || mergedUserProfile.name);
 
       const mergedEmail =
-        (mergedUserProfile.email && mergedUserProfile.email !== 'fabricio@momentus.app')
+        (mergedUserProfile.email && mergedUserProfile.email !== 'fabricio@momentus.app' && mergedUserProfile.email !== 'contato@momentusapp.com.br')
           ? mergedUserProfile.email
           : (cloudEmail || mergedUserProfile.email);
 

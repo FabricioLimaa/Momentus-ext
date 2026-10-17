@@ -80,7 +80,7 @@ Nós NÃO vendemos, alugamos ou compartilhamos seus dados pessoais com terceiros
 Seus dados permanecem armazenados de forma segura enquanto você mantiver uma conta ativa no aplicativo.
 
 **5. Seus Direitos como Titular dos Dados (LGPD)**
-Você tem o direito de acessar, corrigir, eliminar e solicitar a portabilidade de seus dados. Para exercer esses direitos ou para qualquer dúvida, entre em contato pelo e-mail: fabriciodacostalima@gmail.com.
+Você tem o direito de acessar, corrigir, eliminar e solicitar a portabilidade de seus dados. Para exercer esses direitos ou para qualquer dúvida, entre em contato pelo e-mail: contato@momentusapp.com.br.
 
 **6. Alterações a Esta Política de Privacidade**
 Podemos atualizar esta política periodicamente. Notificaremos sobre quaisquer alterações publicando a nova versão nesta tela.`;
