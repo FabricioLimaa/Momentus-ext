@@ -20,29 +20,29 @@ export const INITIAL_CATEGORIES: Category[] = [
     id: 'cat-saude',
     name: 'Saúde & Bem-estar',
     color: '#33B679',
-    stickerId: 'stk_zen',
-    metaMinutosSemanal: 180, // 3h semanais
+    stickerId: null,
+    metaMinutosSemanal: null,
   },
   {
     id: 'cat-trabalho',
     name: 'Trabalho & Foco',
     color: '#039BE5',
-    stickerId: 'stk_rocket',
-    metaMinutosSemanal: 600, // 10h semanais
+    stickerId: null,
+    metaMinutosSemanal: null,
   },
   {
     id: 'cat-estudos',
     name: 'Estudos & Leitura',
     color: '#8E24AA',
-    stickerId: 'stk_coffee',
-    metaMinutosSemanal: 300, // 5h semanais
+    stickerId: null,
+    metaMinutosSemanal: null,
   },
   {
     id: 'cat-fitness',
     name: 'Fitness & Treino',
     color: '#F4511E',
-    stickerId: 'stk_bolt',
-    metaMinutosSemanal: 240, // 4h semanais
+    stickerId: null,
+    metaMinutosSemanal: null,
   },
   {
     id: 'cat-pessoal',
@@ -61,105 +61,19 @@ export const getTodayDateString = (): string => {
   return `${year}-${month}-${day}`;
 };
 
-export const INITIAL_HABITS: HabitItem[] = [
-  {
-    id: 'h-1',
-    title: 'Meditação Matinal e Mindfulness',
-    description: '10 minutos de respiração e foco antes de iniciar o dia',
-    timeStart: '07:00',
-    timeEnd: '07:15',
-    categoryId: 'cat-saude',
-    completed: true,
-    date: getTodayDateString(),
-    streak: 5,
-  },
-  {
-    id: 'h-2',
-    title: 'Revisar Metas e Prioridades',
-    description: 'Definir as 3 tarefas inegociáveis do dia de trabalho',
-    timeStart: '08:00',
-    timeEnd: '08:30',
-    categoryId: 'cat-trabalho',
-    completed: false,
-    date: getTodayDateString(),
-    streak: 4,
-  },
-  {
-    id: 'h-3',
-    title: 'Treino de Força / Hipertrofia',
-    description: 'Treino focado na academia com registro de cargas',
-    timeStart: '18:00',
-    timeEnd: '19:00',
-    categoryId: 'cat-fitness',
-    completed: false,
-    date: getTodayDateString(),
-    streak: 3,
-  },
-  {
-    id: 'h-4',
-    title: 'Leitura de 20 Páginas',
-    description: 'Leitura de livro técnico ou desenvolvimento pessoal',
-    timeStart: '21:30',
-    timeEnd: '22:00',
-    categoryId: 'cat-estudos',
-    completed: false,
-    date: getTodayDateString(),
-    streak: 6,
-  },
-];
+export const INITIAL_HABITS: HabitItem[] = [];
 
-export const INITIAL_TEMPLATES: RoutineTemplate[] = [
-  {
-    id: 'tmpl-matinal',
-    title: 'Rotina Matinal Blindada',
-    description: 'Comece seu dia com energia, clareza e sem celular na primeira hora.',
-    icon: 'sunny',
-    color: '#F59E0B',
-    items: [
-      { id: 'ti-1', title: 'Beber 500ml de água', durationMinutes: 5, timeStart: '06:30', categoryId: 'cat-saude' },
-      { id: 'ti-2', title: 'Alongamento & Mobilidade', durationMinutes: 15, timeStart: '06:35', categoryId: 'cat-fitness' },
-      { id: 'ti-3', title: 'Meditação / Silêncio', durationMinutes: 10, timeStart: '06:50', categoryId: 'cat-saude' },
-      { id: 'ti-4', title: 'Café & Planejamento', durationMinutes: 20, timeStart: '07:00', categoryId: 'cat-trabalho' },
-    ],
-  },
-  {
-    id: 'tmpl-foco',
-    title: 'Bloco de Foco Profundo (Deep Work)',
-    description: 'Estrutura comprovada para alta produtividade sem distrações.',
-    icon: 'flame',
-    color: '#039BE5',
-    items: [
-      { id: 'ti-5', title: 'Sessão 1 de Foco Imersivo (50m)', durationMinutes: 50, timeStart: '09:00', categoryId: 'cat-trabalho' },
-      { id: 'ti-6', title: 'Pausa Ativa (Caminhada/Água)', durationMinutes: 10, timeStart: '09:50', categoryId: 'cat-saude' },
-      { id: 'ti-7', title: 'Sessão 2 de Foco Imersivo (50m)', durationMinutes: 50, timeStart: '10:00', categoryId: 'cat-trabalho' },
-      { id: 'ti-8', title: 'Processar Emails e Mensagens', durationMinutes: 20, timeStart: '10:50', categoryId: 'cat-trabalho' },
-    ],
-  },
-  {
-    id: 'tmpl-noturno',
-    title: 'Ritual Noturno Reparador',
-    description: 'Prepare o cérebro e o corpo para um sono profundo.',
-    icon: 'moon',
-    color: '#8E24AA',
-    items: [
-      { id: 'ti-9', title: 'Desligar Telas e Notificações', durationMinutes: 5, timeStart: '21:00', categoryId: 'cat-saude' },
-      { id: 'ti-10', title: 'Organizar mesa para amanhã', durationMinutes: 15, timeStart: '21:05', categoryId: 'cat-pessoal' },
-      { id: 'ti-11', title: 'Leitura relaxante de livro físico', durationMinutes: 30, timeStart: '21:20', categoryId: 'cat-estudos' },
-      { id: 'ti-12', title: 'Luz apagada e sono', durationMinutes: 480, timeStart: '22:00', categoryId: 'cat-saude' },
-    ],
-  },
-];
+export const INITIAL_TEMPLATES: RoutineTemplate[] = [];
 
-// Lista oficial equivalente a AchievementsList.kt do app Android nativo
+// Lista oficial equivalente a AchievementsList.kt do app Android nativo (100% bloqueadas inicialmente)
 export const INITIAL_ACHIEVEMENTS: Achievement[] = [
   {
     id: 'FIRST_HABIT',
     title: 'Primeiro Hábito!',
     description: 'Você concluiu seu primeiro hábito.',
     icon: 'checkmark-circle',
-    unlocked: true,
-    unlockedAt: '2026-10-10',
-    progress: 1,
+    unlocked: false,
+    progress: 0,
     maxProgress: 1,
     xpReward: 10,
   },
@@ -168,9 +82,8 @@ export const INITIAL_ACHIEVEMENTS: Achievement[] = [
     title: 'Tudo Organizado',
     description: 'Você criou ou aplicou seu primeiro template.',
     icon: 'grid',
-    unlocked: true,
-    unlockedAt: '2026-10-11',
-    progress: 1,
+    unlocked: false,
+    progress: 0,
     maxProgress: 1,
     xpReward: 20,
   },
@@ -179,9 +92,8 @@ export const INITIAL_ACHIEVEMENTS: Achievement[] = [
     title: 'Pegando o Ritmo',
     description: 'Manteve uma sequência de 3 dias.',
     icon: 'flame',
-    unlocked: true,
-    unlockedAt: '2026-10-12',
-    progress: 3,
+    unlocked: false,
+    progress: 0,
     maxProgress: 3,
     xpReward: 30,
   },
@@ -191,7 +103,7 @@ export const INITIAL_ACHIEVEMENTS: Achievement[] = [
     description: 'Manteve uma sequência de 7 dias consecutivos.',
     icon: 'trophy',
     unlocked: false,
-    progress: 5,
+    progress: 0,
     maxProgress: 7,
     xpReward: 70,
   },
@@ -201,7 +113,7 @@ export const INITIAL_ACHIEVEMENTS: Achievement[] = [
     description: 'Manteve uma sequência de 30 dias.',
     icon: 'medal',
     unlocked: false,
-    progress: 5,
+    progress: 0,
     maxProgress: 30,
     xpReward: 300,
   },
@@ -210,9 +122,8 @@ export const INITIAL_ACHIEVEMENTS: Achievement[] = [
     title: 'Dez em Dez',
     description: 'Você completou 10 hábitos no total.',
     icon: 'star',
-    unlocked: true,
-    unlockedAt: '2026-10-12',
-    progress: 10,
+    unlocked: false,
+    progress: 0,
     maxProgress: 10,
     xpReward: 50,
   },
@@ -222,7 +133,7 @@ export const INITIAL_ACHIEVEMENTS: Achievement[] = [
     description: 'Você completou 50 hábitos no total.',
     icon: 'ribbon',
     unlocked: false,
-    progress: 28,
+    progress: 0,
     maxProgress: 50,
     xpReward: 100,
   },
@@ -232,13 +143,13 @@ export const INITIAL_ACHIEVEMENTS: Achievement[] = [
     description: 'Você completou 100 hábitos no total.',
     icon: 'shield-checkmark',
     unlocked: false,
-    progress: 28,
+    progress: 0,
     maxProgress: 100,
     xpReward: 200,
   },
 ];
 
-// Lista oficial equivalente a MarketRepository.kt do app Android nativo
+// Lista oficial equivalente a MarketRepository.kt do app Android nativo (100% não possuídos inicialmente)
 export const INITIAL_MARKET_ITEMS: MarketItem[] = [
   {
     id: 'stk_rocket',
@@ -247,8 +158,8 @@ export const INITIAL_MARKET_ITEMS: MarketItem[] = [
     type: 'STICKER',
     rarity: 'RARE',
     basePrice: 150,
-    finalPrice: 150, // 150 * 1
-    isOwned: true,
+    finalPrice: 150,
+    isOwned: false,
     iconName: 'rocket',
   },
   {
@@ -270,7 +181,7 @@ export const INITIAL_MARKET_ITEMS: MarketItem[] = [
     rarity: 'COMMON',
     basePrice: 50,
     finalPrice: 50,
-    isOwned: true,
+    isOwned: false,
     iconName: 'fitness',
   },
   {

@@ -235,7 +235,27 @@ export default function TemplatesScreen() {
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}>
-          {templates.map((template) => {
+          {templates.length === 0 ? (
+            <View style={[styles.emptyCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+              <View style={[styles.emptyIconCircle, { backgroundColor: `${theme.primary}15` }]}>
+                <Ionicons name="layers-outline" size={36} color={theme.primary} />
+              </View>
+              <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
+                Nenhum template cadastrado
+              </Text>
+              <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
+                Crie modelos de rotina personalizados com suas atividades frequentes para aplicá-los rapidamente ao seu dia a dia.
+              </Text>
+              <TouchableOpacity
+                style={[styles.emptyActionBtn, { backgroundColor: theme.primary }]}
+                onPress={() => setIsCreateModalOpen(true)}
+                activeOpacity={0.85}>
+                <Ionicons name="add" size={18} color="#0F172A" />
+                <Text style={styles.emptyActionBtnText}>Criar Primeiro Template</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            templates.map((template) => {
             const complexity = getComplexityLabel(template.items.length);
             const totalMinutes = template.items.reduce((acc, i) => acc + (i.durationMinutes || 30), 0);
 
@@ -322,7 +342,7 @@ export default function TemplatesScreen() {
                 </TouchableOpacity>
               </View>
             );
-          })}
+          }))}
 
           <View style={{ height: 40 }} />
         </ScrollView>
@@ -971,5 +991,48 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     fontWeight: '800',
     fontSize: 15,
+  },
+  emptyCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 40,
+    marginHorizontal: 16,
+  },
+  emptyIconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginBottom: 24,
+    paddingHorizontal: 8,
+  },
+  emptyActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 16,
+  },
+  emptyActionBtnText: {
+    color: '#0F172A',
+    fontWeight: '800',
+    fontSize: 14,
   },
 });
