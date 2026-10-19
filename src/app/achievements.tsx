@@ -9,7 +9,9 @@ import {
   StatusBar,
   Modal,
   Alert,
+  Image,
 } from 'react-native';
+import { auth as firebaseAuth } from '@/config/firebase';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { MomentusColors } from '@/constants/theme';
@@ -87,6 +89,14 @@ export default function AchievementsScreen() {
     }
   };
 
+  const [avatarError, setAvatarError] = useState(false);
+  const authUser = firebaseAuth.currentUser;
+  const resolvedName =
+    userProfile.name && userProfile.name !== 'Usuário'
+      ? userProfile.name
+      : (authUser?.displayName?.trim() || userProfile.name || 'Usuário');
+  const displayPhoto = userProfile.photoUrl || authUser?.photoURL || null;
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <StatusBar
@@ -101,15 +111,25 @@ export default function AchievementsScreen() {
             { backgroundColor: theme.surface, borderColor: theme.outline },
           ]}>
           <View style={styles.profileTopRow}>
-            <View style={[styles.avatarLarge, { borderColor: userLevel.rankColor }]}>
-              <Text style={styles.avatarLargeText}>
-                {userProfile.name ? userProfile.name.charAt(0).toUpperCase() : 'U'}
-              </Text>
+            <View style={[styles.avatarLarge, { borderColor: userLevel.rankColor, overflow: 'hidden' }]}>
+              {displayPhoto && !avatarError ? (
+                <Image
+                  source={{ uri: displayPhoto }}
+                  style={{ width: '100%', height: '100%' }}
+                  resizeMode="cover"
+                  onError={() => setAvatarError(true)}
+                  {...(Platform.OS === 'web' ? { referrerPolicy: 'no-referrer' } : {})}
+                />
+              ) : (
+                <Text style={styles.avatarLargeText}>
+                  {resolvedName ? resolvedName.charAt(0).toUpperCase() : 'U'}
+                </Text>
+              )}
             </View>
 
             <View style={styles.profileDetails}>
               <Text style={[styles.profileName, { color: theme.textPrimary }]}>
-                {userProfile.name || 'Usuário'}
+                {resolvedName}
               </Text>
               <View style={styles.levelRankRow}>
                 <View

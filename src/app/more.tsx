@@ -19,11 +19,22 @@ import { useMomentus } from '@/context/MomentusContext';
 import { CategoriesModal } from '@/components/momentus/CategoriesModal';
 import { SettingsModal } from '@/components/momentus/SettingsModal';
 
+import { auth as firebaseAuth } from '@/config/firebase';
+
 export default function MoreScreen() {
   const router = useRouter();
   const { userProfile, userLevel, logout, theme } = useMomentus();
   const [categoriesModalVisible, setCategoriesModalVisible] = useState(false);
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
+  const [avatarError, setAvatarError] = useState(false);
+
+  const authUser = firebaseAuth.currentUser;
+  const displayName =
+    userProfile.name && userProfile.name !== 'Usuário'
+      ? userProfile.name
+      : (authUser?.displayName?.trim() || userProfile.name || 'Usuário');
+  const displayEmail = userProfile.email || authUser?.email || '';
+  const displayPhoto = userProfile.photoUrl || authUser?.photoURL || null;
 
   const handleLogout = () => {
     Alert.alert('Sair da Conta', 'Deseja realmente sair da sua conta?', [
@@ -55,19 +66,21 @@ export default function MoreScreen() {
           {/* User Profile Card */}
           <View style={[styles.profileCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
             <View style={[styles.avatar, { borderColor: userLevel.rankColor, overflow: 'hidden' }]}>
-              {userProfile.photoUrl ? (
+              {displayPhoto && !avatarError ? (
                 <Image
-                  source={{ uri: userProfile.photoUrl }}
+                  source={{ uri: displayPhoto }}
                   style={styles.avatarImage}
                   resizeMode="cover"
+                  onError={() => setAvatarError(true)}
+                  {...(Platform.OS === 'web' ? { referrerPolicy: 'no-referrer' } : {})}
                 />
               ) : (
-                <Text style={styles.avatarText}>{userProfile.name.charAt(0)}</Text>
+                <Text style={styles.avatarText}>{displayName.charAt(0).toUpperCase()}</Text>
               )}
             </View>
             <View style={styles.profileInfo}>
-              <Text style={[styles.userName, { color: theme.textPrimary }]}>{userProfile.name}</Text>
-              <Text style={[styles.userEmail, { color: theme.textSecondary }]}>{userProfile.email}</Text>
+              <Text style={[styles.userName, { color: theme.textPrimary }]}>{displayName}</Text>
+              <Text style={[styles.userEmail, { color: theme.textSecondary }]}>{displayEmail}</Text>
               <View style={[styles.rankBadge, { backgroundColor: `${userLevel.rankColor}20` }]}>
                 <Ionicons name="sparkles" size={12} color={userLevel.rankColor} />
                 <Text style={[styles.rankText, { color: userLevel.rankColor }]}>

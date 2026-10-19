@@ -21,6 +21,7 @@ import { EventDetailDialog } from '@/components/momentus/EventDetailDialog';
 import { NewHabitModal } from '@/components/momentus/NewHabitModal';
 import { getTodayDateString, getStreakColor } from '@/constants/initialData';
 import { HabitItem } from '@/types';
+import { auth as firebaseAuth } from '@/config/firebase';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -42,6 +43,15 @@ export default function HomeScreen() {
   // Estados de seleção múltipla
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedHabitIds, setSelectedHabitIds] = useState<string[]>([]);
+  const [avatarError, setAvatarError] = useState(false);
+
+  const authUser = firebaseAuth.currentUser;
+  const resolvedName =
+    userProfile.name && userProfile.name !== 'Usuário'
+      ? userProfile.name
+      : (authUser?.displayName?.trim() || userProfile.name || 'Explorador');
+  const userName = resolvedName.split(' ')[0] || 'Explorador';
+  const displayPhoto = userProfile.photoUrl || authUser?.photoURL || null;
 
   const todayStr = getTodayDateString();
   const todayHabits = useMemo(() => {
@@ -70,8 +80,6 @@ export default function HomeScreen() {
     if (hour < 18) return 'Boa tarde,';
     return 'Boa noite,';
   }, []);
-
-  const userName = userProfile.name ? userProfile.name.split(' ')[0] : 'Explorador';
 
   // Toggle seleção múltipla
   const handleToggleSelectHabit = (id: string) => {
@@ -189,15 +197,17 @@ export default function HomeScreen() {
               style={styles.userProfileGreetingRow}
               activeOpacity={0.8}>
               <View style={[styles.homeAvatar, { borderColor: theme.primary }]}>
-                {userProfile.photoUrl ? (
+                {displayPhoto && !avatarError ? (
                   <Image
-                    source={{ uri: userProfile.photoUrl }}
+                    source={{ uri: displayPhoto }}
                     style={styles.homeAvatarImage}
                     resizeMode="cover"
+                    onError={() => setAvatarError(true)}
+                    {...(Platform.OS === 'web' ? { referrerPolicy: 'no-referrer' } : {})}
                   />
                 ) : (
                   <Text style={[styles.homeAvatarText, { color: theme.primary }]}>
-                    {userProfile.name ? userProfile.name.charAt(0).toUpperCase() : 'U'}
+                    {resolvedName ? resolvedName.charAt(0).toUpperCase() : 'U'}
                   </Text>
                 )}
               </View>

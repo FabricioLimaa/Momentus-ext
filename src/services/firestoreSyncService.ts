@@ -1,4 +1,4 @@
-import { firestore } from "@/config/firebase";
+import { firestore, auth } from "@/config/firebase";
 import {
   Achievement,
   Category,
@@ -564,35 +564,60 @@ export async function syncWithFirestore(
     const userDocSnap = await getDoc(userDocRef);
     const cloudUserData = userDocSnap.exists() ? userDocSnap.data() : {};
 
-    if (mergedUserProfile) {
+    const authUser = auth.currentUser;
+    const authDisplayName = authUser?.displayName?.trim() || null;
+    const authEmail = authUser?.email?.trim() || null;
+    const authPhotoUrl = authUser?.photoURL || null;
+
+    if (mergedUserProfile || authUser) {
+      const baseProfile: UserProfile = mergedUserProfile || {
+        name: 'Usuário',
+        email: '',
+        photoUrl: null,
+        totalPoints: 0,
+        currentStreak: 0,
+        bestStreak: 0,
+        totalCompleted: 0,
+        focusMinutesToday: 0,
+        isLoggedIn: true,
+      };
+
       const cloudPoints =
         typeof cloudUserData?.points === "number" ? cloudUserData.points : 0;
       const cloudStreak =
         typeof cloudUserData?.streak === "number" ? cloudUserData.streak : 0;
-      const mergedPoints = Math.max(mergedUserProfile.totalPoints, cloudPoints);
-      const mergedStreak = Math.max(mergedUserProfile.currentStreak, cloudStreak);
+      const mergedPoints = Math.max(baseProfile.totalPoints, cloudPoints);
+      const mergedStreak = Math.max(baseProfile.currentStreak, cloudStreak);
 
-      const cloudDisplayName = cloudUserData?.display_name;
-      const cloudEmail = cloudUserData?.email;
+      const cloudDisplayName =
+        typeof cloudUserData?.display_name === "string" &&
+        cloudUserData.display_name.trim().length > 0 &&
+        cloudUserData.display_name !== "Usuário"
+          ? cloudUserData.display_name.trim()
+          : null;
+      const cloudEmail =
+        typeof cloudUserData?.email === "string" &&
+        cloudUserData.email.trim().length > 0
+          ? cloudUserData.email.trim()
+          : null;
 
+      // Prioridade máxima para a conta oficial do Google / Firebase Auth:
       const mergedName =
-        mergedUserProfile.name &&
-        mergedUserProfile.name !== "Fabrício Lima" &&
-        mergedUserProfile.name !== "Usuário"
-          ? mergedUserProfile.name
-          : cloudDisplayName || mergedUserProfile.name;
+        authDisplayName ||
+        cloudDisplayName ||
+        (baseProfile.name && baseProfile.name !== "Usuário" ? baseProfile.name : null) ||
+        (authEmail ? authEmail.split("@")[0] : null) ||
+        "Usuário";
 
-      const mergedEmail =
-        mergedUserProfile.email &&
-        mergedUserProfile.email !== "fabricio@momentus.app" &&
-        mergedUserProfile.email !== "contato@momentusapp.com.br"
-          ? mergedUserProfile.email
-          : cloudEmail || mergedUserProfile.email;
+      const mergedEmail = authEmail || cloudEmail || baseProfile.email || "";
+      const mergedPhotoUrl = authPhotoUrl || baseProfile.photoUrl || null;
 
       mergedUserProfile = {
-        ...mergedUserProfile,
+        ...baseProfile,
         name: mergedName,
         email: mergedEmail,
+        photoUrl: mergedPhotoUrl,
+        isLoggedIn: true,
         totalPoints: mergedPoints,
         currentStreak: mergedStreak,
       };
@@ -600,7 +625,7 @@ export async function syncWithFirestore(
       // MANTÉM RIGOROSAMENTE APENAS OS CAMPOS DE UserData.kt:
       // display_name, email, points, streak, terms_accepted, terms_accepted_version
       const userProfilePayload: Record<string, any> = {
-        display_name: mergedName || null,
+        display_name: mergedName !== "Usuário" ? mergedName : null,
         email: mergedEmail || null,
         points: mergedPoints,
         streak: mergedStreak,

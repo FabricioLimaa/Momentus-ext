@@ -289,7 +289,21 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           setTemplates(cleanTemplates);
           setAchievements(cleanAchievements);
           setMarketItems(cleanMarketItems);
-          if (dbUserProfile) setUserProfile(dbUserProfile);
+          if (dbUserProfile) {
+            const currentAuth = firebaseAuth.currentUser;
+            if (currentAuth) {
+              const enriched: UserProfile = {
+                ...dbUserProfile,
+                name: currentAuth.displayName || (dbUserProfile.name !== 'Usuário' ? dbUserProfile.name : (currentAuth.email ? currentAuth.email.split('@')[0] : 'Usuário')),
+                email: currentAuth.email || dbUserProfile.email,
+                photoUrl: currentAuth.photoURL ?? dbUserProfile.photoUrl,
+                isLoggedIn: true,
+              };
+              setUserProfile(enriched);
+            } else {
+              setUserProfile(dbUserProfile);
+            }
+          }
           if (dbSettings) setSettings(dbSettings);
         } else {
           // 2. Se o SQLite estiver vazio, verifica se há dados antigos no AsyncStorage para migrar
@@ -313,7 +327,18 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             setTemplates(initialTmpl);
             setAchievements(initialAch);
             setMarketItems(initialMkt);
-            setUserProfile(initialProf);
+            const currentAuth = firebaseAuth.currentUser;
+            if (currentAuth) {
+              setUserProfile({
+                ...initialProf,
+                name: currentAuth.displayName || (initialProf.name !== 'Usuário' ? initialProf.name : (currentAuth.email ? currentAuth.email.split('@')[0] : 'Usuário')),
+                email: currentAuth.email || initialProf.email,
+                photoUrl: currentAuth.photoURL ?? initialProf.photoUrl,
+                isLoggedIn: true,
+              });
+            } else {
+              setUserProfile(initialProf);
+            }
             setSettings(initialSett);
 
             // Grava no SQLite imediatamente para consolidar a migração
@@ -355,13 +380,23 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           photoURL: user.photoURL,
         });
 
-        setUserProfile((prev) => ({
-          ...prev,
-          email: user.email || prev.email,
-          name: user.displayName || (user.email ? user.email.split('@')[0] : prev.name),
-          photoUrl: user.photoURL ?? prev.photoUrl,
-          isLoggedIn: true,
-        }));
+        const activeName =
+          user.displayName?.trim() ||
+          (user.email ? user.email.split('@')[0] : 'Usuário');
+        const activeEmail = user.email || '';
+        const activePhoto = user.photoURL || null;
+
+        setUserProfile((prev) => {
+          const nextProfile: UserProfile = {
+            ...prev,
+            email: activeEmail || prev.email,
+            name: activeName !== 'Usuário' ? activeName : (prev.name !== 'Usuário' ? prev.name : 'Usuário'),
+            photoUrl: activePhoto ?? prev.photoUrl,
+            isLoggedIn: true,
+          };
+          setAppKv('user_profile', nextProfile).catch(() => {});
+          return nextProfile;
+        });
 
         try {
           // Sincroniza dados da nuvem (Firestore) do usuário recém-autenticado
@@ -962,7 +997,8 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const syncCloudAction = async (targetUid?: string): Promise<void> => {
-    const uid = targetUid || firebaseAuth.currentUser?.uid;
+    const authUser = firebaseAuth.currentUser;
+    const uid = targetUid || authUser?.uid;
     if (!uid) {
       if (userProfile.isLoggedIn) {
         const backupTimestamp = formatBackupTimestamp();
@@ -976,6 +1012,16 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
       throw new Error('Faça login com sua conta Momentus para sincronizar os dados na nuvem.');
     }
+
+    const currentProfileWithAuth: UserProfile = {
+      ...userProfile,
+      name:
+        authUser?.displayName?.trim() ||
+        (userProfile.name !== 'Usuário' ? userProfile.name : (authUser?.email ? authUser.email.split('@')[0] : 'Usuário')),
+      email: authUser?.email || userProfile.email,
+      photoUrl: authUser?.photoURL ?? userProfile.photoUrl,
+      isLoggedIn: true,
+    };
 
     const {
       mergedHabits,
@@ -991,7 +1037,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       templates,
       achievements,
       marketItems,
-      userProfile
+      currentProfileWithAuth
     );
 
     const backupTimestamp = formatBackupTimestamp();
