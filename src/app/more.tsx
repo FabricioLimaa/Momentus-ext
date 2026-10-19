@@ -80,7 +80,7 @@ export default function MoreScreen() {
           {/* Menu Items List */}
           <View style={[styles.menuGroup, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
             <TouchableOpacity
-              onPress={() => setCategoriesModalVisible(true)}
+              onPress={() => router.push('/categories' as any)}
               style={styles.menuItem}>
               <View style={styles.menuItemLeft}>
                 <View style={[styles.iconBox, { backgroundColor: 'rgba(51, 182, 121, 0.15)' }]}>

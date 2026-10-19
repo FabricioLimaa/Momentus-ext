@@ -9,6 +9,7 @@ import {
 } from "@/types";
 import {
   collection,
+  deleteDoc,
   deleteField,
   doc,
   getDoc,
@@ -149,20 +150,38 @@ export async function syncWithFirestore(
     COMPLETED_HABITS_COLLECTION,
   );
   const inventoryColRef = collection(userDocRef, INVENTORY_COLLECTION);
+  const metasColRef = collection(userDocRef, "metas");
 
   // ========================================================
-  // 1. Sincronização de Categorias (Category.kt)
+  // 1. Sincronização de Categorias (Category.kt) e Metas (Meta.kt)
   // ========================================================
+  const LEGACY_MOCK_CAT_IDS = new Set([
+    "cat-saude",
+    "cat-trabalho",
+    "cat-estudos",
+    "cat-fitness",
+    "cat-pessoal",
+  ]);
+
   const categoriesSnapshot = await getDocs(categoriesColRef);
   const cloudCategoriesMap = new Map<string, any>();
   categoriesSnapshot.forEach((d) => cloudCategoriesMap.set(d.id, d.data()));
 
+  const metasSnapshot = await getDocs(metasColRef);
+  const cloudMetasMap = new Map<string, any>();
+  metasSnapshot.forEach((d) => cloudMetasMap.set(d.id, d.data()));
+
+  // Filtra categorias locais ignorando mocks legados de teste
+  const cleanLocalCategories = localCategories.filter(
+    (c) => !LEGACY_MOCK_CAT_IDS.has(c.id),
+  );
+
   const localCategoriesMap = new Map<string, Category>(
-    localCategories.map((c) => [c.id, c]),
+    cleanLocalCategories.map((c) => [c.id, c]),
   );
   const categoriesBatch = writeBatch(firestore);
 
-  localCategories.forEach((cat) => {
+  cleanLocalCategories.forEach((cat) => {
     if (!cloudCategoriesMap.has(cat.id)) {
       const docRef = doc(categoriesColRef, cat.id);
       categoriesBatch.set(docRef, {
@@ -170,30 +189,70 @@ export async function syncWithFirestore(
         nome: cat.name,
         descricao: null,
         duracaoPadraoMinutos: 60,
-        cor: cat.color || "#CCCCCC",
+        cor: cat.color || "#616161",
         tag: null,
         stickerId: cat.stickerId || null,
         lastUpdated: new Date(),
       });
       result.uploadedCategories++;
     }
+
+    // Sincroniza meta na subcoleção 'metas' do Firestore conforme Meta.kt
+    const metaDocRef = doc(metasColRef, cat.id);
+    if (cat.metaMinutosSemanal != null && cat.metaMinutosSemanal > 0) {
+      categoriesBatch.set(metaDocRef, {
+        categoryId: cat.id,
+        metaMinutosSemanal: cat.metaMinutosSemanal,
+      });
+    } else if (cloudMetasMap.has(cat.id)) {
+      categoriesBatch.delete(metaDocRef);
+    }
   });
   await categoriesBatch.commit();
 
-  const mergedCategories: Category[] = [...localCategories];
+  let mergedCategories: Category[] = [...cleanLocalCategories];
   cloudCategoriesMap.forEach((cloudCat, id) => {
-    if (!localCategoriesMap.has(id)) {
+    if (!localCategoriesMap.has(id) && !LEGACY_MOCK_CAT_IDS.has(id)) {
+      const metaVal =
+        cloudMetasMap.get(id)?.metaMinutosSemanal ??
+        cloudCat.metaMinutosSemanal ??
+        null;
       mergedCategories.push({
         id,
-        name: cloudCat.nome || cloudCat.name || "Geral",
-        color: cloudCat.cor || cloudCat.color || "#34D399",
+        name: cloudCat.nome || cloudCat.name || "Outros",
+        color: cloudCat.cor || cloudCat.color || "#616161",
         icon: cloudCat.icon || undefined,
         stickerId: cloudCat.stickerId || null,
-        metaMinutosSemanal: cloudCat.metaMinutosSemanal || null,
+        metaMinutosSemanal: metaVal,
       });
       result.downloadedCategories++;
     }
   });
+
+  // Se o usuário não tiver nenhuma categoria na nuvem nem localmente, garante a categoria padrão "Outros"
+  if (mergedCategories.length === 0) {
+    const defaultOutros: Category = {
+      id: "cat-outros",
+      name: "Outros",
+      color: "#616161",
+      stickerId: null,
+      metaMinutosSemanal: null,
+    };
+    mergedCategories.push(defaultOutros);
+    try {
+      const defaultDocRef = doc(categoriesColRef, defaultOutros.id);
+      await setDoc(defaultDocRef, {
+        id: defaultOutros.id,
+        nome: defaultOutros.name,
+        descricao: null,
+        duracaoPadraoMinutos: 60,
+        cor: defaultOutros.color,
+        tag: null,
+        stickerId: null,
+        lastUpdated: new Date(),
+      });
+    } catch {}
+  }
 
   // ========================================================
   // 2. Sincronização de Hábitos Concluídos (HabitoConcluido.kt)
@@ -287,7 +346,7 @@ export async function syncWithFirestore(
           cloudItem.horarioTerminoString || cloudItem.horarioTermino,
           "09:00",
         ),
-        categoryId: cloudItem.categoryId || mergedCategories[0]?.id || "cat-1",
+        categoryId: cloudItem.categoryId || mergedCategories[0]?.id || "cat-outros",
         completed: isCompleted,
         streak: 0,
         googleCalendarEventId: cloudItem.googleCalendarEventId || null,
@@ -606,3 +665,61 @@ export function listenToFirestoreSync(
     },
   );
 }
+
+/**
+ * Salva ou atualiza uma categoria e sua meta no Firestore do usuário.
+ */
+export async function saveCategoryToFirestore(
+  userId: string,
+  category: Category,
+): Promise<void> {
+  try {
+    const userDocRef = doc(firestore, "users", userId);
+    const catDocRef = doc(collection(userDocRef, CATEGORIES_COLLECTION), category.id);
+    await setDoc(catDocRef, {
+      id: category.id,
+      nome: category.name,
+      descricao: null,
+      duracaoPadraoMinutos: 60,
+      cor: category.color || "#616161",
+      tag: null,
+      stickerId: category.stickerId || null,
+      lastUpdated: new Date(),
+    });
+
+    const metaDocRef = doc(collection(userDocRef, "metas"), category.id);
+    if (category.metaMinutosSemanal != null && category.metaMinutosSemanal > 0) {
+      await setDoc(metaDocRef, {
+        categoryId: category.id,
+        metaMinutosSemanal: category.metaMinutosSemanal,
+      });
+    } else {
+      try {
+        await deleteDoc(metaDocRef);
+      } catch {}
+    }
+  } catch (err) {
+    console.warn("Erro ao salvar categoria no Firestore:", err);
+  }
+}
+
+/**
+ * Remove uma categoria e sua respectiva meta do Firestore.
+ */
+export async function deleteCategoryFromFirestore(
+  userId: string,
+  categoryId: string,
+): Promise<void> {
+  try {
+    const userDocRef = doc(firestore, "users", userId);
+    const catDocRef = doc(collection(userDocRef, CATEGORIES_COLLECTION), categoryId);
+    const metaDocRef = doc(collection(userDocRef, "metas"), categoryId);
+    await deleteDoc(catDocRef);
+    try {
+      await deleteDoc(metaDocRef);
+    } catch {}
+  } catch (err) {
+    console.warn("Erro ao excluir categoria do Firestore:", err);
+  }
+}
+

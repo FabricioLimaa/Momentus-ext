@@ -62,7 +62,12 @@ import {
 } from '@/services/backupService';
 import { auth as firebaseAuth } from '@/config/firebase';
 import { logoutUser } from '@/services/authService';
-import { syncWithFirestore, clearCloudData } from '@/services/firestoreSyncService';
+import {
+  syncWithFirestore,
+  clearCloudData,
+  saveCategoryToFirestore,
+  deleteCategoryFromFirestore,
+} from '@/services/firestoreSyncService';
 import { onAuthStateChanged } from 'firebase/auth';
 
 export interface AppTheme {
@@ -232,18 +237,56 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         const dbUserProfile = await getAppKv<UserProfile>('user_profile');
         const dbSettings = await getAppKv<AppSettings>('app_settings');
 
+        const LEGACY_MOCK_CAT_IDS = new Set([
+          'cat-saude',
+          'cat-trabalho',
+          'cat-estudos',
+          'cat-fitness',
+          'cat-pessoal',
+        ]);
+        const LEGACY_MOCK_TMPL_IDS = new Set([
+          'tmpl-matinal',
+          'tmpl-foco',
+          'tmpl-noturno',
+        ]);
+
+        let cleanCats = dbCategories.filter((c) => !LEGACY_MOCK_CAT_IDS.has(c.id));
+        if (cleanCats.length === 0) {
+          cleanCats = INITIAL_CATEGORIES;
+        }
+
+        const cleanTemplates = dbTemplates.filter((t) => !LEGACY_MOCK_TMPL_IDS.has(t.id));
+
+        // Conquistas e itens da loja limpos e zerados inicialmente
+        const cleanAchievements =
+          dbAchievements.length > 0 && dbAchievements.every((a) => !a.unlocked || a.progress > 0)
+            ? dbAchievements.map((a) =>
+                a.unlocked && (!a.unlockedAt || a.unlockedAt.includes('2026-10-10'))
+                  ? { ...a, unlocked: false, progress: 0, unlockedAt: undefined }
+                  : a
+              )
+            : INITIAL_ACHIEVEMENTS;
+
+        const cleanMarketItems =
+          dbMarketItems.length > 0
+            ? dbMarketItems.map((m) =>
+                m.isOwned && (m.id === 'stk_rocket' || m.id === 'stk_zen')
+                  ? { ...m, isOwned: false }
+                  : m
+              )
+            : INITIAL_MARKET_ITEMS;
+
         const hasDbData =
-          dbCategories.length > 0 ||
+          cleanCats.length > 0 ||
           dbHabits.length > 0 ||
-          dbTemplates.length > 0 ||
-          dbAchievements.length > 0;
+          cleanTemplates.length > 0;
 
         if (hasDbData) {
-          if (dbCategories.length > 0) setCategories(dbCategories);
+          setCategories(cleanCats);
           if (dbHabits.length > 0) setHabits(dbHabits);
-          if (dbTemplates.length > 0) setTemplates(dbTemplates);
-          if (dbAchievements.length > 0) setAchievements(dbAchievements);
-          if (dbMarketItems.length > 0) setMarketItems(dbMarketItems);
+          setTemplates(cleanTemplates);
+          setAchievements(cleanAchievements);
+          setMarketItems(cleanMarketItems);
           if (dbUserProfile) setUserProfile(dbUserProfile);
           if (dbSettings) setSettings(dbSettings);
         } else {
@@ -251,15 +294,19 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           const savedAsync = await AsyncStorage.getItem(STORAGE_KEY);
           if (savedAsync) {
             const parsed = JSON.parse(savedAsync);
-            const initialCats = parsed.categories || INITIAL_CATEGORIES;
+            const rawCats: Category[] = parsed.categories || INITIAL_CATEGORIES;
+            const initialCats = rawCats.filter((c) => !LEGACY_MOCK_CAT_IDS.has(c.id));
             const initialHab = parsed.habits || INITIAL_HABITS;
-            const initialTmpl = parsed.templates || INITIAL_TEMPLATES;
-            const initialAch = parsed.achievements || INITIAL_ACHIEVEMENTS;
-            const initialMkt = parsed.marketItems || INITIAL_MARKET_ITEMS;
+            const initialTmpl = (parsed.templates || INITIAL_TEMPLATES).filter(
+              (t: any) => !LEGACY_MOCK_TMPL_IDS.has(t.id)
+            );
+            const initialAch = INITIAL_ACHIEVEMENTS;
+            const initialMkt = INITIAL_MARKET_ITEMS;
             const initialProf = parsed.userProfile || INITIAL_USER_PROFILE;
             const initialSett = parsed.settings || INITIAL_SETTINGS;
 
-            setCategories(initialCats);
+            const finalCats = initialCats.length > 0 ? initialCats : INITIAL_CATEGORIES;
+            setCategories(finalCats);
             setHabits(initialHab);
             setTemplates(initialTmpl);
             setAchievements(initialAch);
@@ -268,7 +315,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             setSettings(initialSett);
 
             // Grava no SQLite imediatamente para consolidar a migração
-            await setAllCategoriesDb(initialCats);
+            await setAllCategoriesDb(finalCats);
             await setAllHabitsDb(initialHab);
             await setAllTemplatesDb(initialTmpl);
             await setAllAchievementsDb(initialAch);
@@ -276,7 +323,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             await setAppKv('user_profile', initialProf);
             await setAppKv('app_settings', initialSett);
           } else {
-            // Inicializa o banco SQLite com os dados padrão do Momentus
+            // Inicializa o banco SQLite com os dados padrão do Momentus (apenas Outros)
             await setAllCategoriesDb(INITIAL_CATEGORIES);
             await setAllHabitsDb(INITIAL_HABITS);
             await setAllTemplatesDb(INITIAL_TEMPLATES);
@@ -681,27 +728,48 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     stickerId: string | null,
     metaMinutosSemanal: number | null
   ) => {
+    let targetCat: Category;
     if (id) {
+      targetCat = {
+        id,
+        name,
+        color,
+        stickerId,
+        metaMinutosSemanal,
+      };
       setCategories((prev) =>
-        prev.map((c) =>
-          c.id === id ? { ...c, name, color, stickerId, metaMinutosSemanal } : c
-        )
+        prev.map((c) => (c.id === id ? targetCat : c))
       );
     } else {
-      const newCat: Category = {
+      targetCat = {
         id: `cat-${Date.now()}`,
         name,
         color,
         stickerId,
         metaMinutosSemanal,
       };
-      setCategories((prev) => [...prev, newCat]);
+      setCategories((prev) => [...prev, targetCat]);
     }
+
+    const currentUid = firebaseAuth.currentUser?.uid;
+    if (currentUid) {
+      saveCategoryToFirestore(currentUid, targetCat).catch(() => {});
+    }
+
     triggerHaptic('success');
   };
 
   const deleteCategory = (id: string) => {
-    setCategories((prev) => prev.filter((c) => c.id !== id));
+    setCategories((prev) => {
+      const remaining = prev.filter((c) => c.id !== id);
+      return remaining.length > 0 ? remaining : INITIAL_CATEGORIES;
+    });
+
+    const currentUid = firebaseAuth.currentUser?.uid;
+    if (currentUid) {
+      deleteCategoryFromFirestore(currentUid, id).catch(() => {});
+    }
+
     triggerHaptic('impact');
   };
 

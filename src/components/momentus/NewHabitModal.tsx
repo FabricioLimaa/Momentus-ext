@@ -56,7 +56,8 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
       const nextH = String((now.getHours() + 1) % 24).padStart(2, '0');
       setTimeStart(`${h}:00`);
       setTimeEnd(`${nextH}:00`);
-      setSelectedCategoryId(categories[0]?.id || 'cat-saude');
+      const defaultCat = categories.find((c) => c.name.toLowerCase() === 'outros') || categories[0];
+      setSelectedCategoryId(defaultCat?.id || 'cat-outros');
       setSaveToGoogle(false);
     }
   }, [habitToEdit, visible, categories]);

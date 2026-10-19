@@ -46,7 +46,7 @@ export default function TemplatesScreen() {
       title: 'Primeira atividade',
       timeStart: '08:00',
       durationMinutes: 30,
-      categoryId: categories[0]?.id || 'cat-saude',
+      categoryId: categories[0]?.id || 'cat-outros',
     },
   ]);
 
@@ -161,7 +161,7 @@ export default function TemplatesScreen() {
         title: 'Primeira atividade',
         timeStart: '08:00',
         durationMinutes: 30,
-        categoryId: categories[0]?.id || 'cat-saude',
+        categoryId: categories[0]?.id || 'cat-outros',
       },
     ]);
 
@@ -185,7 +185,7 @@ export default function TemplatesScreen() {
           title: it.title || 'Atividade',
           durationMinutes: it.durationMinutes || 30,
           timeStart: it.timeStart || '08:00',
-          categoryId: it.categoryId || categories[0]?.id || 'cat-saude',
+          categoryId: it.categoryId || categories[0]?.id || 'cat-outros',
         })),
       });
 
@@ -498,7 +498,7 @@ export default function TemplatesScreen() {
                         title: `Nova Atividade ${editItems.length + 1}`,
                         timeStart: '09:00',
                         durationMinutes: 30,
-                        categoryId: categories[0]?.id || 'cat-saude',
+                        categoryId: categories[0]?.id || 'cat-outros',
                       },
                     ])
                   }>
@@ -597,7 +597,7 @@ export default function TemplatesScreen() {
                         title: `Atividade ${newItems.length + 1}`,
                         timeStart: '09:00',
                         durationMinutes: 30,
-                        categoryId: categories[0]?.id || 'cat-saude',
+                        categoryId: categories[0]?.id || 'cat-outros',
                       },
                     ])
                   }>

@@ -17,37 +17,9 @@ export const GOOGLE_CALENDAR_COLORS = [
 
 export const INITIAL_CATEGORIES: Category[] = [
   {
-    id: 'cat-saude',
-    name: 'Saúde & Bem-estar',
-    color: '#33B679',
-    stickerId: null,
-    metaMinutosSemanal: null,
-  },
-  {
-    id: 'cat-trabalho',
-    name: 'Trabalho & Foco',
-    color: '#039BE5',
-    stickerId: null,
-    metaMinutosSemanal: null,
-  },
-  {
-    id: 'cat-estudos',
-    name: 'Estudos & Leitura',
-    color: '#8E24AA',
-    stickerId: null,
-    metaMinutosSemanal: null,
-  },
-  {
-    id: 'cat-fitness',
-    name: 'Fitness & Treino',
-    color: '#F4511E',
-    stickerId: null,
-    metaMinutosSemanal: null,
-  },
-  {
-    id: 'cat-pessoal',
-    name: 'Pessoal & Rotina',
-    color: '#F6BF26',
+    id: 'cat-outros',
+    name: 'Outros',
+    color: '#616161',
     stickerId: null,
     metaMinutosSemanal: null,
   },
