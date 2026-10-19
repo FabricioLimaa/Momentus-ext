@@ -1,14 +1,45 @@
-import React from 'react';
-import { Tabs } from 'expo-router';
+import React, { useEffect } from 'react';
+import { Tabs, useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { Platform } from 'react-native';
 import { MomentusColors } from '@/constants/theme';
 import { MomentusProvider, useMomentus } from '@/context/MomentusContext';
+import { CURRENT_TERMS_VERSION } from '@/constants/legalContent';
+import { auth as firebaseAuth } from '@/config/firebase';
 
 function TabsNavigator() {
-  const { theme, settings } = useMomentus();
+  const router = useRouter();
+  const pathname = usePathname();
+  const { theme, settings, userProfile, isLoaded } = useMomentus();
   const primaryColor = settings.primaryColorHex || MomentusColors.emeraldNeon;
+
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    const isUserLoggedIn = userProfile.isLoggedIn || !!firebaseAuth.currentUser;
+    const isTermsOk =
+      !!settings.termsAccepted &&
+      (settings.termsAcceptedVersion ?? 0) >= CURRENT_TERMS_VERSION;
+
+    const isExemptRoute =
+      pathname === '/legal' ||
+      pathname === '/login' ||
+      pathname === '/signup' ||
+      pathname === '/forgot-password' ||
+      pathname === '/onboarding';
+
+    if (isUserLoggedIn && !isTermsOk && !isExemptRoute) {
+      router.replace('/legal?mandatory=true' as any);
+    }
+  }, [
+    isLoaded,
+    settings.termsAccepted,
+    settings.termsAcceptedVersion,
+    userProfile.isLoggedIn,
+    pathname,
+    router,
+  ]);
 
   return (
     <>

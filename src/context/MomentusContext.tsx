@@ -69,7 +69,9 @@ import {
   deleteCategoryFromFirestore,
   saveTemplateToFirestore,
   deleteTemplateFromFirestore,
+  saveTermsAcceptance,
 } from '@/services/firestoreSyncService';
+import { CURRENT_TERMS_VERSION } from '@/constants/legalContent';
 import { onAuthStateChanged } from 'firebase/auth';
 
 export interface AppTheme {
@@ -96,6 +98,7 @@ interface MomentusContextData {
   userLevel: UserLevelInfo;
   settings: AppSettings;
   theme: AppTheme;
+  isLoaded: boolean;
   selectedDate: string;
   setSelectedDate: (date: string) => void;
   // Celebration Lottie Actions
@@ -143,6 +146,10 @@ interface MomentusContextData {
   login: (email: string, name?: string, photoUrl?: string | null) => void;
   logout: () => void;
   syncCloudAction: (targetUid?: string) => Promise<void>;
+  // Legal Actions
+  acceptTermsAction: () => Promise<void>;
+  declineTermsAction: () => Promise<void>;
+  isTermsAccepted: () => boolean;
 }
 
 const STORAGE_KEY = '@momentus_state_v2';
@@ -996,6 +1003,46 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     triggerHaptic('impact');
   };
 
+  const acceptTermsAction = async (): Promise<void> => {
+    const now = new Date();
+    const formattedDate = `${String(now.getDate()).padStart(2, '0')}/${String(
+      now.getMonth() + 1
+    ).padStart(2, '0')}/${now.getFullYear()}`;
+
+    const nextSettings: AppSettings = {
+      ...settings,
+      termsAccepted: true,
+      termsAcceptedVersion: CURRENT_TERMS_VERSION,
+      termsAcceptedAt: formattedDate,
+    };
+
+    setSettings(nextSettings);
+    await setAppKv('app_settings', nextSettings);
+
+    const currentUid = firebaseAuth.currentUser?.uid;
+    if (currentUid) {
+      try {
+        await saveTermsAcceptance(currentUid, CURRENT_TERMS_VERSION);
+      } catch (err) {
+        console.warn('Erro ao salvar aceite de termos no Firestore:', err);
+      }
+    }
+
+    soundManager.playSuccessSound();
+    triggerHaptic('success');
+  };
+
+  const declineTermsAction = async (): Promise<void> => {
+    logout();
+  };
+
+  const isTermsAccepted = (): boolean => {
+    return (
+      !!settings.termsAccepted &&
+      (settings.termsAcceptedVersion ?? 0) >= CURRENT_TERMS_VERSION
+    );
+  };
+
   const syncCloudAction = async (targetUid?: string): Promise<void> => {
     const authUser = firebaseAuth.currentUser;
     const uid = targetUid || authUser?.uid;
@@ -1030,6 +1077,8 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       mergedAchievements,
       mergedMarketItems,
       mergedUserProfile,
+      cloudTermsAccepted,
+      cloudTermsVersion,
     } = await syncWithFirestore(
       uid,
       habits,
@@ -1041,9 +1090,17 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     );
 
     const backupTimestamp = formatBackupTimestamp();
+    const termsAcceptedCombined = settings.termsAccepted || cloudTermsAccepted;
+    const termsVersionCombined = Math.max(
+      settings.termsAcceptedVersion ?? 0,
+      cloudTermsVersion ?? 0
+    );
+
     const updatedSettings: AppSettings = {
       ...settings,
       lastBackupAt: backupTimestamp,
+      termsAccepted: termsAcceptedCombined,
+      termsAcceptedVersion: termsVersionCombined,
     };
 
     setHabits(mergedHabits);
@@ -1107,6 +1164,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         userLevel,
         settings,
         theme,
+        isLoaded,
         selectedDate,
         setSelectedDate,
         celebration,
@@ -1135,6 +1193,9 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         login,
         logout,
         syncCloudAction,
+        acceptTermsAction,
+        declineTermsAction,
+        isTermsAccepted,
       }}>
       {children}
       <WebAlertModal

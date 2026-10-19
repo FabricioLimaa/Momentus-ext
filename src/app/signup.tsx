@@ -62,10 +62,10 @@ export default function SignUpScreen() {
         console.warn('Erro ao sincronizar dados na nuvem:', syncErr);
       }
       setLoading(false);
-      Alert.alert('Sucesso! 🎉', 'Conta criada com sucesso!', [
+      Alert.alert('Sucesso! 🎉', 'Conta criada com sucesso! Por favor, leia e aceite os termos para começar.', [
         {
           text: 'Continuar',
-          onPress: () => router.replace('/'),
+          onPress: () => router.replace('/legal?mandatory=true' as any),
         },
       ]);
     } catch (err: any) {

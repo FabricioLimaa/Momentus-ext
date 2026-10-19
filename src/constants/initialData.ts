@@ -211,6 +211,9 @@ export const INITIAL_SETTINGS: AppSettings = {
   fontSizeMultiplier: 1.0,
   primaryColorHex: '#34D399',
   googleCalendarSyncEnabled: true,
+  termsAccepted: false,
+  termsAcceptedVersion: 0,
+  termsAcceptedAt: null,
 };
 
 export function getStreakColor(streakCount: number): string {

@@ -128,6 +128,8 @@ export async function syncWithFirestore(
   mergedAchievements: Achievement[];
   mergedMarketItems: MarketItem[];
   mergedUserProfile?: UserProfile;
+  cloudTermsAccepted?: boolean;
+  cloudTermsVersion?: number;
   result: SyncResult;
 }> {
   const result: SyncResult = {
@@ -559,10 +561,17 @@ export async function syncWithFirestore(
   let mergedUserProfile: UserProfile | undefined = localUserProfile
     ? { ...localUserProfile }
     : undefined;
+  let cloudTermsAccepted = false;
+  let cloudTermsVersion = 0;
 
   try {
     const userDocSnap = await getDoc(userDocRef);
     const cloudUserData = userDocSnap.exists() ? userDocSnap.data() : {};
+    cloudTermsAccepted = cloudUserData?.terms_accepted === true;
+    cloudTermsVersion =
+      typeof cloudUserData?.terms_accepted_version === "number"
+        ? cloudUserData.terms_accepted_version
+        : 0;
 
     const authUser = auth.currentUser;
     const authDisplayName = authUser?.displayName?.trim() || null;
@@ -629,8 +638,8 @@ export async function syncWithFirestore(
         email: mergedEmail || null,
         points: mergedPoints,
         streak: mergedStreak,
-        terms_accepted: true,
-        terms_accepted_version: 1,
+        terms_accepted: cloudTermsAccepted,
+        terms_accepted_version: cloudTermsVersion,
       };
 
       // Limpa os campos extras legados que causam crash no app nativo Kotlin:
@@ -664,8 +673,56 @@ export async function syncWithFirestore(
     mergedAchievements,
     mergedMarketItems,
     mergedUserProfile,
+    cloudTermsAccepted,
+    cloudTermsVersion,
     result,
   };
+}
+
+/**
+ * Salva o aceite dos termos no Firestore do usuário (espelho exato do UserRepository.kt -> acceptTerms).
+ */
+export async function saveTermsAcceptance(
+  userId: string,
+  version: number = 1
+): Promise<void> {
+  if (!userId || userId === "local_user") return;
+  const userDocRef = doc(firestore, "users", userId);
+  await setDoc(
+    userDocRef,
+    {
+      terms_accepted: true,
+      terms_accepted_version: version,
+      terms_accepted_at: new Date().toISOString(),
+    },
+    { merge: true }
+  );
+}
+
+/**
+ * Consulta se o usuário aceitou os termos no Firestore (espelho do UserRepository.kt -> hasAcceptedTerms).
+ */
+export async function hasAcceptedTermsCloud(
+  userId: string
+): Promise<{ accepted: boolean; version: number }> {
+  if (!userId || userId === "local_user") return { accepted: false, version: 0 };
+  try {
+    const userDocRef = doc(firestore, "users", userId);
+    const snap = await getDoc(userDocRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      return {
+        accepted: data?.terms_accepted === true,
+        version:
+          typeof data?.terms_accepted_version === "number"
+            ? data.terms_accepted_version
+            : 0,
+      };
+    }
+  } catch (err) {
+    console.warn("Erro ao consultar termos no Firestore:", err);
+  }
+  return { accepted: false, version: 0 };
 }
 
 /**

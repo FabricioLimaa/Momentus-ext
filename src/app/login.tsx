@@ -22,6 +22,8 @@ import {
   loginWithApple,
   loginWithEmail,
 } from '@/services/authService';
+import { hasAcceptedTermsCloud } from '@/services/firestoreSyncService';
+import { CURRENT_TERMS_VERSION } from '@/constants/legalContent';
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
@@ -37,6 +39,19 @@ export default function LoginScreen() {
 
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const isPasswordValid = password.length >= 6;
+
+  const navigatePostLogin = async (uid: string) => {
+    try {
+      const { accepted, version } = await hasAcceptedTermsCloud(uid);
+      if (!accepted || version < CURRENT_TERMS_VERSION) {
+        router.replace('/legal?mandatory=true' as any);
+        return;
+      }
+    } catch (err) {
+      console.warn('Erro ao verificar termos pós login:', err);
+    }
+    router.replace('/');
+  };
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
@@ -54,7 +69,7 @@ export default function LoginScreen() {
       }
       setLoading(false);
       Alert.alert('Sucesso! ✨', `Bem-vindo(a), ${user.displayName || 'Usuário'}!`);
-      router.replace('/');
+      await navigatePostLogin(user.uid);
     } catch (err: any) {
       setLoading(false);
       if (err.message !== 'SIGN_IN_CANCELLED' && err.code !== 'SIGN_IN_CANCELLED') {
@@ -82,7 +97,7 @@ export default function LoginScreen() {
       }
       setLoading(false);
       Alert.alert('Sucesso! 🍏', 'Login realizado com a Apple.');
-      router.replace('/');
+      await navigatePostLogin(user.uid);
     } catch (err: any) {
       setLoading(false);
       if (err.code !== 'ERR_REQUEST_CANCELED') {
@@ -115,7 +130,7 @@ export default function LoginScreen() {
         console.warn('Erro ao sincronizar dados na nuvem:', syncErr);
       }
       setLoading(false);
-      router.replace('/');
+      await navigatePostLogin(user.uid);
     } catch (err: any) {
       setLoading(false);
       Alert.alert('Erro no login', err.message || 'E-mail ou senha incorretos.');

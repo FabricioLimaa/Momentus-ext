@@ -113,6 +113,7 @@ export interface AppSettings {
   googleCalendarSyncEnabled: boolean;
   lastBackupAt?: string | null;
   termsAccepted?: boolean;
+  termsAcceptedVersion?: number;
   termsAcceptedAt?: string | null;
 }
 
