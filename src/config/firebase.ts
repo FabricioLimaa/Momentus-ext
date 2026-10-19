@@ -23,8 +23,8 @@ const firebaseConfig: FirebaseOptions = {
       : '1:809975381863:android:4ec3a4f530212cddb9f9c2'),
 };
 
-// Ativa o token de depuração do App Check na Web para ambiente de desenvolvimento local
-if (Platform.OS === 'web' && typeof window !== 'undefined') {
+// Ativa o token de depuração do App Check na Web apenas em ambiente de desenvolvimento local (__DEV__)
+if (__DEV__ && Platform.OS === 'web' && typeof window !== 'undefined') {
   (window as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
 }
 
