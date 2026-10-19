@@ -5,6 +5,7 @@ import {
   HabitItem,
   MarketItem,
   RoutineTemplate,
+  TemplateItem,
   UserProfile,
 } from "@/types";
 import {
@@ -15,8 +16,10 @@ import {
   getDoc,
   getDocs,
   onSnapshot,
+  query,
   setDoc,
   Unsubscribe,
+  where,
   writeBatch,
 } from "firebase/firestore";
 
@@ -329,8 +332,37 @@ export async function syncWithFirestore(
   });
   await eventsBatch.commit();
 
+  // Mapeia eventos que pertencem a templates (templateId != null ou data == null)
+  const templateEventsMap = new Map<string, TemplateItem[]>();
   const mergedHabits: HabitItem[] = [...localHabits];
+
   cloudEventsMap.forEach((cloudItem, id) => {
+    // Se o evento pertencer a um template, agrupa no mapa de eventos de template
+    if (cloudItem.templateId) {
+      const tmplId = String(cloudItem.templateId);
+      if (!templateEventsMap.has(tmplId)) {
+        templateEventsMap.set(tmplId, []);
+      }
+      templateEventsMap.get(tmplId)!.push({
+        id,
+        title: cloudItem.titulo || cloudItem.title || "Atividade",
+        description: cloudItem.descricao || cloudItem.description || null,
+        timeStart: parseTimeString(
+          cloudItem.horarioInicioString || cloudItem.horarioInicio,
+          "08:00",
+        ),
+        timeEnd: parseTimeString(
+          cloudItem.horarioTerminoString || cloudItem.horarioTermino,
+          "08:30",
+        ),
+        categoryId: cloudItem.categoryId || mergedCategories[0]?.id || "cat-outros",
+        templateId: tmplId,
+        order: cloudItem.ordem ?? 0,
+      });
+      return;
+    }
+
+    // Se não for evento de template, é um hábito diário
     if (!localEventsMap.has(id)) {
       const isCompleted = cloudCompletedHabitsSet.has(id);
       mergedHabits.push({
@@ -357,7 +389,7 @@ export async function syncWithFirestore(
   });
 
   // ========================================================
-  // 4. Sincronização de Templates (Template.kt)
+  // 4. Sincronização de Templates (Template.kt e ItemCronograma.kt)
   // ========================================================
   const mergedTemplates: RoutineTemplate[] = [...localTemplates];
   try {
@@ -384,7 +416,9 @@ export async function syncWithFirestore(
     });
     await templatesBatch.commit();
 
+    // Sincroniza templates da nuvem para o estado local
     cloudTemplatesMap.forEach((cloudTmpl, id) => {
+      const itemsForTemplate = templateEventsMap.get(id) || [];
       if (!localTemplatesMap.has(id)) {
         mergedTemplates.push({
           id,
@@ -392,14 +426,54 @@ export async function syncWithFirestore(
           description:
             cloudTmpl.descricao ||
             cloudTmpl.description ||
-            "Rotina sincronizada da nuvem",
+            null,
           icon: "sparkles",
           color: "#34D399",
-          items: [],
+          lastUpdated: cloudTmpl.lastUpdated ? String(cloudTmpl.lastUpdated) : null,
+          items: itemsForTemplate,
         });
         result.downloadedTemplates++;
+      } else {
+        // Se já existia localmente mas estava sem itens e na nuvem temos os eventos
+        const localIdx = mergedTemplates.findIndex((t) => t.id === id);
+        if (localIdx >= 0 && mergedTemplates[localIdx].items.length === 0 && itemsForTemplate.length > 0) {
+          mergedTemplates[localIdx] = {
+            ...mergedTemplates[localIdx],
+            items: itemsForTemplate,
+          };
+        }
       }
     });
+
+    // Envia os itens dos templates locais para a coleção 'eventos' no Firestore se ainda não existirem lá
+    const templateItemsBatch = writeBatch(firestore);
+    let itemsToUploadCount = 0;
+    localTemplates.forEach((tmpl) => {
+      tmpl.items.forEach((item, idx) => {
+        if (!cloudEventsMap.has(item.id)) {
+          const itemDocRef = doc(eventsColRef, item.id);
+          templateItemsBatch.set(itemDocRef, {
+            id: item.id,
+            titulo: item.title,
+            descricao: item.description || null,
+            data: null,
+            diaDaSemana: null,
+            horarioInicioString: formatTimeToIsoLocal(item.timeStart),
+            horarioTerminoString: formatTimeToIsoLocal(item.timeEnd || item.timeStart),
+            ordem: item.order ?? idx,
+            categoryId: item.categoryId || "cat-outros",
+            templateId: tmpl.id,
+            googleCalendarEventId: null,
+            isDeleted: false,
+            lastUpdated: new Date(),
+          });
+          itemsToUploadCount++;
+        }
+      });
+    });
+    if (itemsToUploadCount > 0) {
+      await templateItemsBatch.commit();
+    }
   } catch (err) {
     console.warn("Aviso ao sincronizar templates no Firestore:", err);
   }
@@ -722,4 +796,82 @@ export async function deleteCategoryFromFirestore(
     console.warn("Erro ao excluir categoria do Firestore:", err);
   }
 }
+
+/**
+ * Salva ou atualiza um template e seus eventos no Firestore do usuário.
+ */
+export async function saveTemplateToFirestore(
+  userId: string,
+  template: RoutineTemplate,
+): Promise<void> {
+  try {
+    const userDocRef = doc(firestore, "users", userId);
+    const templateDocRef = doc(collection(userDocRef, TEMPLATES_COLLECTION), template.id);
+    const eventsColRef = collection(userDocRef, EVENTS_COLLECTION);
+
+    const batch = writeBatch(firestore);
+
+    // 1. Salva o documento do Template (Template.kt)
+    batch.set(templateDocRef, {
+      id: template.id,
+      nome: template.title,
+      descricao: template.description || null,
+      lastUpdated: new Date(),
+    });
+
+    // 2. Salva cada item do template como evento na coleção 'eventos' (ItemCronograma.kt)
+    template.items.forEach((item, idx) => {
+      const itemDocRef = doc(eventsColRef, item.id);
+      batch.set(itemDocRef, {
+        id: item.id,
+        titulo: item.title,
+        descricao: item.description || null,
+        data: null,
+        diaDaSemana: null,
+        horarioInicioString: formatTimeToIsoLocal(item.timeStart),
+        horarioTerminoString: formatTimeToIsoLocal(item.timeEnd || item.timeStart),
+        ordem: item.order ?? idx,
+        categoryId: item.categoryId || "cat-outros",
+        templateId: template.id,
+        googleCalendarEventId: null,
+        isDeleted: false,
+        lastUpdated: new Date(),
+      });
+    });
+
+    await batch.commit();
+  } catch (error) {
+    console.warn("Erro ao salvar template no Firestore:", error);
+  }
+}
+
+/**
+ * Remove um template e seus eventos associados do Firestore do usuário.
+ */
+export async function deleteTemplateFromFirestore(
+  userId: string,
+  templateId: string,
+): Promise<void> {
+  try {
+    const userDocRef = doc(firestore, "users", userId);
+    const templateDocRef = doc(collection(userDocRef, TEMPLATES_COLLECTION), templateId);
+    const eventsColRef = collection(userDocRef, EVENTS_COLLECTION);
+
+    // Busca eventos com templateId
+    const eventsQuery = query(eventsColRef, where("templateId", "==", templateId));
+    const eventsSnapshot = await getDocs(eventsQuery);
+
+    const batch = writeBatch(firestore);
+    batch.delete(templateDocRef);
+
+    eventsSnapshot.forEach((docSnap) => {
+      batch.delete(docSnap.ref);
+    });
+
+    await batch.commit();
+  } catch (error) {
+    console.warn("Erro ao deletar template do Firestore:", error);
+  }
+}
+
 

@@ -67,6 +67,8 @@ import {
   clearCloudData,
   saveCategoryToFirestore,
   deleteCategoryFromFirestore,
+  saveTemplateToFirestore,
+  deleteTemplateFromFirestore,
 } from '@/services/firestoreSyncService';
 import { onAuthStateChanged } from 'firebase/auth';
 
@@ -657,12 +659,19 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const willSaveToCalendar = saveToGoogle ?? settings.googleCalendarSyncEnabled ?? false;
     const newHabits: HabitItem[] = [];
 
+    // Filtra eventos duplicados no template (conforme TemplateViewModel.kt)
+    const uniqueTemplateItems = template.items.filter(
+      (item, idx, self) =>
+        idx === self.findIndex((t) => `${t.title}-${t.timeStart}-${t.categoryId}` === `${item.title}-${item.timeStart}-${item.categoryId}`)
+    );
+
     dates.forEach((targetDate) => {
-      template.items.forEach((item, index) => {
+      uniqueTemplateItems.forEach((item) => {
+        const deterministicId = `applied_${item.id}_${targetDate}`;
         newHabits.push({
-          id: `h-tmpl-${Date.now()}-${targetDate}-${index}`,
+          id: deterministicId,
           title: item.title,
-          description: `Importado de "${template.title}"`,
+          description: item.description || undefined,
           timeStart: item.timeStart || '08:00',
           timeEnd: item.timeEnd,
           categoryId: item.categoryId,
@@ -674,7 +683,13 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       });
     });
 
-    setHabits((prev) => [...newHabits, ...prev]);
+    setHabits((prev) => {
+      // Evita duplicar se o evento determinístico já estiver na lista
+      const newHabitsMap = new Map(newHabits.map((h) => [h.id, h]));
+      const filteredPrev = prev.filter((p) => !newHabitsMap.has(p.id));
+      return [...newHabits, ...filteredPrev];
+    });
+
     addPoints(20 * dates.length);
     soundManager.playSuccessSound();
     triggerHaptic('success');
@@ -698,27 +713,52 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
   };
 
-
   const addTemplate = (templateData: Omit<RoutineTemplate, 'id'>) => {
     const newTemplate: RoutineTemplate = {
       ...templateData,
       id: `tmpl-${Date.now()}`,
+      lastUpdated: new Date().toISOString(),
     };
     const nextTemplates = [...templates, newTemplate];
     setTemplates(nextTemplates);
     triggerHaptic('success');
     checkAndUnlockAchievements(userProfile.currentStreak, userProfile.totalCompleted, nextTemplates.length);
+
+    const currentUserId = firebaseAuth.currentUser?.uid;
+    if (currentUserId) {
+      saveTemplateToFirestore(currentUserId, newTemplate).catch((err) =>
+        console.warn('Erro ao salvar template criado no Firestore:', err)
+      );
+    }
   };
 
   const updateTemplate = (updatedTemplate: RoutineTemplate) => {
-    setTemplates((prev) => prev.map((t) => (t.id === updatedTemplate.id ? updatedTemplate : t)));
+    const enriched = {
+      ...updatedTemplate,
+      lastUpdated: new Date().toISOString(),
+    };
+    setTemplates((prev) => prev.map((t) => (t.id === enriched.id ? enriched : t)));
     triggerHaptic('success');
+
+    const currentUserId = firebaseAuth.currentUser?.uid;
+    if (currentUserId) {
+      saveTemplateToFirestore(currentUserId, enriched).catch((err) =>
+        console.warn('Erro ao atualizar template no Firestore:', err)
+      );
+    }
   };
 
   const deleteTemplate = (id: string) => {
     setTemplates((prev) => prev.filter((t) => t.id !== id));
     deleteTemplateDb(id).catch(() => {});
     triggerHaptic('impact');
+
+    const currentUserId = firebaseAuth.currentUser?.uid;
+    if (currentUserId) {
+      deleteTemplateFromFirestore(currentUserId, id).catch((err) =>
+        console.warn('Erro ao excluir template do Firestore:', err)
+      );
+    }
   };
 
   const upsertCategory = (

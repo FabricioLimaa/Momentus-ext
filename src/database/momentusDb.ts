@@ -365,9 +365,9 @@ export async function upsertTemplateDb(template: RoutineTemplate): Promise<void>
       [
         template.id,
         template.title,
-        template.description,
-        template.icon,
-        template.color,
+        template.description ?? null,
+        template.icon ?? null,
+        template.color ?? null,
         JSON.stringify(template.items),
       ]
     );
@@ -388,7 +388,14 @@ export async function setAllTemplatesDb(templates: RoutineTemplate[]): Promise<v
         await db.runAsync(
           `INSERT INTO templates (id, title, description, icon, color, itemsJson)
            VALUES (?, ?, ?, ?, ?, ?)`,
-          [t.id, t.title, t.description, t.icon, t.color, JSON.stringify(t.items)]
+          [
+            t.id,
+            t.title,
+            t.description ?? null,
+            t.icon ?? null,
+            t.color ?? null,
+            JSON.stringify(t.items),
+          ]
         );
       }
     });

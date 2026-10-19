@@ -24,19 +24,44 @@ export interface HabitItem {
 export interface TemplateItem {
   id: string;
   title: string;
-  durationMinutes: number;
-  timeStart: string;
-  timeEnd?: string;
+  description?: string | null;
+  timeStart: string; // "07:30" ou "07:30:00"
+  timeEnd?: string;  // "08:00" ou "08:00:00"
+  durationMinutes?: number;
   categoryId: string;
+  templateId?: string | null;
+  order?: number;
 }
 
 export interface RoutineTemplate {
   id: string;
   title: string;
-  description: string;
-  icon: string;
-  color: string;
+  description?: string | null;
+  icon?: string;
+  color?: string;
+  lastUpdated?: string | null;
   items: TemplateItem[];
+}
+
+export interface SharedTemplate {
+  template: {
+    id: string;
+    nome: string;
+    descricao?: string | null;
+    lastUpdated?: any;
+  };
+  eventos: Array<{
+    id: string;
+    titulo: string;
+    descricao?: string | null;
+    horarioInicio?: string;
+    horarioTermino?: string;
+    horarioInicioString?: string;
+    horarioTerminoString?: string;
+    categoryId: string;
+    templateId?: string | null;
+    ordem?: number;
+  }>;
 }
 
 export interface Achievement {

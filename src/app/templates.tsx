@@ -5,20 +5,31 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Platform,
   StatusBar,
   Modal,
   TextInput,
   Alert,
+  Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { MomentusColors } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import { ApplyTemplateDialog } from '@/components/momentus/ApplyTemplateDialog';
-import { RoutineTemplate, TemplateItem } from '@/types';
+import { RoutineTemplate, TemplateItem, SharedTemplate } from '@/types';
+
+interface EventFormState {
+  id?: string;
+  title: string;
+  description: string;
+  timeStart: string;
+  timeEnd: string;
+  categoryId: string;
+}
 
 export default function TemplatesScreen() {
+  const router = useRouter();
   const {
     templates,
     categories,
@@ -29,92 +40,268 @@ export default function TemplatesScreen() {
     theme,
   } = useMomentus();
 
-  // Estados de modais
+  // Estados dos diálogos
   const [selectedTemplateForApply, setSelectedTemplateForApply] = useState<RoutineTemplate | null>(null);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<RoutineTemplate | null>(null);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
 
-  // Formulário de Criação de Template
-  const [newTitle, setNewTitle] = useState('');
-  const [newDesc, setNewDesc] = useState('');
-  const newColor = '#34D399';
-  const [newItems, setNewItems] = useState<
-    { title: string; timeStart: string; durationMinutes: number; categoryId: string }[]
-  >([
+  // Estados do formulário de criação/edição
+  const [formName, setFormName] = useState('');
+  const [formDescription, setFormDescription] = useState('');
+  const [formEvents, setFormEvents] = useState<EventFormState[]>([
     {
-      title: 'Primeira atividade',
+      title: '',
+      description: '',
       timeStart: '08:00',
-      durationMinutes: 30,
+      timeEnd: '08:30',
       categoryId: categories[0]?.id || 'cat-outros',
     },
   ]);
 
-  // Estados do Modal de Detalhes / Edição (espelhando TemplateDetailScreen.kt)
-  const [editTitle, setEditTitle] = useState('');
-  const [editDesc, setEditDesc] = useState('');
-  const [editItems, setEditItems] = useState<TemplateItem[]>([]);
-
-  // Formulário de Importação
+  // Estado do diálogo de importação
   const [importJsonText, setImportJsonText] = useState('');
 
+  const defaultCategoryId = categories.find((c) => c.name.toLowerCase() === 'outros')?.id || categories[0]?.id || 'cat-outros';
+
+  const handleOpenCreateModal = () => {
+    setEditingTemplateId(null);
+    setFormName('');
+    setFormDescription('');
+    setFormEvents([
+      {
+        title: '',
+        description: '',
+        timeStart: '08:00',
+        timeEnd: '08:30',
+        categoryId: defaultCategoryId,
+      },
+    ]);
+    setIsFormModalOpen(true);
+  };
+
   const handleOpenEditModal = (template: RoutineTemplate) => {
-    setEditingTemplate(template);
-    setEditTitle(template.title);
-    setEditDesc(template.description);
-    setEditItems(template.items.map((item) => ({ ...item })));
+    setEditingTemplateId(template.id);
+    setFormName(template.title);
+    setFormDescription(template.description || '');
+    setFormEvents(
+      template.items.length > 0
+        ? template.items.map((it) => ({
+            id: it.id,
+            title: it.title,
+            description: it.description || '',
+            timeStart: it.timeStart || '08:00',
+            timeEnd: it.timeEnd || it.timeStart || '08:30',
+            categoryId: it.categoryId || defaultCategoryId,
+          }))
+        : [
+            {
+              title: '',
+              description: '',
+              timeStart: '08:00',
+              timeEnd: '08:30',
+              categoryId: defaultCategoryId,
+            },
+          ]
+    );
+    setIsFormModalOpen(true);
   };
 
-  const handleSaveEditedTemplate = () => {
-    if (!editingTemplate) return;
-    if (!editTitle.trim()) {
-      Alert.alert('Atenção', 'Informe o título do template.');
-      return;
-    }
-    if (editItems.length === 0) {
-      Alert.alert('Atenção', 'O template precisa ter pelo menos 1 atividade.');
-      return;
-    }
-
-    updateTemplate({
-      ...editingTemplate,
-      title: editTitle.trim(),
-      description: editDesc.trim() || 'Template personalizado de rotina',
-      items: editItems,
-    });
-
-    setEditingTemplate(null);
-    Alert.alert('Atualizado! ✨', 'As alterações no template foram salvas com sucesso.');
+  const handleAddEventField = () => {
+    setFormEvents((prev) => [
+      ...prev,
+      {
+        title: '',
+        description: '',
+        timeStart: '09:00',
+        timeEnd: '09:30',
+        categoryId: defaultCategoryId,
+      },
+    ]);
   };
 
-  const handleMoveEditItem = (index: number, direction: 'up' | 'down') => {
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= editItems.length) return;
-    const copy = [...editItems];
-    const temp = copy[index];
-    copy[index] = copy[targetIndex];
-    copy[targetIndex] = temp;
-    setEditItems(copy);
+  const handleRemoveEventField = (index: number) => {
+    if (formEvents.length <= 1) return;
+    setFormEvents((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateEventField = (index: number, updates: Partial<EventFormState>) => {
+    setFormEvents((prev) =>
+      prev.map((ev, i) => (i === index ? { ...ev, ...updates } : ev))
+    );
+  };
+
+  const handleSaveFormTemplate = () => {
+    if (!formName.trim()) {
+      Alert.alert('Atenção', 'Informe o nome do template.');
+      return;
+    }
+
+    const hasInvalidEvent = formEvents.some((ev) => !ev.title.trim());
+    if (hasInvalidEvent) {
+      Alert.alert('Atenção', 'Todos os eventos da rotina precisam ter um título.');
+      return;
+    }
+
+    const items: TemplateItem[] = formEvents.map((ev, idx) => ({
+      id: ev.id || `ti-${Date.now()}-${idx}`,
+      title: ev.title.trim(),
+      description: ev.description.trim() || null,
+      timeStart: ev.timeStart,
+      timeEnd: ev.timeEnd || ev.timeStart,
+      categoryId: ev.categoryId,
+      order: idx,
+    }));
+
+    if (editingTemplateId) {
+      const existing = templates.find((t) => t.id === editingTemplateId);
+      if (existing) {
+        updateTemplate({
+          ...existing,
+          title: formName.trim(),
+          description: formDescription.trim() || null,
+          items,
+        });
+        Alert.alert('Sucesso!', 'Template atualizado com sucesso.');
+      }
+    } else {
+      addTemplate({
+        title: formName.trim(),
+        description: formDescription.trim() || null,
+        icon: 'sparkles',
+        color: '#34D399',
+        items,
+      });
+      Alert.alert('Sucesso!', 'Template criado com sucesso.');
+    }
+
+    setIsFormModalOpen(false);
   };
 
   const handleDeleteTemplateConfirm = (template: RoutineTemplate) => {
     Alert.alert(
-      'Excluir Template',
-      `Deseja realmente excluir o modelo "${template.title}"?`,
+      'Deletar Template',
+      `Você tem certeza que quer deletar o template "${template.title}"? Essa ação não pode ser desfeita.`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
-          text: 'Excluir',
+          text: 'DELETAR',
           style: 'destructive',
           onPress: () => {
             deleteTemplate(template.id);
-            if (editingTemplate?.id === template.id) {
-              setEditingTemplate(null);
+            if (editingTemplateId === template.id) {
+              setIsFormModalOpen(false);
             }
           },
         },
       ]
     );
+  };
+
+  const handleShareTemplate = async (template: RoutineTemplate) => {
+    try {
+      const shareData: SharedTemplate = {
+        template: {
+          id: template.id,
+          nome: template.title,
+          descricao: template.description || null,
+          lastUpdated: template.lastUpdated || new Date().toISOString(),
+        },
+        eventos: template.items.map((it) => ({
+          id: it.id,
+          titulo: it.title,
+          descricao: it.description || null,
+          horarioInicio: it.timeStart,
+          horarioTermino: it.timeEnd || it.timeStart,
+          horarioInicioString: it.timeStart.length === 5 ? `${it.timeStart}:00` : it.timeStart,
+          horarioTerminoString: (it.timeEnd || it.timeStart).length === 5 ? `${it.timeEnd || it.timeStart}:00` : (it.timeEnd || it.timeStart),
+          categoryId: it.categoryId,
+          templateId: template.id,
+          ordem: it.order ?? 0,
+        })),
+      };
+
+      const jsonString = JSON.stringify(shareData, null, 2);
+      await Share.share({
+        message: jsonString,
+        title: `Template Momentus: ${template.title}`,
+      });
+    } catch (err: any) {
+      console.warn('Erro ao compartilhar template:', err);
+    }
+  };
+
+  const handleImportJson = () => {
+    try {
+      if (!importJsonText.trim()) {
+        Alert.alert('Atenção', 'Cole o JSON do template para importar.');
+        return;
+      }
+
+      const parsed = JSON.parse(importJsonText);
+
+      // 1. Formato Kotlin oficial SharedTemplate
+      if (parsed.template && Array.isArray(parsed.eventos)) {
+        const rawTmpl = parsed.template;
+        const rawEvents = parsed.eventos;
+        const newTemplateTitle = `${rawTmpl.nome || 'Template'} (Importado)`;
+        const newTemplateDesc = rawTmpl.descricao || null;
+
+        const newItems: TemplateItem[] = rawEvents.map((it: any, idx: number) => ({
+          id: `ti-imp-${Date.now()}-${idx}`,
+          title: it.titulo || it.title || 'Atividade',
+          description: it.descricao || it.description || null,
+          timeStart: (it.horarioInicioString || it.horarioInicio || '08:00').substring(0, 5),
+          timeEnd: (it.horarioTerminoString || it.horarioTermino || '08:30').substring(0, 5),
+          categoryId: it.categoryId || defaultCategoryId,
+          order: it.ordem ?? idx,
+        }));
+
+        addTemplate({
+          title: newTemplateTitle,
+          description: newTemplateDesc,
+          icon: 'sparkles',
+          color: '#34D399',
+          items: newItems,
+        });
+
+        setIsImportModalOpen(false);
+        setImportJsonText('');
+        Alert.alert('Template Importado! 🚀', `O template "${newTemplateTitle}" foi adicionado.`);
+        return;
+      }
+
+      // 2. Formato alternativo / legado ({ title, items })
+      if (parsed.title && Array.isArray(parsed.items)) {
+        const newTemplateTitle = `${parsed.title} (Importado)`;
+        const newItems: TemplateItem[] = parsed.items.map((it: any, idx: number) => ({
+          id: `ti-imp-${Date.now()}-${idx}`,
+          title: it.title || 'Atividade',
+          description: it.description || null,
+          timeStart: (it.timeStart || '08:00').substring(0, 5),
+          timeEnd: (it.timeEnd || '08:30').substring(0, 5),
+          categoryId: it.categoryId || defaultCategoryId,
+          order: idx,
+        }));
+
+        addTemplate({
+          title: newTemplateTitle,
+          description: parsed.description || null,
+          icon: parsed.icon || 'sparkles',
+          color: parsed.color || '#34D399',
+          items: newItems,
+        });
+
+        setIsImportModalOpen(false);
+        setImportJsonText('');
+        Alert.alert('Template Importado! 🚀', `O template "${newTemplateTitle}" foi adicionado.`);
+        return;
+      }
+
+      throw new Error('Formato de JSON inválido ou não reconhecido.');
+    } catch (e: any) {
+      Alert.alert('Erro na Importação', e.message || 'Código JSON inválido');
+    }
   };
 
   const handleApplyConfirm = (dates: string[], saveToGoogle: boolean) => {
@@ -126,536 +313,417 @@ export default function TemplatesScreen() {
     setSelectedTemplateForApply(null);
 
     Alert.alert(
-      'Rotina Agendada! 🚀',
-      `"${templateName}" foi aplicada com sucesso em ${dates.length} dia${dates.length === 1 ? '' : 's'}! (+${dates.length * 20} XP)`
+      'Template Aplicado! 🚀',
+      `"${templateName}" foi agendado em ${dates.length} dia${dates.length === 1 ? '' : 's'} com sucesso! (+${dates.length * 20} XP)`
     );
   };
 
-  const handleSaveNewTemplate = () => {
-    if (!newTitle.trim()) {
-      Alert.alert('Atenção', 'Informe o título do template.');
-      return;
-    }
-
-    const items: TemplateItem[] = newItems.map((item, index) => ({
-      id: `ti-${Date.now()}-${index}`,
-      title: item.title,
-      durationMinutes: item.durationMinutes,
-      timeStart: item.timeStart,
-      categoryId: item.categoryId,
-    }));
-
-    addTemplate({
-      title: newTitle.trim(),
-      description: newDesc.trim() || 'Template personalizado de rotina',
-      icon: 'sparkles',
-      color: newColor,
-      items,
-    });
-
-    setIsCreateModalOpen(false);
-    setNewTitle('');
-    setNewDesc('');
-    setNewItems([
-      {
-        title: 'Primeira atividade',
-        timeStart: '08:00',
-        durationMinutes: 30,
-        categoryId: categories[0]?.id || 'cat-outros',
-      },
-    ]);
-
-    Alert.alert('Sucesso!', 'Seu novo template de rotina foi criado.');
-  };
-
-  const handleImportJson = () => {
-    try {
-      const parsed = JSON.parse(importJsonText);
-      if (!parsed.title || !Array.isArray(parsed.items)) {
-        throw new Error('Formato inválido. O template precisa ter title e items.');
-      }
-
-      addTemplate({
-        title: parsed.title,
-        description: parsed.description || 'Template importado',
-        icon: parsed.icon || 'folder-outline',
-        color: parsed.color || '#34D399',
-        items: parsed.items.map((it: any, idx: number) => ({
-          id: `ti-imp-${Date.now()}-${idx}`,
-          title: it.title || 'Atividade',
-          durationMinutes: it.durationMinutes || 30,
-          timeStart: it.timeStart || '08:00',
-          categoryId: it.categoryId || categories[0]?.id || 'cat-outros',
-        })),
-      });
-
-      setIsImportModalOpen(false);
-      setImportJsonText('');
-      Alert.alert('Sucesso!', `Template "${parsed.title}" importado com sucesso!`);
-    } catch (e: any) {
-      Alert.alert('Erro na Importação', e.message || 'JSON inválido');
-    }
-  };
-
-  const getComplexityLabel = (count: number) => {
-    if (count <= 3) return { label: 'Leve', color: MomentusColors.emeraldNeon };
-    if (count <= 6) return { label: 'Média', color: MomentusColors.gold };
-    return { label: 'Alta', color: MomentusColors.fireStreak };
+  const getComplexity = (count: number) => {
+    if (count > 8) return 'Alta';
+    if (count > 4) return 'Média';
+    return 'Leve';
   };
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} backgroundColor={theme.background} />
       <View style={[styles.container, { backgroundColor: theme.background }]}>
-        <View style={styles.header}>
-          <View>
-            <Text style={[styles.title, { color: theme.textPrimary }]}>Modelos de Rotina</Text>
-            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Carregue, edite ou crie blocos reutilizáveis</Text>
-          </View>
+        {/* TopBar idêntica ao TemplatesScreen.kt */}
+        <View style={[styles.topBar, { borderBottomColor: theme.outline }]}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+            activeOpacity={0.7}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="arrow-back" size={24} color={theme.textPrimary} />
+          </TouchableOpacity>
 
-          <View style={styles.headerButtonsRow}>
-            <TouchableOpacity
-              style={[styles.headerIconBtn, { backgroundColor: theme.surface, borderColor: theme.outline }]}
-              onPress={() => setIsImportModalOpen(true)}
-              activeOpacity={0.7}>
-              <Ionicons name="download-outline" size={20} color={theme.primary} />
-            </TouchableOpacity>
+          <Text style={[styles.topBarTitle, { color: theme.textPrimary }]}>Meus Templates</Text>
 
-            <TouchableOpacity
-              style={[styles.headerPrimaryBtn, { backgroundColor: theme.primary }]}
-              onPress={() => setIsCreateModalOpen(true)}
-              activeOpacity={0.8}>
-              <Ionicons name="add" size={18} color="#0F172A" />
-              <Text style={styles.headerPrimaryBtnText}>Criar</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={styles.importTopBtn}
+            onPress={() => setIsImportModalOpen(true)}
+            activeOpacity={0.7}>
+            <Ionicons name="download-outline" size={18} color={theme.primary} />
+            <Text style={[styles.importTopBtnText, { color: theme.primary }]}>Importar</Text>
+          </TouchableOpacity>
         </View>
 
+        {/* Conteúdo Principal */}
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}>
           {templates.length === 0 ? (
-            <View style={[styles.emptyCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
-              <View style={[styles.emptyIconCircle, { backgroundColor: `${theme.primary}15` }]}>
-                <Ionicons name="layers-outline" size={36} color={theme.primary} />
+            <View style={styles.emptyContainer}>
+              <View style={[styles.emptyIconCircle, { backgroundColor: `${theme.textSecondary}15` }]}>
+                <Ionicons name="layers-outline" size={48} color={`${theme.textSecondary}80`} />
               </View>
-              <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
-                Nenhum template cadastrado
-              </Text>
+              <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>Nenhum template</Text>
               <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-                Crie modelos de rotina personalizados com suas atividades frequentes para aplicá-los rapidamente ao seu dia a dia.
+                Crie seu primeiro template para reutilizar rotinas facilmente.
               </Text>
               <TouchableOpacity
-                style={[styles.emptyActionBtn, { backgroundColor: theme.primary }]}
-                onPress={() => setIsCreateModalOpen(true)}
+                style={[styles.emptyCreateBtn, { backgroundColor: theme.primary }]}
+                onPress={handleOpenCreateModal}
                 activeOpacity={0.85}>
-                <Ionicons name="add" size={18} color="#0F172A" />
-                <Text style={styles.emptyActionBtnText}>Criar Primeiro Template</Text>
+                <Ionicons name="add" size={20} color="#0F172A" />
+                <Text style={styles.emptyCreateBtnText}>Criar Primeiro Template</Text>
               </TouchableOpacity>
             </View>
           ) : (
             templates.map((template) => {
-            const complexity = getComplexityLabel(template.items.length);
-            const totalMinutes = template.items.reduce((acc, i) => acc + (i.durationMinutes || 30), 0);
+              const complexity = getComplexity(template.items.length);
+              const sortedEvents = [...template.items].sort((a, b) => a.timeStart.localeCompare(b.timeStart));
+              const previewEvents = sortedEvents.slice(0, 4);
+              const remainingCount = template.items.length - 4;
 
-            return (
-              <View key={template.id} style={[styles.templateCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
-                {/* Header do Card */}
-                <View style={styles.cardHeader}>
-                  <View style={styles.cardHeaderLeft}>
-                    <View style={[styles.iconBox, { backgroundColor: `${template.color}20` }]}>
-                      <Ionicons name={(template.icon as any) || 'calendar'} size={24} color={template.color} />
-                    </View>
-                    <View style={styles.titleGroup}>
-                      <Text style={[styles.cardTitle, { color: theme.textPrimary }]}>{template.title}</Text>
-                      <View style={styles.metaRow}>
-                        <View style={[styles.complexityBadge, { backgroundColor: `${complexity.color}15` }]}>
-                          <Text style={[styles.complexityBadgeText, { color: complexity.color }]}>
-                            {complexity.label}
-                          </Text>
-                        </View>
-                        <Text style={[styles.cardMeta, { color: theme.textSecondary }]}>
-                          {template.items.length} atividades • ~{totalMinutes} min
+              return (
+                <View
+                  key={template.id}
+                  style={[
+                    styles.templateCard,
+                    { backgroundColor: theme.surface, borderColor: theme.outline },
+                  ]}>
+                  {/* Cabeçalho do Card */}
+                  <View style={styles.cardHeader}>
+                    <View style={styles.cardHeaderInfo}>
+                      <Text style={[styles.cardTitle, { color: theme.textPrimary }]}>
+                        {template.title}
+                      </Text>
+                      {template.description ? (
+                        <Text
+                          style={[styles.cardDescription, { color: theme.textSecondary }]}
+                          numberOfLines={2}>
+                          {template.description}
                         </Text>
-                      </View>
+                      ) : null}
+                      <Text style={[styles.cardItemCount, { color: theme.primary }]}>
+                        {template.items.length} atividades configuradas
+                      </Text>
+                    </View>
+
+                    {/* Botões de Ação */}
+                    <View style={styles.cardActionButtons}>
+                      <TouchableOpacity
+                        style={styles.iconBtn}
+                        onPress={() => handleShareTemplate(template)}
+                        activeOpacity={0.7}>
+                        <Ionicons name="share-social-outline" size={18} color={theme.textSecondary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.iconBtn}
+                        onPress={() => handleOpenEditModal(template)}
+                        activeOpacity={0.7}>
+                        <Ionicons name="pencil-outline" size={18} color={theme.textSecondary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.iconBtn}
+                        onPress={() => handleDeleteTemplateConfirm(template)}
+                        activeOpacity={0.7}>
+                        <Ionicons name="trash-outline" size={18} color={MomentusColors.errorRed} />
+                      </TouchableOpacity>
                     </View>
                   </View>
 
-                  {/* Botões de Ação (Editar Detalhes / Excluir) */}
-                  <View style={styles.cardActionsRight}>
+                  {/* Chips de Status (conforme nativo) */}
+                  <View style={styles.statChipsRow}>
+                    <View style={[styles.statChip, { backgroundColor: `${theme.textSecondary}10`, borderColor: theme.outline }]}>
+                      <Ionicons name="time-outline" size={12} color={theme.primary} />
+                      <Text style={[styles.statChipText, { color: theme.textPrimary }]}>Novo template</Text>
+                    </View>
+                    <View style={[styles.statChip, { backgroundColor: `${theme.textSecondary}10`, borderColor: theme.outline }]}>
+                      <Ionicons name="trending-up-outline" size={12} color={theme.primary} />
+                      <Text style={[styles.statChipText, { color: theme.textPrimary }]}>Foco {complexity}</Text>
+                    </View>
+                    <View style={[styles.statChip, { backgroundColor: `${theme.textSecondary}10`, borderColor: theme.outline }]}>
+                      <Ionicons name="star" size={12} color={theme.primary} />
+                      <Text style={[styles.statChipText, { color: theme.textPrimary }]}>Eficaz</Text>
+                    </View>
+                  </View>
+
+                  <View style={[styles.divider, { backgroundColor: theme.outline }]} />
+
+                  {/* Prévia das Atividades */}
+                  <View style={styles.previewEventsList}>
+                    {previewEvents.map((item, idx) => {
+                      const category = categories.find((c) => c.id === item.categoryId);
+                      const catColor = category?.color || '#616161';
+
+                      return (
+                        <View key={item.id || idx} style={styles.previewEventRow}>
+                          <View style={[styles.categoryDot, { backgroundColor: catColor }]} />
+                          <View style={styles.previewEventInfo}>
+                            <Text style={[styles.previewEventTitle, { color: theme.textPrimary }]} numberOfLines={1}>
+                              {item.title}
+                            </Text>
+                            {item.description ? (
+                              <Text style={[styles.previewEventDesc, { color: theme.textSecondary }]} numberOfLines={1}>
+                                {item.description}
+                              </Text>
+                            ) : null}
+                          </View>
+                          <Text style={[styles.previewEventTime, { color: theme.textSecondary }]}>
+                            {item.timeStart} - {item.timeEnd || item.timeStart}
+                          </Text>
+                        </View>
+                      );
+                    })}
+
+                    {remainingCount > 0 ? (
+                      <Text style={[styles.remainingText, { color: theme.primary }]}>
+                        + {remainingCount} atividades...
+                      </Text>
+                    ) : null}
+                  </View>
+
+                  {/* Botão Primário: Aplicar Template */}
+                  <TouchableOpacity
+                    style={[styles.applyButton, { backgroundColor: theme.primary }]}
+                    onPress={() => setSelectedTemplateForApply(template)}
+                    activeOpacity={0.85}>
+                    <Ionicons name="calendar-outline" size={18} color="#0F172A" />
+                    <Text style={styles.applyButtonText}>Aplicar Template</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })
+          )}
+        </ScrollView>
+
+        {/* FAB (+) para Criar Novo Template */}
+        <TouchableOpacity
+          style={[styles.fabButton, { backgroundColor: theme.primary }]}
+          onPress={handleOpenCreateModal}
+          activeOpacity={0.85}>
+          <Ionicons name="add" size={28} color="#0F172A" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Modal de Criação / Edição de Template (CreateTemplateDialog.kt) */}
+      <Modal
+        visible={isFormModalOpen}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setIsFormModalOpen(false)}>
+        <SafeAreaView style={[styles.formModalSafe, { backgroundColor: theme.background }]}>
+          <View style={[styles.formModalHeader, { borderBottomColor: theme.outline }]}>
+            <View>
+              <Text style={[styles.formModalTitle, { color: theme.textPrimary }]}>
+                {editingTemplateId ? 'Editar Template' : 'Criar Template'}
+              </Text>
+              <Text style={[styles.formModalSubtitle, { color: theme.textSecondary }]}>
+                Defina uma rotina com múltiplos eventos
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.modalCloseBtn, { backgroundColor: `${theme.textSecondary}15` }]}
+              onPress={() => setIsFormModalOpen(false)}
+              activeOpacity={0.7}>
+              <Ionicons name="close" size={20} color={theme.textPrimary} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.formScroll} contentContainerStyle={styles.formScrollContent}>
+            {/* Nome do Template */}
+            <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>Nome do Template *</Text>
+            <TextInput
+              style={[styles.input, { backgroundColor: theme.surface, borderColor: theme.outline, color: theme.textPrimary }]}
+              value={formName}
+              onChangeText={setFormName}
+              placeholder="ex: Dia de Trabalho, Fim de Semana"
+              placeholderTextColor={`${theme.textSecondary}80`}
+            />
+
+            {/* Descrição do Template */}
+            <Text style={[styles.inputLabel, { color: theme.textPrimary, marginTop: 16 }]}>
+              Descrição do Template (opcional)
+            </Text>
+            <TextInput
+              style={[styles.input, { backgroundColor: theme.surface, borderColor: theme.outline, color: theme.textPrimary }]}
+              value={formDescription}
+              onChangeText={setFormDescription}
+              placeholder="Ex: Rotina focada em estudos e foco..."
+              placeholderTextColor={`${theme.textSecondary}80`}
+            />
+
+            {/* Eventos da Rotina */}
+            <View style={styles.eventsHeaderRow}>
+              <Text style={[styles.sectionTitle, { color: theme.primary }]}>Eventos da Rotina</Text>
+              <Text style={[styles.sectionCount, { color: theme.textSecondary }]}>
+                {formEvents.length} evento{formEvents.length === 1 ? '' : 's'}
+              </Text>
+            </View>
+
+            {formEvents.map((ev, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.eventFormCard,
+                  { backgroundColor: theme.surface, borderColor: theme.outline },
+                ]}>
+                <View style={styles.eventFormCardHeader}>
+                  <Text style={[styles.eventFormIndex, { color: theme.primary }]}>
+                    Evento {index + 1}
+                  </Text>
+                  {formEvents.length > 1 ? (
                     <TouchableOpacity
-                      style={[styles.cardActionBtn, { backgroundColor: theme.surfaceElevated }]}
-                      onPress={() => handleOpenEditModal(template)}
-                      activeOpacity={0.7}>
-                      <Ionicons name="create-outline" size={18} color={theme.primary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.cardActionBtn, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}
-                      onPress={() => handleDeleteTemplateConfirm(template)}
+                      onPress={() => handleRemoveEventField(index)}
                       activeOpacity={0.7}>
                       <Ionicons name="trash-outline" size={18} color={MomentusColors.errorRed} />
                     </TouchableOpacity>
+                  ) : null}
+                </View>
+
+                {/* Título do Evento */}
+                <TextInput
+                  style={[styles.eventInput, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary }]}
+                  value={ev.title}
+                  onChangeText={(val) => handleUpdateEventField(index, { title: val })}
+                  placeholder="Título da atividade *"
+                  placeholderTextColor={`${theme.textSecondary}80`}
+                />
+
+                {/* Descrição do Evento */}
+                <TextInput
+                  style={[styles.eventInput, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary, marginTop: 8 }]}
+                  value={ev.description}
+                  onChangeText={(val) => handleUpdateEventField(index, { description: val })}
+                  placeholder="Descrição da atividade (opcional)"
+                  placeholderTextColor={`${theme.textSecondary}80`}
+                />
+
+                {/* Horários */}
+                <View style={styles.timeRow}>
+                  <View style={styles.timeCol}>
+                    <Text style={[styles.timeLabel, { color: theme.textSecondary }]}>Início</Text>
+                    <TextInput
+                      style={[styles.timeInput, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary }]}
+                      value={ev.timeStart}
+                      onChangeText={(val) => handleUpdateEventField(index, { timeStart: val })}
+                      placeholder="08:00"
+                      maxLength={5}
+                      placeholderTextColor={`${theme.textSecondary}80`}
+                    />
+                  </View>
+                  <View style={styles.timeCol}>
+                    <Text style={[styles.timeLabel, { color: theme.textSecondary }]}>Término</Text>
+                    <TextInput
+                      style={[styles.timeInput, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary }]}
+                      value={ev.timeEnd}
+                      onChangeText={(val) => handleUpdateEventField(index, { timeEnd: val })}
+                      placeholder="08:30"
+                      maxLength={5}
+                      placeholderTextColor={`${theme.textSecondary}80`}
+                    />
                   </View>
                 </View>
 
-                {/* Descrição */}
-                <Text style={[styles.cardDesc, { color: theme.textSecondary }]}>{template.description}</Text>
-
-                {/* Timeline Preview (Primeiras 4 atividades) */}
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={() => handleOpenEditModal(template)}
-                  style={[styles.timelinePreviewBox, { backgroundColor: theme.surfaceElevated }]}>
-                  <View style={styles.timelinePreviewHeader}>
-                    <Text style={[styles.timelinePreviewTitle, { color: theme.textSecondary }]}>
-                      Linha do tempo (toque para editar):
-                    </Text>
-                    <Ionicons name="reorder-three-outline" size={16} color={theme.textSecondary} />
-                  </View>
-                  {template.items.slice(0, 4).map((item, idx) => {
-                    const cat = categories.find((c) => c.id === item.categoryId);
+                {/* Categoria */}
+                <Text style={[styles.timeLabel, { color: theme.textSecondary, marginTop: 10, marginBottom: 6 }]}>
+                  Categoria
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
+                  {categories.map((cat) => {
+                    const isSelected = ev.categoryId === cat.id;
                     return (
-                      <View key={idx} style={styles.previewItemRow}>
-                        <View style={[styles.previewDot, { backgroundColor: cat?.color || template.color }]} />
-                        <Text style={[styles.previewTime, { color: theme.primary }]}>{item.timeStart || '08:00'}</Text>
-                        <Text numberOfLines={1} style={[styles.previewTitle, { color: theme.textPrimary }]}>
-                          {item.title}
+                      <TouchableOpacity
+                        key={cat.id}
+                        style={[
+                          styles.categoryChip,
+                          {
+                            backgroundColor: isSelected ? `${cat.color}30` : theme.surfaceElevated,
+                            borderColor: isSelected ? cat.color : theme.outline,
+                          },
+                        ]}
+                        onPress={() => handleUpdateEventField(index, { categoryId: cat.id })}
+                        activeOpacity={0.7}>
+                        <View style={[styles.chipDot, { backgroundColor: cat.color }]} />
+                        <Text style={[styles.chipText, { color: isSelected ? cat.color : theme.textPrimary }]}>
+                          {cat.name}
                         </Text>
-                      </View>
+                      </TouchableOpacity>
                     );
                   })}
-                  {template.items.length > 4 && (
-                    <Text style={[styles.previewMoreText, { color: theme.textSecondary }]}>
-                      +{template.items.length - 4} outras atividades...
-                    </Text>
-                  )}
-                </TouchableOpacity>
-
-                {/* Botão de Aplicação */}
-                <TouchableOpacity
-                  onPress={() => setSelectedTemplateForApply(template)}
-                  style={[styles.applyBtn, { backgroundColor: theme.primary }]}
-                  activeOpacity={0.85}>
-                  <Ionicons name="calendar-outline" size={16} color="#0F172A" />
-                  <Text style={styles.applyBtnText}>Agendar em Datas (+20 XP)</Text>
-                </TouchableOpacity>
+                </ScrollView>
               </View>
-            );
-          }))}
+            ))}
 
-          <View style={{ height: 40 }} />
-        </ScrollView>
+            {/* Botão Adicionar Evento */}
+            <TouchableOpacity
+              style={[styles.addEventBtn, { borderColor: theme.primary }]}
+              onPress={handleAddEventField}
+              activeOpacity={0.7}>
+              <Ionicons name="add" size={18} color={theme.primary} />
+              <Text style={[styles.addEventBtnText, { color: theme.primary }]}>Adicionar Evento</Text>
+            </TouchableOpacity>
+          </ScrollView>
 
-        {/* Diálogo de Aplicação de Template (Mini Calendário Multi-Data) */}
-        <ApplyTemplateDialog
-          visible={!!selectedTemplateForApply}
-          templateTitle={selectedTemplateForApply?.title}
-          onDismiss={() => setSelectedTemplateForApply(null)}
-          onConfirm={handleApplyConfirm}
-        />
-
-        {/* Modal: Detalhes e Edição do Template (equivalente a TemplateDetailScreen.kt) */}
-        <Modal
-          visible={!!editingTemplate}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setEditingTemplate(null)}>
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
-              <ScrollView showsVerticalScrollIndicator={false}>
-                <View style={styles.modalHeaderRow}>
-                  <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Detalhes do Template</Text>
-                  <TouchableOpacity onPress={() => setEditingTemplate(null)}>
-                    <Ionicons name="close" size={24} color={theme.textSecondary} />
-                  </TouchableOpacity>
-                </View>
-
-                <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>Título do Template *</Text>
-                <TextInput
-                  style={[styles.input, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary }]}
-                  value={editTitle}
-                  onChangeText={setEditTitle}
-                  placeholder="Nome do Template"
-                  placeholderTextColor={MomentusColors.textMuted}
-                />
-
-                <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>Descrição</Text>
-                <TextInput
-                  style={[styles.input, styles.textArea, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary }]}
-                  value={editDesc}
-                  onChangeText={setEditDesc}
-                  multiline
-                  numberOfLines={2}
-                  placeholder="Descrição da rotina"
-                  placeholderTextColor={MomentusColors.textMuted}
-                />
-
-                <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>
-                  Eventos do Template ({editItems.length}) • Reordene ou edite
-                </Text>
-
-                {editItems.map((item, idx) => (
-                  <View
-                    key={item.id || idx}
-                    style={[styles.editItemCard, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}>
-                    <View style={styles.createItemRow}>
-                      <View style={styles.reorderCol}>
-                        <TouchableOpacity
-                          disabled={idx === 0}
-                          onPress={() => handleMoveEditItem(idx, 'up')}
-                          style={styles.reorderBtn}>
-                          <Ionicons
-                            name="chevron-up"
-                            size={16}
-                            color={idx === 0 ? theme.outline : theme.primary}
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          disabled={idx === editItems.length - 1}
-                          onPress={() => handleMoveEditItem(idx, 'down')}
-                          style={styles.reorderBtn}>
-                          <Ionicons
-                            name="chevron-down"
-                            size={16}
-                            color={idx === editItems.length - 1 ? theme.outline : theme.primary}
-                          />
-                        </TouchableOpacity>
-                      </View>
-
-                      <TextInput
-                        style={[styles.input, { flex: 2, backgroundColor: theme.surface, borderColor: theme.outline, color: theme.textPrimary }]}
-                        placeholder="Atividade"
-                        placeholderTextColor={MomentusColors.textMuted}
-                        value={item.title}
-                        onChangeText={(val) => {
-                          const copy = [...editItems];
-                          copy[idx] = { ...copy[idx], title: val };
-                          setEditItems(copy);
-                        }}
-                      />
-
-                      <TextInput
-                        style={[styles.input, { flex: 1, backgroundColor: theme.surface, borderColor: theme.outline, color: theme.textPrimary }]}
-                        placeholder="08:00"
-                        placeholderTextColor={MomentusColors.textMuted}
-                        value={item.timeStart}
-                        onChangeText={(val) => {
-                          const copy = [...editItems];
-                          copy[idx] = { ...copy[idx], timeStart: val };
-                          setEditItems(copy);
-                        }}
-                      />
-
-                      {editItems.length > 1 && (
-                        <TouchableOpacity
-                          onPress={() => setEditItems(editItems.filter((_, i) => i !== idx))}
-                          style={styles.removeItemBtn}>
-                          <Ionicons name="trash-outline" size={18} color={MomentusColors.errorRed} />
-                        </TouchableOpacity>
-                      )}
-                    </View>
-
-                    {/* Seletor rápido de categoria para o item */}
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryPillsScroll}>
-                      {categories.map((cat) => {
-                        const isSelected = item.categoryId === cat.id;
-                        return (
-                          <TouchableOpacity
-                            key={cat.id}
-                            onPress={() => {
-                              const copy = [...editItems];
-                              copy[idx] = { ...copy[idx], categoryId: cat.id };
-                              setEditItems(copy);
-                            }}
-                            style={[
-                              styles.categoryMiniPill,
-                              { borderColor: cat.color },
-                              isSelected && { backgroundColor: `${cat.color}25` },
-                            ]}>
-                            <View style={[styles.previewDot, { backgroundColor: cat.color }]} />
-                            <Text
-                              style={[
-                                styles.categoryMiniPillText,
-                                { color: isSelected ? cat.color : theme.textSecondary },
-                              ]}>
-                              {cat.name}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </ScrollView>
-                  </View>
-                ))}
-
-                <TouchableOpacity
-                  style={[styles.addItemBtn, { borderColor: theme.outline }]}
-                  onPress={() =>
-                    setEditItems([
-                      ...editItems,
-                      {
-                        id: `ti-edit-${Date.now()}`,
-                        title: `Nova Atividade ${editItems.length + 1}`,
-                        timeStart: '09:00',
-                        durationMinutes: 30,
-                        categoryId: categories[0]?.id || 'cat-outros',
-                      },
-                    ])
-                  }>
-                  <Ionicons name="add" size={16} color={theme.primary} />
-                  <Text style={[styles.addItemBtnText, { color: theme.primary }]}>Adicionar Evento ao Template</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.submitModalBtn, { backgroundColor: theme.primary }]}
-                  onPress={handleSaveEditedTemplate}
-                  activeOpacity={0.85}>
-                  <Text style={styles.submitModalBtnText}>Salvar Alterações</Text>
-                </TouchableOpacity>
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Modal: Criar Template */}
-        <Modal
-          visible={isCreateModalOpen}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setIsCreateModalOpen(false)}>
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
-              <ScrollView showsVerticalScrollIndicator={false}>
-                <View style={styles.modalHeaderRow}>
-                  <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Novo Template</Text>
-                  <TouchableOpacity onPress={() => setIsCreateModalOpen(false)}>
-                    <Ionicons name="close" size={24} color={theme.textSecondary} />
-                  </TouchableOpacity>
-                </View>
-
-                <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>Título do Template *</Text>
-                <TextInput
-                  style={[styles.input, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary }]}
-                  placeholder="Ex: Rotina de Estudos Foco Total"
-                  placeholderTextColor={MomentusColors.textMuted}
-                  value={newTitle}
-                  onChangeText={setNewTitle}
-                />
-
-                <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>Descrição</Text>
-                <TextInput
-                  style={[styles.input, styles.textArea, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary }]}
-                  placeholder="Explique o objetivo deste template..."
-                  placeholderTextColor={MomentusColors.textMuted}
-                  value={newDesc}
-                  onChangeText={setNewDesc}
-                  multiline
-                  numberOfLines={2}
-                />
-
-                <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>Atividades da Rotina ({newItems.length})</Text>
-                {newItems.map((item, idx) => (
-                  <View key={idx} style={styles.createItemRow}>
-                    <TextInput
-                      style={[styles.input, { flex: 2, backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary }]}
-                      placeholder="Nome da atividade"
-                      placeholderTextColor={MomentusColors.textMuted}
-                      value={item.title}
-                      onChangeText={(val) => {
-                        const copy = [...newItems];
-                        copy[idx].title = val;
-                        setNewItems(copy);
-                      }}
-                    />
-                    <TextInput
-                      style={[styles.input, { flex: 1, backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary }]}
-                      placeholder="08:00"
-                      placeholderTextColor={MomentusColors.textMuted}
-                      value={item.timeStart}
-                      onChangeText={(val) => {
-                        const copy = [...newItems];
-                        copy[idx].timeStart = val;
-                        setNewItems(copy);
-                      }}
-                    />
-                    {newItems.length > 1 && (
-                      <TouchableOpacity
-                        onPress={() => setNewItems(newItems.filter((_, i) => i !== idx))}
-                        style={styles.removeItemBtn}>
-                        <Ionicons name="trash-outline" size={18} color={MomentusColors.errorRed} />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                ))}
-
-                <TouchableOpacity
-                  style={[styles.addItemBtn, { borderColor: theme.outline }]}
-                  onPress={() =>
-                    setNewItems([
-                      ...newItems,
-                      {
-                        title: `Atividade ${newItems.length + 1}`,
-                        timeStart: '09:00',
-                        durationMinutes: 30,
-                        categoryId: categories[0]?.id || 'cat-outros',
-                      },
-                    ])
-                  }>
-                  <Ionicons name="add" size={16} color={theme.primary} />
-                  <Text style={[styles.addItemBtnText, { color: theme.primary }]}>Adicionar Outra Atividade</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.submitModalBtn, { backgroundColor: theme.primary }]}
-                  onPress={handleSaveNewTemplate}
-                  activeOpacity={0.85}>
-                  <Text style={styles.submitModalBtnText}>Salvar Template</Text>
-                </TouchableOpacity>
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Modal: Importar JSON */}
-        <Modal
-          visible={isImportModalOpen}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setIsImportModalOpen(false)}>
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
-              <View style={styles.modalHeaderRow}>
-                <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Importar Template</Text>
-                <TouchableOpacity onPress={() => setIsImportModalOpen(false)}>
-                  <Ionicons name="close" size={24} color={theme.textSecondary} />
-                </TouchableOpacity>
-              </View>
-
-              <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>
-                Cole o código JSON do template para adicioná-lo à sua biblioteca.
+          {/* Footer com Botão de Confirmação */}
+          <View style={[styles.formModalFooter, { borderTopColor: theme.outline }]}>
+            <TouchableOpacity
+              style={[styles.saveTemplateBtn, { backgroundColor: theme.primary }]}
+              onPress={handleSaveFormTemplate}
+              activeOpacity={0.85}>
+              <Ionicons name="checkmark" size={20} color="#0F172A" />
+              <Text style={styles.saveTemplateBtnText}>
+                {editingTemplateId ? 'Salvar Alterações' : 'Criar Template'}
               </Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
 
-              <TextInput
-                style={[styles.input, styles.jsonInput, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary }]}
-                placeholder='{"title": "Rotina", "items": [...]}'
-                placeholderTextColor={MomentusColors.textMuted}
-                value={importJsonText}
-                onChangeText={setImportJsonText}
-                multiline
-                numberOfLines={6}
-              />
+      {/* Modal de Importação (ImportTemplateDialog.kt) */}
+      <Modal
+        visible={isImportModalOpen}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setIsImportModalOpen(false)}>
+        <View style={styles.importOverlay}>
+          <View style={[styles.importDialog, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+            <Text style={[styles.importTitle, { color: theme.textPrimary }]}>Importar Template</Text>
+            <Text style={[styles.importSubtitle, { color: theme.textSecondary }]}>
+              Cole o código do template compartilhado abaixo para adicioná-lo à sua lista.
+            </Text>
 
+            <TextInput
+              style={[styles.importInput, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary }]}
+              value={importJsonText}
+              onChangeText={setImportJsonText}
+              placeholder="Cole o JSON do template aqui..."
+              placeholderTextColor={`${theme.textSecondary}80`}
+              multiline
+              textAlignVertical="top"
+            />
+
+            <View style={styles.importActions}>
               <TouchableOpacity
-                style={[styles.submitModalBtn, { backgroundColor: theme.primary }]}
+                style={styles.importCancelBtn}
+                onPress={() => setIsImportModalOpen(false)}
+                activeOpacity={0.7}>
+                <Text style={[styles.importCancelBtnText, { color: theme.textSecondary }]}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.importConfirmBtn, { backgroundColor: theme.primary }]}
                 onPress={handleImportJson}
-                disabled={!importJsonText.trim()}
                 activeOpacity={0.85}>
-                <Text style={styles.submitModalBtnText}>Importar</Text>
+                <Text style={styles.importConfirmBtnText}>Importar</Text>
               </TouchableOpacity>
             </View>
           </View>
-        </Modal>
-      </View>
+        </View>
+      </Modal>
+
+      {/* Modal de Aplicação de Template */}
+      {selectedTemplateForApply && (
+        <ApplyTemplateDialog
+          visible={true}
+          templateTitle={selectedTemplateForApply.title}
+          onDismiss={() => setSelectedTemplateForApply(null)}
+          onConfirm={handleApplyConfirm}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -663,376 +731,425 @@ export default function TemplatesScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: MomentusColors.navyBackground,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   container: {
     flex: 1,
-    backgroundColor: MomentusColors.navyBackground,
   },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    marginBottom: 16,
+  topBar: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  title: {
-    color: MomentusColors.textPrimary,
-    fontSize: 24,
-    fontWeight: '900',
-  },
-  subtitle: {
-    color: MomentusColors.textSecondary,
-    fontSize: 13,
-    marginTop: 2,
-  },
-  headerButtonsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  headerIconBtn: {
+  backButton: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: MomentusColors.navySurface,
-    borderWidth: 1,
-    borderColor: MomentusColors.navyOutline,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  headerPrimaryBtn: {
+  topBarTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    flex: 1,
+    marginLeft: 8,
+  },
+  importTopBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: MomentusColors.emeraldNeon,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
   },
-  headerPrimaryBtnText: {
-    color: '#0F172A',
-    fontWeight: '800',
-    fontSize: 13,
+  importTopBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
   },
   scroll: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 60,
+    padding: 16,
+    paddingBottom: 100,
   },
-  templateCard: {
-    backgroundColor: MomentusColors.navySurface,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: MomentusColors.navyOutline,
-    padding: 18,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  cardHeader: {
-    flexDirection: 'row',
+  emptyContainer: {
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 24,
+  },
+  emptyIconCircle: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  emptyTitle: {
+    fontSize: 22,
+    fontWeight: '900',
     marginBottom: 8,
   },
-  cardHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
+  emptySubtitle: {
+    fontSize: 15,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
   },
-  cardActionsRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  cardActionBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  iconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  titleGroup: {
-    flex: 1,
-  },
-  cardTitle: {
-    color: MomentusColors.textPrimary,
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  metaRow: {
+  emptyCreateBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginTop: 4,
-  },
-  complexityBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  complexityBadgeText: {
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  cardMeta: {
-    color: MomentusColors.textSecondary,
-    fontSize: 12,
-  },
-  cardDesc: {
-    color: MomentusColors.textSecondary,
-    fontSize: 13,
-    lineHeight: 18,
-    marginBottom: 14,
-  },
-  timelinePreviewBox: {
-    backgroundColor: 'rgba(15, 23, 42, 0.4)',
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 16,
-    gap: 8,
-  },
-  timelinePreviewHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 2,
-  },
-  timelinePreviewTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: MomentusColors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  previewItemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  previewDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  previewTime: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: MomentusColors.emeraldNeon,
-    width: 44,
-  },
-  previewTitle: {
-    flex: 1,
-    fontSize: 13,
-    color: MomentusColors.textPrimary,
-  },
-  previewMoreText: {
-    fontSize: 11,
-    color: MomentusColors.textSecondary,
-    fontStyle: 'italic',
-    marginTop: 2,
-  },
-  applyBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: MomentusColors.emeraldNeon,
+    paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 14,
-    gap: 8,
   },
-  applyBtnText: {
-    color: '#0F172A',
-    fontWeight: '800',
-    fontSize: 14,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.75)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalCard: {
-    width: '100%',
-    maxWidth: 440,
-    maxHeight: '88%',
-    backgroundColor: MomentusColors.navySurface,
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: MomentusColors.navyOutline,
-    padding: 22,
-  },
-  modalHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: MomentusColors.textPrimary,
-  },
-  modalSubtitle: {
-    fontSize: 13,
-    color: MomentusColors.textSecondary,
-    marginBottom: 16,
-  },
-  inputLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: MomentusColors.textPrimary,
-    marginBottom: 6,
-    marginTop: 10,
-  },
-  input: {
-    backgroundColor: MomentusColors.navyBackground,
-    borderWidth: 1,
-    borderColor: MomentusColors.navyOutline,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    color: MomentusColors.textPrimary,
-    fontSize: 14,
-  },
-  textArea: {
-    height: 60,
-    textAlignVertical: 'top',
-  },
-  jsonInput: {
-    height: 120,
-    textAlignVertical: 'top',
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontSize: 12,
-  },
-  editItemCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 10,
-    marginBottom: 10,
-  },
-  createItemRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 6,
-    alignItems: 'center',
-  },
-  reorderCol: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 2,
-  },
-  reorderBtn: {
-    padding: 2,
-  },
-  categoryPillsScroll: {
-    marginTop: 4,
-  },
-  categoryMiniPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginRight: 6,
-  },
-  categoryMiniPillText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  removeItemBtn: {
-    padding: 8,
-  },
-  addItemBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(52, 211, 153, 0.3)',
-    backgroundColor: 'rgba(52, 211, 153, 0.08)',
-    marginTop: 4,
-    marginBottom: 16,
-  },
-  addItemBtnText: {
-    color: MomentusColors.emeraldNeon,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  submitModalBtn: {
-    backgroundColor: MomentusColors.emeraldNeon,
-    paddingVertical: 14,
-    borderRadius: 16,
-    alignItems: 'center',
-    marginTop: 12,
-  },
-  submitModalBtnText: {
+  emptyCreateBtnText: {
     color: '#0F172A',
     fontWeight: '800',
     fontSize: 15,
   },
-  emptyCard: {
-    borderRadius: 24,
+  templateCard: {
+    borderRadius: 20,
     borderWidth: 1,
-    padding: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 40,
-    marginHorizontal: 16,
-  },
-  emptyIconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
+    padding: 18,
     marginBottom: 16,
   },
-  emptyTitle: {
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  cardHeaderInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  cardTitle: {
     fontSize: 18,
-    fontWeight: '800',
-    marginBottom: 8,
-    textAlign: 'center',
+    fontWeight: '900',
+    marginBottom: 4,
   },
-  emptySubtitle: {
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: 'center',
-    marginBottom: 24,
-    paddingHorizontal: 8,
+  cardDescription: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 6,
   },
-  emptyActionBtn: {
+  cardItemCount: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  cardActionButtons: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 16,
+    gap: 4,
   },
-  emptyActionBtnText: {
+  iconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statChipsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 14,
+  },
+  statChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  statChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    marginVertical: 14,
+  },
+  previewEventsList: {
+    gap: 10,
+    marginBottom: 16,
+  },
+  previewEventRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  categoryDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 10,
+  },
+  previewEventInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  previewEventTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  previewEventDesc: {
+    fontSize: 12,
+  },
+  previewEventTime: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  remainingText: {
+    fontSize: 12,
+    fontWeight: '700',
+    paddingLeft: 20,
+    marginTop: 2,
+  },
+  applyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 48,
+    borderRadius: 14,
+  },
+  applyButtonText: {
     color: '#0F172A',
     fontWeight: '800',
+    fontSize: 15,
+  },
+  fabButton: {
+    position: 'absolute',
+    right: 20,
+    bottom: 24,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+  },
+  formModalSafe: {
+    flex: 1,
+  },
+  formModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  formModalTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  formModalSubtitle: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  modalCloseBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  formScroll: {
+    flex: 1,
+  },
+  formScrollContent: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  inputLabel: {
     fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  input: {
+    height: 48,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    fontSize: 15,
+  },
+  eventsHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 24,
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  sectionCount: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  eventFormCard: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 12,
+  },
+  eventFormCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  eventFormIndex: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  eventInput: {
+    height: 44,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    fontSize: 14,
+  },
+  timeRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 10,
+  },
+  timeCol: {
+    flex: 1,
+  },
+  timeLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  timeInput: {
+    height: 40,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  categoryScroll: {
+    flexDirection: 'row',
+  },
+  categoryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginRight: 8,
+  },
+  chipDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  chipText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  addEventBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    marginTop: 8,
+    marginBottom: 20,
+  },
+  addEventBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  formModalFooter: {
+    padding: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  saveTemplateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 50,
+    borderRadius: 14,
+  },
+  saveTemplateBtnText: {
+    color: '#0F172A',
+    fontWeight: '800',
+    fontSize: 16,
+  },
+  importOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  importDialog: {
+    width: '100%',
+    maxWidth: 440,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 20,
+  },
+  importTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    marginBottom: 6,
+  },
+  importSubtitle: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  importInput: {
+    height: 140,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 13,
+    marginBottom: 20,
+  },
+  importActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+  },
+  importCancelBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  importCancelBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  importConfirmBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  importConfirmBtnText: {
+    color: '#0F172A',
+    fontSize: 14,
+    fontWeight: '800',
   },
 });

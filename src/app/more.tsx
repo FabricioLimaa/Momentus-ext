@@ -104,8 +104,8 @@ export default function MoreScreen() {
                   <Ionicons name="grid-outline" size={20} color={MomentusColors.fireStreak} />
                 </View>
                 <View>
-                  <Text style={[styles.menuItemTitle, { color: theme.textPrimary }]}>Modelos de Rotina</Text>
-                  <Text style={[styles.menuItemSub, { color: theme.textSecondary }]}>Templates prontos para o seu dia</Text>
+                  <Text style={[styles.menuItemTitle, { color: theme.textPrimary }]}>Meus Templates</Text>
+                  <Text style={[styles.menuItemSub, { color: theme.textSecondary }]}>Reutilize rotinas facilmente</Text>
                 </View>
               </View>
               <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
