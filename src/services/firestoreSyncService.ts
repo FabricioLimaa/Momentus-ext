@@ -9,6 +9,7 @@ import {
 } from "@/types";
 import {
   collection,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -23,6 +24,7 @@ const CATEGORIES_COLLECTION = "categories";
 const TEMPLATES_COLLECTION = "templates";
 const UNLOCKED_ACHIEVEMENTS_COLLECTION = "unlocked_achievements";
 const COMPLETED_HABITS_COLLECTION = "completed_habits";
+const INVENTORY_COLLECTION = "inventory";
 
 export interface SyncResult {
   uploadedEvents: number;
@@ -35,12 +37,77 @@ export interface SyncResult {
 }
 
 /**
- * Executa a sincronização bidirecional completa do Firestore espelhando a lógica de:
- * - SyncWorker.kt
- * - ScheduleRepository.kt (eventos)
- * - CategoryRepository.kt (categories)
- * - TemplateRepository.kt (templates)
- * - GamificationRepository.kt (unlocked_achievements, completed_habits, points & purchased_stickers)
+ * Converte data em formato 'YYYY-MM-DD' para epoch timestamp em milissegundos (Long no Kotlin).
+ */
+function dateToMillis(dateStr?: string | null): number | null {
+  if (!dateStr) return null;
+  if (typeof dateStr === "number") return dateStr;
+  const parts = String(dateStr).split("-");
+  if (parts.length === 3) {
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    return new Date(year, month, day, 12, 0, 0).getTime();
+  }
+  const parsed = new Date(dateStr).getTime();
+  return isNaN(parsed) ? null : parsed;
+}
+
+/**
+ * Converte epoch timestamp ou Timestamp do Firestore de volta para string 'YYYY-MM-DD'.
+ */
+function millisToDateString(val?: any): string {
+  if (!val) return new Date().toISOString().slice(0, 10);
+  if (typeof val === "string" && val.includes("-") && val.length === 10) {
+    return val;
+  }
+  if (typeof val === "number") {
+    const d = new Date(val);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  if (val && typeof val.toDate === "function") {
+    const d = val.toDate();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  return new Date().toISOString().slice(0, 10);
+}
+
+/**
+ * Formata o horário no padrão ISO_LOCAL_TIME esperado pelo Kotlin ('HH:mm:ss').
+ */
+function formatTimeToIsoLocal(timeStr?: string, fallback = "08:00:00"): string {
+  if (!timeStr) return fallback;
+  if (timeStr.length === 5) return `${timeStr}:00`;
+  if (timeStr.length === 8) return timeStr;
+  return fallback;
+}
+
+/**
+ * Extrai 'HH:mm' a partir de strings como '08:00:00' ou '08:00'.
+ */
+function parseTimeString(val?: any, fallback = "08:00"): string {
+  if (!val || typeof val !== "string") return fallback;
+  if (val.length >= 5) {
+    return val.slice(0, 5);
+  }
+  return fallback;
+}
+
+/**
+ * Executa a sincronização bidirecional do Firestore respeitando ESTRITAMENTE o schema do app nativo:
+ * - users/{userId}: UserData.kt (display_name, email, points, streak, terms_accepted, terms_accepted_version)
+ * - eventos: ItemCronograma.kt (data como Long, horarioInicioString/horarioTerminoString como ISO_LOCAL_TIME)
+ * - completed_habits: HabitoConcluido.kt (itemCronogramaId, dataConclusao)
+ * - inventory: MarketRepository.kt (subcoleção com documentos por itemId)
+ * - unlocked_achievements: UnlockedAchievement.kt (achievementId, dateUnlocked)
+ * - categories: Category.kt (nome, cor, stickerId, duracaoPadraoMinutos)
+ * - templates: Template.kt (nome, descricao)
  */
 export async function syncWithFirestore(
   userId: string,
@@ -81,9 +148,10 @@ export async function syncWithFirestore(
     userDocRef,
     COMPLETED_HABITS_COLLECTION,
   );
+  const inventoryColRef = collection(userDocRef, INVENTORY_COLLECTION);
 
   // ========================================================
-  // 1. Sincronização de Categorias (CategoryRepository.kt)
+  // 1. Sincronização de Categorias (Category.kt)
   // ========================================================
   const categoriesSnapshot = await getDocs(categoriesColRef);
   const cloudCategoriesMap = new Map<string, any>();
@@ -100,11 +168,12 @@ export async function syncWithFirestore(
       categoriesBatch.set(docRef, {
         id: cat.id,
         nome: cat.name,
-        cor: cat.color,
-        icon: cat.icon || null,
+        descricao: null,
+        duracaoPadraoMinutos: 60,
+        cor: cat.color || "#CCCCCC",
+        tag: null,
         stickerId: cat.stickerId || null,
-        metaMinutosSemanal: cat.metaMinutosSemanal || null,
-        lastUpdated: new Date().toISOString(),
+        lastUpdated: new Date(),
       });
       result.uploadedCategories++;
     }
@@ -127,7 +196,45 @@ export async function syncWithFirestore(
   });
 
   // ========================================================
-  // 2. Sincronização de Eventos/Hábitos (ScheduleRepository.kt)
+  // 2. Sincronização de Hábitos Concluídos (HabitoConcluido.kt)
+  // ========================================================
+  const completedHabitsSnapshot = await getDocs(completedHabitsColRef);
+  const cloudCompletedHabitsSet = new Set<string>();
+  completedHabitsSnapshot.forEach((d) => {
+    const data = d.data();
+    const habitId = data.itemCronogramaId || d.id;
+    cloudCompletedHabitsSet.add(habitId);
+  });
+
+  try {
+    const completedBatch = writeBatch(firestore);
+    let completedChanges = 0;
+
+    localHabits.forEach((habit) => {
+      const compRef = doc(completedHabitsColRef, habit.id);
+      if (habit.completed && !cloudCompletedHabitsSet.has(habit.id)) {
+        completedBatch.set(compRef, {
+          itemCronogramaId: habit.id,
+          dataConclusao: dateToMillis(habit.date) || Date.now(),
+        });
+        cloudCompletedHabitsSet.add(habit.id);
+        completedChanges++;
+      } else if (!habit.completed && cloudCompletedHabitsSet.has(habit.id)) {
+        completedBatch.delete(compRef);
+        cloudCompletedHabitsSet.delete(habit.id);
+        completedChanges++;
+      }
+    });
+
+    if (completedChanges > 0) {
+      await completedBatch.commit();
+    }
+  } catch (err) {
+    console.warn("Aviso ao sincronizar completed_habits no Firestore:", err);
+  }
+
+  // ========================================================
+  // 3. Sincronização de Eventos (ItemCronograma.kt)
   // ========================================================
   const eventsSnapshot = await getDocs(eventsColRef);
   const cloudEventsMap = new Map<string, any>();
@@ -140,73 +247,58 @@ export async function syncWithFirestore(
 
   localHabits.forEach((habit) => {
     const cloudItem = cloudEventsMap.get(habit.id);
-    if (!cloudItem || cloudItem.completed !== habit.completed) {
+    if (!cloudItem) {
       const docRef = doc(eventsColRef, habit.id);
+      // Salva ESTRITAMENTE os campos esperados pelo ItemCronograma nativo
       eventsBatch.set(docRef, {
         id: habit.id,
         titulo: habit.title,
         descricao: habit.description || null,
-        data: habit.date,
-        horarioInicio: habit.timeStart,
-        horarioTermino: habit.timeEnd || habit.timeStart,
+        data: dateToMillis(habit.date),
+        diaDaSemana: null,
+        horarioInicioString: formatTimeToIsoLocal(habit.timeStart),
+        horarioTerminoString: formatTimeToIsoLocal(habit.timeEnd || habit.timeStart),
+        ordem: 0,
         categoryId: habit.categoryId,
-        completed: habit.completed,
-        streak: habit.streak,
+        templateId: null,
         googleCalendarEventId: habit.googleCalendarEventId || null,
-        saveToGoogle: habit.saveToGoogle || false,
-        lastUpdated: new Date().toISOString(),
+        isDeleted: false,
+        lastUpdated: new Date(),
       });
-      if (!cloudItem) result.uploadedEvents++;
+      result.uploadedEvents++;
     }
   });
   await eventsBatch.commit();
 
-  // Registra hábitos concluídos na subcoleção completed_habits em batch isolado
-  try {
-    const completedBatch = writeBatch(firestore);
-    let hasCompleted = false;
-    localHabits.forEach((habit) => {
-      if (habit.completed) {
-        hasCompleted = true;
-        const compRef = doc(completedHabitsColRef, habit.id);
-        completedBatch.set(compRef, {
-          habitId: habit.id,
-          title: habit.title,
-          completedDate: habit.date,
-          lastUpdated: new Date().toISOString(),
-        });
-      }
-    });
-    if (hasCompleted) {
-      await completedBatch.commit();
-    }
-  } catch {}
-
   const mergedHabits: HabitItem[] = [...localHabits];
   cloudEventsMap.forEach((cloudItem, id) => {
     if (!localEventsMap.has(id)) {
+      const isCompleted = cloudCompletedHabitsSet.has(id);
       mergedHabits.push({
         id,
         title: cloudItem.titulo || cloudItem.title || "Rotina",
         description: cloudItem.descricao || cloudItem.description || undefined,
-        date:
-          cloudItem.data ||
-          cloudItem.date ||
-          new Date().toISOString().slice(0, 10),
-        timeStart: cloudItem.horarioInicio || cloudItem.timeStart || "08:00",
-        timeEnd: cloudItem.horarioTermino || cloudItem.timeEnd || undefined,
+        date: millisToDateString(cloudItem.data || cloudItem.date),
+        timeStart: parseTimeString(
+          cloudItem.horarioInicioString || cloudItem.horarioInicio,
+          "08:00",
+        ),
+        timeEnd: parseTimeString(
+          cloudItem.horarioTerminoString || cloudItem.horarioTermino,
+          "09:00",
+        ),
         categoryId: cloudItem.categoryId || mergedCategories[0]?.id || "cat-1",
-        completed: !!cloudItem.completed,
-        streak: cloudItem.streak || 0,
+        completed: isCompleted,
+        streak: 0,
         googleCalendarEventId: cloudItem.googleCalendarEventId || null,
-        saveToGoogle: !!cloudItem.saveToGoogle,
+        saveToGoogle: false,
       });
       result.downloadedEvents++;
     }
   });
 
   // ========================================================
-  // 3. Sincronização de Templates (TemplateRepository.kt)
+  // 4. Sincronização de Templates (Template.kt)
   // ========================================================
   const mergedTemplates: RoutineTemplate[] = [...localTemplates];
   try {
@@ -224,13 +316,8 @@ export async function syncWithFirestore(
       templatesBatch.set(docRef, {
         id: tmpl.id,
         nome: tmpl.title,
-        title: tmpl.title,
-        descricao: tmpl.description,
-        description: tmpl.description,
-        icon: tmpl.icon,
-        color: tmpl.color,
-        items: tmpl.items,
-        lastUpdated: new Date().toISOString(),
+        descricao: tmpl.description || null,
+        lastUpdated: new Date(),
       });
       if (!cloudTemplatesMap.has(tmpl.id)) {
         result.uploadedTemplates++;
@@ -242,37 +329,42 @@ export async function syncWithFirestore(
       if (!localTemplatesMap.has(id)) {
         mergedTemplates.push({
           id,
-          title: cloudTmpl.title || cloudTmpl.nome || "Modelo de Rotina",
+          title: cloudTmpl.nome || cloudTmpl.title || "Modelo de Rotina",
           description:
-            cloudTmpl.description ||
             cloudTmpl.descricao ||
+            cloudTmpl.description ||
             "Rotina sincronizada da nuvem",
-          icon: cloudTmpl.icon || "sparkles",
-          color: cloudTmpl.color || "#34D399",
-          items: Array.isArray(cloudTmpl.items) ? cloudTmpl.items : [],
+          icon: "sparkles",
+          color: "#34D399",
+          items: [],
         });
         result.downloadedTemplates++;
       }
     });
-  } catch {}
+  } catch (err) {
+    console.warn("Aviso ao sincronizar templates no Firestore:", err);
+  }
 
   // ========================================================
-  // 4. Sincronização de Gamificação: Conquistas, XP e Stickers (GamificationRepository.kt)
+  // 5. Sincronização de Conquistas (UnlockedAchievement.kt)
   // ========================================================
   let mergedAchievements: Achievement[] = [...localAchievements];
   try {
     const achSnapshot = await getDocs(achievementsColRef);
     const cloudUnlockedSet = new Map<string, any>();
-    achSnapshot.forEach((d) => cloudUnlockedSet.set(d.id, d.data()));
+    achSnapshot.forEach((d) => {
+      const data = d.data();
+      const achId = data.achievementId || d.id;
+      cloudUnlockedSet.set(achId, data);
+    });
 
     const achBatch = writeBatch(firestore);
     localAchievements.forEach((ach) => {
       if (ach.unlocked && !cloudUnlockedSet.has(ach.id)) {
         const achDocRef = doc(achievementsColRef, ach.id);
         achBatch.set(achDocRef, {
-          id: ach.id,
-          title: ach.title,
-          unlockedAt: ach.unlockedAt || new Date().toISOString().slice(0, 10),
+          achievementId: ach.id,
+          dateUnlocked: new Date(),
         });
         result.syncedAchievements++;
       }
@@ -281,22 +373,56 @@ export async function syncWithFirestore(
 
     mergedAchievements = localAchievements.map((ach) => {
       if (!ach.unlocked && cloudUnlockedSet.has(ach.id)) {
-        const cloudData = cloudUnlockedSet.get(ach.id);
         result.syncedAchievements++;
         return {
           ...ach,
           unlocked: true,
           progress: ach.maxProgress,
-          unlockedAt:
-            cloudData?.unlockedAt || new Date().toISOString().slice(0, 10),
+          unlockedAt: new Date().toISOString().slice(0, 10),
         };
       }
       return ach;
     });
-  } catch {}
+  } catch (err) {
+    console.warn("Aviso ao sincronizar conquistas no Firestore:", err);
+  }
 
-  // Sincronização do documento raiz users/{userId} (points e purchased_stickers)
+  // ========================================================
+  // 6. Sincronização do Inventário de Mercado (MarketRepository.kt)
+  // ========================================================
   let mergedMarketItems: MarketItem[] = [...localMarketItems];
+  try {
+    const inventorySnapshot = await getDocs(inventoryColRef);
+    const cloudInventorySet = new Set<string>();
+    inventorySnapshot.forEach((d) => cloudInventorySet.add(d.id));
+
+    const inventoryBatch = writeBatch(firestore);
+    let newItems = 0;
+    localMarketItems.forEach((item) => {
+      if (item.isOwned && !cloudInventorySet.has(item.id)) {
+        const itemDocRef = doc(inventoryColRef, item.id);
+        inventoryBatch.set(itemDocRef, {
+          purchasedAt: Date.now(),
+        });
+        cloudInventorySet.add(item.id);
+        newItems++;
+      }
+    });
+    if (newItems > 0) {
+      await inventoryBatch.commit();
+    }
+
+    mergedMarketItems = localMarketItems.map((item) => ({
+      ...item,
+      isOwned: item.isOwned || cloudInventorySet.has(item.id),
+    }));
+  } catch (err) {
+    console.warn("Aviso ao sincronizar inventário no Firestore:", err);
+  }
+
+  // ========================================================
+  // 7. Sincronização do Documento Raiz do Usuário (UserData.kt)
+  // ========================================================
   let mergedUserProfile: UserProfile | undefined = localUserProfile
     ? { ...localUserProfile }
     : undefined;
@@ -305,91 +431,72 @@ export async function syncWithFirestore(
     const userDocSnap = await getDoc(userDocRef);
     const cloudUserData = userDocSnap.exists() ? userDocSnap.data() : {};
 
-    const localOwnedIds = localMarketItems
-      .filter((i) => i.isOwned)
-      .map((i) => i.id);
-    const cloudOwnedIds: string[] = Array.isArray(
-      cloudUserData?.purchased_stickers,
-    )
-      ? cloudUserData.purchased_stickers
-      : [];
-    const combinedOwnedSet = new Set<string>([
-      ...localOwnedIds,
-      ...cloudOwnedIds,
-    ]);
-
-    mergedMarketItems = localMarketItems.map((item) => ({
-      ...item,
-      isOwned: combinedOwnedSet.has(item.id),
-    }));
-
     if (mergedUserProfile) {
       const cloudPoints =
         typeof cloudUserData?.points === "number" ? cloudUserData.points : 0;
-      const cloudBestStreak =
-        typeof cloudUserData?.bestStreak === "number"
-          ? cloudUserData.bestStreak
-          : 0;
+      const cloudStreak =
+        typeof cloudUserData?.streak === "number" ? cloudUserData.streak : 0;
       const mergedPoints = Math.max(mergedUserProfile.totalPoints, cloudPoints);
-      const mergedBestStreak = Math.max(
-        mergedUserProfile.bestStreak,
-        cloudBestStreak,
-      );
+      const mergedStreak = Math.max(mergedUserProfile.currentStreak, cloudStreak);
 
-      // Prioriza dados da nuvem se existirem e não forem o fallback inicial
-      const cloudDisplayName =
-        cloudUserData?.display_name || cloudUserData?.displayName || cloudUserData?.name;
+      const cloudDisplayName = cloudUserData?.display_name;
       const cloudEmail = cloudUserData?.email;
-      const cloudPhoto = cloudUserData?.photo_url || cloudUserData?.photoUrl;
 
       const mergedName =
-        (mergedUserProfile.name && mergedUserProfile.name !== 'Fabrício Lima' && mergedUserProfile.name !== 'Usuário')
+        mergedUserProfile.name &&
+        mergedUserProfile.name !== "Fabrício Lima" &&
+        mergedUserProfile.name !== "Usuário"
           ? mergedUserProfile.name
-          : (cloudDisplayName || mergedUserProfile.name);
+          : cloudDisplayName || mergedUserProfile.name;
 
       const mergedEmail =
-        (mergedUserProfile.email && mergedUserProfile.email !== 'fabricio@momentus.app' && mergedUserProfile.email !== 'contato@momentusapp.com.br')
+        mergedUserProfile.email &&
+        mergedUserProfile.email !== "fabricio@momentus.app" &&
+        mergedUserProfile.email !== "contato@momentusapp.com.br"
           ? mergedUserProfile.email
-          : (cloudEmail || mergedUserProfile.email);
-
-      const mergedPhoto = mergedUserProfile.photoUrl || cloudPhoto || null;
+          : cloudEmail || mergedUserProfile.email;
 
       mergedUserProfile = {
         ...mergedUserProfile,
         name: mergedName,
         email: mergedEmail,
-        photoUrl: mergedPhoto,
         totalPoints: mergedPoints,
-        bestStreak: mergedBestStreak,
+        currentStreak: mergedStreak,
       };
 
+      // MANTÉM RIGOROSAMENTE APENAS OS CAMPOS DE UserData.kt:
+      // display_name, email, points, streak, terms_accepted, terms_accepted_version
       const userProfilePayload: Record<string, any> = {
+        display_name: mergedName || null,
+        email: mergedEmail || null,
         points: mergedPoints,
-        purchased_stickers: Array.from(combinedOwnedSet),
-        currentStreak: mergedUserProfile.currentStreak,
-        bestStreak: mergedBestStreak,
-        totalCompleted: mergedUserProfile.totalCompleted,
-        focusMinutesToday: mergedUserProfile.focusMinutesToday,
-        lastSyncAt: new Date().toISOString(),
+        streak: mergedStreak,
+        terms_accepted: true,
+        terms_accepted_version: 1,
       };
 
-      if (mergedName) {
-        userProfilePayload.display_name = mergedName;
-      }
-      if (mergedEmail) {
-        userProfilePayload.email = mergedEmail;
-      }
-      if (mergedPhoto) {
-        userProfilePayload.photo_url = mergedPhoto;
+      // Limpa os campos extras legados que causam crash no app nativo Kotlin:
+      const nonNativeFields = [
+        "bestStreak",
+        "currentStreak",
+        "focusMinutesToday",
+        "lastSyncAt",
+        "totalCompleted",
+        "purchased_stickers",
+        "photo_url",
+        "clearedAt",
+      ];
+
+      for (const field of nonNativeFields) {
+        if (field in cloudUserData) {
+          userProfilePayload[field] = deleteField();
+        }
       }
 
       await setDoc(userDocRef, userProfilePayload, { merge: true });
     }
   } catch (err) {
-    console.warn(
-      "Aviso ao sincronizar perfil de gamificação no Firestore:",
-      err,
-    );
+    console.warn("Aviso ao sincronizar perfil do usuário no Firestore:", err);
   }
 
   return {
@@ -419,6 +526,7 @@ export async function clearCloudData(userId: string): Promise<boolean> {
     COMPLETED_HABITS_COLLECTION,
     UNLOCKED_ACHIEVEMENTS_COLLECTION,
     TEMPLATES_COLLECTION,
+    INVENTORY_COLLECTION,
   ];
 
   for (const collectionName of collectionsToClear) {
@@ -434,24 +542,41 @@ export async function clearCloudData(userId: string): Promise<boolean> {
       }
       clearedAny = true;
     } catch {
-      // Subcoleção pode não estar liberada nas Security Rules do Firestore para este usuário
+      // Subcoleção pode não conter documentos
     }
   }
 
   try {
-    await setDoc(
-      userDocRef,
-      {
-        points: 0,
-        purchased_stickers: [],
-        currentStreak: 0,
-        bestStreak: 0,
-        totalCompleted: 0,
-        focusMinutesToday: 0,
-        clearedAt: new Date().toISOString(),
-      },
-      { merge: true },
-    );
+    const userDocSnap = await getDoc(userDocRef);
+    const cloudData = userDocSnap.exists() ? userDocSnap.data() : {};
+
+    const resetPayload: Record<string, any> = {
+      display_name: null,
+      email: null,
+      points: 0,
+      streak: 0,
+      terms_accepted: true,
+      terms_accepted_version: 1,
+    };
+
+    const extraFields = [
+      "bestStreak",
+      "currentStreak",
+      "focusMinutesToday",
+      "lastSyncAt",
+      "totalCompleted",
+      "purchased_stickers",
+      "photo_url",
+      "clearedAt",
+    ];
+
+    for (const f of extraFields) {
+      if (f in cloudData) {
+        resetPayload[f] = deleteField();
+      }
+    }
+
+    await setDoc(userDocRef, resetPayload, { merge: true });
     clearedAny = true;
   } catch {}
 
