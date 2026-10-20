@@ -338,9 +338,23 @@ export async function syncWithFirestore(
 
   // Mapeia eventos que pertencem a templates (templateId != null ou data == null)
   const templateEventsMap = new Map<string, TemplateItem[]>();
-  const mergedHabits: HabitItem[] = [...localHabits];
+  
+  // Identifica eventos deletados na nuvem para não ressuscitar
+  const deletedCloudIds = new Set<string>();
+  cloudEventsMap.forEach((cloudItem, id) => {
+    if (cloudItem.isDeleted === true) {
+      deletedCloudIds.add(id);
+    }
+  });
+
+  const mergedHabits: HabitItem[] = localHabits.filter((h) => !deletedCloudIds.has(h.id));
 
   cloudEventsMap.forEach((cloudItem, id) => {
+    // Se o evento foi deletado, ignora
+    if (cloudItem.isDeleted === true) {
+      return;
+    }
+
     // Se o evento pertencer a um template, agrupa no mapa de eventos de template
     if (cloudItem.templateId) {
       const tmplId = String(cloudItem.templateId);
@@ -1006,7 +1020,12 @@ export async function deleteHabitFromFirestore(
   try {
     const userDocRef = doc(firestore, "users", userId);
     const eventDocRef = doc(collection(userDocRef, EVENTS_COLLECTION), habitId);
-    await setDoc(eventDocRef, { isDeleted: true, lastUpdated: new Date() }, { merge: true });
+    // Exclui fisicamente o documento da coleção de eventos, igual ao Kotlin:
+    // firestore.collection("users").document(uid).collection(EVENTS_COLLECTION).document(item.id).delete()
+    await deleteDoc(eventDocRef);
+    // Remove também quaisquer registros de conclusão deste hábito
+    const compDocRef = doc(collection(userDocRef, COMPLETED_HABITS_COLLECTION), habitId);
+    await deleteDoc(compDocRef).catch(() => {});
   } catch (err) {
     console.warn("Erro ao excluir hábito do Firestore:", err);
   }

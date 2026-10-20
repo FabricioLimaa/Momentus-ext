@@ -66,17 +66,21 @@ export default function SettingsScreen() {
   const handleSyncNow = async () => {
     setIsSyncing(true);
     try {
-      // 1. Sincroniza com o calendário nativo
-      const count = await syncAllHabitsToCalendarAction();
-      // 2. Sincroniza com Cloud Firestore
+      // 1. Sincroniza diretamente com o Cloud Firestore
       await syncCloudAction().catch(() => {});
+
+      // 2. Sincroniza com a agenda nativa apenas em dispositivos móveis (evita downloads de arquivos na Web)
+      let count = 0;
+      if (Platform.OS !== 'web') {
+        count = await syncAllHabitsToCalendarAction();
+      }
 
       setIsSyncing(false);
       Alert.alert(
         'Sincronização Concluída! ☁️✨',
         count > 0
           ? `${count} rotina(s) sincronizada(s) com a agenda e salvas na nuvem!`
-          : 'Seus dados e rotinas estão 100% sincronizados com a nuvem e com a agenda.'
+          : 'Seus dados e rotinas estão 100% sincronizados com a nuvem e com o banco de dados.'
       );
     } catch {
       setIsSyncing(false);

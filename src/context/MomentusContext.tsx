@@ -45,6 +45,8 @@ import {
   setAllCategoriesDb,
   getAllHabits,
   setAllHabitsDb,
+  deleteHabitDb,
+  deleteMultipleHabitsDb,
   getAllTemplates,
   setAllTemplatesDb,
   deleteTemplateDb,
@@ -241,7 +243,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   useEffect(() => {
     async function loadState() {
       try {
-        // 1. Tenta carregar do SQLite
+        // 1. Tenta carregar dados das tabelas locais (SQLite ou AsyncStorage no Web)
         const dbCategories = await getAllCategories();
         const dbHabits = await getAllHabits();
         const dbTemplates = await getAllTemplates();
@@ -249,6 +251,32 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         const dbMarketItems = await getAllMarketItems();
         const dbUserProfile = await getAppKv<UserProfile>('user_profile');
         const dbSettings = await getAppKv<AppSettings>('app_settings');
+
+        // Carrega também estado prévio do AsyncStorage para migração suave
+        const savedAsync = await AsyncStorage.getItem(STORAGE_KEY);
+        const legacyParsed = savedAsync ? JSON.parse(savedAsync) : null;
+
+        // Configurações e aceite dos termos: prioriza o que está persistido localmente e nunca reseta
+        const effectiveSettings: AppSettings = dbSettings || legacyParsed?.settings || INITIAL_SETTINGS;
+        setSettings(effectiveSettings);
+        await setAppKv('app_settings', effectiveSettings).catch(() => {});
+
+        // Perfil do usuário: restaura nome, foto e status
+        const effectiveProfile: UserProfile = dbUserProfile || legacyParsed?.userProfile || INITIAL_USER_PROFILE;
+        const currentAuth = firebaseAuth.currentUser;
+        const enrichedProfile: UserProfile = {
+          ...effectiveProfile,
+          ...(currentAuth
+            ? {
+                name: currentAuth.displayName || effectiveProfile.name,
+                email: currentAuth.email || effectiveProfile.email,
+                photoUrl: currentAuth.photoURL ?? effectiveProfile.photoUrl,
+                isLoggedIn: true,
+              }
+            : {}),
+        };
+        setUserProfile(enrichedProfile);
+        await setAppKv('user_profile', enrichedProfile).catch(() => {});
 
         const LEGACY_MOCK_CAT_IDS = new Set([
           'cat-saude',
@@ -264,115 +292,36 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         ]);
 
         let cleanCats = dbCategories.filter((c) => !LEGACY_MOCK_CAT_IDS.has(c.id));
+        if (cleanCats.length === 0 && legacyParsed?.categories) {
+          cleanCats = (legacyParsed.categories as Category[]).filter((c) => !LEGACY_MOCK_CAT_IDS.has(c.id));
+        }
         if (cleanCats.length === 0) {
           cleanCats = INITIAL_CATEGORIES;
         }
+        setCategories(cleanCats);
+        await setAllCategoriesDb(cleanCats).catch(() => {});
 
-        const cleanTemplates = dbTemplates.filter((t) => !LEGACY_MOCK_TMPL_IDS.has(t.id));
+        const initialHab = dbHabits.length > 0 ? dbHabits : (legacyParsed?.habits || []);
+        setHabits(initialHab);
 
-        // Conquistas e itens da loja limpos e zerados inicialmente
+        const cleanTemplates = (dbTemplates.length > 0 ? dbTemplates : (legacyParsed?.templates || [])).filter(
+          (t: RoutineTemplate) => !LEGACY_MOCK_TMPL_IDS.has(t.id)
+        );
+        setTemplates(cleanTemplates);
+
         const cleanAchievements =
-          dbAchievements.length > 0 && dbAchievements.every((a) => !a.unlocked || a.progress > 0)
-            ? dbAchievements.map((a) =>
-                a.unlocked && (!a.unlockedAt || a.unlockedAt.includes('2026-10-10'))
-                  ? { ...a, unlocked: false, progress: 0, unlockedAt: undefined }
-                  : a
-              )
-            : INITIAL_ACHIEVEMENTS;
+          dbAchievements.length > 0
+            ? dbAchievements
+            : (legacyParsed?.achievements || INITIAL_ACHIEVEMENTS);
+        setAchievements(cleanAchievements);
 
         const cleanMarketItems =
           dbMarketItems.length > 0
-            ? dbMarketItems.map((m) =>
-                m.isOwned && (m.id === 'stk_rocket' || m.id === 'stk_zen')
-                  ? { ...m, isOwned: false }
-                  : m
-              )
-            : INITIAL_MARKET_ITEMS;
-
-        const hasDbData =
-          cleanCats.length > 0 ||
-          dbHabits.length > 0 ||
-          cleanTemplates.length > 0;
-
-        if (hasDbData) {
-          setCategories(cleanCats);
-          if (dbHabits.length > 0) setHabits(dbHabits);
-          setTemplates(cleanTemplates);
-          setAchievements(cleanAchievements);
-          setMarketItems(cleanMarketItems);
-          if (dbUserProfile) {
-            const currentAuth = firebaseAuth.currentUser;
-            if (currentAuth) {
-              const enriched: UserProfile = {
-                ...dbUserProfile,
-                name: currentAuth.displayName || (dbUserProfile.name !== 'Usuário' ? dbUserProfile.name : (currentAuth.email ? currentAuth.email.split('@')[0] : 'Usuário')),
-                email: currentAuth.email || dbUserProfile.email,
-                photoUrl: currentAuth.photoURL ?? dbUserProfile.photoUrl,
-                isLoggedIn: true,
-              };
-              setUserProfile(enriched);
-            } else {
-              setUserProfile(dbUserProfile);
-            }
-          }
-          if (dbSettings) setSettings(dbSettings);
-        } else {
-          // 2. Se o SQLite estiver vazio, verifica se há dados antigos no AsyncStorage para migrar
-          const savedAsync = await AsyncStorage.getItem(STORAGE_KEY);
-          if (savedAsync) {
-            const parsed = JSON.parse(savedAsync);
-            const rawCats: Category[] = parsed.categories || INITIAL_CATEGORIES;
-            const initialCats = rawCats.filter((c) => !LEGACY_MOCK_CAT_IDS.has(c.id));
-            const initialHab = parsed.habits || INITIAL_HABITS;
-            const initialTmpl = (parsed.templates || INITIAL_TEMPLATES).filter(
-              (t: any) => !LEGACY_MOCK_TMPL_IDS.has(t.id)
-            );
-            const initialAch = INITIAL_ACHIEVEMENTS;
-            const initialMkt = INITIAL_MARKET_ITEMS;
-            const initialProf = parsed.userProfile || INITIAL_USER_PROFILE;
-            const initialSett = parsed.settings || INITIAL_SETTINGS;
-
-            const finalCats = initialCats.length > 0 ? initialCats : INITIAL_CATEGORIES;
-            setCategories(finalCats);
-            setHabits(initialHab);
-            setTemplates(initialTmpl);
-            setAchievements(initialAch);
-            setMarketItems(initialMkt);
-            const currentAuth = firebaseAuth.currentUser;
-            if (currentAuth) {
-              setUserProfile({
-                ...initialProf,
-                name: currentAuth.displayName || (initialProf.name !== 'Usuário' ? initialProf.name : (currentAuth.email ? currentAuth.email.split('@')[0] : 'Usuário')),
-                email: currentAuth.email || initialProf.email,
-                photoUrl: currentAuth.photoURL ?? initialProf.photoUrl,
-                isLoggedIn: true,
-              });
-            } else {
-              setUserProfile(initialProf);
-            }
-            setSettings(initialSett);
-
-            // Grava no SQLite imediatamente para consolidar a migração
-            await setAllCategoriesDb(finalCats);
-            await setAllHabitsDb(initialHab);
-            await setAllTemplatesDb(initialTmpl);
-            await setAllAchievementsDb(initialAch);
-            await setAllMarketItemsDb(initialMkt);
-            await setAppKv('user_profile', initialProf);
-            await setAppKv('app_settings', initialSett);
-          } else {
-            // Inicializa o banco SQLite com os dados padrão do Momentus (apenas Outros)
-            await setAllCategoriesDb(INITIAL_CATEGORIES);
-            await setAllHabitsDb(INITIAL_HABITS);
-            await setAllTemplatesDb(INITIAL_TEMPLATES);
-            await setAllAchievementsDb(INITIAL_ACHIEVEMENTS);
-            await setAllMarketItemsDb(INITIAL_MARKET_ITEMS);
-            await setAppKv('user_profile', INITIAL_USER_PROFILE);
-            await setAppKv('app_settings', INITIAL_SETTINGS);
-          }
-        }
+            ? dbMarketItems
+            : (legacyParsed?.marketItems || INITIAL_MARKET_ITEMS);
+        setMarketItems(cleanMarketItems);
       } catch (e) {
-        console.warn('Erro ao carregar dados do SQLite:', e);
+        console.warn('Erro ao carregar dados do banco:', e);
       } finally {
         setIsLoaded(true);
       }
@@ -384,13 +333,6 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     // Observa mudanças de autenticação do Firebase e sincroniza automaticamente
     const unsubAuth = onAuthStateChanged(firebaseAuth, async (user) => {
       if (user) {
-        console.log('[AUTH] Usuário detectado no onAuthStateChanged:', {
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName,
-          photoURL: user.photoURL,
-        });
-
         const activeName =
           user.displayName?.trim() ||
           (user.email ? user.email.split('@')[0] : 'Usuário');
@@ -418,7 +360,18 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
     });
 
-    return () => unsubAuth();
+    // Sincronização periódica a cada 60 segundos com a nuvem (equivalente ao SyncWorker.kt)
+    const periodicSyncTimer = setInterval(() => {
+      const activeUid = firebaseAuth.currentUser?.uid;
+      if (activeUid) {
+        syncCloudActionRef.current(activeUid).catch(() => {});
+      }
+    }, 60000);
+
+    return () => {
+      unsubAuth();
+      clearInterval(periodicSyncTimer);
+    };
   }, []);
 
   // Persistência contínua: grava no SQLite e mantém AsyncStorage sincronizado
@@ -582,6 +535,12 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             cancelHabitNotifications(habit.id).catch(() => {});
           } else {
             triggerHaptic('impact');
+            nextTotalCompleted = Math.max(0, nextTotalCompleted - 1);
+            setUserProfile((p) => ({
+              ...p,
+              totalCompleted: Math.max(0, p.totalCompleted - 1),
+              totalPoints: Math.max(0, p.totalPoints - 15),
+            }));
             // Reagenda os alarmes se desmarcou
             scheduleHabitNotifications({ ...habit, completed: false }).catch(() => {});
           }
@@ -616,7 +575,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         console.warn('Erro ao salvar conclusão no Firestore:', err)
       );
       saveUserProfileToFirestore(currentUserId, {
-        totalPoints: userProfile.totalPoints + (nextCompleted ? 15 : 0),
+        totalPoints: Math.max(0, userProfile.totalPoints + (nextCompleted ? 15 : -15)),
         currentStreak: nextStreak,
         bestStreak: Math.max(userProfile.bestStreak, nextStreak),
         totalCompleted: nextTotalCompleted,
@@ -683,6 +642,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
     }
     setHabits((prev) => prev.filter((h) => h.id !== id));
+    deleteHabitDb(id).catch(() => {});
     triggerHaptic('impact');
 
     const currentUserId = firebaseAuth.currentUser?.uid;
@@ -703,6 +663,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
     });
     setHabits((prev) => prev.filter((h) => !idSet.has(h.id)));
+    deleteMultipleHabitsDb(ids).catch(() => {});
     triggerHaptic('impact');
 
     const currentUserId = firebaseAuth.currentUser?.uid;

@@ -19,6 +19,7 @@ import { GlassCard } from '@/components/momentus/GlassCard';
 import { TimelineEventItem } from '@/components/momentus/TimelineEventItem';
 import { EventDetailDialog } from '@/components/momentus/EventDetailDialog';
 import { NewHabitModal } from '@/components/momentus/NewHabitModal';
+import { CircularProgressRing } from '@/components/momentus/CircularProgressRing';
 import { getTodayDateString, getStreakColor } from '@/constants/initialData';
 import { HabitItem } from '@/types';
 import { auth as firebaseAuth } from '@/config/firebase';
@@ -258,13 +259,14 @@ export default function HomeScreen() {
                   </Text>
                 </View>
 
-                {/* Progresso circular estilizado */}
+                {/* Progresso circular funcional */}
                 <View style={styles.circularProgressContainer}>
-                  <View style={[styles.circularProgressRing, { borderColor: theme.primary }]}>
-                    <Text style={[styles.progressPercentageText, { color: theme.primary }]}>
-                      {Math.round(progress * 100)}%
-                    </Text>
-                  </View>
+                  <CircularProgressRing
+                    progress={progress}
+                    size={78}
+                    strokeWidth={8}
+                    color={theme.primary}
+                  />
                 </View>
               </View>
             </GlassCard>
@@ -273,9 +275,23 @@ export default function HomeScreen() {
           {/* 3. Seção "Seu dia" com Timeline Vertical */}
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Seu dia</Text>
-            <Text style={[styles.sectionCountText, { color: theme.textSecondary }]}>
-              {completionsToday}/{totalToday} concluídas
-            </Text>
+            <View style={styles.sectionHeaderRight}>
+              <Text style={[styles.sectionCountText, { color: theme.textSecondary }]}>
+                {completionsToday}/{totalToday} concluídas
+              </Text>
+              {todayHabits.length > 0 && !isSelectionMode && (
+                <TouchableOpacity
+                  onPress={() => setIsSelectionMode(true)}
+                  style={[
+                    styles.selectModeBtn,
+                    { borderColor: theme.outline, backgroundColor: theme.surface },
+                  ]}
+                  activeOpacity={0.7}>
+                  <Ionicons name="checkbox-outline" size={14} color={theme.primary} />
+                  <Text style={[styles.selectModeBtnText, { color: theme.primary }]}>Selecionar</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
 
           {todayHabits.length === 0 ? (
@@ -546,8 +562,26 @@ const styles = StyleSheet.create({
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'baseline',
+    alignItems: 'center',
     marginBottom: 16,
+  },
+  sectionHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  selectModeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  selectModeBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   sectionTitle: {
     fontSize: 20,

@@ -106,17 +106,6 @@ function parseLocalDateTime(dateStr: string, timeStr: string): Date {
 }
 
 /**
- * Formata Date para padrão iCalendar UTC/Local (YYYYMMDDTHHMMSS) para exportação Web (.ics).
- */
-function formatIcsDate(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return (
-    `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T` +
-    `${pad(d.getHours())}${pad(d.getMinutes())}00`
-  );
-}
-
-/**
  * Sincroniza um hábito para o calendário nativo (Google Calendar no Android / Apple Calendar no iOS).
  * Retorna o ID do evento criado ou atualizado.
  */
@@ -207,54 +196,10 @@ export async function syncAllHabitsToCalendar(
 ): Promise<{ syncedCount: number; updatedHabits: HabitItem[] }> {
   const categoryMap = new Map<string, Category>(categories.map((c) => [c.id, c]));
 
-  // Suporte Web: gera e baixa arquivo .ics padrão para importação direta no Google/Apple Calendar
-  if (Platform.OS === 'web' && typeof document !== 'undefined') {
+  // Suporte Web: na plataforma Web a sincronização ocorre diretamente via nuvem (Firestore),
+  // sem disparar downloads indesejados de arquivos .ics no navegador.
+  if (Platform.OS === 'web') {
     const activeHabits = habits.filter((h) => h.saveToGoogle || !h.completed);
-    if (activeHabits.length === 0) {
-      return { syncedCount: 0, updatedHabits: habits };
-    }
-
-    const lines: string[] = [
-      'BEGIN:VCALENDAR',
-      'VERSION:2.0',
-      'PRODID:-//Momentus//Rotinas//PT',
-      'CALSCALE:GREGORIAN',
-    ];
-
-    for (const habit of activeHabits) {
-      const startDate = parseLocalDateTime(habit.date, habit.timeStart);
-      let endDate = parseLocalDateTime(habit.date, habit.timeEnd || habit.timeStart);
-      if (endDate.getTime() <= startDate.getTime()) {
-        endDate = new Date(startDate.getTime() + 30 * 60 * 1000);
-      }
-      const cat = categoryMap.get(habit.categoryId);
-      const desc = [habit.description || '', cat ? `Categoria: ${cat.name}` : '']
-        .filter(Boolean)
-        .join(' - ');
-
-      lines.push(
-        'BEGIN:VEVENT',
-        `UID:${habit.id}@momentus.app`,
-        `DTSTAMP:${formatIcsDate(new Date())}`,
-        `DTSTART:${formatIcsDate(startDate)}`,
-        `DTEND:${formatIcsDate(endDate)}`,
-        `SUMMARY:${habit.title}`,
-        `DESCRIPTION:${desc}`,
-        'END:VEVENT'
-      );
-    }
-
-    lines.push('END:VCALENDAR');
-    const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'momentus_agenda.ics';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
     return {
       syncedCount: activeHabits.length,
       updatedHabits: habits.map((h) =>
