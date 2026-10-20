@@ -7,7 +7,6 @@ import { MomentusColors } from '@/constants/theme';
 import { MomentusProvider, useMomentus } from '@/context/MomentusContext';
 import { CURRENT_TERMS_VERSION } from '@/constants/legalContent';
 import { auth as firebaseAuth } from '@/config/firebase';
-import { SplashScreen } from '@/components/momentus/SplashScreen';
 
 function TabsNavigator() {
   const router = useRouter();
@@ -41,10 +40,6 @@ function TabsNavigator() {
     pathname,
     router,
   ]);
-
-  if (!isLoaded) {
-    return <SplashScreen syncMessage="Carregando suas rotinas..." />;
-  }
 
   return (
     <>

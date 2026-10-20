@@ -24,6 +24,7 @@ import {
 } from '@/services/authService';
 import { hasAcceptedTermsCloud } from '@/services/firestoreSyncService';
 import { CURRENT_TERMS_VERSION } from '@/constants/legalContent';
+import { SplashScreen } from '@/components/momentus/SplashScreen';
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
@@ -34,6 +35,8 @@ export default function LoginScreen() {
   const [showEmailFields, setShowEmailFields] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isPostLoginSyncing, setIsPostLoginSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState('Sincronizando suas rotinas...');
 
   const primaryColor = settings.primaryColorHex || MomentusColors.emeraldNeon;
 
@@ -44,12 +47,14 @@ export default function LoginScreen() {
     try {
       const { accepted, version } = await hasAcceptedTermsCloud(uid);
       if (!accepted || version < CURRENT_TERMS_VERSION) {
+        setIsPostLoginSyncing(false);
         router.replace('/legal?mandatory=true' as any);
         return;
       }
     } catch (err) {
       console.warn('Erro ao verificar termos pós login:', err);
     }
+    setIsPostLoginSyncing(false);
     router.replace('/');
   };
 
@@ -57,6 +62,8 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       const user = await loginWithGoogle();
+      setIsPostLoginSyncing(true);
+      setSyncMessage('Carregando suas rotinas...');
       login(
         user.email || 'usuario@gmail.com',
         user.displayName || undefined,
@@ -68,10 +75,10 @@ export default function LoginScreen() {
         console.warn('Erro ao sincronizar dados do Firestore após login:', syncErr);
       }
       setLoading(false);
-      Alert.alert('Sucesso! ✨', `Bem-vindo(a), ${user.displayName || 'Usuário'}!`);
       await navigatePostLogin(user.uid);
     } catch (err: any) {
       setLoading(false);
+      setIsPostLoginSyncing(false);
       if (err.message !== 'SIGN_IN_CANCELLED' && err.code !== 'SIGN_IN_CANCELLED') {
         Alert.alert(
           'Erro ao entrar com Google',
@@ -85,6 +92,8 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       const user = await loginWithApple();
+      setIsPostLoginSyncing(true);
+      setSyncMessage('Carregando suas rotinas...');
       login(
         user.email || 'usuario@apple.com',
         user.displayName || undefined,
@@ -96,10 +105,10 @@ export default function LoginScreen() {
         console.warn('Erro ao sincronizar dados do Firestore após login Apple:', syncErr);
       }
       setLoading(false);
-      Alert.alert('Sucesso! 🍏', 'Login realizado com a Apple.');
       await navigatePostLogin(user.uid);
     } catch (err: any) {
       setLoading(false);
+      setIsPostLoginSyncing(false);
       if (err.code !== 'ERR_REQUEST_CANCELED') {
         Alert.alert('Erro ao entrar com Apple', err.message || 'Não foi possível autenticar.');
       }
@@ -119,6 +128,8 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       const user = await loginWithEmail(email, password);
+      setIsPostLoginSyncing(true);
+      setSyncMessage('Carregando suas rotinas...');
       login(
         user.email || email,
         user.displayName || undefined,
@@ -133,9 +144,14 @@ export default function LoginScreen() {
       await navigatePostLogin(user.uid);
     } catch (err: any) {
       setLoading(false);
+      setIsPostLoginSyncing(false);
       Alert.alert('Erro no login', err.message || 'E-mail ou senha incorretos.');
     }
   };
+
+  if (isPostLoginSyncing) {
+    return <SplashScreen syncMessage={syncMessage} />;
+  }
 
   return (
     <KeyboardAvoidingView

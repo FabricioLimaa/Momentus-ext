@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MomentusColors } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import { registerWithEmail } from '@/services/authService';
+import { SplashScreen } from '@/components/momentus/SplashScreen';
 
 export default function SignUpScreen() {
   const insets = useSafeAreaInsets();
@@ -27,6 +28,7 @@ export default function SignUpScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isPostSignUpSyncing, setIsPostSignUpSyncing] = useState(false);
 
   const primaryColor = settings.primaryColorHex || MomentusColors.emeraldNeon;
 
@@ -51,6 +53,7 @@ export default function SignUpScreen() {
     setLoading(true);
     try {
       const user = await registerWithEmail(email, password, name.trim());
+      setIsPostSignUpSyncing(true);
       login(
         user.email || email,
         user.displayName || name.trim(),
@@ -62,6 +65,7 @@ export default function SignUpScreen() {
         console.warn('Erro ao sincronizar dados na nuvem:', syncErr);
       }
       setLoading(false);
+      setIsPostSignUpSyncing(false);
       Alert.alert('Sucesso! 🎉', 'Conta criada com sucesso! Por favor, leia e aceite os termos para começar.', [
         {
           text: 'Continuar',
@@ -70,9 +74,14 @@ export default function SignUpScreen() {
       ]);
     } catch (err: any) {
       setLoading(false);
+      setIsPostSignUpSyncing(false);
       Alert.alert('Erro ao criar conta', err.message || 'Verifique seus dados e tente novamente.');
     }
   };
+
+  if (isPostSignUpSyncing) {
+    return <SplashScreen syncMessage="Preparando seu espaço..." />;
+  }
 
   return (
     <KeyboardAvoidingView
