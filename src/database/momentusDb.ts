@@ -1,5 +1,6 @@
 import type * as SQLite from 'expo-sqlite';
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Category,
   HabitItem,
@@ -158,6 +159,15 @@ async function initDatabaseSchema(db: SQLite.SQLiteDatabase): Promise<void> {
 // ==========================================
 
 export async function getAllCategories(): Promise<Category[]> {
+  if (Platform.OS === 'web') {
+    try {
+      const raw = await AsyncStorage.getItem('@momentus_categories');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
   return enqueueDbOperation(async (db) => {
     const rows = await db.getAllAsync<{
       id: string;
@@ -180,6 +190,19 @@ export async function getAllCategories(): Promise<Category[]> {
 }
 
 export async function upsertCategoryDb(category: Category): Promise<void> {
+  if (Platform.OS === 'web') {
+    try {
+      const cats = await getAllCategories();
+      const idx = cats.findIndex((c) => c.id === category.id);
+      if (idx >= 0) cats[idx] = category;
+      else cats.push(category);
+      await AsyncStorage.setItem('@momentus_categories', JSON.stringify(cats));
+    } catch (e) {
+      console.warn('Erro ao salvar categoria no web:', e);
+    }
+    return;
+  }
+
   return enqueueDbOperation(async (db) => {
     await db.runAsync(
       `INSERT OR REPLACE INTO categories (id, name, color, icon, stickerId, metaMinutosSemanal)
@@ -197,12 +220,34 @@ export async function upsertCategoryDb(category: Category): Promise<void> {
 }
 
 export async function deleteCategoryDb(id: string): Promise<void> {
+  if (Platform.OS === 'web') {
+    try {
+      const cats = await getAllCategories();
+      await AsyncStorage.setItem(
+        '@momentus_categories',
+        JSON.stringify(cats.filter((c) => c.id !== id))
+      );
+    } catch (e) {
+      console.warn('Erro ao deletar categoria no web:', e);
+    }
+    return;
+  }
+
   return enqueueDbOperation(async (db) => {
     await db.runAsync('DELETE FROM categories WHERE id = ?', [id]);
   }, undefined);
 }
 
 export async function setAllCategoriesDb(categories: Category[]): Promise<void> {
+  if (Platform.OS === 'web') {
+    try {
+      await AsyncStorage.setItem('@momentus_categories', JSON.stringify(categories));
+    } catch (e) {
+      console.warn('Erro ao salvar todas categorias no web:', e);
+    }
+    return;
+  }
+
   return enqueueDbOperation(async (db) => {
     await db.withTransactionAsync(async () => {
       await db.runAsync('DELETE FROM categories');
@@ -229,6 +274,15 @@ export async function setAllCategoriesDb(categories: Category[]): Promise<void> 
 // ==========================================
 
 export async function getAllHabits(): Promise<HabitItem[]> {
+  if (Platform.OS === 'web') {
+    try {
+      const raw = await AsyncStorage.getItem('@momentus_habits');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
   return enqueueDbOperation(async (db) => {
     const rows = await db.getAllAsync<{
       id: string;
@@ -261,6 +315,19 @@ export async function getAllHabits(): Promise<HabitItem[]> {
 }
 
 export async function upsertHabitDb(habit: HabitItem): Promise<void> {
+  if (Platform.OS === 'web') {
+    try {
+      const habits = await getAllHabits();
+      const idx = habits.findIndex((h) => h.id === habit.id);
+      if (idx >= 0) habits[idx] = habit;
+      else habits.unshift(habit);
+      await AsyncStorage.setItem('@momentus_habits', JSON.stringify(habits));
+    } catch (e) {
+      console.warn('Erro ao salvar hábito no web:', e);
+    }
+    return;
+  }
+
   return enqueueDbOperation(async (db) => {
     await db.runAsync(
       `INSERT OR REPLACE INTO habits 
@@ -284,6 +351,19 @@ export async function upsertHabitDb(habit: HabitItem): Promise<void> {
 }
 
 export async function deleteHabitDb(id: string): Promise<void> {
+  if (Platform.OS === 'web') {
+    try {
+      const habits = await getAllHabits();
+      await AsyncStorage.setItem(
+        '@momentus_habits',
+        JSON.stringify(habits.filter((h) => h.id !== id))
+      );
+    } catch (e) {
+      console.warn('Erro ao deletar hábito no web:', e);
+    }
+    return;
+  }
+
   return enqueueDbOperation(async (db) => {
     await db.runAsync('DELETE FROM habits WHERE id = ?', [id]);
   }, undefined);
@@ -291,6 +371,20 @@ export async function deleteHabitDb(id: string): Promise<void> {
 
 export async function deleteMultipleHabitsDb(ids: string[]): Promise<void> {
   if (ids.length === 0) return;
+  if (Platform.OS === 'web') {
+    try {
+      const habits = await getAllHabits();
+      const idSet = new Set(ids);
+      await AsyncStorage.setItem(
+        '@momentus_habits',
+        JSON.stringify(habits.filter((h) => !idSet.has(h.id)))
+      );
+    } catch (e) {
+      console.warn('Erro ao deletar múltiplos hábitos no web:', e);
+    }
+    return;
+  }
+
   return enqueueDbOperation(async (db) => {
     const placeholders = ids.map(() => '?').join(',');
     await db.runAsync(`DELETE FROM habits WHERE id IN (${placeholders})`, ids);
@@ -298,6 +392,15 @@ export async function deleteMultipleHabitsDb(ids: string[]): Promise<void> {
 }
 
 export async function setAllHabitsDb(habits: HabitItem[]): Promise<void> {
+  if (Platform.OS === 'web') {
+    try {
+      await AsyncStorage.setItem('@momentus_habits', JSON.stringify(habits));
+    } catch (e) {
+      console.warn('Erro ao salvar todos os hábitos no web:', e);
+    }
+    return;
+  }
+
   return enqueueDbOperation(async (db) => {
     await db.withTransactionAsync(async () => {
       await db.runAsync('DELETE FROM habits');
@@ -330,6 +433,15 @@ export async function setAllHabitsDb(habits: HabitItem[]): Promise<void> {
 // ==========================================
 
 export async function getAllTemplates(): Promise<RoutineTemplate[]> {
+  if (Platform.OS === 'web') {
+    try {
+      const raw = await AsyncStorage.getItem('@momentus_templates');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
   return enqueueDbOperation(async (db) => {
     const rows = await db.getAllAsync<{
       id: string;
@@ -358,6 +470,19 @@ export async function getAllTemplates(): Promise<RoutineTemplate[]> {
 }
 
 export async function upsertTemplateDb(template: RoutineTemplate): Promise<void> {
+  if (Platform.OS === 'web') {
+    try {
+      const templates = await getAllTemplates();
+      const idx = templates.findIndex((t) => t.id === template.id);
+      if (idx >= 0) templates[idx] = template;
+      else templates.push(template);
+      await AsyncStorage.setItem('@momentus_templates', JSON.stringify(templates));
+    } catch (e) {
+      console.warn('Erro ao salvar template no web:', e);
+    }
+    return;
+  }
+
   return enqueueDbOperation(async (db) => {
     await db.runAsync(
       `INSERT OR REPLACE INTO templates (id, title, description, icon, color, itemsJson)
@@ -375,12 +500,34 @@ export async function upsertTemplateDb(template: RoutineTemplate): Promise<void>
 }
 
 export async function deleteTemplateDb(id: string): Promise<void> {
+  if (Platform.OS === 'web') {
+    try {
+      const templates = await getAllTemplates();
+      await AsyncStorage.setItem(
+        '@momentus_templates',
+        JSON.stringify(templates.filter((t) => t.id !== id))
+      );
+    } catch (e) {
+      console.warn('Erro ao deletar template no web:', e);
+    }
+    return;
+  }
+
   return enqueueDbOperation(async (db) => {
     await db.runAsync('DELETE FROM templates WHERE id = ?', [id]);
   }, undefined);
 }
 
 export async function setAllTemplatesDb(templates: RoutineTemplate[]): Promise<void> {
+  if (Platform.OS === 'web') {
+    try {
+      await AsyncStorage.setItem('@momentus_templates', JSON.stringify(templates));
+    } catch (e) {
+      console.warn('Erro ao salvar todos os templates no web:', e);
+    }
+    return;
+  }
+
   return enqueueDbOperation(async (db) => {
     await db.withTransactionAsync(async () => {
       await db.runAsync('DELETE FROM templates');
@@ -407,6 +554,15 @@ export async function setAllTemplatesDb(templates: RoutineTemplate[]): Promise<v
 // ==========================================
 
 export async function getAllAchievements(): Promise<Achievement[]> {
+  if (Platform.OS === 'web') {
+    try {
+      const raw = await AsyncStorage.getItem('@momentus_achievements');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
   return enqueueDbOperation(async (db) => {
     const rows = await db.getAllAsync<{
       id: string;
@@ -435,6 +591,15 @@ export async function getAllAchievements(): Promise<Achievement[]> {
 }
 
 export async function setAllAchievementsDb(achievements: Achievement[]): Promise<void> {
+  if (Platform.OS === 'web') {
+    try {
+      await AsyncStorage.setItem('@momentus_achievements', JSON.stringify(achievements));
+    } catch (e) {
+      console.warn('Erro ao salvar conquistas no web:', e);
+    }
+    return;
+  }
+
   return enqueueDbOperation(async (db) => {
     await db.withTransactionAsync(async () => {
       await db.runAsync('DELETE FROM achievements');
@@ -460,6 +625,15 @@ export async function setAllAchievementsDb(achievements: Achievement[]): Promise
 }
 
 export async function getAllMarketItems(): Promise<MarketItem[]> {
+  if (Platform.OS === 'web') {
+    try {
+      const raw = await AsyncStorage.getItem('@momentus_market_items');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
   return enqueueDbOperation(async (db) => {
     const rows = await db.getAllAsync<{
       id: string;
@@ -488,6 +662,15 @@ export async function getAllMarketItems(): Promise<MarketItem[]> {
 }
 
 export async function setAllMarketItemsDb(items: MarketItem[]): Promise<void> {
+  if (Platform.OS === 'web') {
+    try {
+      await AsyncStorage.setItem('@momentus_market_items', JSON.stringify(items));
+    } catch (e) {
+      console.warn('Erro ao salvar loja no web:', e);
+    }
+    return;
+  }
+
   return enqueueDbOperation(async (db) => {
     await db.withTransactionAsync(async () => {
       await db.runAsync('DELETE FROM market_items');
@@ -517,6 +700,15 @@ export async function setAllMarketItemsDb(items: MarketItem[]): Promise<void> {
 // ==========================================
 
 export async function getAppKv<T>(key: string): Promise<T | null> {
+  if (Platform.OS === 'web') {
+    try {
+      const raw = await AsyncStorage.getItem(`@momentus_kv_${key}`);
+      return raw ? (JSON.parse(raw) as T) : null;
+    } catch {
+      return null;
+    }
+  }
+
   return enqueueDbOperation(async (db) => {
     const row = await db.getFirstAsync<{ value: string }>(
       'SELECT value FROM app_kv WHERE key = ?',
@@ -532,6 +724,15 @@ export async function getAppKv<T>(key: string): Promise<T | null> {
 }
 
 export async function setAppKv<T>(key: string, value: T): Promise<void> {
+  if (Platform.OS === 'web') {
+    try {
+      await AsyncStorage.setItem(`@momentus_kv_${key}`, JSON.stringify(value));
+    } catch (e) {
+      console.warn('Erro ao salvar key-value no web:', e);
+    }
+    return;
+  }
+
   return enqueueDbOperation(async (db) => {
     await db.runAsync(
       'INSERT OR REPLACE INTO app_kv (key, value) VALUES (?, ?)',
@@ -545,6 +746,23 @@ export async function setAppKv<T>(key: string, value: T): Promise<void> {
 // ==========================================
 
 export async function clearEntireDatabase(): Promise<void> {
+  if (Platform.OS === 'web') {
+    try {
+      await AsyncStorage.multiRemove([
+        '@momentus_categories',
+        '@momentus_habits',
+        '@momentus_templates',
+        '@momentus_achievements',
+        '@momentus_market_items',
+        '@momentus_kv_user_profile',
+        '@momentus_kv_app_settings',
+      ]);
+    } catch (e) {
+      console.warn('Erro ao limpar banco no web:', e);
+    }
+    return;
+  }
+
   return enqueueDbOperation(async (db) => {
     await db.withTransactionAsync(async () => {
       await db.runAsync('DELETE FROM habits');

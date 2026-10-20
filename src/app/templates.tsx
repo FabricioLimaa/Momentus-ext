@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { MomentusColors } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import { ApplyTemplateDialog } from '@/components/momentus/ApplyTemplateDialog';
+import { TimePickerModal } from '@/components/momentus/TimePickerModal';
 import { RoutineTemplate, TemplateItem, SharedTemplate } from '@/types';
 
 interface EventFormState {
@@ -62,7 +63,31 @@ export default function TemplatesScreen() {
   // Estado do diálogo de importação
   const [importJsonText, setImportJsonText] = useState('');
 
+  // Estado do TimePicker para itens do template
+  const [timePickerTarget, setTimePickerTarget] = useState<{
+    index: number;
+    field: 'timeStart' | 'timeEnd';
+    title: string;
+    initialTime: string;
+  } | null>(null);
+
   const defaultCategoryId = categories.find((c) => c.name.toLowerCase() === 'outros')?.id || categories[0]?.id || 'cat-outros';
+
+  const parseTimeToMinutes = (t: string) => {
+    if (!t) return 0;
+    const [h, m] = t.split(':').map((v) => parseInt(v, 10) || 0);
+    return h * 60 + m;
+  };
+
+  const isEventTimeInvalid = (start: string, end: string) => {
+    if (!start || !end) return false;
+    return parseTimeToMinutes(end) <= parseTimeToMinutes(start);
+  };
+
+  const hasInvalidTime = formEvents.some((ev) => isEventTimeInvalid(ev.timeStart, ev.timeEnd));
+  const isFormValid =
+    formName.trim().length > 0 &&
+    formEvents.every((ev) => ev.title.trim().length > 0 && !isEventTimeInvalid(ev.timeStart, ev.timeEnd));
 
   const handleOpenCreateModal = () => {
     setEditingTemplateId(null);
@@ -140,6 +165,14 @@ export default function TemplatesScreen() {
     const hasInvalidEvent = formEvents.some((ev) => !ev.title.trim());
     if (hasInvalidEvent) {
       Alert.alert('Atenção', 'Todos os eventos da rotina precisam ter um título.');
+      return;
+    }
+
+    if (hasInvalidTime) {
+      Alert.alert(
+        'Horário Inválido',
+        'O horário de término de cada atividade deve ser posterior ao horário de início.'
+      );
       return;
     }
 
@@ -594,30 +627,83 @@ export default function TemplatesScreen() {
                 />
 
                 {/* Horários */}
-                <View style={styles.timeRow}>
-                  <View style={styles.timeCol}>
-                    <Text style={[styles.timeLabel, { color: theme.textSecondary }]}>Início</Text>
-                    <TextInput
-                      style={[styles.timeInput, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary }]}
-                      value={ev.timeStart}
-                      onChangeText={(val) => handleUpdateEventField(index, { timeStart: val })}
-                      placeholder="08:00"
-                      maxLength={5}
-                      placeholderTextColor={`${theme.textSecondary}80`}
-                    />
-                  </View>
-                  <View style={styles.timeCol}>
-                    <Text style={[styles.timeLabel, { color: theme.textSecondary }]}>Término</Text>
-                    <TextInput
-                      style={[styles.timeInput, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary }]}
-                      value={ev.timeEnd}
-                      onChangeText={(val) => handleUpdateEventField(index, { timeEnd: val })}
-                      placeholder="08:30"
-                      maxLength={5}
-                      placeholderTextColor={`${theme.textSecondary}80`}
-                    />
-                  </View>
-                </View>
+                {(() => {
+                  const isTimeInvalid = isEventTimeInvalid(ev.timeStart, ev.timeEnd);
+                  return (
+                    <>
+                      <View style={styles.timeRow}>
+                        <View style={styles.timeCol}>
+                          <Text style={[styles.timeLabel, { color: theme.textSecondary }]}>Início</Text>
+                          <TouchableOpacity
+                            style={[
+                              styles.timeInputTouchable,
+                              {
+                                backgroundColor: theme.surfaceElevated,
+                                borderColor: isTimeInvalid ? MomentusColors.errorRed : theme.outline,
+                              },
+                            ]}
+                            onPress={() =>
+                              setTimePickerTarget({
+                                index,
+                                field: 'timeStart',
+                                title: `Hora de Início - Evento ${index + 1}`,
+                                initialTime: ev.timeStart,
+                              })
+                            }
+                            activeOpacity={0.7}>
+                            <Text style={[styles.timeInputText, { color: theme.textPrimary }]}>
+                              {ev.timeStart}
+                            </Text>
+                            <Ionicons
+                              name="time-outline"
+                              size={16}
+                              color={isTimeInvalid ? MomentusColors.errorRed : theme.textSecondary}
+                            />
+                          </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.timeCol}>
+                          <Text style={[styles.timeLabel, { color: theme.textSecondary }]}>Término</Text>
+                          <TouchableOpacity
+                            style={[
+                              styles.timeInputTouchable,
+                              {
+                                backgroundColor: theme.surfaceElevated,
+                                borderColor: isTimeInvalid ? MomentusColors.errorRed : theme.outline,
+                              },
+                            ]}
+                            onPress={() =>
+                              setTimePickerTarget({
+                                index,
+                                field: 'timeEnd',
+                                title: `Hora de Término - Evento ${index + 1}`,
+                                initialTime: ev.timeEnd,
+                              })
+                            }
+                            activeOpacity={0.7}>
+                            <Text style={[styles.timeInputText, { color: theme.textPrimary }]}>
+                              {ev.timeEnd}
+                            </Text>
+                            <Ionicons
+                              name="time-outline"
+                              size={16}
+                              color={isTimeInvalid ? MomentusColors.errorRed : theme.textSecondary}
+                            />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+
+                      {isTimeInvalid && (
+                        <View style={styles.errorBanner}>
+                          <Ionicons name="alert-circle" size={14} color={MomentusColors.errorRed} />
+                          <Text style={styles.errorBannerText}>
+                            O horário de término deve ser posterior ao horário de início.
+                          </Text>
+                        </View>
+                      )}
+                    </>
+                  );
+                })()}
 
                 {/* Categoria */}
                 <Text style={[styles.timeLabel, { color: theme.textSecondary, marginTop: 10, marginBottom: 6 }]}>
@@ -662,8 +748,13 @@ export default function TemplatesScreen() {
           {/* Footer com Botão de Confirmação */}
           <View style={[styles.formModalFooter, { borderTopColor: theme.outline }]}>
             <TouchableOpacity
-              style={[styles.saveTemplateBtn, { backgroundColor: theme.primary }]}
+              style={[
+                styles.saveTemplateBtn,
+                { backgroundColor: theme.primary },
+                !isFormValid && styles.disabledBtn,
+              ]}
               onPress={handleSaveFormTemplate}
+              disabled={!isFormValid}
               activeOpacity={0.85}>
               <Ionicons name="checkmark" size={20} color="#0F172A" />
               <Text style={styles.saveTemplateBtnText}>
@@ -722,6 +813,22 @@ export default function TemplatesScreen() {
           templateTitle={selectedTemplateForApply.title}
           onDismiss={() => setSelectedTemplateForApply(null)}
           onConfirm={handleApplyConfirm}
+        />
+      )}
+
+      {/* Modal de Seleção de Horário para Atividades do Template */}
+      {timePickerTarget && (
+        <TimePickerModal
+          visible={true}
+          title={timePickerTarget.title}
+          initialTime={timePickerTarget.initialTime}
+          onDismiss={() => setTimePickerTarget(null)}
+          onConfirm={(newTime) => {
+            handleUpdateEventField(timePickerTarget.index, {
+              [timePickerTarget.field]: newTime,
+            });
+            setTimePickerTarget(null);
+          }}
         />
       )}
     </SafeAreaView>
@@ -1041,6 +1148,40 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     fontSize: 14,
     textAlign: 'center',
+  },
+  timeInputTouchable: {
+    height: 42,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  timeInputText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginTop: 8,
+  },
+  errorBannerText: {
+    color: MomentusColors.errorRed,
+    fontSize: 12,
+    fontWeight: '600',
+    flex: 1,
+  },
+  disabledBtn: {
+    opacity: 0.5,
   },
   categoryScroll: {
     flexDirection: 'row',

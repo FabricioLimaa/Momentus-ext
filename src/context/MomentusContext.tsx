@@ -70,6 +70,10 @@ import {
   saveTemplateToFirestore,
   deleteTemplateFromFirestore,
   saveTermsAcceptance,
+  saveHabitToFirestore,
+  deleteHabitFromFirestore,
+  saveHabitCompletionToFirestore,
+  saveUserProfileToFirestore,
 } from '@/services/firestoreSyncService';
 import { CURRENT_TERMS_VERSION } from '@/constants/legalContent';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -605,6 +609,31 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
 
     checkAndUnlockAchievements(nextStreak, nextTotalCompleted, templates.length);
+
+    const currentUserId = firebaseAuth.currentUser?.uid;
+    if (currentUserId) {
+      saveHabitCompletionToFirestore(currentUserId, id, targetDate || getTodayDateString(), nextCompleted).catch((err) =>
+        console.warn('Erro ao salvar conclusão no Firestore:', err)
+      );
+      saveUserProfileToFirestore(currentUserId, {
+        totalPoints: userProfile.totalPoints + (nextCompleted ? 15 : 0),
+        currentStreak: nextStreak,
+        bestStreak: Math.max(userProfile.bestStreak, nextStreak),
+        totalCompleted: nextTotalCompleted,
+      }).catch((err) =>
+        console.warn('Erro ao salvar perfil no Firestore:', err)
+      );
+      const currentHabit = habits.find((h) => h.id === id);
+      if (currentHabit) {
+        saveHabitToFirestore(currentUserId, {
+          ...currentHabit,
+          completed: nextCompleted,
+          streak: nextCompleted ? currentHabit.streak + 1 : Math.max(0, currentHabit.streak - 1),
+        }).catch((err) =>
+          console.warn('Erro ao salvar hábito alterado no Firestore:', err)
+        );
+      }
+    }
   };
 
   const addHabit = (habitData: Omit<HabitItem, 'id' | 'completed' | 'streak'>) => {
@@ -618,10 +647,18 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setHabits((prev) => [newHabit, ...prev]);
     triggerHaptic('success');
 
-    // 1. Agendar notificações locais (início e término)
+    // 1. Grava no Firestore atomicamente
+    const currentUserId = firebaseAuth.currentUser?.uid;
+    if (currentUserId) {
+      saveHabitToFirestore(currentUserId, newHabit).catch((err) =>
+        console.warn('Erro ao salvar hábito criado no Firestore:', err)
+      );
+    }
+
+    // 2. Agendar notificações locais (início e término)
     scheduleHabitNotifications(newHabit).catch(() => {});
 
-    // 2. Sincronizar com calendário nativo se solicitado
+    // 3. Sincronizar com calendário nativo se solicitado
     const shouldSyncCalendar = newHabit.saveToGoogle ?? settings.googleCalendarSyncEnabled;
     if (shouldSyncCalendar) {
       const category = categories.find((c) => c.id === newHabit.categoryId);
@@ -647,6 +684,13 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
     setHabits((prev) => prev.filter((h) => h.id !== id));
     triggerHaptic('impact');
+
+    const currentUserId = firebaseAuth.currentUser?.uid;
+    if (currentUserId) {
+      deleteHabitFromFirestore(currentUserId, id).catch((err) =>
+        console.warn('Erro ao excluir hábito no Firestore:', err)
+      );
+    }
   };
 
   const deleteMultipleHabits = (ids: string[]) => {
@@ -660,11 +704,27 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
     setHabits((prev) => prev.filter((h) => !idSet.has(h.id)));
     triggerHaptic('impact');
+
+    const currentUserId = firebaseAuth.currentUser?.uid;
+    if (currentUserId) {
+      ids.forEach((id) => {
+        deleteHabitFromFirestore(currentUserId, id).catch((err) =>
+          console.warn('Erro ao excluir múltiplos hábitos no Firestore:', err)
+        );
+      });
+    }
   };
 
   const updateHabit = (updated: HabitItem) => {
     setHabits((prev) => prev.map((h) => (h.id === updated.id ? updated : h)));
     triggerHaptic('impact');
+
+    const currentUserId = firebaseAuth.currentUser?.uid;
+    if (currentUserId) {
+      saveHabitToFirestore(currentUserId, updated).catch((err) =>
+        console.warn('Erro ao atualizar hábito no Firestore:', err)
+      );
+    }
 
     // Atualiza notificações agendadas
     cancelHabitNotifications(updated.id)
@@ -736,6 +796,13 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     soundManager.playSuccessSound();
     triggerHaptic('success');
     checkAndUnlockAchievements(userProfile.currentStreak, userProfile.totalCompleted, templates.length);
+
+    const currentUserId = firebaseAuth.currentUser?.uid;
+    if (currentUserId && newHabits.length > 0) {
+      Promise.all(newHabits.map((h) => saveHabitToFirestore(currentUserId, h))).catch((err) =>
+        console.warn('Erro ao salvar hábitos do template no Firestore:', err)
+      );
+    }
 
     // Agenda notificações para os novos hábitos
     newHabits.forEach((h) => {

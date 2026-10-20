@@ -41,7 +41,8 @@ export interface SyncResult {
 }
 
 /**
- * Converte data em formato 'YYYY-MM-DD' para epoch timestamp em milissegundos (Long no Kotlin).
+ * Converte data em formato 'YYYY-MM-DD' para epoch timestamp em milissegundos UTC (Long no Kotlin).
+ * Espelha rigorosamente: date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
  */
 function dateToMillis(dateStr?: string | null): number | null {
   if (!dateStr) return null;
@@ -51,14 +52,15 @@ function dateToMillis(dateStr?: string | null): number | null {
     const year = parseInt(parts[0], 10);
     const month = parseInt(parts[1], 10) - 1;
     const day = parseInt(parts[2], 10);
-    return new Date(year, month, day, 12, 0, 0).getTime();
+    return Date.UTC(year, month, day, 0, 0, 0);
   }
   const parsed = new Date(dateStr).getTime();
   return isNaN(parsed) ? null : parsed;
 }
 
 /**
- * Converte epoch timestamp ou Timestamp do Firestore de volta para string 'YYYY-MM-DD'.
+ * Converte epoch timestamp ou Timestamp do Firestore de volta para string 'YYYY-MM-DD' usando UTC.
+ * Evita o deslocamento de data em fusos negativos (ex: UTC-3 Brasil).
  */
 function millisToDateString(val?: any): string {
   if (!val) return new Date().toISOString().slice(0, 10);
@@ -67,16 +69,16 @@ function millisToDateString(val?: any): string {
   }
   if (typeof val === "number") {
     const d = new Date(val);
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
+    const yyyy = d.getUTCFullYear();
+    const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const dd = String(d.getUTCDate()).padStart(2, "0");
     return `${yyyy}-${mm}-${dd}`;
   }
   if (val && typeof val.toDate === "function") {
     const d = val.toDate();
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
+    const yyyy = d.getUTCFullYear();
+    const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const dd = String(d.getUTCDate()).padStart(2, "0");
     return `${yyyy}-${mm}-${dd}`;
   }
   return new Date().toISOString().slice(0, 10);
@@ -953,6 +955,112 @@ export async function deleteTemplateFromFirestore(
     await batch.commit();
   } catch (error) {
     console.warn("Erro ao deletar template do Firestore:", error);
+  }
+}
+
+/**
+ * Salva ou atualiza pontualmente um evento (hábito) no Firestore do usuário.
+ * Espelha fielmente o modelo ItemCronograma.kt
+ */
+export async function saveHabitToFirestore(
+  userId: string,
+  habit: HabitItem,
+): Promise<void> {
+  if (!userId || userId === "local_user") return;
+  try {
+    const userDocRef = doc(firestore, "users", userId);
+    const eventDocRef = doc(collection(userDocRef, EVENTS_COLLECTION), habit.id);
+
+    await setDoc(
+      eventDocRef,
+      {
+        id: habit.id,
+        titulo: habit.title,
+        descricao: habit.description || null,
+        data: dateToMillis(habit.date),
+        diaDaSemana: null,
+        horarioInicioString: formatTimeToIsoLocal(habit.timeStart),
+        horarioTerminoString: formatTimeToIsoLocal(habit.timeEnd || habit.timeStart),
+        ordem: 0,
+        categoryId: habit.categoryId,
+        templateId: null,
+        googleCalendarEventId: habit.googleCalendarEventId || null,
+        isDeleted: false,
+        lastUpdated: new Date(),
+      },
+      { merge: true },
+    );
+  } catch (err) {
+    console.warn("Erro ao salvar hábito no Firestore:", err);
+  }
+}
+
+/**
+ * Exclui pontualmente um evento no Firestore do usuário (marca como isDeleted ou deleta documento).
+ */
+export async function deleteHabitFromFirestore(
+  userId: string,
+  habitId: string,
+): Promise<void> {
+  if (!userId || userId === "local_user") return;
+  try {
+    const userDocRef = doc(firestore, "users", userId);
+    const eventDocRef = doc(collection(userDocRef, EVENTS_COLLECTION), habitId);
+    await setDoc(eventDocRef, { isDeleted: true, lastUpdated: new Date() }, { merge: true });
+  } catch (err) {
+    console.warn("Erro ao excluir hábito do Firestore:", err);
+  }
+}
+
+/**
+ * Registra ou remove a conclusão de um hábito no Firestore (completed_habits).
+ */
+export async function saveHabitCompletionToFirestore(
+  userId: string,
+  habitId: string,
+  completedDate: string,
+  completed: boolean,
+): Promise<void> {
+  if (!userId || userId === "local_user") return;
+  try {
+    const userDocRef = doc(firestore, "users", userId);
+    const completionDocId = `${habitId}_${completedDate}`;
+    const compDocRef = doc(collection(userDocRef, COMPLETED_HABITS_COLLECTION), completionDocId);
+    if (completed) {
+      await setDoc(compDocRef, {
+        itemCronogramaId: habitId,
+        dataConclusao: completedDate,
+        dataCriacao: new Date(),
+      });
+    } else {
+      await deleteDoc(compDocRef);
+    }
+  } catch (err) {
+    console.warn("Erro ao atualizar conclusão no Firestore:", err);
+  }
+}
+
+/**
+ * Salva pontualmente o perfil do usuário (pontos, ofensiva, etc.) no Firestore.
+ */
+export async function saveUserProfileToFirestore(
+  userId: string,
+  profile: Partial<UserProfile>,
+): Promise<void> {
+  if (!userId || userId === "local_user") return;
+  try {
+    const userDocRef = doc(firestore, "users", userId);
+    const payload: Record<string, any> = {};
+    if (typeof profile.totalPoints === "number") payload.points = profile.totalPoints;
+    if (typeof profile.currentStreak === "number") payload.streak = profile.currentStreak;
+    if (profile.name && profile.name !== "Usuário") payload.display_name = profile.name;
+    if (profile.email) payload.email = profile.email;
+
+    if (Object.keys(payload).length > 0) {
+      await setDoc(userDocRef, payload, { merge: true });
+    }
+  } catch (err) {
+    console.warn("Erro ao salvar perfil no Firestore:", err);
   }
 }
 

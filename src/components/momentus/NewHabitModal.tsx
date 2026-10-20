@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Modal,
   View,
@@ -16,6 +16,7 @@ import { MomentusColors } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import { getTodayDateString } from '@/constants/initialData';
 import { HabitItem } from '@/types';
+import { TimePickerModal } from './TimePickerModal';
 
 interface NewHabitModalProps {
   visible: boolean;
@@ -40,6 +41,9 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
   const [saveToGoogle, setSaveToGoogle] = useState(false);
 
+  const [showStartTimePicker, setShowStartTimePicker] = useState(false);
+  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
+
   React.useEffect(() => {
     if (habitToEdit) {
       setTitle(habitToEdit.title);
@@ -62,8 +66,25 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
     }
   }, [habitToEdit, visible, categories]);
 
+  const parseTimeToMinutes = (t: string) => {
+    if (!t) return 0;
+    const parts = t.split(':');
+    const h = parseInt(parts[0], 10) || 0;
+    const m = parseInt(parts[1], 10) || 0;
+    return h * 60 + m;
+  };
+
+  const isTimeInvalid = useMemo(() => {
+    if (!timeStart || !timeEnd) return false;
+    return parseTimeToMinutes(timeEnd) <= parseTimeToMinutes(timeStart);
+  }, [timeStart, timeEnd]);
+
+  const isFormValid = useMemo(() => {
+    return title.trim().length > 0 && !!selectedCategoryId && !isTimeInvalid;
+  }, [title, selectedCategoryId, isTimeInvalid]);
+
   const handleSave = () => {
-    if (!title.trim() || !selectedCategoryId) return;
+    if (!isFormValid) return;
 
     if (isEditMode && habitToEdit) {
       updateHabit({
@@ -89,7 +110,6 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
 
     onClose();
   };
-
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
@@ -120,25 +140,56 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
             <View style={styles.timeRow}>
               <View style={styles.timeCol}>
                 <Text style={[styles.subLabel, { color: theme.textSecondary }]}>Início</Text>
-                <TextInput
-                  style={[styles.input, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary }]}
-                  placeholder="08:00"
-                  placeholderTextColor={MomentusColors.textMuted}
-                  value={timeStart}
-                  onChangeText={setTimeStart}
-                />
+                <TouchableOpacity
+                  onPress={() => setShowStartTimePicker(true)}
+                  activeOpacity={0.7}
+                  style={[
+                    styles.timeInputTouchable,
+                    {
+                      backgroundColor: theme.surfaceElevated,
+                      borderColor: isTimeInvalid ? MomentusColors.errorRed : theme.outline,
+                    },
+                  ]}>
+                  <Text style={[styles.timeText, { color: theme.textPrimary }]}>{timeStart}</Text>
+                  <Ionicons
+                    name="time-outline"
+                    size={18}
+                    color={isTimeInvalid ? MomentusColors.errorRed : theme.textSecondary}
+                  />
+                </TouchableOpacity>
               </View>
+
               <View style={styles.timeCol}>
                 <Text style={[styles.subLabel, { color: theme.textSecondary }]}>Fim</Text>
-                <TextInput
-                  style={[styles.input, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary }]}
-                  placeholder="09:00"
-                  placeholderTextColor={MomentusColors.textMuted}
-                  value={timeEnd}
-                  onChangeText={setTimeEnd}
-                />
+                <TouchableOpacity
+                  onPress={() => setShowEndTimePicker(true)}
+                  activeOpacity={0.7}
+                  style={[
+                    styles.timeInputTouchable,
+                    {
+                      backgroundColor: theme.surfaceElevated,
+                      borderColor: isTimeInvalid ? MomentusColors.errorRed : theme.outline,
+                    },
+                  ]}>
+                  <Text style={[styles.timeText, { color: theme.textPrimary }]}>{timeEnd}</Text>
+                  <Ionicons
+                    name="time-outline"
+                    size={18}
+                    color={isTimeInvalid ? MomentusColors.errorRed : theme.textSecondary}
+                  />
+                </TouchableOpacity>
               </View>
             </View>
+
+            {/* Mensagem de Alerta Visual quando inválido */}
+            {isTimeInvalid && (
+              <View style={styles.errorBanner}>
+                <Ionicons name="alert-circle" size={16} color={MomentusColors.errorRed} />
+                <Text style={styles.errorBannerText}>
+                  O horário de término deve ser posterior ao horário de início.
+                </Text>
+              </View>
+            )}
 
             {/* Categorias */}
             <Text style={[styles.label, { color: theme.textPrimary }]}>Categoria</Text>
@@ -203,8 +254,8 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
 
             <TouchableOpacity
               onPress={handleSave}
-              style={[styles.saveBtn, { backgroundColor: theme.primary }, !title.trim() && styles.disabledBtn]}
-              disabled={!title.trim()}>
+              style={[styles.saveBtn, { backgroundColor: theme.primary }, !isFormValid && styles.disabledBtn]}
+              disabled={!isFormValid}>
               <Text style={styles.saveText}>
                 {isEditMode ? 'Salvar Alterações' : 'Salvar Rotina'}
               </Text>
@@ -213,6 +264,29 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
 
         </View>
       </KeyboardAvoidingView>
+
+      {/* Modais de Seleção de Horário */}
+      <TimePickerModal
+        visible={showStartTimePicker}
+        title="Hora de Início"
+        initialTime={timeStart}
+        onDismiss={() => setShowStartTimePicker(false)}
+        onConfirm={(t) => {
+          setTimeStart(t);
+          setShowStartTimePicker(false);
+        }}
+      />
+
+      <TimePickerModal
+        visible={showEndTimePicker}
+        title="Hora de Término"
+        initialTime={timeEnd}
+        onDismiss={() => setShowEndTimePicker(false)}
+        onConfirm={(t) => {
+          setTimeEnd(t);
+          setShowEndTimePicker(false);
+        }}
+      />
     </Modal>
   );
 };
@@ -267,6 +341,37 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     color: MomentusColors.textPrimary,
     fontSize: 15,
+  },
+  timeInputTouchable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  timeText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 10,
+  },
+  errorBannerText: {
+    color: MomentusColors.errorRed,
+    fontSize: 12,
+    fontWeight: '600',
+    flex: 1,
   },
   textArea: {
     height: 72,
@@ -368,5 +473,3 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
-
-
