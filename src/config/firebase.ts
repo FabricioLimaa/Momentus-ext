@@ -35,6 +35,9 @@ export const firebaseApp =
 // Inicializa o Firebase Auth com persistência assíncrona no React Native e fallback seguro para Web
 export const auth = (() => {
   try {
+    if (Platform.OS === 'web') {
+      return firebaseAuth.getAuth(firebaseApp);
+    }
     const getRnPersistence = (firebaseAuth as any).getReactNativePersistence;
     if (typeof getRnPersistence === 'function') {
       return firebaseAuth.initializeAuth(firebaseApp, {

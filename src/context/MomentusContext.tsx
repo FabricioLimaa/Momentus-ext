@@ -243,8 +243,14 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Load state: SQLite first, with seamless migration from legacy AsyncStorage
   useEffect(() => {
     async function loadState() {
+      const startTime = Date.now();
       try {
-        // 1. Tenta carregar dados das tabelas locais (SQLite ou AsyncStorage no Web)
+        // 1. Aguarda a restauração completa da sessão de autenticação do Firebase (evita deslogar ao recarregar F5)
+        if (typeof (firebaseAuth as any).authStateReady === 'function') {
+          await (firebaseAuth as any).authStateReady().catch(() => {});
+        }
+
+        // 2. Tenta carregar dados das tabelas locais (SQLite ou AsyncStorage no Web)
         const dbCategories = await getAllCategories();
         const dbHabits = await getAllHabits();
         const dbTemplates = await getAllTemplates();
@@ -277,6 +283,8 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 photoUrl: currentAuth.photoURL ?? effectiveProfile.photoUrl,
                 isLoggedIn: true,
               }
+            : effectiveProfile.isLoggedIn
+            ? { isLoggedIn: true }
             : {}),
         };
         setUserProfile(enrichedProfile);
@@ -327,6 +335,12 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       } catch (e) {
         console.warn('Erro ao carregar dados do banco:', e);
       } finally {
+        // Garante tempo de exibição agradável da SplashScreen (1500ms) idêntico ao nativo
+        const elapsed = Date.now() - startTime;
+        const minSplashTime = 1500;
+        if (elapsed < minSplashTime) {
+          await new Promise((res) => setTimeout(res, minSplashTime - elapsed));
+        }
         setIsLoaded(true);
       }
     }

@@ -33,6 +33,36 @@ export const getTodayDateString = (): string => {
   return `${year}-${month}-${day}`;
 };
 
+/**
+ * Converte data do formato 'YYYY-MM-DD' para o formato brasileiro 'DD-MM-YYYY'.
+ * Ex: '2026-10-21' -> '21-10-2026'
+ */
+export const formatDateToBr = (dateStr?: string | null): string => {
+  if (!dateStr) return '';
+  if (/^\d{2}[-/]\d{2}[-/]\d{4}$/.test(dateStr)) return dateStr;
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    const [y, m, d] = parts;
+    return `${d}-${m}-${y}`;
+  }
+  return dateStr;
+};
+
+/**
+ * Converte data de 'DD-MM-YYYY' ou 'DD/MM/YYYY' para o formato chave 'YYYY-MM-DD'.
+ */
+export const parseBrDateToIso = (dateStr?: string | null): string => {
+  if (!dateStr) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+  const separator = dateStr.includes('/') ? '/' : '-';
+  const parts = dateStr.split(separator);
+  if (parts.length === 3) {
+    const [d, m, y] = parts;
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  return dateStr;
+};
+
 export const INITIAL_HABITS: HabitItem[] = [];
 
 export const INITIAL_TEMPLATES: RoutineTemplate[] = [];

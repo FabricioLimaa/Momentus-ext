@@ -5,6 +5,7 @@ import { HabitItem, Category } from '@/types';
 import { MomentusColors } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import { getIconForMarketItem } from './TimelineEventItem';
+import { formatDateToBr } from '@/constants/initialData';
 
 interface EventDetailDialogProps {
   visible: boolean;
@@ -72,7 +73,18 @@ export const EventDetailDialog: React.FC<EventDetailDialogProps> = ({
               </View>
             </View>
 
-            {/* 4. Horário com Ícone de Relógio */}
+            {/* 4. Data e Horário */}
+            {!!event.date && (
+              <View style={[styles.timeRow, { marginBottom: 6 }]}>
+                <View style={[styles.timeIconBox, { backgroundColor: `${theme.primary}15` }]}>
+                  <Ionicons name="calendar-outline" size={18} color={theme.primary} />
+                </View>
+                <Text style={[styles.timeText, { color: theme.textPrimary }]}>
+                  {formatDateToBr(event.date)}
+                </Text>
+              </View>
+            )}
+
             <View style={styles.timeRow}>
               <View style={[styles.timeIconBox, { backgroundColor: `${theme.primary}15` }]}>
                 <Ionicons name="time-outline" size={18} color={theme.primary} />

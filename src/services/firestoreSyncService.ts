@@ -1,4 +1,5 @@
 import { firestore, auth } from "@/config/firebase";
+import { getTodayDateString } from "@/constants/initialData";
 import {
   Achievement,
   Category,
@@ -63,7 +64,7 @@ function dateToMillis(dateStr?: string | null): number | null {
  * Evita o deslocamento de data em fusos negativos (ex: UTC-3 Brasil).
  */
 function millisToDateString(val?: any): string {
-  if (!val) return new Date().toISOString().slice(0, 10);
+  if (!val) return getTodayDateString();
   if (typeof val === "string" && val.includes("-") && val.length === 10) {
     return val;
   }
@@ -81,7 +82,7 @@ function millisToDateString(val?: any): string {
     const dd = String(d.getUTCDate()).padStart(2, "0");
     return `${yyyy}-${mm}-${dd}`;
   }
-  return new Date().toISOString().slice(0, 10);
+  return getTodayDateString();
 }
 
 /**
@@ -529,7 +530,7 @@ export async function syncWithFirestore(
           ...ach,
           unlocked: true,
           progress: ach.maxProgress,
-          unlockedAt: new Date().toISOString().slice(0, 10),
+          unlockedAt: getTodayDateString(),
         };
       }
       return ach;

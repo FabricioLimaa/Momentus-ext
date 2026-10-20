@@ -16,7 +16,7 @@ import { useMomentus } from '@/context/MomentusContext';
 import { TimelineEventItem } from '@/components/momentus/TimelineEventItem';
 import { EventDetailDialog } from '@/components/momentus/EventDetailDialog';
 import { NewHabitModal } from '@/components/momentus/NewHabitModal';
-import { getTodayDateString } from '@/constants/initialData';
+import { getTodayDateString, formatDateToBr } from '@/constants/initialData';
 import { HabitItem } from '@/types';
 
 const WEEKDAYS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
@@ -480,7 +480,9 @@ export default function CalendarScreen() {
             </View>
             <View>
               <Text style={[styles.summaryDateText, { color: theme.textPrimary }]}>
-                {selectedDate === todayStr ? 'Hoje' : selectedDate}
+                {selectedDate === todayStr
+                  ? `Hoje (${formatDateToBr(selectedDate)})`
+                  : formatDateToBr(selectedDate)}
               </Text>
               <Text style={[styles.summaryHabitsCount, { color: theme.textSecondary }]}>
                 {completedCount} de {habitsForDate.length} atividades finalizadas
