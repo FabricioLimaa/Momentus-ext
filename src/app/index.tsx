@@ -86,9 +86,15 @@ export default function HomeScreen() {
 
   // Toggle seleção múltipla
   const handleToggleSelectHabit = (id: string) => {
-    setSelectedHabitIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
-    );
+    setSelectedHabitIds((prev) => {
+      const next = prev.includes(id)
+        ? prev.filter((item) => item !== id)
+        : [...prev, id];
+      if (next.length === 0) {
+        setIsSelectionMode(false);
+      }
+      return next;
+    });
   };
 
   const handleSelectAll = () => {
@@ -345,30 +351,6 @@ export default function HomeScreen() {
               >
                 {completionsToday}/{totalToday} concluídas
               </Text>
-              {todayHabits.length > 0 && !isSelectionMode && (
-                <TouchableOpacity
-                  onPress={() => setIsSelectionMode(true)}
-                  style={[
-                    styles.selectModeBtn,
-                    {
-                      borderColor: theme.outline,
-                      backgroundColor: theme.surface,
-                    },
-                  ]}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons
-                    name="checkbox-outline"
-                    size={14}
-                    color={theme.primary}
-                  />
-                  <Text
-                    style={[styles.selectModeBtnText, { color: theme.primary }]}
-                  >
-                    Selecionar
-                  </Text>
-                </TouchableOpacity>
-              )}
             </View>
           </View>
 
@@ -428,6 +410,8 @@ export default function HomeScreen() {
                       if (!isSelectionMode) {
                         setIsSelectionMode(true);
                         setSelectedHabitIds([habit.id]);
+                      } else {
+                        handleToggleSelectHabit(habit.id);
                       }
                     }}
                   />

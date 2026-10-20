@@ -63,6 +63,80 @@ export const parseBrDateToIso = (dateStr?: string | null): string => {
   return dateStr;
 };
 
+/**
+ * Retorna as datas ('YYYY-MM-DD') onde TODAS as rotinas planejadas foram concluídas.
+ * Um dia só é considerado concluído se:
+ * 1. Existe ao menos 1 rotina naquele dia.
+ * 2. 100% das rotinas daquele dia estão marcadas como concluídas.
+ */
+export const getFullyCompletedDates = (habits: HabitItem[]): string[] => {
+  const byDate = new Map<string, { total: number; completed: number }>();
+  for (const h of habits) {
+    if (!h.date) continue;
+    const current = byDate.get(h.date) || { total: 0, completed: 0 };
+    current.total += 1;
+    if (h.completed) current.completed += 1;
+    byDate.set(h.date, current);
+  }
+
+  const completedDays: string[] = [];
+  byDate.forEach((val, dateStr) => {
+    if (val.total > 0 && val.completed === val.total) {
+      completedDays.push(dateStr);
+    }
+  });
+
+  return completedDays.sort();
+};
+
+function getPreviousDateStr(dateStr: string): string {
+  const parts = dateStr.split('-');
+  const y = Number(parts[0]);
+  const m = Number(parts[1]);
+  const d = Number(parts[2]);
+  const date = new Date(y, m - 1, d);
+  date.setDate(date.getDate() - 1);
+  const prevY = date.getFullYear();
+  const prevM = String(date.getMonth() + 1).padStart(2, '0');
+  const prevD = String(date.getDate()).padStart(2, '0');
+  return `${prevY}-${prevM}-${prevD}`;
+}
+
+/**
+ * Calcula a sequência diária (streak) com base estrita nos dias 100% concluídos.
+ * Segue a lógica oficial de CategoryRepository.kt:355-371 do app nativo.
+ */
+export const calculateStreakFromCompletedDays = (
+  completedDays: string[],
+  todayStr: string
+): number => {
+  if (completedDays.length === 0) return 0;
+
+  const yesterdayStr = getPreviousDateStr(todayStr);
+  const lastCompleted = completedDays[completedDays.length - 1];
+  if (lastCompleted !== todayStr && lastCompleted !== yesterdayStr) {
+    return 0;
+  }
+
+  let streak = 0;
+  let expectedDateStr: string | null = null;
+
+  for (let i = completedDays.length - 1; i >= 0; i--) {
+    const curDateStr = completedDays[i];
+    if (expectedDateStr === null) {
+      streak = 1;
+      expectedDateStr = getPreviousDateStr(curDateStr);
+    } else if (curDateStr === expectedDateStr) {
+      streak += 1;
+      expectedDateStr = getPreviousDateStr(curDateStr);
+    } else {
+      break;
+    }
+  }
+
+  return streak;
+};
+
 export const INITIAL_HABITS: HabitItem[] = [];
 
 export const INITIAL_TEMPLATES: RoutineTemplate[] = [];

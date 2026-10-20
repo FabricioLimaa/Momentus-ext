@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Pressable, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { HabitItem, Category } from '@/types';
 import { MomentusColors } from '@/constants/theme';
@@ -91,6 +91,14 @@ export const TimelineEventItem: React.FC<TimelineEventItemProps> = ({
       onPress={onClick}
       onLongPress={onLongClick}
       delayLongPress={350}
+      {...(Platform.OS === 'web'
+        ? {
+            onContextMenu: (e: any) => {
+              e.preventDefault();
+              onLongClick();
+            },
+          }
+        : {})}
       style={[
         styles.container,
         isSelected && { backgroundColor: `${theme.primary}20`, borderRadius: 12 },

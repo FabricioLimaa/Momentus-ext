@@ -20,6 +20,8 @@ import {
   INITIAL_USER_PROFILE,
   INITIAL_SETTINGS,
   getTodayDateString,
+  getFullyCompletedDates,
+  calculateStreakFromCompletedDays,
 } from '@/constants/initialData';
 import { calculateUserLevel, UserLevelInfo } from '@/domain/userLevel';
 import { soundManager } from '@/util/soundManager';
@@ -316,6 +318,18 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         const initialHab = dbHabits.length > 0 ? dbHabits : (legacyParsed?.habits || []);
         setHabits(initialHab);
 
+        // Recalcula estritamente os dias 100% concluídos e o streak real a partir do histórico
+        const initialCompletedDays = getFullyCompletedDates(initialHab);
+        const realTotalCompleted = initialCompletedDays.length;
+        const realStreak = calculateStreakFromCompletedDays(initialCompletedDays, getTodayDateString());
+
+        setUserProfile((p) => ({
+          ...p,
+          totalCompleted: realTotalCompleted,
+          currentStreak: realStreak,
+          bestStreak: Math.max(p.bestStreak, realStreak),
+        }));
+
         const cleanTemplates = (dbTemplates.length > 0 ? dbTemplates : (legacyParsed?.templates || [])).filter(
           (t: RoutineTemplate) => !LEGACY_MOCK_TMPL_IDS.has(t.id)
         );
@@ -546,38 +560,25 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const toggleHabit = (id: string) => {
     let nextCompleted = false;
+    let targetDate = '';
+    let shouldCelebrateDay = false;
     let nextTotalCompleted = userProfile.totalCompleted;
     let nextStreak = userProfile.currentStreak;
-    let targetDate = '';
 
     setHabits((prev) => {
+      const targetHabit = prev.find((h) => h.id === id);
+      if (!targetHabit) return prev;
+      nextCompleted = !targetHabit.completed;
+      targetDate = targetHabit.date;
+
       const updated = prev.map((habit) => {
         if (habit.id === id) {
-          nextCompleted = !habit.completed;
-          targetDate = habit.date;
           if (nextCompleted) {
             soundManager.playSuccessSound();
             triggerHaptic('success');
-            addPoints(15);
-            nextTotalCompleted += 1;
-            nextStreak = Math.max(nextStreak, habit.streak + 1);
-            setUserProfile((p) => ({
-              ...p,
-              totalCompleted: p.totalCompleted + 1,
-              currentStreak: nextStreak,
-              bestStreak: Math.max(p.bestStreak, nextStreak),
-            }));
-            // Cancela os alarmes pendentes se o hábito foi concluído
             cancelHabitNotifications(habit.id).catch(() => {});
           } else {
             triggerHaptic('impact');
-            nextTotalCompleted = Math.max(0, nextTotalCompleted - 1);
-            setUserProfile((p) => ({
-              ...p,
-              totalCompleted: Math.max(0, p.totalCompleted - 1),
-              totalPoints: Math.max(0, p.totalPoints - 15),
-            }));
-            // Reagenda os alarmes se desmarcou
             scheduleHabitNotifications({ ...habit, completed: false }).catch(() => {});
           }
           return {
@@ -589,34 +590,65 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return habit;
       });
 
+      // Um dia concluído só é computado se 100% das rotinas planejadas daquele dia foram finalizadas
+      const fullyCompletedDates = getFullyCompletedDates(updated);
+      nextTotalCompleted = fullyCompletedDates.length;
+      nextStreak = calculateStreakFromCompletedDays(fullyCompletedDates, getTodayDateString());
+
       if (nextCompleted && targetDate) {
         const dayHabits = updated.filter((h) => h.date === targetDate);
         if (dayHabits.length > 0 && dayHabits.every((h) => h.completed)) {
-          showCelebration(
-            'Dia Conquistado! 🌟',
-            'Parabéns! Você concluiu 100% das suas tarefas planejadas.',
-            25
-          );
+          shouldCelebrateDay = true;
         }
       }
 
+      setUserProfile((p) => {
+        const deltaPoints = (nextCompleted ? 15 : -15) + (shouldCelebrateDay ? 25 : 0);
+        const nextPoints = Math.max(0, p.totalPoints + deltaPoints);
+        const nextBestStreak = Math.max(p.bestStreak, nextStreak);
+        const nextProfile: UserProfile = {
+          ...p,
+          totalPoints: nextPoints,
+          totalCompleted: nextTotalCompleted,
+          currentStreak: nextStreak,
+          bestStreak: nextBestStreak,
+        };
+
+        const currentUserId = firebaseAuth.currentUser?.uid;
+        if (currentUserId) {
+          saveUserProfileToFirestore(currentUserId, {
+            totalPoints: nextPoints,
+            totalCompleted: nextTotalCompleted,
+            currentStreak: nextStreak,
+            bestStreak: nextBestStreak,
+          }).catch(() => {});
+        }
+
+        return nextProfile;
+      });
+
       return updated;
     });
+
+    if (shouldCelebrateDay) {
+      showCelebration(
+        'Dia Conquistado! 🌟',
+        'Parabéns! Você concluiu 100% das suas tarefas planejadas.',
+        25
+      );
+    }
 
     checkAndUnlockAchievements(nextStreak, nextTotalCompleted, templates.length);
 
     const currentUserId = firebaseAuth.currentUser?.uid;
     if (currentUserId) {
-      saveHabitCompletionToFirestore(currentUserId, id, targetDate || getTodayDateString(), nextCompleted).catch((err) =>
+      saveHabitCompletionToFirestore(
+        currentUserId,
+        id,
+        targetDate || getTodayDateString(),
+        nextCompleted
+      ).catch((err) =>
         console.warn('Erro ao salvar conclusão no Firestore:', err)
-      );
-      saveUserProfileToFirestore(currentUserId, {
-        totalPoints: Math.max(0, userProfile.totalPoints + (nextCompleted ? 15 : -15)),
-        currentStreak: nextStreak,
-        bestStreak: Math.max(userProfile.bestStreak, nextStreak),
-        totalCompleted: nextTotalCompleted,
-      }).catch((err) =>
-        console.warn('Erro ao salvar perfil no Firestore:', err)
       );
       const currentHabit = habits.find((h) => h.id === id);
       if (currentHabit) {
