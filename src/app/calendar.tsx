@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -130,30 +130,6 @@ export default function CalendarScreen() {
 
   const completedCount = habitsForDate.filter((h) => h.completed).length;
 
-  // Sincroniza a âncora da semana quando a data selecionada mudar fora da semana
-  useEffect(() => {
-    if (!selectedDate) return;
-    const [y, m, d] = selectedDate.split('-').map(Number);
-    if (!y || !m || !d) return;
-    const target = new Date(y, m - 1, d);
-
-    // Verifica se a data selecionada já está dentro da semana visível
-    const anchor = new Date(weekAnchorDate);
-    const dayOfWeek = anchor.getDay();
-    const sunday = new Date(anchor);
-    sunday.setDate(anchor.getDate() - dayOfWeek);
-    sunday.setHours(0, 0, 0, 0);
-
-    const saturday = new Date(sunday);
-    saturday.setDate(sunday.getDate() + 6);
-    saturday.setHours(23, 59, 59, 999);
-
-    if (target.getTime() < sunday.getTime() || target.getTime() > saturday.getTime()) {
-      setWeekAnchorDate(target);
-      setCurrentYearMonth({ year: target.getFullYear(), month: target.getMonth() });
-    }
-  }, [selectedDate, weekAnchorDate]);
-
   // Cálculo da Semana (estritamente de Domingo a Sábado)
   const currentWeekDays = useMemo(() => {
     const anchor = new Date(weekAnchorDate);
@@ -180,29 +156,49 @@ export default function CalendarScreen() {
     return days;
   }, [weekAnchorDate]);
 
-  // Título amigável da semana (ex: "Outubro 2026" ou "Out - Nov 2026")
+  // Título amigável da semana com o intervalo de dias e mês (ex: "18 a 24 de Outubro 2026")
   const weekTitle = useMemo(() => {
     if (currentWeekDays.length === 0) return '';
-    const first = currentWeekDays[0].fullDate;
-    const last = currentWeekDays[6].fullDate;
-    if (first.getMonth() === last.getMonth()) {
-      return `${MONTH_NAMES[first.getMonth()]} ${first.getFullYear()}`;
+    const first = currentWeekDays[0];
+    const last = currentWeekDays[6];
+    const firstMonth = first.fullDate.getMonth();
+    const lastMonth = last.fullDate.getMonth();
+    const firstYear = first.fullDate.getFullYear();
+    const lastYear = last.fullDate.getFullYear();
+
+    if (firstMonth === lastMonth && firstYear === lastYear) {
+      return `${first.dayNumber} a ${last.dayNumber} de ${MONTH_NAMES[firstMonth]} ${firstYear}`;
     }
-    return `${MONTH_NAMES[first.getMonth()].slice(0, 3)} - ${MONTH_NAMES[last.getMonth()].slice(0, 3)} ${last.getFullYear()}`;
+    if (firstYear === lastYear) {
+      return `${first.dayNumber} ${MONTH_NAMES[firstMonth].slice(0, 3)} - ${last.dayNumber} ${MONTH_NAMES[lastMonth].slice(0, 3)} ${firstYear}`;
+    }
+    return `${first.dayNumber} ${MONTH_NAMES[firstMonth].slice(0, 3)} - ${last.dayNumber} ${MONTH_NAMES[lastMonth].slice(0, 3)} ${lastYear}`;
   }, [currentWeekDays]);
 
+  // Navega para a semana anterior mantendo a seleção coerente e sem travas
   const prevWeek = () => {
     setWeekAnchorDate((prev) => {
       const next = new Date(prev);
       next.setDate(prev.getDate() - 7);
+      const y = next.getFullYear();
+      const m = String(next.getMonth() + 1).padStart(2, '0');
+      const d = String(next.getDate()).padStart(2, '0');
+      setSelectedDate(`${y}-${m}-${d}`);
+      setCurrentYearMonth({ year: next.getFullYear(), month: next.getMonth() });
       return next;
     });
   };
 
+  // Navega para a próxima semana mantendo a seleção coerente e sem travas
   const nextWeek = () => {
     setWeekAnchorDate((prev) => {
       const next = new Date(prev);
       next.setDate(prev.getDate() + 7);
+      const y = next.getFullYear();
+      const m = String(next.getMonth() + 1).padStart(2, '0');
+      const d = String(next.getDate()).padStart(2, '0');
+      setSelectedDate(`${y}-${m}-${d}`);
+      setCurrentYearMonth({ year: next.getFullYear(), month: next.getMonth() });
       return next;
     });
   };
@@ -393,21 +389,35 @@ export default function CalendarScreen() {
             ]}>
             {/* Barra de Navegação da Semana */}
             <View style={styles.calendarNavRow}>
-              <TouchableOpacity onPress={prevWeek} style={styles.navBtn} activeOpacity={0.7}>
-                <Ionicons name="chevron-back" size={18} color={theme.textPrimary} />
+              <TouchableOpacity
+                onPress={prevWeek}
+                style={styles.navBtn}
+                activeOpacity={0.7}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                <Ionicons name="chevron-back" size={20} color={theme.textPrimary} />
               </TouchableOpacity>
-              <Text style={[styles.navTitle, { color: theme.textPrimary }]}>{weekTitle}</Text>
+              <Text
+                style={[styles.navTitle, { color: theme.textPrimary }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit>
+                {weekTitle}
+              </Text>
               <View style={styles.navRightGroup}>
                 {!isCurrentWeekShowingToday && (
                   <TouchableOpacity
                     onPress={goToToday}
                     style={[styles.todayBadgeBtn, { borderColor: theme.outline }]}
-                    activeOpacity={0.7}>
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                     <Text style={[styles.todayBadgeText, { color: primaryColor }]}>Hoje</Text>
                   </TouchableOpacity>
                 )}
-                <TouchableOpacity onPress={nextWeek} style={styles.navBtn} activeOpacity={0.7}>
-                  <Ionicons name="chevron-forward" size={18} color={theme.textPrimary} />
+                <TouchableOpacity
+                  onPress={nextWeek}
+                  style={styles.navBtn}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                  <Ionicons name="chevron-forward" size={20} color={theme.textPrimary} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -694,8 +704,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   navTitle: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '800',
+    flex: 1,
+    textAlign: 'center',
+    marginHorizontal: 4,
   },
   todayBadgeBtn: {
     paddingHorizontal: 8,
