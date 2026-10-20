@@ -1,28 +1,28 @@
-import React, { useState, useMemo } from 'react';
+import { CircularProgressRing } from "@/components/momentus/CircularProgressRing";
+import { EventDetailDialog } from "@/components/momentus/EventDetailDialog";
+import { GlassCard } from "@/components/momentus/GlassCard";
+import { NewHabitModal } from "@/components/momentus/NewHabitModal";
+import { TimelineEventItem } from "@/components/momentus/TimelineEventItem";
+import { auth as firebaseAuth } from "@/config/firebase";
+import { getStreakColor, getTodayDateString } from "@/constants/initialData";
+import { MomentusColors } from "@/constants/theme";
+import { useMomentus } from "@/context/MomentusContext";
+import { HabitItem } from "@/types";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { useMemo, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Platform,
-  StatusBar,
-  Alert,
-  Image,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { MomentusColors } from '@/constants/theme';
-import { useMomentus } from '@/context/MomentusContext';
-import { GlassCard } from '@/components/momentus/GlassCard';
-import { TimelineEventItem } from '@/components/momentus/TimelineEventItem';
-import { EventDetailDialog } from '@/components/momentus/EventDetailDialog';
-import { NewHabitModal } from '@/components/momentus/NewHabitModal';
-import { CircularProgressRing } from '@/components/momentus/CircularProgressRing';
-import { getTodayDateString, getStreakColor } from '@/constants/initialData';
-import { HabitItem } from '@/types';
-import { auth as firebaseAuth } from '@/config/firebase';
+    Alert,
+    Image,
+    Platform,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -39,7 +39,8 @@ export default function HomeScreen() {
   // Estados de modais
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [habitToEdit, setHabitToEdit] = useState<HabitItem | null>(null);
-  const [selectedDetailHabit, setSelectedDetailHabit] = useState<HabitItem | null>(null);
+  const [selectedDetailHabit, setSelectedDetailHabit] =
+    useState<HabitItem | null>(null);
 
   // Estados de seleção múltipla
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -48,10 +49,10 @@ export default function HomeScreen() {
 
   const authUser = firebaseAuth.currentUser;
   const resolvedName =
-    userProfile.name && userProfile.name !== 'Usuário'
+    userProfile.name && userProfile.name !== "Usuário"
       ? userProfile.name
-      : (authUser?.displayName?.trim() || userProfile.name || 'Explorador');
-  const userName = resolvedName.split(' ')[0] || 'Explorador';
+      : authUser?.displayName?.trim() || userProfile.name || "Explorador";
+  const userName = resolvedName.split(" ")[0] || "Explorador";
   const displayPhoto = userProfile.photoUrl || authUser?.photoURL || null;
 
   const todayStr = getTodayDateString();
@@ -67,25 +68,26 @@ export default function HomeScreen() {
 
   // Frase motivacional idêntica ao Jetpack Compose HomeScreen.kt
   const motivationalText = useMemo(() => {
-    if (totalToday === 0) return 'Dia livre! Que tal planejar algo novo? ✨';
-    if (completionsToday === 0) return 'Vamos começar? O primeiro passo! 🚀';
-    if (progress < 0.5) return 'Ótimo começo! Continue focado. 💪';
-    if (progress < 1.0) return 'Mais da metade concluído! Você está quase lá. ⚡';
-    return 'Dia perfeito! Você conquistou todas as suas metas! 🏆';
+    if (totalToday === 0) return "Dia livre! Que tal planejar algo novo? ✨";
+    if (completionsToday === 0) return "Vamos começar? O primeiro passo! 🚀";
+    if (progress < 0.5) return "Ótimo começo! Continue focado. 💪";
+    if (progress < 1.0)
+      return "Mais da metade concluído! Você está quase lá. ⚡";
+    return "Dia perfeito! Você conquistou todas as suas metas! 🏆";
   }, [totalToday, completionsToday, progress]);
 
   // Saudação por horário
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Bom dia,';
-    if (hour < 18) return 'Boa tarde,';
-    return 'Boa noite,';
+    if (hour < 12) return "Bom dia,";
+    if (hour < 18) return "Boa tarde,";
+    return "Boa noite,";
   }, []);
 
   // Toggle seleção múltipla
   const handleToggleSelectHabit = (id: string) => {
     setSelectedHabitIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
     );
   };
 
@@ -105,44 +107,46 @@ export default function HomeScreen() {
   const handleConfirmDeleteSelected = () => {
     if (selectedHabitIds.length === 0) return;
     Alert.alert(
-      'Excluir Selecionadas',
+      "Excluir Selecionadas",
       `Tem certeza que deseja excluir as ${selectedHabitIds.length} rotinas selecionadas?`,
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: "Cancelar", style: "cancel" },
         {
-          text: 'Excluir Todas',
-          style: 'destructive',
+          text: "Excluir Todas",
+          style: "destructive",
           onPress: () => {
             deleteMultipleHabits(selectedHabitIds);
             handleClearSelection();
           },
         },
-      ]
+      ],
     );
   };
 
   const handleConfirmDeleteSingle = (habit: HabitItem) => {
     Alert.alert(
-      'Excluir Rotina',
-      'Deseja realmente remover esta rotina? Esta ação não poderá ser desfeita.',
+      "Excluir Rotina",
+      "Deseja realmente remover esta rotina? Esta ação não poderá ser desfeita.",
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: "Cancelar", style: "cancel" },
         {
-          text: 'Excluir',
-          style: 'destructive',
+          text: "Excluir",
+          style: "destructive",
           onPress: () => {
             deleteHabit(habit.id);
             setSelectedDetailHabit(null);
           },
         },
-      ]
+      ],
     );
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: theme.background }]}
+    >
       <StatusBar
-        barStyle={theme.isDark ? 'light-content' : 'dark-content'}
+        barStyle={theme.isDark ? "light-content" : "dark-content"}
         backgroundColor={theme.background}
       />
       <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -151,23 +155,37 @@ export default function HomeScreen() {
           <View
             style={[
               styles.selectionTopBar,
-              { backgroundColor: theme.surface, borderBottomColor: theme.outline },
-            ]}>
-            <TouchableOpacity onPress={handleClearSelection} style={styles.iconButton}>
+              {
+                backgroundColor: theme.surface,
+                borderBottomColor: theme.outline,
+              },
+            ]}
+          >
+            <TouchableOpacity
+              onPress={handleClearSelection}
+              style={styles.iconButton}
+            >
               <Ionicons name="close" size={24} color={theme.textPrimary} />
             </TouchableOpacity>
 
-            <Text style={[styles.selectionCountText, { color: theme.textPrimary }]}>
-              {selectedHabitIds.length} selecionada{selectedHabitIds.length === 1 ? '' : 's'}
+            <Text
+              style={[styles.selectionCountText, { color: theme.textPrimary }]}
+            >
+              {selectedHabitIds.length} selecionada
+              {selectedHabitIds.length === 1 ? "" : "s"}
             </Text>
 
             <View style={styles.selectionActions}>
-              <TouchableOpacity onPress={handleSelectAll} style={styles.iconButton}>
+              <TouchableOpacity
+                onPress={handleSelectAll}
+                style={styles.iconButton}
+              >
                 <Ionicons
                   name={
-                    selectedHabitIds.length === todayHabits.length && todayHabits.length > 0
-                      ? 'checkbox'
-                      : 'checkbox-outline'
+                    selectedHabitIds.length === todayHabits.length &&
+                    todayHabits.length > 0
+                      ? "checkbox"
+                      : "checkbox-outline"
                   }
                   size={22}
                   color={theme.primary}
@@ -180,8 +198,13 @@ export default function HomeScreen() {
                 style={[
                   styles.iconButton,
                   selectedHabitIds.length === 0 && { opacity: 0.4 },
-                ]}>
-                <Ionicons name="trash-outline" size={22} color={MomentusColors.errorRed} />
+                ]}
+              >
+                <Ionicons
+                  name="trash-outline"
+                  size={22}
+                  color={MomentusColors.errorRed}
+                />
               </TouchableOpacity>
             </View>
           </View>
@@ -190,13 +213,15 @@ export default function HomeScreen() {
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}>
+          showsVerticalScrollIndicator={false}
+        >
           {/* 1. Header de Saudação (Mockup 3) */}
           <View style={styles.homeHeader}>
             <TouchableOpacity
-              onPress={() => router.push('/more' as any)}
+              onPress={() => router.push("/more" as any)}
               style={styles.userProfileGreetingRow}
-              activeOpacity={0.8}>
+              activeOpacity={0.8}
+            >
               <View style={[styles.homeAvatar, { borderColor: theme.primary }]}>
                 {displayPhoto && !avatarError ? (
                   <Image
@@ -204,44 +229,68 @@ export default function HomeScreen() {
                     style={styles.homeAvatarImage}
                     resizeMode="cover"
                     onError={() => setAvatarError(true)}
-                    {...(Platform.OS === 'web' ? { referrerPolicy: 'no-referrer' } : {})}
+                    {...(Platform.OS === "web"
+                      ? { referrerPolicy: "no-referrer" }
+                      : {})}
                   />
                 ) : (
-                  <Text style={[styles.homeAvatarText, { color: theme.primary }]}>
-                    {resolvedName ? resolvedName.charAt(0).toUpperCase() : 'U'}
+                  <Text
+                    style={[styles.homeAvatarText, { color: theme.primary }]}
+                  >
+                    {resolvedName ? resolvedName.charAt(0).toUpperCase() : "U"}
                   </Text>
                 )}
               </View>
               <View>
-                <Text style={[styles.greetingText, { color: theme.textSecondary }]}>{greeting}</Text>
-                <Text style={[styles.userNameText, { color: theme.textPrimary }]}>{userName} 👋</Text>
+                <Text
+                  style={[styles.greetingText, { color: theme.textSecondary }]}
+                >
+                  {greeting}
+                </Text>
+                <Text
+                  style={[styles.userNameText, { color: theme.textPrimary }]}
+                >
+                  {userName} 👋
+                </Text>
               </View>
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => router.push('/updates' as any)}
+              onPress={() => router.push("/updates" as any)}
               style={[
                 styles.notificationButton,
                 { backgroundColor: theme.surface, borderColor: theme.outline },
               ]}
-              activeOpacity={0.7}>
-              <Ionicons name="notifications-outline" size={22} color={theme.textPrimary} />
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name="notifications-outline"
+                size={22}
+                color={theme.textPrimary}
+              />
             </TouchableOpacity>
           </View>
 
           {/* 2. Card de Streak & Progresso Circular (Mockup 3) */}
           <TouchableOpacity
             activeOpacity={0.85}
-            onPress={() => router.push('/achievements' as any)}
-            style={styles.streakCardContainer}>
+            onPress={() => router.push("/achievements" as any)}
+            style={styles.streakCardContainer}
+          >
             <GlassCard
               style={[
                 styles.streakGlassCard,
-                { backgroundColor: theme.glassCard, borderColor: theme.glassBorder },
-              ]}>
+                {
+                  backgroundColor: theme.glassCard,
+                  borderColor: theme.glassBorder,
+                },
+              ]}
+            >
               <View style={styles.streakCardRow}>
                 <View style={styles.streakInfoCol}>
-                  <Text style={[styles.streakLabel, { color: theme.textSecondary }]}>
+                  <Text
+                    style={[styles.streakLabel, { color: theme.textSecondary }]}
+                  >
                     Sequência Atual
                   </Text>
                   <View style={styles.streakNumberRow}>
@@ -250,11 +299,21 @@ export default function HomeScreen() {
                       size={28}
                       color={getStreakColor(userProfile.currentStreak)}
                     />
-                    <Text style={[styles.streakNumberText, { color: theme.textPrimary }]}>
+                    <Text
+                      style={[
+                        styles.streakNumberText,
+                        { color: theme.textPrimary },
+                      ]}
+                    >
                       {userProfile.currentStreak} dias
                     </Text>
                   </View>
-                  <Text style={[styles.motivationalText, { color: theme.textSecondary }]}>
+                  <Text
+                    style={[
+                      styles.motivationalText,
+                      { color: theme.textSecondary },
+                    ]}
+                  >
                     {motivationalText}
                   </Text>
                 </View>
@@ -274,9 +333,16 @@ export default function HomeScreen() {
 
           {/* 3. Seção "Seu dia" com Timeline Vertical */}
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Seu dia</Text>
+            <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
+              Seu dia
+            </Text>
             <View style={styles.sectionHeaderRight}>
-              <Text style={[styles.sectionCountText, { color: theme.textSecondary }]}>
+              <Text
+                style={[
+                  styles.sectionCountText,
+                  { color: theme.textSecondary },
+                ]}
+              >
                 {completionsToday}/{totalToday} concluídas
               </Text>
               {todayHabits.length > 0 && !isSelectionMode && (
@@ -284,11 +350,23 @@ export default function HomeScreen() {
                   onPress={() => setIsSelectionMode(true)}
                   style={[
                     styles.selectModeBtn,
-                    { borderColor: theme.outline, backgroundColor: theme.surface },
+                    {
+                      borderColor: theme.outline,
+                      backgroundColor: theme.surface,
+                    },
                   ]}
-                  activeOpacity={0.7}>
-                  <Ionicons name="checkbox-outline" size={14} color={theme.primary} />
-                  <Text style={[styles.selectModeBtnText, { color: theme.primary }]}>Selecionar</Text>
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name="checkbox-outline"
+                    size={14}
+                    color={theme.primary}
+                  />
+                  <Text
+                    style={[styles.selectModeBtnText, { color: theme.primary }]}
+                  >
+                    Selecionar
+                  </Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -299,7 +377,8 @@ export default function HomeScreen() {
               style={[
                 styles.emptyContainer,
                 { backgroundColor: theme.surface, borderColor: theme.outline },
-              ]}>
+              ]}
+            >
               <Ionicons
                 name="calendar-outline"
                 size={48}
@@ -308,17 +387,21 @@ export default function HomeScreen() {
               <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
                 Nada agendado para hoje
               </Text>
-              <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
+              <Text
+                style={[styles.emptySubtitle, { color: theme.textSecondary }]}
+              >
                 Toque no + para começar sua jornada.
               </Text>
             </View>
           ) : (
             <View style={styles.timelineList}>
               {todayHabits.map((habit, index) => {
-                const category = categories.find((c) => c.id === habit.categoryId) || {
-                  id: 'default',
-                  name: 'Geral',
-                  color: '#34D399',
+                const category = categories.find(
+                  (c) => c.id === habit.categoryId,
+                ) || {
+                  id: "default",
+                  name: "Geral",
+                  color: "#34D399",
                 };
 
                 const isSelected = selectedHabitIds.includes(habit.id);
@@ -364,7 +447,8 @@ export default function HomeScreen() {
             onPress={() => {
               setHabitToEdit(null);
               setIsAddModalVisible(true);
-            }}>
+            }}
+          >
             <Ionicons name="add" size={30} color="#000000" />
           </TouchableOpacity>
         )}
@@ -411,16 +495,16 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: MomentusColors.navyBackground,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
   container: {
     flex: 1,
     backgroundColor: MomentusColors.navyBackground,
   },
   selectionTopBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: MomentusColors.navySurface,
@@ -429,19 +513,19 @@ const styles = StyleSheet.create({
   },
   selectionCountText: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: "800",
     color: MomentusColors.textPrimary,
   },
   selectionActions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
   },
   iconButton: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   scrollView: {
     flex: 1,
@@ -451,14 +535,14 @@ const styles = StyleSheet.create({
     paddingTop: 16,
   },
   homeHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 24,
   },
   userProfileGreetingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
   homeAvatar: {
@@ -466,27 +550,27 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
     borderWidth: 2,
-    backgroundColor: 'rgba(52, 211, 153, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
+    backgroundColor: "rgba(52, 211, 153, 0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
   },
   homeAvatarImage: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   homeAvatarText: {
     fontSize: 20,
-    fontWeight: '800',
+    fontWeight: "800",
   },
   greetingText: {
     fontSize: 14,
     color: MomentusColors.textSecondary,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   userNameText: {
     fontSize: 24,
-    fontWeight: '900',
+    fontWeight: "900",
     color: MomentusColors.textPrimary,
     marginTop: 2,
   },
@@ -497,8 +581,8 @@ const styles = StyleSheet.create({
     backgroundColor: MomentusColors.navySurface,
     borderWidth: 1,
     borderColor: MomentusColors.navyOutline,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   streakCardContainer: {
     marginBottom: 32,
@@ -507,9 +591,9 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   streakCardRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   streakInfoCol: {
     flex: 1,
@@ -518,22 +602,22 @@ const styles = StyleSheet.create({
   streakLabel: {
     fontSize: 13,
     color: MomentusColors.textSecondary,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   streakNumberRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
     marginVertical: 4,
   },
   streakNumberText: {
     fontSize: 22,
-    fontWeight: '900',
+    fontWeight: "900",
     color: MomentusColors.textPrimary,
   },
   motivationalText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: "700",
     color: MomentusColors.emeraldNeon,
     marginTop: 2,
     lineHeight: 18,
@@ -541,8 +625,8 @@ const styles = StyleSheet.create({
   circularProgressContainer: {
     width: 80,
     height: 80,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   circularProgressRing: {
     width: 74,
@@ -550,29 +634,29 @@ const styles = StyleSheet.create({
     borderRadius: 37,
     borderWidth: 6,
     borderColor: MomentusColors.emeraldNeon,
-    backgroundColor: 'rgba(52, 211, 153, 0.08)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(52, 211, 153, 0.08)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   progressPercentageText: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: "800",
     color: MomentusColors.textPrimary,
   },
   sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 16,
   },
   sectionHeaderRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 10,
   },
   selectModeBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -581,21 +665,21 @@ const styles = StyleSheet.create({
   },
   selectModeBtnText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: '800',
+    fontWeight: "800",
     color: MomentusColors.textPrimary,
   },
   sectionCountText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: "600",
     color: MomentusColors.textSecondary,
   },
   emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 48,
     backgroundColor: MomentusColors.navySurface,
     borderRadius: 24,
@@ -605,7 +689,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
     color: MomentusColors.textPrimary,
     marginTop: 12,
   },
@@ -622,15 +706,15 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   fab: {
-    position: 'absolute',
+    position: "absolute",
     right: 20,
     bottom: 24,
     width: 58,
     height: 58,
     borderRadius: 29,
     backgroundColor: MomentusColors.emeraldNeon,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     shadowColor: MomentusColors.emeraldNeon,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.45,

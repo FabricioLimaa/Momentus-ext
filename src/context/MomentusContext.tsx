@@ -218,6 +218,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Ref para permitir chamada segura de syncCloudAction a partir de callbacks externos
   const syncCloudActionRef = useRef<(targetUid?: string) => Promise<void>>(async () => {});
+  const lastLoadedUid = useRef<string | null>(null);
 
   const showCelebration = (title: string, message: string, pointsEarned?: number) => {
     setCelebration({ visible: true, title, message, pointsEarned });
@@ -264,6 +265,9 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         // Perfil do usuário: restaura nome, foto e status
         const effectiveProfile: UserProfile = dbUserProfile || legacyParsed?.userProfile || INITIAL_USER_PROFILE;
         const currentAuth = firebaseAuth.currentUser;
+        if (currentAuth?.uid) {
+          lastLoadedUid.current = currentAuth.uid;
+        }
         const enrichedProfile: UserProfile = {
           ...effectiveProfile,
           ...(currentAuth
@@ -332,31 +336,49 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     // Observa mudanças de autenticação do Firebase e sincroniza automaticamente
     const unsubAuth = onAuthStateChanged(firebaseAuth, async (user) => {
-      if (user) {
-        const activeName =
-          user.displayName?.trim() ||
-          (user.email ? user.email.split('@')[0] : 'Usuário');
-        const activeEmail = user.email || '';
-        const activePhoto = user.photoURL || null;
+      if (!user) {
+        setUserProfile((prev) => ({
+          ...prev,
+          isLoggedIn: false,
+        }));
+        return;
+      }
 
-        setUserProfile((prev) => {
-          const nextProfile: UserProfile = {
-            ...prev,
-            email: activeEmail || prev.email,
-            name: activeName !== 'Usuário' ? activeName : (prev.name !== 'Usuário' ? prev.name : 'Usuário'),
-            photoUrl: activePhoto ?? prev.photoUrl,
-            isLoggedIn: true,
-          };
-          setAppKv('user_profile', nextProfile).catch(() => {});
-          return nextProfile;
-        });
+      // Se havia um usuário logado e houve troca para outra conta, limpa cache local da anterior
+      if (lastLoadedUid.current && lastLoadedUid.current !== user.uid) {
+        await clearEntireDatabase().catch(() => {});
+        await AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
+        setHabits([]);
+        setCategories(INITIAL_CATEGORIES);
+        setTemplates([]);
+        setAchievements(INITIAL_ACHIEVEMENTS);
+        setMarketItems(INITIAL_MARKET_ITEMS);
+      }
+      lastLoadedUid.current = user.uid;
 
-        try {
-          // Sincroniza dados da nuvem (Firestore) do usuário recém-autenticado
-          await syncCloudActionRef.current(user.uid);
-        } catch (syncErr) {
-          console.warn('[AUTH] Aviso ao sincronizar nuvem no onAuthStateChanged:', syncErr);
-        }
+      const activeName =
+        user.displayName?.trim() ||
+        (user.email ? user.email.split('@')[0] : 'Usuário');
+      const activeEmail = user.email || '';
+      const activePhoto = user.photoURL || null;
+
+      setUserProfile((prev) => {
+        const nextProfile: UserProfile = {
+          ...prev,
+          email: activeEmail || prev.email,
+          name: activeName !== 'Usuário' ? activeName : (prev.name !== 'Usuário' ? prev.name : 'Usuário'),
+          photoUrl: activePhoto ?? prev.photoUrl,
+          isLoggedIn: true,
+        };
+        setAppKv('user_profile', nextProfile).catch(() => {});
+        return nextProfile;
+      });
+
+      try {
+        // Sincroniza dados da nuvem (Firestore) do usuário recém-autenticado
+        await syncCloudActionRef.current(user.uid);
+      } catch (syncErr) {
+        console.warn('[AUTH] Aviso ao sincronizar nuvem no onAuthStateChanged:', syncErr);
       }
     });
 
@@ -1023,11 +1045,16 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const logout = () => {
+    lastLoadedUid.current = null;
     logoutUser().catch(() => {});
-    setUserProfile((prev) => ({
-      ...prev,
-      isLoggedIn: false,
-    }));
+    clearEntireDatabase().catch(() => {});
+    AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
+    setHabits([]);
+    setCategories(INITIAL_CATEGORIES);
+    setTemplates([]);
+    setAchievements(INITIAL_ACHIEVEMENTS);
+    setMarketItems(INITIAL_MARKET_ITEMS);
+    setUserProfile(INITIAL_USER_PROFILE);
     triggerHaptic('impact');
   };
 
