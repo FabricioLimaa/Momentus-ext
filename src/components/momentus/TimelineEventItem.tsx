@@ -127,7 +127,7 @@ export const TimelineEventItem: React.FC<TimelineEventItemProps> = ({
         <View
           style={[
             styles.timelineDot,
-            { backgroundColor: categoryColor, borderColor: theme.background },
+            { backgroundColor: categoryColor, borderColor: theme.surface },
           ]}
         />
         <View

@@ -32,10 +32,8 @@ export const GlassCard: React.FC<GlassCardProps> = ({ children, style, highlight
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: MomentusColors.navySurface,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: MomentusColors.navyOutline,
     padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },

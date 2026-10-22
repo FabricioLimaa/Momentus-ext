@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { MomentusColors } from '@/constants/theme';
+import { MomentusColors, getContrastTextColor } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 
 type StatsFilter = 'WEEK' | 'MONTH' | 'YEAR';
@@ -204,7 +204,7 @@ export default function StatsScreen() {
                   <Text
                     style={[
                       styles.filterText,
-                      { color: isSelected ? '#000000' : theme.textSecondary },
+                      { color: isSelected ? getContrastTextColor(theme.primary) : theme.textSecondary },
                       isSelected && { fontWeight: '800' },
                     ]}>
                     {labels[f]}
@@ -246,46 +246,58 @@ export default function StatsScreen() {
             </View>
 
             {/* Card 2: Horário Ápice */}
-            <View style={styles.insightCard}>
+            <View
+              style={[
+                styles.insightCard,
+                { backgroundColor: theme.surface, borderColor: theme.outline },
+              ]}>
               <View style={styles.insightHeader}>
                 <Ionicons name="time" size={20} color={MomentusColors.cyan} />
-                <Text style={styles.insightLabel}>Horário Ápice</Text>
+                <Text style={[styles.insightLabel, { color: theme.textSecondary }]}>Horário Ápice</Text>
               </View>
-              <Text style={styles.insightValue}>{stats.bestHour}</Text>
-              <Text style={styles.insightSub}>Maior produtividade</Text>
+              <Text style={[styles.insightValue, { color: theme.textPrimary }]}>{stats.bestHour}</Text>
+              <Text style={[styles.insightSub, { color: theme.textSecondary }]}>Maior produtividade</Text>
             </View>
           </View>
 
           <View style={styles.insightsRow}>
             {/* Card 3: Total Concluído */}
-            <View style={styles.insightCard}>
+            <View
+              style={[
+                styles.insightCard,
+                { backgroundColor: theme.surface, borderColor: theme.outline },
+              ]}>
               <View style={styles.insightHeader}>
-                <Ionicons name="checkmark-done-circle" size={20} color={MomentusColors.emeraldNeon} />
-                <Text style={styles.insightLabel}>Concluídos</Text>
+                <Ionicons name="checkmark-done-circle" size={20} color={theme.primary} />
+                <Text style={[styles.insightLabel, { color: theme.textSecondary }]}>Concluídos</Text>
               </View>
-              <Text style={styles.insightValue}>{stats.currentCount}</Text>
-              <Text style={styles.insightSub}>Neste período</Text>
+              <Text style={[styles.insightValue, { color: theme.textPrimary }]}>{stats.currentCount}</Text>
+              <Text style={[styles.insightSub, { color: theme.textSecondary }]}>Neste período</Text>
             </View>
 
             {/* Card 4: Categoria Top */}
-            <View style={styles.insightCard}>
+            <View
+              style={[
+                styles.insightCard,
+                { backgroundColor: theme.surface, borderColor: theme.outline },
+              ]}>
               <View style={styles.insightHeader}>
                 <Ionicons name="star" size={20} color={MomentusColors.gold} />
-                <Text style={styles.insightLabel}>Destaque</Text>
+                <Text style={[styles.insightLabel, { color: theme.textSecondary }]}>Destaque</Text>
               </View>
-              <Text numberOfLines={1} style={styles.insightValueSmall}>
+              <Text numberOfLines={1} style={[styles.insightValueSmall, { color: theme.textPrimary }]}>
                 {stats.bestCategory}
               </Text>
-              <Text style={styles.insightSub}>Maior consistência</Text>
+              <Text style={[styles.insightSub, { color: theme.textSecondary }]}>Maior consistência</Text>
             </View>
           </View>
 
           {/* Gráfico de Barras */}
-          <Text style={styles.sectionTitle}>Conclusões por Período</Text>
-          <View style={styles.chartCard}>
+          <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Conclusões por Período</Text>
+          <View style={[styles.chartCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
             <View style={styles.chartHeader}>
-              <Text style={styles.chartTitle}>Hábitos Finalizados</Text>
-              <Text style={styles.chartAverage}>Média: {stats.dailyAverage} / dia</Text>
+              <Text style={[styles.chartTitle, { color: theme.textPrimary }]}>Hábitos Finalizados</Text>
+              <Text style={[styles.chartAverage, { color: theme.primary }]}>Média: {stats.dailyAverage} / dia</Text>
             </View>
 
             <View style={styles.barsContainer}>
@@ -296,15 +308,15 @@ export default function StatsScreen() {
                 const barColor = item.color
                   ? item.color
                   : isPeak
-                  ? (theme.primary || MomentusColors.emeraldNeon)
-                  : MomentusColors.navyOutline;
+                  ? theme.primary
+                  : theme.outline;
 
                 return (
                   <View key={index} style={styles.barCol}>
-                    <Text style={styles.barCountLabel}>
+                    <Text style={[styles.barCountLabel, { color: theme.textSecondary }]}>
                       {item.count > 0 ? item.count : ''}
                     </Text>
-                    <View style={styles.barTrack}>
+                    <View style={[styles.barTrack, { backgroundColor: theme.surfaceElevated }]}>
                       <View
                         style={[
                           styles.barFill,
@@ -312,7 +324,7 @@ export default function StatsScreen() {
                             height: `${heightPercent}%`,
                             backgroundColor: barColor,
                             borderWidth: isPeak && item.color ? 1.5 : 0,
-                            borderColor: '#FFFFFF',
+                            borderColor: theme.surface,
                           },
                         ]}
                       />
@@ -320,7 +332,7 @@ export default function StatsScreen() {
                     <Text
                       style={[
                         styles.barDayText,
-                        isPeak && !item.color && { color: theme.primary || MomentusColors.emeraldNeon, fontWeight: '800' },
+                        isPeak && !item.color && { color: theme.primary, fontWeight: '800' },
                         item.color && { color: theme.textSecondary, fontWeight: isPeak ? '800' : '600' },
                       ]}>
                       {item.label}
@@ -332,21 +344,21 @@ export default function StatsScreen() {
           </View>
 
           {/* Taxas por Categoria */}
-          <Text style={styles.sectionTitle}>Metas por Categoria</Text>
-          <View style={styles.categoriesProgressCard}>
+          <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Metas por Categoria</Text>
+          <View style={[styles.categoriesProgressCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
             {stats.categoryRates.map((cat) => (
               <View key={cat.id} style={styles.catProgressItem}>
                 <View style={styles.catProgressHeader}>
                   <View style={styles.catNameWithDot}>
                     <View style={[styles.catSmallDot, { backgroundColor: cat.color }]} />
-                    <Text style={styles.catProgressTitle}>{cat.name}</Text>
+                    <Text style={[styles.catProgressTitle, { color: theme.textPrimary }]}>{cat.name}</Text>
                   </View>
                   <Text style={[styles.catProgressPercent, { color: cat.color }]}>
                     {cat.rate}% ({cat.completed}/{cat.total})
                   </Text>
                 </View>
 
-                <View style={styles.catProgressBarTrack}>
+                <View style={[styles.catProgressBarTrack, { backgroundColor: theme.surfaceElevated }]}>
                   <View
                     style={[
                       styles.catProgressBarFill,
@@ -425,7 +437,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   sectionTitle: {
-    color: MomentusColors.emeraldNeon,
     fontSize: 14,
     fontWeight: '800',
     letterSpacing: 0.5,
@@ -439,10 +450,8 @@ const styles = StyleSheet.create({
   },
   insightCard: {
     flex: 1,
-    backgroundColor: MomentusColors.navySurface,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: MomentusColors.navyOutline,
     padding: 16,
   },
   insightHeader: {
@@ -452,31 +461,25 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   insightLabel: {
-    color: MomentusColors.textSecondary,
     fontSize: 12,
     fontWeight: '600',
   },
   insightValue: {
-    color: MomentusColors.textPrimary,
     fontSize: 26,
     fontWeight: '900',
     marginBottom: 2,
   },
   insightValueSmall: {
-    color: MomentusColors.textPrimary,
     fontSize: 18,
     fontWeight: '900',
     marginBottom: 2,
   },
   insightSub: {
-    color: MomentusColors.textSecondary,
     fontSize: 11,
   },
   chartCard: {
-    backgroundColor: MomentusColors.navySurface,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: MomentusColors.navyOutline,
     padding: 18,
     marginBottom: 20,
   },
@@ -487,12 +490,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   chartTitle: {
-    color: MomentusColors.textPrimary,
     fontSize: 14,
     fontWeight: 'bold',
   },
   chartAverage: {
-    color: MomentusColors.emeraldNeon,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -532,10 +533,8 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   categoriesProgressCard: {
-    backgroundColor: MomentusColors.navySurface,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: MomentusColors.navyOutline,
     padding: 18,
     gap: 16,
   },

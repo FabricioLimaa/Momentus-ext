@@ -259,14 +259,18 @@ export default function AchievementsScreen() {
                 <TouchableOpacity
                   key={ach.id}
                   onPress={() => setSelectedAchievement(ach)}
-                  style={[styles.itemCard, ach.unlocked && styles.itemCardUnlocked]}
+                  style={[
+                    styles.itemCard,
+                    { backgroundColor: theme.surface, borderColor: theme.outline },
+                    ach.unlocked && { borderColor: `${theme.primary}60` },
+                  ]}
                   activeOpacity={0.75}>
                   <View
                     style={[
                       styles.iconCircle,
                       ach.unlocked
                         ? { backgroundColor: `${theme.primary}25`, borderColor: theme.primary }
-                        : { backgroundColor: MomentusColors.navyOutline, borderColor: 'transparent' },
+                        : { backgroundColor: theme.surfaceElevated, borderColor: 'transparent' },
                     ]}>
                     <Ionicons
                       name={ach.unlocked ? icon : 'lock-closed'}
@@ -277,24 +281,24 @@ export default function AchievementsScreen() {
 
                   <View style={styles.itemInfo}>
                     <View style={styles.itemTitleRow}>
-                      <Text style={styles.itemTitle}>{ach.title}</Text>
+                      <Text style={[styles.itemTitle, { color: theme.textPrimary }]}>{ach.title}</Text>
                       {ach.unlocked ? (
-                        <View style={styles.unlockedTag}>
-                          <Text style={styles.unlockedTagText}>Desbloqueado</Text>
+                        <View style={[styles.unlockedTag, { backgroundColor: `${theme.primary}20` }]}>
+                          <Text style={[styles.unlockedTagText, { color: theme.primary }]}>Desbloqueado</Text>
                         </View>
                       ) : (
-                        <Text style={styles.lockedRewardText}>+{ach.xpReward} XP</Text>
+                        <Text style={[styles.lockedRewardText, { color: theme.primary }]}>+{ach.xpReward} XP</Text>
                       )}
                     </View>
 
-                    <Text style={styles.itemDesc}>{ach.description}</Text>
+                    <Text style={[styles.itemDesc, { color: theme.textSecondary }]}>{ach.description}</Text>
 
                     {/* Progress Bar */}
                     <View style={styles.progressRow}>
-                      <View style={styles.progressBarTrack}>
-                        <View style={[styles.progressBarFill, { width: `${percent}%` }]} />
+                      <View style={[styles.progressBarTrack, { backgroundColor: theme.surfaceElevated }]}>
+                        <View style={[styles.progressBarFill, { width: `${percent}%`, backgroundColor: theme.primary }]} />
                       </View>
-                      <Text style={styles.progressText}>
+                      <Text style={[styles.progressText, { color: theme.textSecondary }]}>
                         {ach.progress}/{ach.maxProgress}
                       </Text>
                     </View>
@@ -308,7 +312,7 @@ export default function AchievementsScreen() {
               const rarityColor = getRarityColor(item.rarity);
 
               return (
-                <View key={item.id} style={styles.itemCard}>
+                <View key={item.id} style={[styles.itemCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
                   <View
                     style={[
                       styles.iconCircle,
@@ -319,7 +323,7 @@ export default function AchievementsScreen() {
 
                   <View style={styles.itemInfo}>
                     <View style={styles.itemTitleRow}>
-                      <Text style={styles.itemTitle}>{item.name}</Text>
+                      <Text style={[styles.itemTitle, { color: theme.textPrimary }]}>{item.name}</Text>
                       <View style={[styles.rarityBadge, { borderColor: rarityColor }]}>
                         <Text style={[styles.rarityText, { color: rarityColor }]}>
                           {item.rarity}
@@ -327,7 +331,7 @@ export default function AchievementsScreen() {
                       </View>
                     </View>
 
-                    <Text style={styles.itemDesc}>{item.description}</Text>
+                    <Text style={[styles.itemDesc, { color: theme.textSecondary }]}>{item.description}</Text>
 
                     <View style={styles.marketActionRow}>
                       <View style={styles.priceTag}>
@@ -370,7 +374,7 @@ export default function AchievementsScreen() {
           animationType="fade"
           onRequestClose={() => setSelectedAchievement(null)}>
           <View style={styles.modalOverlay}>
-            <View style={styles.modalCard}>
+            <View style={[styles.modalCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
               {selectedAchievement && (
                 <>
                   <View style={styles.modalIconWrap}>
@@ -379,7 +383,7 @@ export default function AchievementsScreen() {
                         styles.modalIconCircle,
                         selectedAchievement.unlocked
                           ? { backgroundColor: `${theme.primary}25`, borderColor: theme.primary }
-                          : { backgroundColor: MomentusColors.navyOutline, borderColor: 'transparent' },
+                          : { backgroundColor: theme.surfaceElevated, borderColor: 'transparent' },
                       ]}>
                       <Ionicons
                         name={selectedAchievement.unlocked ? getIconForAchievement(selectedAchievement.id) : 'lock-closed'}
@@ -389,16 +393,16 @@ export default function AchievementsScreen() {
                     </View>
                   </View>
 
-                  <Text style={styles.modalTitle}>{selectedAchievement.title}</Text>
-                  <Text style={styles.modalSubtitle}>{selectedAchievement.description}</Text>
+                  <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>{selectedAchievement.title}</Text>
+                  <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>{selectedAchievement.description}</Text>
 
-                  <View style={styles.modalRewardBox}>
-                    <Text style={styles.modalRewardLabel}>Recompensa</Text>
-                    <Text style={styles.modalRewardValue}>+{selectedAchievement.xpReward} XP</Text>
+                  <View style={[styles.modalRewardBox, { backgroundColor: theme.surfaceElevated }]}>
+                    <Text style={[styles.modalRewardLabel, { color: theme.textSecondary }]}>Recompensa</Text>
+                    <Text style={[styles.modalRewardValue, { color: theme.primary }]}>+{selectedAchievement.xpReward} XP</Text>
                   </View>
 
-                  <View style={styles.modalStatusBox}>
-                    <Text style={styles.modalStatusText}>
+                  <View style={[styles.modalStatusBox, { backgroundColor: theme.surfaceElevated }]}>
+                    <Text style={[styles.modalStatusText, { color: theme.textSecondary }]}>
                       {selectedAchievement.unlocked
                         ? `Conquistada em ${selectedAchievement.unlockedAt || 'Recentemente'}`
                         : `Progresso: ${selectedAchievement.progress} de ${selectedAchievement.maxProgress}`}
@@ -574,10 +578,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   itemCard: {
-    backgroundColor: MomentusColors.navySurface,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: MomentusColors.navyOutline,
     padding: 16,
     marginBottom: 12,
     flexDirection: 'row',
@@ -705,10 +707,8 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 380,
-    backgroundColor: MomentusColors.navySurface,
     borderRadius: 28,
     borderWidth: 1,
-    borderColor: MomentusColors.navyOutline,
     padding: 24,
     alignItems: 'center',
   },

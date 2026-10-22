@@ -374,7 +374,7 @@ export default function SettingsScreen() {
                 <Switch
                   value={soundEnabled}
                   onValueChange={handleToggleSound}
-                  trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: 'rgba(52, 211, 153, 0.4)' }}
+                  trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: `${primaryColorHex}66` }}
                   thumbColor={soundEnabled ? primaryColorHex : '#94A3B8'}
                 />
               </View>
@@ -389,7 +389,7 @@ export default function SettingsScreen() {
                 <Switch
                   value={hapticsEnabled}
                   onValueChange={handleToggleHaptics}
-                  trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: 'rgba(52, 211, 153, 0.4)' }}
+                  trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: `${primaryColorHex}66` }}
                   thumbColor={hapticsEnabled ? primaryColorHex : '#94A3B8'}
                 />
               </View>
@@ -404,7 +404,7 @@ export default function SettingsScreen() {
                 <Switch
                   value={syncEnabled}
                   onValueChange={handleToggleSync}
-                  trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: 'rgba(52, 211, 153, 0.4)' }}
+                  trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: `${primaryColorHex}66` }}
                   thumbColor={syncEnabled ? primaryColorHex : '#94A3B8'}
                 />
               </View>

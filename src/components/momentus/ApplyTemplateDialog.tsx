@@ -191,7 +191,7 @@ export const ApplyTemplateDialog: React.FC<ApplyTemplateDialogProps> = ({
               <Switch
                 value={saveToGoogle}
                 onValueChange={setSaveToGoogle}
-                trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: 'rgba(52, 211, 153, 0.4)' }}
+                trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: `${theme.primary}66` }}
                 thumbColor={saveToGoogle ? theme.primary : '#94A3B8'}
               />
             </View>
@@ -237,10 +237,8 @@ const styles = StyleSheet.create({
   dialogCard: {
     width: '100%',
     maxWidth: 420,
-    backgroundColor: MomentusColors.navySurface,
     borderRadius: 28,
     borderWidth: 1,
-    borderColor: MomentusColors.navyOutline,
     padding: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },

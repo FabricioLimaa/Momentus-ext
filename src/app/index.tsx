@@ -228,7 +228,7 @@ export default function HomeScreen() {
               style={styles.userProfileGreetingRow}
               activeOpacity={0.8}
             >
-              <View style={[styles.homeAvatar, { borderColor: theme.primary }]}>
+              <View style={[styles.homeAvatar, { borderColor: theme.primary, backgroundColor: `${theme.primary}18` }]}>
                 {displayPhoto && !avatarError ? (
                   <Image
                     source={{ uri: displayPhoto }}
@@ -376,14 +376,14 @@ export default function HomeScreen() {
               </Text>
             </View>
           ) : (
-            <View style={styles.timelineList}>
+            <View style={[styles.timelineList, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
               {todayHabits.map((habit, index) => {
                 const category = categories.find(
                   (c) => c.id === habit.categoryId,
                 ) || {
                   id: "default",
                   name: "Geral",
-                  color: "#34D399",
+                  color: theme.primary,
                 };
 
                 const isSelected = selectedHabitIds.includes(habit.id);
@@ -534,7 +534,6 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
     borderWidth: 2,
-    backgroundColor: "rgba(52, 211, 153, 0.1)",
     justifyContent: "center",
     alignItems: "center",
     overflow: "hidden",
@@ -665,10 +664,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 48,
-    backgroundColor: MomentusColors.navySurface,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: MomentusColors.navyOutline,
     marginTop: 8,
   },
   emptyTitle: {
@@ -683,10 +680,8 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   timelineList: {
-    backgroundColor: MomentusColors.navySurface,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: MomentusColors.navyOutline,
     paddingVertical: 12,
   },
   fab: {
@@ -696,10 +691,8 @@ const styles = StyleSheet.create({
     width: 58,
     height: 58,
     borderRadius: 29,
-    backgroundColor: MomentusColors.emeraldNeon,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: MomentusColors.emeraldNeon,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.45,
     shadowRadius: 10,

@@ -219,9 +219,10 @@ export const CategoriesModal: React.FC<CategoriesModalProps> = ({ visible, onClo
                         onPress={() => setSelectedSticker(null)}
                         style={[
                           styles.stickerChip,
-                          selectedSticker === null && styles.stickerChipSelected,
+                          { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
+                          selectedSticker === null && { borderColor: theme.primary, backgroundColor: `${theme.primary}20` },
                         ]}>
-                        <Text style={styles.stickerText}>Nenhum</Text>
+                        <Text style={[styles.stickerText, { color: theme.textSecondary }]}>Nenhum</Text>
                       </TouchableOpacity>
                       {ownedStickers.map((stk) => {
                         const isSel = selectedSticker === stk.id;
@@ -231,14 +232,15 @@ export const CategoriesModal: React.FC<CategoriesModalProps> = ({ visible, onClo
                             onPress={() => setSelectedSticker(stk.id)}
                             style={[
                               styles.stickerChip,
-                              isSel && styles.stickerChipSelected,
+                              { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
+                              isSel && { borderColor: theme.primary, backgroundColor: `${theme.primary}20` },
                             ]}>
                             <Ionicons
                               name={stk.iconName as any}
                               size={16}
-                              color={isSel ? MomentusColors.emeraldNeon : MomentusColors.textSecondary}
+                              color={isSel ? theme.primary : theme.textSecondary}
                             />
-                            <Text style={[styles.stickerText, isSel && { color: MomentusColors.emeraldNeon }]}>
+                            <Text style={[styles.stickerText, { color: isSel ? theme.primary : theme.textSecondary }]}>
                               {stk.name}
                             </Text>
                           </TouchableOpacity>
@@ -251,13 +253,14 @@ export const CategoriesModal: React.FC<CategoriesModalProps> = ({ visible, onClo
                 {/* Meta Semanal Switch */}
                 <View style={styles.metaSwitchRow}>
                   <View>
-                    <Text style={styles.metaSwitchTitle}>Definir Meta Semanal</Text>
-                    <Text style={styles.metaSwitchSubtitle}>Acompanhe o tempo investido</Text>
+                    <Text style={[styles.metaSwitchTitle, { color: theme.textPrimary }]}>Definir Meta Semanal</Text>
+                    <Text style={[styles.metaSwitchSubtitle, { color: theme.textSecondary }]}>Acompanhe o tempo investido</Text>
                   </View>
                   <Switch
                     value={isMetaEnabled}
                     onValueChange={setIsMetaEnabled}
-                    trackColor={{ false: MomentusColors.navyOutline, true: MomentusColors.emeraldNeon }}
+                    trackColor={{ false: theme.outline, true: `${theme.primary}66` }}
+                    thumbColor={isMetaEnabled ? theme.primary : '#94A3B8'}
                   />
                 </View>
 
@@ -288,8 +291,8 @@ export const CategoriesModal: React.FC<CategoriesModalProps> = ({ visible, onClo
               <View style={styles.subModalFooter}>
                 <TouchableOpacity
                   onPress={() => setEditModalVisible(false)}
-                  style={styles.cancelSubBtn}>
-                  <Text style={styles.cancelSubText}>Cancelar</Text>
+                  style={[styles.cancelSubBtn, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}>
+                  <Text style={[styles.cancelSubText, { color: theme.textSecondary }]}>Cancelar</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -359,10 +362,8 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   categoryCard: {
-    backgroundColor: MomentusColors.navySurface,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: MomentusColors.navyOutline,
     padding: 16,
     marginBottom: 12,
   },
@@ -496,15 +497,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: MomentusColors.navySurface,
     borderWidth: 1,
-    borderColor: MomentusColors.navyOutline,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 12,
   },
   stickerChipSelected: {
-    borderColor: MomentusColors.emeraldNeon,
     backgroundColor: 'rgba(52, 211, 153, 0.15)',
   },
   stickerText: {
@@ -547,9 +545,7 @@ const styles = StyleSheet.create({
   },
   cancelSubBtn: {
     flex: 1,
-    backgroundColor: MomentusColors.navySurface,
     borderWidth: 1,
-    borderColor: MomentusColors.navyOutline,
     paddingVertical: 14,
     borderRadius: 16,
     alignItems: 'center',
@@ -560,7 +556,6 @@ const styles = StyleSheet.create({
   },
   saveSubBtn: {
     flex: 1.5,
-    backgroundColor: MomentusColors.emeraldNeon,
     paddingVertical: 14,
     borderRadius: 16,
     alignItems: 'center',

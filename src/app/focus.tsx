@@ -281,8 +281,16 @@ export default function FocusScreen() {
 
         {/* Big Circular Timer Display */}
         <View style={styles.timerCenter}>
-          <View style={[styles.outerCircle, { borderColor: `${theme.primary}50`, shadowColor: theme.primary }]}>
-            <View style={[styles.innerCircle, { backgroundColor: theme.surface }]}>
+          <View
+            style={[
+              styles.outerCircle,
+              {
+                borderColor: `${theme.primary}50`,
+                shadowColor: theme.primary,
+                backgroundColor: theme.isDark ? 'rgba(30, 41, 59, 0.6)' : 'rgba(241, 245, 249, 0.8)',
+              },
+            ]}>
+            <View style={[styles.innerCircle, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
               <Text style={[styles.modeStatusLabel, { color: theme.textSecondary }]}>{modeLabel}</Text>
               <Text style={[styles.timerDisplay, { color: theme.textPrimary }]}>{timeFormatted}</Text>
               <View
@@ -575,10 +583,8 @@ const styles = StyleSheet.create({
   },
   modeTabsRow: {
     flexDirection: 'row',
-    backgroundColor: MomentusColors.navySurface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: MomentusColors.navyOutline,
     padding: 4,
     marginTop: 8,
   },
@@ -622,11 +628,9 @@ const styles = StyleSheet.create({
     width: 228,
     height: 228,
     borderRadius: 114,
-    backgroundColor: MomentusColors.navySurface,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: MomentusColors.navyOutline,
   },
   modeStatusLabel: {
     fontSize: 13,
@@ -669,9 +673,7 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: MomentusColors.navySurface,
     borderWidth: 1,
-    borderColor: MomentusColors.navyOutline,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -679,11 +681,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: MomentusColors.emeraldNeon,
     paddingHorizontal: 32,
     paddingVertical: 14,
     borderRadius: 26,
-    shadowColor: MomentusColors.emeraldNeon,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.45,
     shadowRadius: 12,
@@ -698,10 +698,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   statsCard: {
-    backgroundColor: MomentusColors.navySurface,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: MomentusColors.navyOutline,
     flexDirection: 'row',
     paddingVertical: 14,
     paddingHorizontal: 8,
@@ -737,10 +735,8 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 420,
-    backgroundColor: MomentusColors.navySurface,
     borderRadius: 28,
     borderWidth: 1,
-    borderColor: MomentusColors.navyOutline,
     padding: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
