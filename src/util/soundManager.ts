@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import type { AudioPlayer } from 'expo-audio';
 
 type ExpoAudioModule = typeof import('expo-audio');
@@ -51,6 +52,16 @@ class SoundManager {
   public async playSuccessSound() {
     if (!this.enabled) return;
     try {
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && (window as any).Audio) {
+        try {
+          const audioAsset = require('@/assets/sounds/inicio_som.mp3');
+          const audioUrl = typeof audioAsset === 'string' ? audioAsset : audioAsset?.default || audioAsset;
+          const htmlAudio = new (window as any).Audio(audioUrl);
+          htmlAudio.play().catch(() => {});
+          return;
+        } catch {}
+      }
+
       const Audio = this.getAudioModule();
       if (!Audio?.createAudioPlayer) return;
 
@@ -73,6 +84,16 @@ class SoundManager {
   public async playAchievementSound() {
     if (!this.enabled) return;
     try {
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && (window as any).Audio) {
+        try {
+          const audioAsset = require('@/assets/sounds/termino_som.mp3');
+          const audioUrl = typeof audioAsset === 'string' ? audioAsset : audioAsset?.default || audioAsset;
+          const htmlAudio = new (window as any).Audio(audioUrl);
+          htmlAudio.play().catch(() => {});
+          return;
+        } catch {}
+      }
+
       const Audio = this.getAudioModule();
       if (!Audio?.createAudioPlayer) return;
 

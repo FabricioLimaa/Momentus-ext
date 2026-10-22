@@ -376,6 +376,7 @@ export default function SettingsScreen() {
                   onValueChange={handleToggleSound}
                   trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: `${primaryColorHex}66` }}
                   thumbColor={soundEnabled ? primaryColorHex : '#94A3B8'}
+                  {...({ activeThumbColor: primaryColorHex } as any)}
                 />
               </View>
 
@@ -391,6 +392,7 @@ export default function SettingsScreen() {
                   onValueChange={handleToggleHaptics}
                   trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: `${primaryColorHex}66` }}
                   thumbColor={hapticsEnabled ? primaryColorHex : '#94A3B8'}
+                  {...({ activeThumbColor: primaryColorHex } as any)}
                 />
               </View>
 
@@ -406,6 +408,7 @@ export default function SettingsScreen() {
                   onValueChange={handleToggleSync}
                   trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: `${primaryColorHex}66` }}
                   thumbColor={syncEnabled ? primaryColorHex : '#94A3B8'}
+                  {...({ activeThumbColor: primaryColorHex } as any)}
                 />
               </View>
             </View>
@@ -441,22 +444,22 @@ export default function SettingsScreen() {
           </View>
 
           <View style={[styles.cloudCard, { backgroundColor: theme.surfaceElevated }]}>
-            <Text style={styles.cloudCardLabel}>Conta</Text>
+            <Text style={[styles.cloudCardLabel, { color: primaryColorHex }]}>Conta</Text>
             <Text style={[styles.cloudCardValue, { color: theme.textPrimary }]}>{userProfile.email || 'contato@momentusapp.com.br'}</Text>
 
-            <Text style={[styles.cloudCardLabel, { marginTop: 12 }]}>Último Backup / Sincronização</Text>
+            <Text style={[styles.cloudCardLabel, { color: primaryColorHex, marginTop: 12 }]}>Último Backup / Sincronização</Text>
             <Text style={[styles.cloudCardValue, { color: theme.textPrimary }]}>
               {settings.lastBackupAt || 'Sincronização Automática Ativa'}
             </Text>
           </View>
 
           <TouchableOpacity
-            style={styles.syncNowBtn}
+            style={[styles.syncNowBtn, { backgroundColor: primaryColorHex }]}
             onPress={handleSyncNow}
             disabled={isSyncing}
             activeOpacity={0.85}>
-            <Ionicons name="sync" size={18} color="#0F172A" />
-            <Text style={styles.syncNowBtnText}>
+            <Ionicons name="sync" size={18} color={getContrastTextColor(primaryColorHex)} />
+            <Text style={[styles.syncNowBtnText, { color: getContrastTextColor(primaryColorHex) }]}>
               {isSyncing ? 'Sincronizando...' : 'Sincronizar Agenda e Nuvem Agora'}
             </Text>
           </TouchableOpacity>
@@ -762,7 +765,6 @@ const styles = StyleSheet.create({
   cloudCardLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: MomentusColors.emeraldNeon,
     textTransform: 'uppercase',
   },
   cloudCardValue: {
@@ -775,13 +777,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: MomentusColors.emeraldNeon,
     paddingVertical: 14,
     borderRadius: 16,
     marginBottom: 12,
   },
   syncNowBtnText: {
-    color: '#0F172A',
     fontWeight: '800',
     fontSize: 14,
   },

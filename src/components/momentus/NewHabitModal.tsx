@@ -31,15 +31,16 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
   habitToEdit,
   initialDate,
 }) => {
-  const { categories, addHabit, updateHabit, selectedDate, theme } = useMomentus();
+  const { categories, addHabit, updateHabit, selectedDate, theme, settings } = useMomentus();
   const isEditMode = !!habitToEdit;
 
+  const defaultGoogleSync = settings.googleCalendarSyncEnabled ?? true;
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [timeStart, setTimeStart] = useState('08:00');
   const [timeEnd, setTimeEnd] = useState('09:00');
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
-  const [saveToGoogle, setSaveToGoogle] = useState(false);
+  const [saveToGoogle, setSaveToGoogle] = useState(defaultGoogleSync);
 
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
@@ -62,9 +63,9 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
       setTimeEnd(`${nextH}:00`);
       const defaultCat = categories.find((c) => c.name.toLowerCase() === 'outros') || categories[0];
       setSelectedCategoryId(defaultCat?.id || 'cat-outros');
-      setSaveToGoogle(false);
+      setSaveToGoogle(settings.googleCalendarSyncEnabled ?? true);
     }
-  }, [habitToEdit, visible, categories]);
+  }, [habitToEdit, visible, categories, settings.googleCalendarSyncEnabled]);
 
   const parseTimeToMinutes = (t: string) => {
     if (!t) return 0;
@@ -315,14 +316,20 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
               <Switch
                 value={saveToGoogle}
                 onValueChange={setSaveToGoogle}
-                trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: 'rgba(52, 211, 153, 0.4)' }}
+                trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: `${theme.primary}66` }}
                 thumbColor={saveToGoogle ? theme.primary : '#94A3B8'}
+                {...({ activeThumbColor: theme.primary } as any)}
               />
             </View>
           </ScrollView>
 
           <View style={styles.footer}>
-            <TouchableOpacity onPress={onClose} style={styles.cancelBtn}>
+            <TouchableOpacity
+              onPress={onClose}
+              style={[
+                styles.cancelBtn,
+                { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
+              ]}>
               <Text style={[styles.cancelText, { color: theme.textSecondary }]}>Cancelar</Text>
             </TouchableOpacity>
 
@@ -594,13 +601,10 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 14,
     borderRadius: 16,
-    backgroundColor: MomentusColors.navySurface,
     borderWidth: 1,
-    borderColor: MomentusColors.navyOutline,
     alignItems: 'center',
   },
   cancelText: {
-    color: MomentusColors.textSecondary,
     fontSize: 15,
     fontWeight: '600',
   },
@@ -608,7 +612,6 @@ const styles = StyleSheet.create({
     flex: 1.5,
     paddingVertical: 14,
     borderRadius: 16,
-    backgroundColor: MomentusColors.emeraldNeon,
     alignItems: 'center',
   },
   disabledBtn: {

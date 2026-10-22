@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useMemo, useRef } from 'react';
-import { useColorScheme, Alert } from 'react-native';
+import { useColorScheme, Alert, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import {
@@ -491,9 +491,24 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const userLevel = calculateUserLevel(userProfile.totalPoints);
 
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      const scale = settings.fontSizeMultiplier || 1.0;
+      if (document.body) {
+        (document.body.style as any).zoom = String(scale);
+      }
+    }
+  }, [settings.fontSizeMultiplier]);
+
   const triggerHaptic = (type: 'impact' | 'success') => {
     if (!settings.hapticsEnabled) return;
     try {
+      if (Platform.OS === 'web') {
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          navigator.vibrate(type === 'impact' ? 20 : [30, 40, 30]);
+        }
+        return;
+      }
       if (type === 'impact') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       } else {

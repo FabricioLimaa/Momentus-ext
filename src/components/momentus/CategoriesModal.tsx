@@ -261,6 +261,7 @@ export const CategoriesModal: React.FC<CategoriesModalProps> = ({ visible, onClo
                     onValueChange={setIsMetaEnabled}
                     trackColor={{ false: theme.outline, true: `${theme.primary}66` }}
                     thumbColor={isMetaEnabled ? theme.primary : '#94A3B8'}
+                    {...({ activeThumbColor: theme.primary } as any)}
                   />
                 </View>
 

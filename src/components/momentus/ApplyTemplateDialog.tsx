@@ -193,6 +193,7 @@ export const ApplyTemplateDialog: React.FC<ApplyTemplateDialogProps> = ({
                 onValueChange={setSaveToGoogle}
                 trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: `${theme.primary}66` }}
                 thumbColor={saveToGoogle ? theme.primary : '#94A3B8'}
+                {...({ activeThumbColor: theme.primary } as any)}
               />
             </View>
 

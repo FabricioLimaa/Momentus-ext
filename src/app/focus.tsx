@@ -9,6 +9,7 @@ import {
   Modal,
   ScrollView,
   Alert,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -390,39 +391,54 @@ export default function FocusScreen() {
           </View>
         </View>
 
-        {/* Modal de Configurações de Foco */}
+        {/* Modal de Configurações de Foco (Padrão Bottom Sheet do NewHabitModal) */}
         <Modal
           visible={showSettingsModal}
           transparent
-          animationType="fade"
+          animationType="slide"
           onRequestClose={() => setShowSettingsModal(false)}>
-          <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.sheetOverlay}>
             <View
               style={[
-                styles.modalCard,
+                styles.sheetContainer,
                 { backgroundColor: theme.surface, borderColor: theme.outline },
               ]}>
-              <ScrollView showsVerticalScrollIndicator={false}>
-                <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Configurações de Foco</Text>
-                <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>
-                  Ajuste a duração dos ciclos de produtividade
-                </Text>
+              <View style={styles.sheetHeader}>
+                <View>
+                  <Text style={[styles.sheetTitle, { color: theme.textPrimary }]}>Configurações de Foco</Text>
+                  <Text style={[styles.sheetSubtitle, { color: theme.textSecondary }]}>
+                    Ajuste os ciclos da Técnica Pomodoro
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => setShowSettingsModal(false)} style={styles.sheetCloseBtn}>
+                  <Ionicons name="close" size={22} color={theme.textSecondary} />
+                </TouchableOpacity>
+              </View>
 
-                {/* Duração do Foco */}
-                <View style={styles.settingBlock}>
+              <ScrollView style={styles.sheetBody} showsVerticalScrollIndicator={false}>
+                {/* 1. Duração do Foco */}
+                <View style={[styles.settingCard, { backgroundColor: theme.surfaceElevated }]}>
                   <View style={styles.settingHeaderRow}>
-                    <Text style={[styles.settingName, { color: theme.textPrimary }]}>Duração do Foco</Text>
+                    <View style={styles.settingTitleCol}>
+                      <View style={styles.settingIconRow}>
+                        <Ionicons name="flame" size={16} color={theme.primary} />
+                        <Text style={[styles.settingName, { color: theme.textPrimary }]}>Duração do Foco</Text>
+                      </View>
+                      <Text style={[styles.settingDesc, { color: theme.textSecondary }]}>Ciclo de produtividade contínua</Text>
+                    </View>
                     <View style={styles.stepperContainer}>
                       <TouchableOpacity
-                        style={[styles.stepperBtn, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}
+                        style={[styles.stepperBtn, { backgroundColor: theme.surface, borderColor: theme.outline }]}
                         onPress={() => setTempFocus((prev) => Math.max(5, prev - 5))}>
-                        <Ionicons name="remove" size={14} color={theme.textPrimary} />
+                        <Ionicons name="remove" size={16} color={theme.textPrimary} />
                       </TouchableOpacity>
                       <Text style={[styles.settingValueText, { color: theme.primary }]}>{tempFocus} min</Text>
                       <TouchableOpacity
-                        style={[styles.stepperBtn, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}
+                        style={[styles.stepperBtn, { backgroundColor: theme.surface, borderColor: theme.outline }]}
                         onPress={() => setTempFocus((prev) => Math.min(120, prev + 5))}>
-                        <Ionicons name="add" size={14} color={theme.textPrimary} />
+                        <Ionicons name="add" size={16} color={theme.textPrimary} />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -432,7 +448,7 @@ export default function FocusScreen() {
                         key={v}
                         style={[
                           styles.presetPill,
-                          { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
+                          { backgroundColor: theme.surface, borderColor: theme.outline },
                           tempFocus === v && { backgroundColor: `${theme.primary}25`, borderColor: theme.primary },
                         ]}
                         onPress={() => setTempFocus(v)}>
@@ -449,21 +465,27 @@ export default function FocusScreen() {
                   </View>
                 </View>
 
-                {/* Pausa Curta */}
-                <View style={styles.settingBlock}>
+                {/* 2. Pausa Curta */}
+                <View style={[styles.settingCard, { backgroundColor: theme.surfaceElevated }]}>
                   <View style={styles.settingHeaderRow}>
-                    <Text style={[styles.settingName, { color: theme.textPrimary }]}>Pausa Curta</Text>
+                    <View style={styles.settingTitleCol}>
+                      <View style={styles.settingIconRow}>
+                        <Ionicons name="cafe" size={16} color={MomentusColors.cyan} />
+                        <Text style={[styles.settingName, { color: theme.textPrimary }]}>Pausa Curta</Text>
+                      </View>
+                      <Text style={[styles.settingDesc, { color: theme.textSecondary }]}>Descanso entre os blocos</Text>
+                    </View>
                     <View style={styles.stepperContainer}>
                       <TouchableOpacity
-                        style={[styles.stepperBtn, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}
+                        style={[styles.stepperBtn, { backgroundColor: theme.surface, borderColor: theme.outline }]}
                         onPress={() => setTempShort((prev) => Math.max(1, prev - 1))}>
-                        <Ionicons name="remove" size={14} color={theme.textPrimary} />
+                        <Ionicons name="remove" size={16} color={theme.textPrimary} />
                       </TouchableOpacity>
                       <Text style={[styles.settingValueText, { color: theme.primary }]}>{tempShort} min</Text>
                       <TouchableOpacity
-                        style={[styles.stepperBtn, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}
+                        style={[styles.stepperBtn, { backgroundColor: theme.surface, borderColor: theme.outline }]}
                         onPress={() => setTempShort((prev) => Math.min(30, prev + 1))}>
-                        <Ionicons name="add" size={14} color={theme.textPrimary} />
+                        <Ionicons name="add" size={16} color={theme.textPrimary} />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -473,7 +495,7 @@ export default function FocusScreen() {
                         key={v}
                         style={[
                           styles.presetPill,
-                          { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
+                          { backgroundColor: theme.surface, borderColor: theme.outline },
                           tempShort === v && { backgroundColor: `${theme.primary}25`, borderColor: theme.primary },
                         ]}
                         onPress={() => setTempShort(v)}>
@@ -490,21 +512,27 @@ export default function FocusScreen() {
                   </View>
                 </View>
 
-                {/* Pausa Longa */}
-                <View style={styles.settingBlock}>
+                {/* 3. Pausa Longa */}
+                <View style={[styles.settingCard, { backgroundColor: theme.surfaceElevated }]}>
                   <View style={styles.settingHeaderRow}>
-                    <Text style={[styles.settingName, { color: theme.textPrimary }]}>Pausa Longa</Text>
+                    <View style={styles.settingTitleCol}>
+                      <View style={styles.settingIconRow}>
+                        <Ionicons name="battery-charging" size={16} color={MomentusColors.gold} />
+                        <Text style={[styles.settingName, { color: theme.textPrimary }]}>Pausa Longa</Text>
+                      </View>
+                      <Text style={[styles.settingDesc, { color: theme.textSecondary }]}>Recuperação a cada 4 ciclos</Text>
+                    </View>
                     <View style={styles.stepperContainer}>
                       <TouchableOpacity
-                        style={[styles.stepperBtn, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}
+                        style={[styles.stepperBtn, { backgroundColor: theme.surface, borderColor: theme.outline }]}
                         onPress={() => setTempLong((prev) => Math.max(5, prev - 5))}>
-                        <Ionicons name="remove" size={14} color={theme.textPrimary} />
+                        <Ionicons name="remove" size={16} color={theme.textPrimary} />
                       </TouchableOpacity>
                       <Text style={[styles.settingValueText, { color: theme.primary }]}>{tempLong} min</Text>
                       <TouchableOpacity
-                        style={[styles.stepperBtn, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}
+                        style={[styles.stepperBtn, { backgroundColor: theme.surface, borderColor: theme.outline }]}
                         onPress={() => setTempLong((prev) => Math.min(60, prev + 5))}>
-                        <Ionicons name="add" size={14} color={theme.textPrimary} />
+                        <Ionicons name="add" size={16} color={theme.textPrimary} />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -514,7 +542,7 @@ export default function FocusScreen() {
                         key={v}
                         style={[
                           styles.presetPill,
-                          { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
+                          { backgroundColor: theme.surface, borderColor: theme.outline },
                           tempLong === v && { backgroundColor: `${theme.primary}25`, borderColor: theme.primary },
                         ]}
                         onPress={() => setTempLong(v)}>
@@ -530,25 +558,29 @@ export default function FocusScreen() {
                     ))}
                   </View>
                 </View>
-
-                <View style={styles.modalButtonsRow}>
-                  <TouchableOpacity
-                    style={styles.modalCancelBtn}
-                    onPress={() => setShowSettingsModal(false)}>
-                    <Text style={[styles.modalCancelText, { color: theme.textSecondary }]}>Cancelar</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.modalSaveBtn, { backgroundColor: theme.primary }]}
-                    onPress={handleSaveSettings}>
-                    <Text style={[styles.modalSaveText, { color: getContrastTextColor(theme.primary) }]}>
-                      Salvar
-                    </Text>
-                  </TouchableOpacity>
-                </View>
               </ScrollView>
+
+              {/* Footer com Cancelar e Salvar Alterações (Igual NewHabitModal) */}
+              <View style={styles.sheetFooter}>
+                <TouchableOpacity
+                  style={[
+                    styles.sheetCancelBtn,
+                    { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
+                  ]}
+                  onPress={() => setShowSettingsModal(false)}>
+                  <Text style={[styles.sheetCancelText, { color: theme.textSecondary }]}>Cancelar</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.sheetSaveBtn, { backgroundColor: theme.primary }]}
+                  onPress={handleSaveSettings}>
+                  <Text style={[styles.sheetSaveText, { color: getContrastTextColor(theme.primary) }]}>
+                    Salvar Alterações
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
       </View>
     </SafeAreaView>
@@ -725,38 +757,44 @@ const styles = StyleSheet.create({
     height: 28,
     backgroundColor: MomentusColors.navyOutline,
   },
-  modalOverlay: {
+  sheetOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.75)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'flex-end',
   },
-  modalCard: {
-    width: '100%',
-    maxWidth: 420,
-    borderRadius: 28,
+  sheetContainer: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     borderWidth: 1,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
-    elevation: 8,
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    maxHeight: '88%',
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: MomentusColors.textPrimary,
+  sheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
-  modalSubtitle: {
-    fontSize: 13,
-    color: MomentusColors.textSecondary,
+  sheetTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  sheetSubtitle: {
+    fontSize: 12,
     marginTop: 2,
-    marginBottom: 20,
   },
-  settingBlock: {
-    marginBottom: 18,
+  sheetCloseBtn: {
+    padding: 6,
+  },
+  sheetBody: {
+    marginBottom: 14,
+  },
+  settingCard: {
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 12,
   },
   settingHeaderRow: {
     flexDirection: 'row',
@@ -764,10 +802,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
+  settingTitleCol: {
+    flex: 1,
+  },
+  settingIconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   settingName: {
     fontSize: 14,
     fontWeight: '700',
-    color: MomentusColors.textPrimary,
+  },
+  settingDesc: {
+    fontSize: 11,
+    marginTop: 2,
   },
   stepperContainer: {
     flexDirection: 'row',
@@ -775,12 +824,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   stepperBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     borderWidth: 1,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   settingValueText: {
     fontSize: 14,
@@ -791,39 +840,42 @@ const styles = StyleSheet.create({
   pillSelectorRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 6,
   },
   presetPill: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
     borderWidth: 1,
   },
   presetPillText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
   },
-  modalButtonsRow: {
+  sheetFooter: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
     gap: 12,
-    marginTop: 16,
+    marginTop: 6,
   },
-  modalCancelBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+  sheetCancelBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
   },
-  modalCancelText: {
+  sheetCancelText: {
+    fontSize: 15,
     fontWeight: '600',
-    fontSize: 14,
   },
-  modalSaveBtn: {
-    paddingHorizontal: 22,
-    paddingVertical: 12,
-    borderRadius: 14,
+  sheetSaveBtn: {
+    flex: 1.5,
+    paddingVertical: 14,
+    borderRadius: 16,
+    alignItems: 'center',
   },
-  modalSaveText: {
-    fontWeight: '800',
-    fontSize: 14,
+  sheetSaveText: {
+    fontSize: 15,
+    fontWeight: 'bold',
   },
 });
