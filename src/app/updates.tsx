@@ -25,33 +25,33 @@ export default function UpdateNotesScreen() {
   const updates = [
     {
       icon: 'sparkles' as const,
-      title: 'Design System Premium',
+      title: 'Visual Moderno e Confortável',
       description:
-        "Migramos para o tema 'Deep Navy' com Glassmorphism. Uma experiência visual mais limpa, moderna e sofisticada em todas as telas.",
+        'Aparência mais limpa e organizada, com transições suaves e facilidade para acompanhar tudo o que importa no seu dia.',
     },
     {
       icon: 'notifications' as const,
-      title: 'Notificações Interativas & Lembretes',
+      title: 'Lembretes e Ações Rápidas',
       description:
-        'Agora você pode concluir ou adiar uma rotina em 15 minutos diretamente pela notificação ou pelo diálogo rápido de lembrete.',
+        'Conclua ou adie suas rotinas com apenas um toque diretamente nas notificações, sem precisar abrir o app.',
     },
     {
       icon: 'cloud-done' as const,
-      title: 'Sincronização Cloud Firestore & SQLite',
+      title: 'Seus Dados Sempre Salvos',
       description:
-        'Seus hábitos, categorias, templates, conquistas e saldo de XP ficam seguros localmente em SQLite e sincronizados na nuvem.',
+        'Suas rotinas, categorias e medalhas ficam salvas no seu aparelho e sincronizadas com sua conta para nunca perder seu progresso.',
     },
     {
-      icon: 'git-network' as const,
-      title: 'Timeline Vertical Conectada',
+      icon: 'calendar' as const,
+      title: 'Linha do Tempo Completa',
       description:
-        'Visualize sua rotina diária como um fluxo contínuo. Melhoramos a legibilidade da agenda com conexões visuais inteligentes.',
+        'Acompanhe seus horários de início e término em uma linha contínua e fácil de ler ao longo de toda a semana.',
     },
     {
       icon: 'bag-handle' as const,
-      title: 'Momentus Store & Stickers',
+      title: 'Loja de Recompensas e Conquistas',
       description:
-        'Adquira stickers exclusivos com seu XP e use-os para dar personalidade às suas categorias de rotina.',
+        'Ganhe pontos ao concluir hábitos e sessões de foco para personalizar suas categorias com adesivos e cores exclusivas.',
     },
   ];
 
@@ -82,7 +82,7 @@ export default function UpdateNotesScreen() {
           <View style={styles.versionRow}>
             <View style={[styles.versionBadge, { backgroundColor: `${theme.primary}15`, borderColor: theme.primary }]}>
               <Text style={[styles.versionBadgeText, { color: theme.primary }]}>
-                Versão 2.1.0 • Paridade Completa
+                Versão 2.1.0 • Estável e Rápido
               </Text>
             </View>
 

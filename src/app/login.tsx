@@ -213,6 +213,17 @@ export default function LoginScreen() {
             </TouchableOpacity>
           )}
 
+          {/* Aviso informativo de login no navegador iOS (iPhone/iPad) */}
+          {Platform.OS === 'web' && typeof navigator !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent) && (
+            <View style={styles.iosWebNoticeBox}>
+              <Ionicons name="information-circle-outline" size={16} color={primaryColor} />
+              <Text style={styles.iosWebNoticeText}>
+                Acesso via navegador no iPhone / iPad:{' '}
+                <Text style={{ color: primaryColor, fontWeight: '700' }}>Em desenvolvimento</Text>. Para melhor experiência, utilize o login por e-mail ou o aplicativo móvel.
+              </Text>
+            </View>
+          )}
+
           {/* Botão Alternar E-mail */}
           <TouchableOpacity
             activeOpacity={0.8}
@@ -427,6 +438,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: MomentusColors.textPrimary,
+  },
+  iosWebNoticeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 10,
+    width: '100%',
+  },
+  iosWebNoticeText: {
+    fontSize: 12,
+    color: MomentusColors.textSecondary,
+    flex: 1,
+    lineHeight: 16,
   },
   emailFieldsBox: {
     width: '100%',

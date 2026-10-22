@@ -26,6 +26,22 @@ import {
 
 const EVENTS_COLLECTION = "eventos";
 const CATEGORIES_COLLECTION = "categories";
+export const LEGACY_MOCK_HABIT_IDS = new Set(["h-1", "h-2", "h-3", "h-4"]);
+export const LEGACY_MOCK_HABIT_TITLES = new Set([
+  "beber 2l de água",
+  "beber 2l de agua",
+  "leitura 20 minutos",
+  "treino ou caminhada",
+  "meditação mindfulness",
+  "meditacao mindfulness",
+]);
+
+export function isMockHabit(id: string, title?: string | null): boolean {
+  if (LEGACY_MOCK_HABIT_IDS.has(id)) return true;
+  if (title && LEGACY_MOCK_HABIT_TITLES.has(title.trim().toLowerCase())) return true;
+  return false;
+}
+
 const TEMPLATES_COLLECTION = "templates";
 const UNLOCKED_ACHIEVEMENTS_COLLECTION = "unlocked_achievements";
 const COMPLETED_HABITS_COLLECTION = "completed_habits";
@@ -179,9 +195,46 @@ export async function syncWithFirestore(
   const cloudMetasMap = new Map<string, any>();
   metasSnapshot.forEach((d) => cloudMetasMap.set(d.id, d.data()));
 
-  // Filtra categorias locais ignorando mocks legados de teste
+  // Procura se já existe uma categoria "Outros" na nuvem (inclusive vinda do nativo com UUID)
+  let cloudOutrosId: string | null = null;
+  cloudCategoriesMap.forEach((cloudCat, id) => {
+    const name = (cloudCat.nome || cloudCat.name || "").trim().toLowerCase();
+    if (name === "outros") {
+      // Prioriza ID com formato UUID ou diferente de 'cat-outros' se existir
+      if (!cloudOutrosId || cloudOutrosId === "cat-outros") {
+        cloudOutrosId = id;
+      }
+    }
+  });
+
+  // Procura se existe categoria "Outros" local
+  let localOutrosId: string | null = null;
+  localCategories.forEach((cat) => {
+    if (cat.name.trim().toLowerCase() === "outros") {
+      if (!localOutrosId || localOutrosId === "cat-outros") {
+        localOutrosId = cat.id;
+      }
+    }
+  });
+
+  const canonicalOutrosId = cloudOutrosId || localOutrosId || "cat-outros";
+  const duplicateOutrosIds = new Set<string>();
+
+  cloudCategoriesMap.forEach((cloudCat, id) => {
+    const name = (cloudCat.nome || cloudCat.name || "").trim().toLowerCase();
+    if (name === "outros" && id !== canonicalOutrosId) {
+      duplicateOutrosIds.add(id);
+    }
+  });
+  localCategories.forEach((cat) => {
+    if (cat.name.trim().toLowerCase() === "outros" && cat.id !== canonicalOutrosId) {
+      duplicateOutrosIds.add(cat.id);
+    }
+  });
+
+  // Filtra categorias locais ignorando mocks legados de teste e duplicatas de "Outros"
   const cleanLocalCategories = localCategories.filter(
-    (c) => !LEGACY_MOCK_CAT_IDS.has(c.id),
+    (c) => !LEGACY_MOCK_CAT_IDS.has(c.id) && !duplicateOutrosIds.has(c.id),
   );
 
   const localCategoriesMap = new Map<string, Category>(
@@ -189,7 +242,20 @@ export async function syncWithFirestore(
   );
   const categoriesBatch = writeBatch(firestore);
 
+  // Exclui duplicatas de Outros da nuvem
+  duplicateOutrosIds.forEach((dupId) => {
+    if (cloudCategoriesMap.has(dupId)) {
+      categoriesBatch.delete(doc(categoriesColRef, dupId));
+      categoriesBatch.delete(doc(metasColRef, dupId));
+    }
+  });
+
   cleanLocalCategories.forEach((cat) => {
+    // Se for 'cat-outros' local mas a nuvem já possui o Outros oficial do nativo, não faz upload duplicado
+    if (cat.id === "cat-outros" && canonicalOutrosId !== "cat-outros") {
+      return;
+    }
+
     if (!cloudCategoriesMap.has(cat.id)) {
       const docRef = doc(categoriesColRef, cat.id);
       categoriesBatch.set(docRef, {
@@ -220,7 +286,10 @@ export async function syncWithFirestore(
 
   let mergedCategories: Category[] = [...cleanLocalCategories];
   cloudCategoriesMap.forEach((cloudCat, id) => {
-    if (!localCategoriesMap.has(id) && !LEGACY_MOCK_CAT_IDS.has(id)) {
+    if (duplicateOutrosIds.has(id) || LEGACY_MOCK_CAT_IDS.has(id)) {
+      return;
+    }
+    if (!localCategoriesMap.has(id)) {
       const metaVal =
         cloudMetasMap.get(id)?.metaMinutosSemanal ??
         cloudCat.metaMinutosSemanal ??
@@ -307,12 +376,24 @@ export async function syncWithFirestore(
   const cloudEventsMap = new Map<string, any>();
   eventsSnapshot.forEach((d) => cloudEventsMap.set(d.id, d.data()));
 
+  // 1. Filtra hábitos locais removendo mocks de teste e ajustando categorias duplicadas
+  const cleanLocalHabits = localHabits
+    .filter((h) => !isMockHabit(h.id, h.title))
+    .map((h) => (duplicateOutrosIds.has(h.categoryId) ? { ...h, categoryId: canonicalOutrosId } : h));
+
   const localEventsMap = new Map<string, HabitItem>(
-    localHabits.map((h) => [h.id, h]),
+    cleanLocalHabits.map((h) => [h.id, h]),
   );
   const eventsBatch = writeBatch(firestore);
 
-  localHabits.forEach((habit) => {
+  // Remove hábitos mockados da nuvem se existirem
+  cloudEventsMap.forEach((cloudItem, id) => {
+    if (isMockHabit(id, cloudItem.titulo || cloudItem.title)) {
+      eventsBatch.delete(doc(eventsColRef, id));
+    }
+  });
+
+  cleanLocalHabits.forEach((habit) => {
     const cloudItem = cloudEventsMap.get(habit.id);
     if (!cloudItem) {
       const docRef = doc(eventsColRef, habit.id);
@@ -348,13 +429,16 @@ export async function syncWithFirestore(
     }
   });
 
-  const mergedHabits: HabitItem[] = localHabits.filter((h) => !deletedCloudIds.has(h.id));
+  const mergedHabits: HabitItem[] = cleanLocalHabits.filter((h) => !deletedCloudIds.has(h.id));
 
   cloudEventsMap.forEach((cloudItem, id) => {
-    // Se o evento foi deletado, ignora
-    if (cloudItem.isDeleted === true) {
+    // Se o evento foi deletado ou é mock de desenvolvimento, ignora
+    if (cloudItem.isDeleted === true || isMockHabit(id, cloudItem.titulo || cloudItem.title)) {
       return;
     }
+
+    const rawCatId = cloudItem.categoryId || canonicalOutrosId;
+    const resolvedCatId = duplicateOutrosIds.has(rawCatId) ? canonicalOutrosId : rawCatId;
 
     // Se o evento pertencer a um template, agrupa no mapa de eventos de template
     if (cloudItem.templateId) {
@@ -374,7 +458,7 @@ export async function syncWithFirestore(
           cloudItem.horarioTerminoString || cloudItem.horarioTermino,
           "08:30",
         ),
-        categoryId: cloudItem.categoryId || mergedCategories[0]?.id || "cat-outros",
+        categoryId: resolvedCatId,
         templateId: tmplId,
         order: cloudItem.ordem ?? 0,
       });
@@ -397,7 +481,7 @@ export async function syncWithFirestore(
           cloudItem.horarioTerminoString || cloudItem.horarioTermino,
           "09:00",
         ),
-        categoryId: cloudItem.categoryId || mergedCategories[0]?.id || "cat-outros",
+        categoryId: resolvedCatId,
         completed: isCompleted,
         streak: 0,
         googleCalendarEventId: cloudItem.googleCalendarEventId || null,

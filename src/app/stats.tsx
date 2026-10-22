@@ -292,6 +292,12 @@ export default function StatsScreen() {
               {stats.chartBars.map((item, index) => {
                 const heightPercent = Math.max(8, Math.round((item.count / stats.maxBarCount) * 100));
                 const isPeak = item.count === stats.maxBarCount && item.count > 0;
+                // Quando exibe categorias (item.color existe), preserva a cor da categoria mesmo em caso de empate
+                const barColor = item.color
+                  ? item.color
+                  : isPeak
+                  ? (theme.primary || MomentusColors.emeraldNeon)
+                  : MomentusColors.navyOutline;
 
                 return (
                   <View key={index} style={styles.barCol}>
@@ -304,9 +310,9 @@ export default function StatsScreen() {
                           styles.barFill,
                           {
                             height: `${heightPercent}%`,
-                            backgroundColor: isPeak
-                              ? MomentusColors.emeraldNeon
-                              : item.color || MomentusColors.navyOutline,
+                            backgroundColor: barColor,
+                            borderWidth: isPeak && item.color ? 1.5 : 0,
+                            borderColor: '#FFFFFF',
                           },
                         ]}
                       />
@@ -314,7 +320,8 @@ export default function StatsScreen() {
                     <Text
                       style={[
                         styles.barDayText,
-                        isPeak && { color: MomentusColors.emeraldNeon, fontWeight: '800' },
+                        isPeak && !item.color && { color: theme.primary || MomentusColors.emeraldNeon, fontWeight: '800' },
+                        item.color && { color: theme.textSecondary, fontWeight: isPeak ? '800' : '600' },
                       ]}>
                       {item.label}
                     </Text>

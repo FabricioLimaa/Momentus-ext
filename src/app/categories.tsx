@@ -258,72 +258,28 @@ export default function CategoriesScreen() {
                 autoFocus
               />
 
-              {/* Seção de Meta Semanal com Switch */}
-              <View style={[styles.metaToggleRow, { borderColor: theme.outline }]}>
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={[
-                      styles.metaToggleTitle,
-                      { color: isMetaEnabled ? theme.primary : theme.textPrimary },
-                    ]}>
-                    Meta Semanal
-                  </Text>
-                  <Text style={[styles.metaToggleSub, { color: theme.textSecondary }]}>
-                    Acompanhe seu progresso de tempo
+              {/* Seção de Meta Semanal com Switch (Em desenvolvimento) */}
+              <View style={[styles.metaToggleRow, { borderColor: theme.outline, opacity: 0.9 }]}>
+                <View style={{ flex: 1, paddingRight: 8 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <Text style={[styles.metaToggleTitle, { color: theme.textSecondary }]}>
+                      Meta Semanal
+                    </Text>
+                    <View style={[styles.devBadge, { backgroundColor: `${theme.primary}20`, borderColor: `${theme.primary}40` }]}>
+                      <Text style={[styles.devBadgeText, { color: theme.primary }]}>Em desenvolvimento</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.metaToggleSub, { color: MomentusColors.textMuted }]}>
+                    Definição de metas por tempo em breve
                   </Text>
                 </View>
                 <Switch
-                  value={isMetaEnabled}
-                  onValueChange={setIsMetaEnabled}
+                  value={false}
+                  disabled={true}
                   trackColor={{ false: theme.outline, true: theme.primary + '60' }}
-                  thumbColor={isMetaEnabled ? theme.primary : '#94A3B8'}
+                  thumbColor={'#64748B'}
                 />
               </View>
-
-              {isMetaEnabled && (
-                <View style={styles.metaInputsRow}>
-                  <View style={styles.metaInputCol}>
-                    <Text style={[styles.metaInputLabel, { color: theme.textSecondary }]}>
-                      Horas
-                    </Text>
-                    <TextInput
-                      style={[
-                        styles.numberInput,
-                        {
-                          backgroundColor: theme.surfaceElevated,
-                          borderColor: theme.outline,
-                          color: theme.textPrimary,
-                        },
-                      ]}
-                      value={metaHours}
-                      onChangeText={(val) => setMetaHours(val.replace(/[^0-9]/g, ''))}
-                      keyboardType="numeric"
-                      placeholder="0"
-                      placeholderTextColor={MomentusColors.textMuted}
-                    />
-                  </View>
-                  <View style={styles.metaInputCol}>
-                    <Text style={[styles.metaInputLabel, { color: theme.textSecondary }]}>
-                      Minutos
-                    </Text>
-                    <TextInput
-                      style={[
-                        styles.numberInput,
-                        {
-                          backgroundColor: theme.surfaceElevated,
-                          borderColor: theme.outline,
-                          color: theme.textPrimary,
-                        },
-                      ]}
-                      value={metaMinutes}
-                      onChangeText={(val) => setMetaMinutes(val.replace(/[^0-9]/g, ''))}
-                      keyboardType="numeric"
-                      placeholder="0"
-                      placeholderTextColor={MomentusColors.textMuted}
-                    />
-                  </View>
-                </View>
-              )}
 
               {/* Seletor de Cores do Google Agenda */}
               <Text style={[styles.inputLabel, { color: theme.textPrimary, marginTop: 16 }]}>
@@ -567,9 +523,20 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 480,
     maxHeight: '90%',
-    borderRadius: 28,
+    borderRadius: 24,
     borderWidth: 1,
-    padding: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 22,
+  },
+  devBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  devBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
   },
   modalHeaderRow: {
     flexDirection: 'row',

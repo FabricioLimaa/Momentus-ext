@@ -85,15 +85,17 @@ export default function FocusScreen() {
 
     if (mode === 'FOCUS') {
       const nextSessions = completedSessions + 1;
-      const xpReward = 10;
+      const sessionBonus = 10;
+      const timeBonus = Math.floor(focusDurationMinutes / 2);
+      const totalReward = sessionBonus + timeBonus;
       setCompletedSessions(nextSessions);
-      setXpGained((prev) => prev + xpReward);
+      setXpGained((prev) => prev + totalReward);
       addFocusMinutes(focusDurationMinutes);
 
       showCelebration(
         'Sessão Concluída! 🎯',
-        `Parabéns! Você completou sua sessão de foco e ganhou +${xpReward} XP.`,
-        xpReward
+        `Parabéns! Você completou ${focusDurationMinutes} min de foco e ganhou +${totalReward} XP (+${sessionBonus} sessão +${timeBonus} tempo).`,
+        totalReward
       );
 
       // Auto-switch: a cada 4 sessões -> Pausa Longa

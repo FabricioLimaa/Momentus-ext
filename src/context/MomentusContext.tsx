@@ -311,10 +311,48 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (cleanCats.length === 0) {
           cleanCats = INITIAL_CATEGORIES;
         }
+
+        // Deduplica Outros se existirem múltiplos (ex: vindo do nativo com UUID e do multi com cat-outros)
+        const outrosCats = cleanCats.filter((c) => c.name.trim().toLowerCase() === 'outros');
+        let canonicalOutrosId = 'cat-outros';
+        const duplicateOutrosIds = new Set<string>();
+        if (outrosCats.length > 0) {
+          const preferredOutros = outrosCats.find((c) => c.id !== 'cat-outros') || outrosCats[0];
+          canonicalOutrosId = preferredOutros.id;
+          outrosCats.forEach((c) => {
+            if (c.id !== canonicalOutrosId) {
+              duplicateOutrosIds.add(c.id);
+            }
+          });
+          cleanCats = cleanCats.filter((c) => !duplicateOutrosIds.has(c.id));
+        }
+
         setCategories(cleanCats);
         await setAllCategoriesDb(cleanCats).catch(() => {});
 
-        const initialHab = dbHabits.length > 0 ? dbHabits : (legacyParsed?.habits || []);
+        const LEGACY_MOCK_HABIT_IDS = new Set(['h-1', 'h-2', 'h-3', 'h-4']);
+        const LEGACY_MOCK_HABIT_TITLES = new Set([
+          'beber 2l de água',
+          'beber 2l de agua',
+          'leitura 20 minutos',
+          'treino ou caminhada',
+          'meditação mindfulness',
+          'meditacao mindfulness',
+        ]);
+
+        const rawHab: HabitItem[] = dbHabits.length > 0 ? dbHabits : (legacyParsed?.habits || []);
+        const initialHab = rawHab
+          .filter(
+            (h: HabitItem) =>
+              !LEGACY_MOCK_HABIT_IDS.has(h.id) &&
+              !LEGACY_MOCK_HABIT_TITLES.has(h.title.trim().toLowerCase())
+          )
+          .map((h: HabitItem) =>
+            duplicateOutrosIds.has(h.categoryId)
+              ? { ...h, categoryId: canonicalOutrosId }
+              : h
+          );
+
         setHabits(initialHab);
 
         // Recalcula estritamente os dias 100% concluídos e o streak real a partir do histórico
@@ -808,10 +846,22 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
 
     setHabits((prev) => {
-      // Evita duplicar se o evento determinístico já estiver na lista
-      const newHabitsMap = new Map(newHabits.map((h) => [h.id, h]));
+      const prevMap = new Map(prev.map((p) => [p.id, p]));
+      // Preserva o status de conclusão se o hábito já tinha sido concluído anteriormente
+      const adjustedNewHabits = newHabits.map((nh) => {
+        const existing = prevMap.get(nh.id);
+        if (existing && existing.completed) {
+          return {
+            ...nh,
+            completed: true,
+          };
+        }
+        return nh;
+      });
+
+      const newHabitsMap = new Map(adjustedNewHabits.map((h) => [h.id, h]));
       const filteredPrev = prev.filter((p) => !newHabitsMap.has(p.id));
-      return [...newHabits, ...filteredPrev];
+      return [...adjustedNewHabits, ...filteredPrev];
     });
 
     addPoints(20 * dates.length);
@@ -965,11 +1015,28 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const addFocusMinutes = (minutes: number) => {
-    setUserProfile((prev) => ({
-      ...prev,
-      focusMinutesToday: prev.focusMinutesToday + minutes,
-      totalPoints: prev.totalPoints + minutes * 2,
-    }));
+    // 10 XP base por sessão concluída + 1 XP a cada 2 minutos de foco
+    const sessionBonus = 10;
+    const timeBonus = Math.floor(minutes / 2);
+    const totalGained = sessionBonus + timeBonus;
+
+    setUserProfile((prev) => {
+      const updated = {
+        ...prev,
+        focusMinutesToday: prev.focusMinutesToday + minutes,
+        totalPoints: prev.totalPoints + totalGained,
+      };
+      setAppKv('user_profile', updated).catch(() => {});
+      return updated;
+    });
+
+    const uid = firebaseAuth.currentUser?.uid;
+    if (uid) {
+      saveUserProfileToFirestore(uid, {
+        totalPoints: userProfile.totalPoints + totalGained,
+      } as any).catch(() => {});
+    }
+
     soundManager.playAchievementSound();
     triggerHaptic('success');
   };
@@ -1197,14 +1264,38 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       termsAcceptedVersion: termsVersionCombined,
     };
 
+    let effectiveProfile = mergedUserProfile || currentProfileWithAuth;
+
+    // Retro-crédito de XP de conquistas para usuários legados/migrados do app nativo
+    const unlockedAchievements = mergedAchievements.filter((a) => a.unlocked);
+    const expectedAchievementXp = unlockedAchievements.reduce(
+      (acc, a) => acc + (a.xpReward || 0),
+      0
+    );
+
+    const backfilledKey = `@momentus_achievements_xp_backfilled_${uid}`;
+    const alreadyBackfilled = await AsyncStorage.getItem(backfilledKey);
+
+    if (!alreadyBackfilled && expectedAchievementXp > 0) {
+      if ((effectiveProfile.totalPoints || 0) < expectedAchievementXp) {
+        const bonusPoints = expectedAchievementXp - (effectiveProfile.totalPoints || 0);
+        effectiveProfile = {
+          ...effectiveProfile,
+          totalPoints: effectiveProfile.totalPoints + bonusPoints,
+        };
+        saveUserProfileToFirestore(uid, {
+          totalPoints: effectiveProfile.totalPoints,
+        } as any).catch(() => {});
+      }
+      await AsyncStorage.setItem(backfilledKey, 'true');
+    }
+
     setHabits(mergedHabits);
     setCategories(mergedCategories);
     setTemplates(mergedTemplates);
     setAchievements(mergedAchievements);
     setMarketItems(mergedMarketItems);
-    if (mergedUserProfile) {
-      setUserProfile(mergedUserProfile);
-    }
+    setUserProfile(effectiveProfile);
     setSettings(updatedSettings);
 
     await setAllHabitsDb(mergedHabits);
@@ -1212,9 +1303,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     await setAllTemplatesDb(mergedTemplates);
     await setAllAchievementsDb(mergedAchievements);
     await setAllMarketItemsDb(mergedMarketItems);
-    if (mergedUserProfile) {
-      await setAppKv('user_profile', mergedUserProfile);
-    }
+    await setAppKv('user_profile', effectiveProfile);
     await setAppKv('app_settings', updatedSettings);
   };
 
