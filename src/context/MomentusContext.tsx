@@ -143,6 +143,8 @@ interface MomentusContextData {
   buyMarketItem: (itemId: string) => boolean;
   // Focus Actions
   addFocusMinutes: (minutes: number) => void;
+  // Haptics Action
+  triggerHaptic: (type: 'impact' | 'success') => void;
   // Settings Actions
   updateSettings: (newSettings: Partial<AppSettings>) => void;
   clearAllLocalData: () => void;
@@ -1042,7 +1044,11 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const updateSettings = (newSettings: Partial<AppSettings>) => {
-    setSettings((prev) => ({ ...prev, ...newSettings }));
+    setSettings((prev) => {
+      const next = { ...prev, ...newSettings };
+      setAppKv('app_settings', next).catch(() => {});
+      return next;
+    });
   };
 
   const clearAllLocalData = () => {
@@ -1367,6 +1373,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         deleteCategory,
         buyMarketItem,
         addFocusMinutes,
+        triggerHaptic,
         updateSettings,
         clearAllLocalData,
         clearCloudDataAction,

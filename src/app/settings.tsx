@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,15 +14,31 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { MomentusColors } from '@/constants/theme';
+import { MomentusColors, getContrastTextColor } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
-import { GOOGLE_CALENDAR_COLORS } from '@/constants/initialData';
+
+// Paleta completa de personalização com o Verde Esmeralda Neon como primeira opção
+export const MOMENTUS_THEME_COLORS = [
+  { id: 'emerald', color: '#34D399', name: 'Esmeralda Neon' },
+  { id: 'electric-blue', color: '#38BDF8', name: 'Azul Elétrico' },
+  { id: 'indigo', color: '#818CF8', name: 'Índigo' },
+  { id: 'purple', color: '#A855F7', name: 'Roxo Neon' },
+  { id: 'rose', color: '#FB7185', name: 'Rosa Neon' },
+  { id: 'amber', color: '#FBBF24', name: 'Âmbar Dourado' },
+  { id: 'orange', color: '#FB923C', name: 'Laranja Solar' },
+  { id: 'sage', color: '#33B679', name: 'Sálvia' },
+  { id: 'grape', color: '#8E24AA', name: 'Uva' },
+  { id: 'peacock', color: '#039BE5', name: 'Pavão' },
+  { id: 'graphite', color: '#64748B', name: 'Grafite' },
+  { id: 'tomato', color: '#EF4444', name: 'Tomate / Rubi' },
+];
 
 export default function SettingsScreen() {
   const router = useRouter();
   const {
     settings,
     updateSettings,
+    triggerHaptic,
     userProfile,
     clearAllLocalData,
     clearCloudDataAction,
@@ -42,6 +58,60 @@ export default function SettingsScreen() {
   const [syncEnabled, setSyncEnabled] = useState(settings.googleCalendarSyncEnabled ?? true);
   const [isSyncing, setIsSyncing] = useState(false);
 
+  // Mantém os estados locais atualizados caso as configurações mudem
+  useEffect(() => {
+    setThemeMode(settings.themeMode);
+    setPrimaryColorHex(settings.primaryColorHex || '#34D399');
+    setFontSizeMultiplier(settings.fontSizeMultiplier || 1.0);
+    setSoundEnabled(settings.soundEnabled);
+    setHapticsEnabled(settings.hapticsEnabled);
+    setSyncEnabled(settings.googleCalendarSyncEnabled ?? true);
+  }, [
+    settings.themeMode,
+    settings.primaryColorHex,
+    settings.fontSizeMultiplier,
+    settings.soundEnabled,
+    settings.hapticsEnabled,
+    settings.googleCalendarSyncEnabled,
+  ]);
+
+  // Ações com reatividade instantânea
+  const handleSelectTheme = (mode: 'system' | 'dark' | 'light') => {
+    setThemeMode(mode);
+    updateSettings({ themeMode: mode });
+    triggerHaptic('impact');
+  };
+
+  const handleSelectColor = (color: string) => {
+    setPrimaryColorHex(color);
+    updateSettings({ primaryColorHex: color });
+    triggerHaptic('impact');
+  };
+
+  const handleSelectFontSize = (val: number) => {
+    setFontSizeMultiplier(val);
+    updateSettings({ fontSizeMultiplier: val });
+    triggerHaptic('impact');
+  };
+
+  const handleToggleSound = (val: boolean) => {
+    setSoundEnabled(val);
+    updateSettings({ soundEnabled: val });
+    triggerHaptic('impact');
+  };
+
+  const handleToggleHaptics = (val: boolean) => {
+    setHapticsEnabled(val);
+    updateSettings({ hapticsEnabled: val });
+    if (val) triggerHaptic('impact');
+  };
+
+  const handleToggleSync = (val: boolean) => {
+    setSyncEnabled(val);
+    updateSettings({ googleCalendarSyncEnabled: val });
+    triggerHaptic('impact');
+  };
+
   const handleSave = () => {
     updateSettings({
       themeMode,
@@ -51,16 +121,28 @@ export default function SettingsScreen() {
       hapticsEnabled,
       googleCalendarSyncEnabled: syncEnabled,
     });
-    Alert.alert('Sucesso!', 'Ajustes salvos com sucesso.');
+    triggerHaptic('success');
+    Alert.alert('Sucesso!', 'Ajustes salvos e aplicados com sucesso.');
   };
 
   const handleReset = () => {
-    setThemeMode('dark');
-    setPrimaryColorHex('#34D399');
-    setFontSizeMultiplier(1.0);
-    setSoundEnabled(true);
-    setHapticsEnabled(true);
-    setSyncEnabled(true);
+    const defaults = {
+      themeMode: 'dark' as const,
+      primaryColorHex: '#34D399',
+      fontSizeMultiplier: 1.0,
+      soundEnabled: true,
+      hapticsEnabled: true,
+      googleCalendarSyncEnabled: true,
+    };
+    setThemeMode(defaults.themeMode);
+    setPrimaryColorHex(defaults.primaryColorHex);
+    setFontSizeMultiplier(defaults.fontSizeMultiplier);
+    setSoundEnabled(defaults.soundEnabled);
+    setHapticsEnabled(defaults.hapticsEnabled);
+    setSyncEnabled(defaults.googleCalendarSyncEnabled);
+    updateSettings(defaults);
+    triggerHaptic('impact');
+    Alert.alert('Padrões Restaurados', 'As preferências visuais e de experiência foram restauradas aos padrões originais.');
   };
 
   const handleSyncNow = async () => {
@@ -180,50 +262,62 @@ export default function SettingsScreen() {
                 { mode: 'system' as const, label: 'Sistema', icon: 'phone-portrait-outline' as const },
                 { mode: 'dark' as const, label: 'Escuro', icon: 'moon-outline' as const },
                 { mode: 'light' as const, label: 'Claro', icon: 'sunny-outline' as const },
-              ].map((item) => (
-                <TouchableOpacity
-                  key={item.mode}
-                  onPress={() => setThemeMode(item.mode)}
-                  style={[
-                    styles.themeBtn,
-                    themeMode === item.mode && { backgroundColor: primaryColorHex },
-                  ]}
-                  activeOpacity={0.7}>
-                  <Ionicons
-                    name={item.icon}
-                    size={16}
-                    color={themeMode === item.mode ? '#0F172A' : theme.textSecondary}
-                  />
-                  <Text
+              ].map((item) => {
+                const isActive = themeMode === item.mode;
+                const activeContrast = getContrastTextColor(primaryColorHex);
+                return (
+                  <TouchableOpacity
+                    key={item.mode}
+                    onPress={() => handleSelectTheme(item.mode)}
                     style={[
-                      styles.themeBtnText,
-                      { color: themeMode === item.mode ? '#0F172A' : theme.textSecondary },
-                      themeMode === item.mode && styles.themeBtnTextActive,
-                    ]}>
-                    {item.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                      styles.themeBtn,
+                      isActive && { backgroundColor: primaryColorHex },
+                    ]}
+                    activeOpacity={0.7}>
+                    <Ionicons
+                      name={item.icon}
+                      size={16}
+                      color={isActive ? activeContrast : theme.textSecondary}
+                    />
+                    <Text
+                      style={[
+                        styles.themeBtnText,
+                        { color: isActive ? activeContrast : theme.textSecondary },
+                        isActive && styles.themeBtnTextActive,
+                      ]}>
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
 
           {/* Cor Principal */}
           <View style={styles.settingBlock}>
-            <Text style={[styles.settingLabel, { color: theme.textPrimary }]}>Cor Principal</Text>
+            <View style={styles.colorHeaderRow}>
+              <Text style={[styles.settingLabel, { color: theme.textPrimary }]}>Cor Principal</Text>
+              <Text style={[styles.colorNameLabel, { color: primaryColorHex }]}>
+                {MOMENTUS_THEME_COLORS.find(
+                  (c) => c.color.toLowerCase() === primaryColorHex.toLowerCase()
+                )?.name || 'Personalizado'}
+              </Text>
+            </View>
             <View style={styles.colorsGrid}>
-              {GOOGLE_CALENDAR_COLORS.map((item) => {
+              {MOMENTUS_THEME_COLORS.map((item) => {
                 const isSelected = primaryColorHex.toLowerCase() === item.color.toLowerCase();
+                const checkContrast = getContrastTextColor(item.color);
                 return (
                   <TouchableOpacity
                     key={item.id}
-                    onPress={() => setPrimaryColorHex(item.color)}
+                    onPress={() => handleSelectColor(item.color)}
                     style={[
                       styles.colorDot,
                       { backgroundColor: item.color },
-                      isSelected && styles.colorDotSelected,
+                      isSelected && [styles.colorDotSelected, { borderColor: theme.textPrimary }],
                     ]}
                     activeOpacity={0.7}>
-                    {isSelected && <Ionicons name="checkmark" size={14} color="#FFF" />}
+                    {isSelected && <Ionicons name="checkmark" size={14} color={checkContrast} />}
                   </TouchableOpacity>
                 );
               })}
@@ -254,7 +348,7 @@ export default function SettingsScreen() {
                     { backgroundColor: theme.surface, borderColor: theme.outline },
                     fontSizeMultiplier === val && { backgroundColor: `${primaryColorHex}25`, borderColor: primaryColorHex },
                   ]}
-                  onPress={() => setFontSizeMultiplier(val)}>
+                  onPress={() => handleSelectFontSize(val)}>
                   <Text
                     style={[
                       styles.fontSizeBtnText,
@@ -279,7 +373,7 @@ export default function SettingsScreen() {
                 </View>
                 <Switch
                   value={soundEnabled}
-                  onValueChange={setSoundEnabled}
+                  onValueChange={handleToggleSound}
                   trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: 'rgba(52, 211, 153, 0.4)' }}
                   thumbColor={soundEnabled ? primaryColorHex : '#94A3B8'}
                 />
@@ -294,7 +388,7 @@ export default function SettingsScreen() {
                 </View>
                 <Switch
                   value={hapticsEnabled}
-                  onValueChange={setHapticsEnabled}
+                  onValueChange={handleToggleHaptics}
                   trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: 'rgba(52, 211, 153, 0.4)' }}
                   thumbColor={hapticsEnabled ? primaryColorHex : '#94A3B8'}
                 />
@@ -309,7 +403,7 @@ export default function SettingsScreen() {
                 </View>
                 <Switch
                   value={syncEnabled}
-                  onValueChange={setSyncEnabled}
+                  onValueChange={handleToggleSync}
                   trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: 'rgba(52, 211, 153, 0.4)' }}
                   thumbColor={syncEnabled ? primaryColorHex : '#94A3B8'}
                 />
@@ -323,7 +417,9 @@ export default function SettingsScreen() {
               style={[styles.saveThemeBtn, { backgroundColor: primaryColorHex }]}
               onPress={handleSave}
               activeOpacity={0.85}>
-              <Text style={styles.saveThemeBtnText}>Salvar</Text>
+              <Text style={[styles.saveThemeBtnText, { color: getContrastTextColor(primaryColorHex) }]}>
+                Salvar Ajustes
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -331,7 +427,7 @@ export default function SettingsScreen() {
               onPress={handleReset}
               activeOpacity={0.7}>
               <Ionicons name="refresh" size={16} color={theme.textSecondary} />
-              <Text style={[styles.resetThemeBtnText, { color: theme.textSecondary }]}>Resetar</Text>
+              <Text style={[styles.resetThemeBtnText, { color: theme.textSecondary }]}>Resetar Padrões</Text>
             </TouchableOpacity>
           </View>
 
@@ -519,8 +615,17 @@ const styles = StyleSheet.create({
     color: MomentusColors.textSecondary,
   },
   themeBtnTextActive: {
-    color: '#0F172A',
     fontWeight: '800',
+  },
+  colorHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  colorNameLabel: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   colorsGrid: {
     flexDirection: 'row',

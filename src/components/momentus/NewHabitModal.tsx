@@ -79,6 +79,17 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
     return parseTimeToMinutes(timeEnd) <= parseTimeToMinutes(timeStart);
   }, [timeStart, timeEnd]);
 
+  const durationLabel = useMemo(() => {
+    if (!timeStart || !timeEnd || isTimeInvalid) return null;
+    const diff = parseTimeToMinutes(timeEnd) - parseTimeToMinutes(timeStart);
+    if (diff <= 0) return null;
+    const h = Math.floor(diff / 60);
+    const m = diff % 60;
+    if (h > 0 && m > 0) return `${h}h ${m}m`;
+    if (h > 0) return `${h}h`;
+    return `${m}m`;
+  }, [timeStart, timeEnd, isTimeInvalid]);
+
   const isFormValid = useMemo(() => {
     return title.trim().length > 0 && !!selectedCategoryId && !isTimeInvalid;
   }, [title, selectedCategoryId, isTimeInvalid]);
@@ -136,49 +147,57 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
             />
 
             {/* Horários */}
-            <Text style={[styles.label, { color: theme.textPrimary }]}>Horário</Text>
-            <View style={styles.timeRow}>
-              <View style={styles.timeCol}>
-                <Text style={[styles.subLabel, { color: theme.textSecondary }]}>Início</Text>
-                <TouchableOpacity
-                  onPress={() => setShowStartTimePicker(true)}
-                  activeOpacity={0.7}
-                  style={[
-                    styles.timeInputTouchable,
-                    {
-                      backgroundColor: theme.surfaceElevated,
-                      borderColor: isTimeInvalid ? MomentusColors.errorRed : theme.outline,
-                    },
-                  ]}>
-                  <Text style={[styles.timeText, { color: theme.textPrimary }]}>{timeStart}</Text>
+            <View style={styles.timeSectionHeader}>
+              <Text style={[styles.label, { color: theme.textPrimary, marginBottom: 0 }]}>Horário de Execução</Text>
+              {!isTimeInvalid && durationLabel && (
+                <View style={[styles.durationBadge, { backgroundColor: `${theme.primary}18`, borderColor: `${theme.primary}30` }]}>
+                  <Ionicons name="hourglass-outline" size={12} color={theme.primary} />
+                  <Text style={[styles.durationText, { color: theme.primary }]}>{durationLabel}</Text>
+                </View>
+              )}
+            </View>
+
+            <View
+              style={[
+                styles.timeRowCard,
+                {
+                  backgroundColor: theme.surfaceElevated,
+                  borderColor: isTimeInvalid ? MomentusColors.errorRed : theme.outline,
+                },
+              ]}>
+              <TouchableOpacity
+                onPress={() => setShowStartTimePicker(true)}
+                activeOpacity={0.7}
+                style={styles.timeBlockBtn}>
+                <Text style={[styles.timeBlockTag, { color: theme.textSecondary }]}>INÍCIO</Text>
+                <View style={styles.timeValueRow}>
                   <Ionicons
                     name="time-outline"
-                    size={18}
-                    color={isTimeInvalid ? MomentusColors.errorRed : theme.textSecondary}
+                    size={16}
+                    color={isTimeInvalid ? MomentusColors.errorRed : theme.primary}
                   />
-                </TouchableOpacity>
+                  <Text style={[styles.timeValueText, { color: theme.textPrimary }]}>{timeStart}</Text>
+                </View>
+              </TouchableOpacity>
+
+              <View style={styles.timeArrowCol}>
+                <Ionicons name="arrow-forward" size={16} color={theme.textSecondary} />
               </View>
 
-              <View style={styles.timeCol}>
-                <Text style={[styles.subLabel, { color: theme.textSecondary }]}>Fim</Text>
-                <TouchableOpacity
-                  onPress={() => setShowEndTimePicker(true)}
-                  activeOpacity={0.7}
-                  style={[
-                    styles.timeInputTouchable,
-                    {
-                      backgroundColor: theme.surfaceElevated,
-                      borderColor: isTimeInvalid ? MomentusColors.errorRed : theme.outline,
-                    },
-                  ]}>
-                  <Text style={[styles.timeText, { color: theme.textPrimary }]}>{timeEnd}</Text>
+              <TouchableOpacity
+                onPress={() => setShowEndTimePicker(true)}
+                activeOpacity={0.7}
+                style={styles.timeBlockBtn}>
+                <Text style={[styles.timeBlockTag, { color: theme.textSecondary }]}>TÉRMINO</Text>
+                <View style={styles.timeValueRow}>
                   <Ionicons
                     name="time-outline"
-                    size={18}
-                    color={isTimeInvalid ? MomentusColors.errorRed : theme.textSecondary}
+                    size={16}
+                    color={isTimeInvalid ? MomentusColors.errorRed : theme.primary}
                   />
-                </TouchableOpacity>
-              </View>
+                  <Text style={[styles.timeValueText, { color: theme.textPrimary }]}>{timeEnd}</Text>
+                </View>
+              </TouchableOpacity>
             </View>
 
             {/* Mensagem de Alerta Visual quando inválido */}
@@ -377,12 +396,58 @@ const styles = StyleSheet.create({
     height: 72,
     textAlignVertical: 'top',
   },
-  timeRow: {
+  timeSectionHeader: {
     flexDirection: 'row',
-    gap: 12,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
   },
-  timeCol: {
+  durationBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 4,
+  },
+  durationText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  timeRowCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+  },
+  timeBlockBtn: {
     flex: 1,
+    paddingVertical: 4,
+  },
+  timeBlockTag: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    marginBottom: 2,
+  },
+  timeValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  timeValueText: {
+    fontSize: 16,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+  },
+  timeArrowCol: {
+    paddingHorizontal: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   categoryChips: {
     flexDirection: 'row',
