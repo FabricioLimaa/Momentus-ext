@@ -11,15 +11,24 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { MomentusColors } from '@/constants/theme';
+import { MomentusColors, getContrastTextColor } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import { TimelineEventItem } from '@/components/momentus/TimelineEventItem';
 import { EventDetailDialog } from '@/components/momentus/EventDetailDialog';
 import { NewHabitModal } from '@/components/momentus/NewHabitModal';
-import { getTodayDateString, formatDateToBr } from '@/constants/initialData';
+import { getTodayDateString } from '@/constants/initialData';
 import { HabitItem } from '@/types';
 
 const WEEKDAYS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
+const WEEKDAYS_FULL = [
+  'Domingo',
+  'Segunda-feira',
+  'Terça-feira',
+  'Quarta-feira',
+  'Quinta-feira',
+  'Sexta-feira',
+  'Sábado',
+];
 const MONTH_NAMES = [
   'Janeiro',
   'Fevereiro',
@@ -35,6 +44,19 @@ const MONTH_NAMES = [
   'Dezembro',
 ];
 
+function formatHumanCalendarDate(dateStr: string, isToday: boolean) {
+  if (!dateStr) return '';
+  const [y, m, d] = dateStr.split('-').map(Number);
+  if (!y || !m || !d) return dateStr;
+  const date = new Date(y, m - 1, d);
+  const dayOfWeek = WEEKDAYS_FULL[date.getDay()];
+  const monthName = MONTH_NAMES[date.getMonth()];
+  if (isToday) {
+    return `Hoje, ${d} de ${monthName}`;
+  }
+  return `${dayOfWeek}, ${d} de ${monthName}`;
+}
+
 interface EventPinsProps {
   pins: string[];
   hasMore: boolean;
@@ -44,6 +66,7 @@ interface EventPinsProps {
 
 function EventPins({ pins, hasMore, isSelected, primaryColor }: EventPinsProps) {
   if (pins.length === 0) return null;
+  const pinContrastColor = isSelected ? getContrastTextColor(primaryColor) : undefined;
   return (
     <View style={styles.pinsRow}>
       {pins.map((color, idx) => (
@@ -51,7 +74,7 @@ function EventPins({ pins, hasMore, isSelected, primaryColor }: EventPinsProps) 
           key={idx}
           style={[
             styles.pinDot,
-            { backgroundColor: isSelected ? '#0F172A' : color },
+            { backgroundColor: isSelected ? pinContrastColor : color },
           ]}
         />
       ))}
@@ -59,7 +82,7 @@ function EventPins({ pins, hasMore, isSelected, primaryColor }: EventPinsProps) 
         <Text
           style={[
             styles.pinPlusText,
-            { color: isSelected ? '#0F172A' : primaryColor },
+            { color: isSelected ? pinContrastColor : primaryColor },
           ]}>
           +
         </Text>
@@ -348,6 +371,7 @@ export default function CalendarScreen() {
                 const isSelected = selectedDate === item.dateStr;
                 const isToday = todayStr === item.dateStr;
                 const { pins, hasMore } = getDayPinsInfo(item.dateStr);
+                const contrastSelected = getContrastTextColor(primaryColor);
 
                 return (
                   <TouchableOpacity
@@ -362,7 +386,7 @@ export default function CalendarScreen() {
                     <Text
                       style={[
                         styles.dayGridText,
-                        { color: isSelected ? '#0F172A' : theme.textPrimary },
+                        { color: isSelected ? contrastSelected : theme.textPrimary },
                         isSelected && { fontWeight: '800' },
                         isToday && !isSelected && { color: primaryColor, fontWeight: '700' },
                       ]}>
@@ -428,6 +452,7 @@ export default function CalendarScreen() {
                 const isSelected = selectedDate === item.dateStr;
                 const isToday = todayStr === item.dateStr;
                 const { pins, hasMore } = getDayPinsInfo(item.dateStr);
+                const contrastSelected = getContrastTextColor(primaryColor);
 
                 return (
                   <TouchableOpacity
@@ -450,7 +475,7 @@ export default function CalendarScreen() {
                       style={[
                         styles.weekDayName,
                         { color: theme.textSecondary },
-                        isSelected && { color: '#0F172A', fontWeight: '800' },
+                        isSelected && { color: contrastSelected, fontWeight: '800' },
                         isToday && !isSelected && { color: primaryColor, fontWeight: '700' },
                       ]}>
                       {item.dayName}
@@ -459,7 +484,7 @@ export default function CalendarScreen() {
                       style={[
                         styles.weekDayNumber,
                         { color: theme.textPrimary },
-                        isSelected && { color: '#0F172A', fontWeight: '900' },
+                        isSelected && { color: contrastSelected, fontWeight: '900' },
                       ]}>
                       {item.dayNumber}
                     </Text>
@@ -478,39 +503,82 @@ export default function CalendarScreen() {
           </View>
         )}
 
-        {/* Resumo do Dia Selecionado */}
-        <View
-          style={[
-            styles.summaryCard,
-            { backgroundColor: theme.surface, borderColor: theme.outline },
-          ]}>
-          <View style={styles.summaryLeft}>
-            <View style={[styles.summaryIconBox, { backgroundColor: `${primaryColor}20` }]}>
-              <Ionicons name="calendar" size={20} color={primaryColor} />
-            </View>
-            <View>
-              <Text style={[styles.summaryDateText, { color: theme.textPrimary }]}>
-                {selectedDate === todayStr
-                  ? `Hoje (${formatDateToBr(selectedDate)})`
-                  : formatDateToBr(selectedDate)}
-              </Text>
-              <Text style={[styles.summaryHabitsCount, { color: theme.textSecondary }]}>
-                {completedCount} de {habitsForDate.length} atividades finalizadas
-              </Text>
-            </View>
-          </View>
+        {/* Resumo Humanizado do Dia Selecionado com Barra de Progresso */}
+        {(() => {
+          const progressPercent =
+            habitsForDate.length > 0 ? Math.round((completedCount / habitsForDate.length) * 100) : 0;
+          const allCompleted = habitsForDate.length > 0 && completedCount === habitsForDate.length;
 
-          <TouchableOpacity
-            onPress={() => {
-              setHabitToEdit(null);
-              setModalVisible(true);
-            }}
-            style={[styles.addBtn, { backgroundColor: primaryColor }]}
-            activeOpacity={0.8}>
-            <Ionicons name="add" size={18} color="#0F172A" />
-            <Text style={styles.addBtnText}>Adicionar</Text>
-          </TouchableOpacity>
-        </View>
+          return (
+            <View
+              style={[
+                styles.summaryCard,
+                { backgroundColor: theme.surface, borderColor: theme.outline },
+              ]}>
+              <View style={styles.summaryTopRow}>
+                <View style={styles.summaryLeft}>
+                  <View style={[styles.summaryIconBox, { backgroundColor: `${primaryColor}20` }]}>
+                    <Ionicons name="calendar" size={18} color={primaryColor} />
+                  </View>
+                  <View style={styles.summaryTextGroup}>
+                    <Text style={[styles.summaryDateText, { color: theme.textPrimary }]}>
+                      {formatHumanCalendarDate(selectedDate, selectedDate === todayStr)}
+                    </Text>
+                    <Text style={[styles.summaryHabitsCount, { color: theme.textSecondary }]}>
+                      {habitsForDate.length === 0
+                        ? 'Nenhuma atividade agendada'
+                        : `${completedCount} de ${habitsForDate.length} concluídas`}
+                    </Text>
+                  </View>
+                </View>
+
+                {habitsForDate.length > 0 && (
+                  <View
+                    style={[
+                      styles.progressBadge,
+                      {
+                        backgroundColor: allCompleted
+                          ? `${MomentusColors.emeraldGreen}20`
+                          : `${primaryColor}15`,
+                        borderColor: allCompleted
+                          ? MomentusColors.emeraldGreen
+                          : `${primaryColor}40`,
+                      },
+                    ]}>
+                    <Text
+                      style={[
+                        styles.progressBadgeText,
+                        {
+                          color: allCompleted ? MomentusColors.emeraldGreen : primaryColor,
+                        },
+                      ]}>
+                      {allCompleted ? '100% Concluído 🎉' : `${progressPercent}%`}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Barra de Progresso do Dia */}
+              {habitsForDate.length > 0 && (
+                <View
+                  style={[
+                    styles.progressBarTrack,
+                    { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
+                  ]}>
+                  <View
+                    style={[
+                      styles.progressBarFill,
+                      {
+                        width: `${progressPercent}%`,
+                        backgroundColor: allCompleted ? MomentusColors.emeraldGreen : primaryColor,
+                      },
+                    ]}
+                  />
+                </View>
+              )}
+            </View>
+          );
+        })()}
 
         {/* Timeline Vertical das Rotinas do Dia */}
         <ScrollView
@@ -540,7 +608,14 @@ export default function CalendarScreen() {
               </TouchableOpacity>
             </View>
           ) : (
-            <View style={styles.timelineList}>
+            <View
+              style={[
+                styles.timelineList,
+                {
+                  backgroundColor: theme.surface,
+                  borderColor: theme.outline,
+                },
+              ]}>
               {habitsForDate.map((habit, index) => {
                 const category = categories.find((c) => c.id === habit.categoryId) || {
                   id: 'cat-outros',
@@ -576,7 +651,7 @@ export default function CalendarScreen() {
             setHabitToEdit(null);
             setModalVisible(true);
           }}>
-          <Ionicons name="add" size={30} color="#000000" />
+          <Ionicons name="add" size={30} color={getContrastTextColor(primaryColor)} />
         </TouchableOpacity>
 
         {/* Diálogo de Detalhes da Rotina */}
@@ -800,15 +875,22 @@ const styles = StyleSheet.create({
   summaryCard: {
     marginHorizontal: 16,
     marginBottom: 14,
-    borderRadius: 18,
+    borderRadius: 20,
     borderWidth: 1,
     padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     maxWidth: 480,
     alignSelf: 'center',
     width: '92%',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  summaryTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   summaryLeft: {
     flexDirection: 'row',
@@ -823,26 +905,37 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  summaryTextGroup: {
+    flex: 1,
+  },
   summaryDateText: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '800',
   },
   summaryHabitsCount: {
     fontSize: 12,
     marginTop: 2,
   },
-  addBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+  progressBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 12,
+    borderWidth: 1,
   },
-  addBtnText: {
-    color: '#0F172A',
+  progressBadgeText: {
     fontSize: 12,
     fontWeight: '800',
+  },
+  progressBarTrack: {
+    height: 6,
+    borderRadius: 3,
+    marginTop: 12,
+    overflow: 'hidden',
+    borderWidth: 0.5,
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 3,
   },
   habitsScroll: {
     flex: 1,
@@ -887,7 +980,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   timelineList: {
-    paddingTop: 8,
+    borderRadius: 24,
+    borderWidth: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 3,
   },
   fab: {
     position: 'absolute',

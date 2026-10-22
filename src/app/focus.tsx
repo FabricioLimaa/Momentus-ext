@@ -7,9 +7,7 @@ import {
   Platform,
   StatusBar,
   Modal,
-  ScrollView,
   Alert,
-  KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,11 +15,13 @@ import * as Haptics from 'expo-haptics';
 import { MomentusColors, getContrastTextColor } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import { getAppKv, setAppKv } from '@/database/momentusDb';
+import { soundManager } from '@/util/soundManager';
 
 type FocusMode = 'FOCUS' | 'SHORT_BREAK' | 'LONG_BREAK';
+type FocusSettingsTab = 'FOCUS' | 'SHORT_BREAK' | 'LONG_BREAK';
 
 export default function FocusScreen() {
-  const { addFocusMinutes, userProfile, theme, showCelebration } = useMomentus();
+  const { addFocusMinutes, userProfile, theme, showCelebration, triggerHaptic } = useMomentus();
 
   // Configuração de durações (em minutos)
   const [focusDurationMinutes, setFocusDurationMinutes] = useState(25);
@@ -53,8 +53,9 @@ export default function FocusScreen() {
     });
   }, []);
 
-  // Diálogo de configurações
+  // Diálogo de configurações no estilo TimePickerModal
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [activeSettingsTab, setActiveSettingsTab] = useState<FocusSettingsTab>('FOCUS');
   const [tempFocus, setTempFocus] = useState(25);
   const [tempShort, setTempShort] = useState(5);
   const [tempLong, setTempLong] = useState(15);
@@ -188,6 +189,9 @@ export default function FocusScreen() {
     setTimeLeft(secs);
     setTotalSeconds(secs);
     setIsRunning(false);
+
+    triggerHaptic('success');
+    soundManager.playSuccessSound();
   };
 
   const minutes = Math.floor(timeLeft / 60);
@@ -351,6 +355,7 @@ export default function FocusScreen() {
               setTempFocus(focusDurationMinutes);
               setTempShort(shortBreakMinutes);
               setTempLong(longBreakMinutes);
+              setActiveSettingsTab('FOCUS');
               setShowSettingsModal(true);
             }}
             style={[
@@ -391,196 +396,332 @@ export default function FocusScreen() {
           </View>
         </View>
 
-        {/* Modal de Configurações de Foco (Padrão Bottom Sheet do NewHabitModal) */}
+        {/* Modal de Configurações de Foco (Estilo idêntico ao TimePickerModal) */}
         <Modal
           visible={showSettingsModal}
           transparent
-          animationType="slide"
+          animationType="fade"
           onRequestClose={() => setShowSettingsModal(false)}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={styles.sheetOverlay}>
+          <View style={styles.pickerOverlay}>
             <View
               style={[
-                styles.sheetContainer,
+                styles.pickerDialogContainer,
                 { backgroundColor: theme.surface, borderColor: theme.outline },
               ]}>
-              <View style={styles.sheetHeader}>
-                <View>
-                  <Text style={[styles.sheetTitle, { color: theme.textPrimary }]}>Configurações de Foco</Text>
-                  <Text style={[styles.sheetSubtitle, { color: theme.textSecondary }]}>
-                    Ajuste os ciclos da Técnica Pomodoro
-                  </Text>
+              {/* Cabeçalho */}
+              <View style={styles.pickerHeader}>
+                <View style={styles.pickerHeaderLeft}>
+                  <View style={[styles.pickerHeaderIconBg, { backgroundColor: `${theme.primary}20` }]}>
+                    <Ionicons name="timer" size={18} color={theme.primary} />
+                  </View>
+                  <View>
+                    <Text style={[styles.pickerTitle, { color: theme.textPrimary }]}>
+                      Configurar Ciclos
+                    </Text>
+                    <Text style={[styles.pickerSubtitle, { color: theme.textSecondary }]}>
+                      Técnica Pomodoro
+                    </Text>
+                  </View>
                 </View>
-                <TouchableOpacity onPress={() => setShowSettingsModal(false)} style={styles.sheetCloseBtn}>
-                  <Ionicons name="close" size={22} color={theme.textSecondary} />
+                <TouchableOpacity
+                  onPress={() => setShowSettingsModal(false)}
+                  style={[styles.pickerCloseBtn, { backgroundColor: theme.surfaceElevated }]}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons name="close" size={18} color={theme.textSecondary} />
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={styles.sheetBody} showsVerticalScrollIndicator={false}>
-                {/* 1. Duração do Foco */}
-                <View style={[styles.settingCard, { backgroundColor: theme.surfaceElevated }]}>
-                  <View style={styles.settingHeaderRow}>
-                    <View style={styles.settingTitleCol}>
-                      <View style={styles.settingIconRow}>
-                        <Ionicons name="flame" size={16} color={theme.primary} />
-                        <Text style={[styles.settingName, { color: theme.textPrimary }]}>Duração do Foco</Text>
-                      </View>
-                      <Text style={[styles.settingDesc, { color: theme.textSecondary }]}>Ciclo de produtividade contínua</Text>
-                    </View>
-                    <View style={styles.stepperContainer}>
-                      <TouchableOpacity
-                        style={[styles.stepperBtn, { backgroundColor: theme.surface, borderColor: theme.outline }]}
-                        onPress={() => setTempFocus((prev) => Math.max(5, prev - 5))}>
-                        <Ionicons name="remove" size={16} color={theme.textPrimary} />
-                      </TouchableOpacity>
-                      <Text style={[styles.settingValueText, { color: theme.primary }]}>{tempFocus} min</Text>
-                      <TouchableOpacity
-                        style={[styles.stepperBtn, { backgroundColor: theme.surface, borderColor: theme.outline }]}
-                        onPress={() => setTempFocus((prev) => Math.min(120, prev + 5))}>
-                        <Ionicons name="add" size={16} color={theme.textPrimary} />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                  <View style={styles.pillSelectorRow}>
-                    {[15, 20, 25, 30, 45, 50, 60, 90].map((v) => (
-                      <TouchableOpacity
-                        key={v}
-                        style={[
-                          styles.presetPill,
-                          { backgroundColor: theme.surface, borderColor: theme.outline },
-                          tempFocus === v && { backgroundColor: `${theme.primary}25`, borderColor: theme.primary },
-                        ]}
-                        onPress={() => setTempFocus(v)}>
-                        <Text
-                          style={[
-                            styles.presetPillText,
-                            { color: theme.textSecondary },
-                            tempFocus === v && { color: theme.primary, fontWeight: '800' },
-                          ]}>
-                          {v}m
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-
-                {/* 2. Pausa Curta */}
-                <View style={[styles.settingCard, { backgroundColor: theme.surfaceElevated }]}>
-                  <View style={styles.settingHeaderRow}>
-                    <View style={styles.settingTitleCol}>
-                      <View style={styles.settingIconRow}>
-                        <Ionicons name="cafe" size={16} color={MomentusColors.cyan} />
-                        <Text style={[styles.settingName, { color: theme.textPrimary }]}>Pausa Curta</Text>
-                      </View>
-                      <Text style={[styles.settingDesc, { color: theme.textSecondary }]}>Descanso entre os blocos</Text>
-                    </View>
-                    <View style={styles.stepperContainer}>
-                      <TouchableOpacity
-                        style={[styles.stepperBtn, { backgroundColor: theme.surface, borderColor: theme.outline }]}
-                        onPress={() => setTempShort((prev) => Math.max(1, prev - 1))}>
-                        <Ionicons name="remove" size={16} color={theme.textPrimary} />
-                      </TouchableOpacity>
-                      <Text style={[styles.settingValueText, { color: theme.primary }]}>{tempShort} min</Text>
-                      <TouchableOpacity
-                        style={[styles.stepperBtn, { backgroundColor: theme.surface, borderColor: theme.outline }]}
-                        onPress={() => setTempShort((prev) => Math.min(30, prev + 1))}>
-                        <Ionicons name="add" size={16} color={theme.textPrimary} />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                  <View style={styles.pillSelectorRow}>
-                    {[3, 5, 8, 10, 15].map((v) => (
-                      <TouchableOpacity
-                        key={v}
-                        style={[
-                          styles.presetPill,
-                          { backgroundColor: theme.surface, borderColor: theme.outline },
-                          tempShort === v && { backgroundColor: `${theme.primary}25`, borderColor: theme.primary },
-                        ]}
-                        onPress={() => setTempShort(v)}>
-                        <Text
-                          style={[
-                            styles.presetPillText,
-                            { color: theme.textSecondary },
-                            tempShort === v && { color: theme.primary, fontWeight: '800' },
-                          ]}>
-                          {v}m
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-
-                {/* 3. Pausa Longa */}
-                <View style={[styles.settingCard, { backgroundColor: theme.surfaceElevated }]}>
-                  <View style={styles.settingHeaderRow}>
-                    <View style={styles.settingTitleCol}>
-                      <View style={styles.settingIconRow}>
-                        <Ionicons name="battery-charging" size={16} color={MomentusColors.gold} />
-                        <Text style={[styles.settingName, { color: theme.textPrimary }]}>Pausa Longa</Text>
-                      </View>
-                      <Text style={[styles.settingDesc, { color: theme.textSecondary }]}>Recuperação a cada 4 ciclos</Text>
-                    </View>
-                    <View style={styles.stepperContainer}>
-                      <TouchableOpacity
-                        style={[styles.stepperBtn, { backgroundColor: theme.surface, borderColor: theme.outline }]}
-                        onPress={() => setTempLong((prev) => Math.max(5, prev - 5))}>
-                        <Ionicons name="remove" size={16} color={theme.textPrimary} />
-                      </TouchableOpacity>
-                      <Text style={[styles.settingValueText, { color: theme.primary }]}>{tempLong} min</Text>
-                      <TouchableOpacity
-                        style={[styles.stepperBtn, { backgroundColor: theme.surface, borderColor: theme.outline }]}
-                        onPress={() => setTempLong((prev) => Math.min(60, prev + 5))}>
-                        <Ionicons name="add" size={16} color={theme.textPrimary} />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                  <View style={styles.pillSelectorRow}>
-                    {[10, 15, 20, 25, 30, 45].map((v) => (
-                      <TouchableOpacity
-                        key={v}
-                        style={[
-                          styles.presetPill,
-                          { backgroundColor: theme.surface, borderColor: theme.outline },
-                          tempLong === v && { backgroundColor: `${theme.primary}25`, borderColor: theme.primary },
-                        ]}
-                        onPress={() => setTempLong(v)}>
-                        <Text
-                          style={[
-                            styles.presetPillText,
-                            { color: theme.textSecondary },
-                            tempLong === v && { color: theme.primary, fontWeight: '800' },
-                          ]}>
-                          {v}m
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              </ScrollView>
-
-              {/* Footer com Cancelar e Salvar Alterações (Igual NewHabitModal) */}
-              <View style={styles.sheetFooter}>
+              {/* Seletor de Abas de Ciclo (Segmented Control) */}
+              <View
+                style={[
+                  styles.pickerTabsRow,
+                  { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
+                ]}>
                 <TouchableOpacity
                   style={[
-                    styles.sheetCancelBtn,
-                    { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
+                    styles.pickerTabItem,
+                    activeSettingsTab === 'FOCUS' && [
+                      styles.pickerTabItemActive,
+                      { backgroundColor: theme.primary },
+                    ],
                   ]}
-                  onPress={() => setShowSettingsModal(false)}>
-                  <Text style={[styles.sheetCancelText, { color: theme.textSecondary }]}>Cancelar</Text>
+                  onPress={() => {
+                    setActiveSettingsTab('FOCUS');
+                    triggerHaptic('impact');
+                  }}
+                  activeOpacity={0.7}>
+                  <Ionicons
+                    name="flame"
+                    size={14}
+                    color={
+                      activeSettingsTab === 'FOCUS'
+                        ? getContrastTextColor(theme.primary)
+                        : theme.textSecondary
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.pickerTabItemText,
+                      {
+                        color:
+                          activeSettingsTab === 'FOCUS'
+                            ? getContrastTextColor(theme.primary)
+                            : theme.textSecondary,
+                      },
+                      activeSettingsTab === 'FOCUS' && styles.pickerTabItemTextActive,
+                    ]}>
+                    Foco
+                  </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.sheetSaveBtn, { backgroundColor: theme.primary }]}
-                  onPress={handleSaveSettings}>
-                  <Text style={[styles.sheetSaveText, { color: getContrastTextColor(theme.primary) }]}>
-                    Salvar Alterações
+                  style={[
+                    styles.pickerTabItem,
+                    activeSettingsTab === 'SHORT_BREAK' && [
+                      styles.pickerTabItemActive,
+                      { backgroundColor: theme.primary },
+                    ],
+                  ]}
+                  onPress={() => {
+                    setActiveSettingsTab('SHORT_BREAK');
+                    triggerHaptic('impact');
+                  }}
+                  activeOpacity={0.7}>
+                  <Ionicons
+                    name="cafe"
+                    size={14}
+                    color={
+                      activeSettingsTab === 'SHORT_BREAK'
+                        ? getContrastTextColor(theme.primary)
+                        : theme.textSecondary
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.pickerTabItemText,
+                      {
+                        color:
+                          activeSettingsTab === 'SHORT_BREAK'
+                            ? getContrastTextColor(theme.primary)
+                            : theme.textSecondary,
+                      },
+                      activeSettingsTab === 'SHORT_BREAK' && styles.pickerTabItemTextActive,
+                    ]}>
+                    Pausa Curta
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.pickerTabItem,
+                    activeSettingsTab === 'LONG_BREAK' && [
+                      styles.pickerTabItemActive,
+                      { backgroundColor: theme.primary },
+                    ],
+                  ]}
+                  onPress={() => {
+                    setActiveSettingsTab('LONG_BREAK');
+                    triggerHaptic('impact');
+                  }}
+                  activeOpacity={0.7}>
+                  <Ionicons
+                    name="battery-charging"
+                    size={14}
+                    color={
+                      activeSettingsTab === 'LONG_BREAK'
+                        ? getContrastTextColor(theme.primary)
+                        : theme.textSecondary
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.pickerTabItemText,
+                      {
+                        color:
+                          activeSettingsTab === 'LONG_BREAK'
+                            ? getContrastTextColor(theme.primary)
+                            : theme.textSecondary,
+                      },
+                      activeSettingsTab === 'LONG_BREAK' && styles.pickerTabItemTextActive,
+                    ]}>
+                    Pausa Longa
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Display Digital Minimalista (Idêntico ao TimePickerModal) */}
+              <View
+                style={[
+                  styles.pickerDisplayCard,
+                  { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
+                ]}>
+                <View style={styles.pickerDigitalRow}>
+                  <View
+                    style={[
+                      styles.pickerDigitalPill,
+                      {
+                        borderColor: `${theme.primary}50`,
+                        backgroundColor: `${theme.primary}15`,
+                      },
+                    ]}>
+                    <Text style={[styles.pickerDigitalNumber, { color: theme.textPrimary }]}>
+                      {String(
+                        activeSettingsTab === 'FOCUS'
+                          ? tempFocus
+                          : activeSettingsTab === 'SHORT_BREAK'
+                            ? tempShort
+                            : tempLong
+                      ).padStart(2, '0')}
+                    </Text>
+                    <Text style={[styles.pickerDigitalTag, { color: theme.primary }]}>MINUTOS</Text>
+                  </View>
+                </View>
+
+                {/* Badge de Status / Propósito */}
+                <View style={[styles.pickerPeriodBadge, { backgroundColor: `${theme.primary}15` }]}>
+                  <Text style={[styles.pickerPeriodText, { color: theme.primary }]}>
+                    {activeSettingsTab === 'FOCUS'
+                      ? 'Produtividade Máxima 🍅'
+                      : activeSettingsTab === 'SHORT_BREAK'
+                        ? 'Descanso Rápido ☕'
+                        : 'Recuperação Profunda 🔋'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Stepper de Ajuste Fino */}
+              <View style={[styles.pickerStepperCard, { borderColor: theme.outline }]}>
+                <TouchableOpacity
+                  style={[
+                    styles.pickerStepperBtn,
+                    { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
+                  ]}
+                  onPress={() => {
+                    if (activeSettingsTab === 'FOCUS') {
+                      setTempFocus((prev) => Math.max(5, prev - 5));
+                    } else if (activeSettingsTab === 'SHORT_BREAK') {
+                      setTempShort((prev) => Math.max(1, prev - 1));
+                    } else {
+                      setTempLong((prev) => Math.max(5, prev - 5));
+                    }
+                    triggerHaptic('impact');
+                  }}
+                  activeOpacity={0.7}>
+                  <Ionicons name="remove" size={18} color={theme.textPrimary} />
+                </TouchableOpacity>
+
+                <View style={styles.pickerStepperLabelCol}>
+                  <Text style={[styles.pickerStepperLabel, { color: theme.textSecondary }]}>
+                    {activeSettingsTab === 'SHORT_BREAK' ? 'Ajuste fino ±1 min' : 'Ajuste fino ±5 min'}
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  style={[
+                    styles.pickerStepperBtn,
+                    { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
+                  ]}
+                  onPress={() => {
+                    if (activeSettingsTab === 'FOCUS') {
+                      setTempFocus((prev) => Math.min(120, prev + 5));
+                    } else if (activeSettingsTab === 'SHORT_BREAK') {
+                      setTempShort((prev) => Math.min(30, prev + 1));
+                    } else {
+                      setTempLong((prev) => Math.min(60, prev + 5));
+                    }
+                    triggerHaptic('impact');
+                  }}
+                  activeOpacity={0.7}>
+                  <Ionicons name="add" size={18} color={theme.textPrimary} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Chips de Atalho Rápido */}
+              <View style={styles.pickerQuickChipsRow}>
+                {(activeSettingsTab === 'FOCUS'
+                  ? [15, 20, 25, 30, 45, 60]
+                  : activeSettingsTab === 'SHORT_BREAK'
+                    ? [3, 5, 8, 10, 15]
+                    : [10, 15, 20, 25, 30]
+                ).map((val) => {
+                  const isCurrent =
+                    (activeSettingsTab === 'FOCUS' && tempFocus === val) ||
+                    (activeSettingsTab === 'SHORT_BREAK' && tempShort === val) ||
+                    (activeSettingsTab === 'LONG_BREAK' && tempLong === val);
+
+                  return (
+                    <TouchableOpacity
+                      key={val}
+                      style={[
+                        styles.pickerQuickChip,
+                        { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
+                        isCurrent && {
+                          backgroundColor: `${theme.primary}25`,
+                          borderColor: theme.primary,
+                        },
+                      ]}
+                      onPress={() => {
+                        if (activeSettingsTab === 'FOCUS') setTempFocus(val);
+                        else if (activeSettingsTab === 'SHORT_BREAK') setTempShort(val);
+                        else setTempLong(val);
+                        triggerHaptic('impact');
+                      }}
+                      activeOpacity={0.7}>
+                      <Text
+                        style={[
+                          styles.pickerQuickChipText,
+                          { color: theme.textSecondary },
+                          isCurrent && { color: theme.primary, fontWeight: '800' },
+                        ]}>
+                        {val}m
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Resumo da Sequência Pomodoro */}
+              <View style={[styles.cycleSummaryCard, { backgroundColor: theme.surfaceElevated }]}>
+                <Ionicons name="information-circle-outline" size={14} color={theme.textSecondary} />
+                <Text style={[styles.cycleSummaryText, { color: theme.textSecondary }]}>
+                  Ciclo: {tempFocus}m foco • {tempShort}m curta • {tempLong}m longa
+                </Text>
+              </View>
+
+              {/* Botões Inferiores */}
+              <View style={styles.pickerActionsRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.pickerCancelBtn,
+                    { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
+                  ]}
+                  onPress={() => setShowSettingsModal(false)}
+                  activeOpacity={0.7}>
+                  <Text style={[styles.pickerCancelBtnText, { color: theme.textSecondary }]}>
+                    Cancelar
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.pickerSaveBtn, { backgroundColor: theme.primary }]}
+                  onPress={handleSaveSettings}
+                  activeOpacity={0.85}>
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={18}
+                    color={getContrastTextColor(theme.primary)}
+                  />
+                  <Text
+                    style={[
+                      styles.pickerSaveBtnText,
+                      { color: getContrastTextColor(theme.primary) },
+                    ]}>
+                    Salvar Ciclos
                   </Text>
                 </TouchableOpacity>
               </View>
             </View>
-          </KeyboardAvoidingView>
+          </View>
         </Modal>
       </View>
     </SafeAreaView>
@@ -757,125 +898,218 @@ const styles = StyleSheet.create({
     height: 28,
     backgroundColor: MomentusColors.navyOutline,
   },
-  sheetOverlay: {
+  pickerOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
-  sheetContainer: {
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    borderWidth: 1,
-    paddingTop: 20,
-    paddingHorizontal: 20,
-    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
-    maxHeight: '88%',
+  pickerDialogContainer: {
+    width: '100%',
+    maxWidth: 380,
+    borderRadius: 28,
+    borderWidth: 1.5,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.35,
+    shadowRadius: 24,
+    elevation: 16,
   },
-  sheetHeader: {
+  pickerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
   },
-  sheetTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  pickerHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
-  sheetSubtitle: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  sheetCloseBtn: {
-    padding: 6,
-  },
-  sheetBody: {
-    marginBottom: 14,
-  },
-  settingCard: {
+  pickerHeaderIconBg: {
+    width: 36,
+    height: 36,
     borderRadius: 18,
-    padding: 14,
-    marginBottom: 12,
-  },
-  settingHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    justifyContent: 'center',
   },
-  settingTitleCol: {
-    flex: 1,
+  pickerTitle: {
+    fontSize: 18,
+    fontWeight: '800',
   },
-  settingIconRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+  pickerSubtitle: {
+    fontSize: 12,
+    marginTop: 1,
   },
-  settingName: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  settingDesc: {
-    fontSize: 11,
-    marginTop: 2,
-  },
-  stepperContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepperBtn: {
+  pickerCloseBtn: {
     width: 32,
     height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pickerTabsRow: {
+    flexDirection: 'row',
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 3,
+    marginBottom: 16,
+  },
+  pickerTabItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  pickerTabItemActive: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  pickerTabItemText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  pickerTabItemTextActive: {
+    fontWeight: '800',
+  },
+  pickerDisplayCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  pickerDigitalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pickerDigitalPill: {
+    paddingHorizontal: 28,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    minWidth: 110,
+  },
+  pickerDigitalNumber: {
+    fontSize: 38,
+    fontWeight: '900',
+    letterSpacing: 1,
+    fontVariant: ['tabular-nums'],
+  },
+  pickerDigitalTag: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    marginTop: 2,
+  },
+  pickerPeriodBadge: {
+    marginTop: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  pickerPeriodText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  pickerStepperCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    marginBottom: 14,
+  },
+  pickerStepperBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pickerStepperLabelCol: {
+    alignItems: 'center',
+  },
+  pickerStepperLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  pickerQuickChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  pickerQuickChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  pickerQuickChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  cycleSummaryCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 16,
+  },
+  cycleSummaryText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  pickerActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  pickerCancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
     borderRadius: 16,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  settingValueText: {
+  pickerCancelBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  pickerSaveBtn: {
+    flex: 1.6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  pickerSaveBtnText: {
     fontSize: 14,
     fontWeight: '800',
-    minWidth: 54,
-    textAlign: 'center',
-  },
-  pillSelectorRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  presetPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  presetPillText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  sheetFooter: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 6,
-  },
-  sheetCancelBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-    alignItems: 'center',
-  },
-  sheetCancelText: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  sheetSaveBtn: {
-    flex: 1.5,
-    paddingVertical: 14,
-    borderRadius: 16,
-    alignItems: 'center',
-  },
-  sheetSaveText: {
-    fontSize: 15,
-    fontWeight: 'bold',
   },
 });
