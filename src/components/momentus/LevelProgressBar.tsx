@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MomentusColors } from '@/constants/theme';
+import { MomentusColors, getContrastTextColor } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 
 export const LevelProgressBar: React.FC = () => {
@@ -12,8 +12,10 @@ export const LevelProgressBar: React.FC = () => {
     <View style={[styles.container, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
       <View style={styles.topRow}>
         <View style={styles.userProfileGroup}>
-          <View style={[styles.avatar, { borderColor: userLevel.rankColor }]}>
-            <Text style={styles.avatarText}>{userProfile.name.charAt(0).toUpperCase()}</Text>
+          <View style={[styles.avatar, { backgroundColor: theme.primary, borderColor: userLevel.rankColor }]}>
+            <Text style={[styles.avatarText, { color: getContrastTextColor(theme.primary) }]}>
+              {userProfile.name.charAt(0).toUpperCase()}
+            </Text>
           </View>
           <View>
             <Text style={[styles.greeting, { color: theme.textPrimary }]}>Olá, {userProfile.name} 👋</Text>

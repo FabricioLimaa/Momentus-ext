@@ -62,8 +62,19 @@ export async function getOrCreateMomentusCalendarId(): Promise<string | null> {
       return existingMomentus.id;
     }
 
-    // 2. Se for Android, tentamos usar o primário gravável ou criar um calendário local
+    // 2. Se for Android, busca prioritariamente a conta Google do usuário (com.google) para que sincronize automaticamente com a nuvem do Google Calendar
     if (Platform.OS === 'android') {
+      const googleWritable = calendars.find(
+        (c) =>
+          c.allowsModifications &&
+          (c.source?.type === 'com.google' ||
+            c.source?.name?.toLowerCase().includes('@gmail.com') ||
+            c.source?.name?.toLowerCase().includes('@google.com'))
+      );
+      if (googleWritable) {
+        return googleWritable.id;
+      }
+
       const primaryWritable = calendars.find((c) => c.isPrimary && c.allowsModifications);
       if (primaryWritable) {
         return primaryWritable.id;
@@ -139,6 +150,8 @@ export async function syncHabitToDeviceCalendar(
       .filter(Boolean)
       .join('\n');
 
+    const systemTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
     // Se já possui googleCalendarEventId, tenta atualizar o evento existente
     if (habit.googleCalendarEventId) {
       try {
@@ -147,6 +160,8 @@ export async function syncHabitToDeviceCalendar(
           startDate,
           endDate,
           notes,
+          timeZone: systemTimeZone,
+          alarms: [{ relativeOffset: -10 }],
         });
         if (updatedId) return updatedId;
       } catch {
@@ -154,13 +169,15 @@ export async function syncHabitToDeviceCalendar(
       }
     }
 
-    // Cria novo evento
+    // Cria novo evento com alarme padrão de 10 min
     const newEventId = await Calendar.createEventAsync(calendarId, {
       title: habit.title,
       startDate,
       endDate,
       notes,
       allDay: false,
+      timeZone: systemTimeZone,
+      alarms: [{ relativeOffset: -10 }],
     });
 
     return newEventId;

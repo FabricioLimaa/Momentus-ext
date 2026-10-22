@@ -97,7 +97,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   motivationText: {
-    color: MomentusColors.emeraldNeon,
     fontSize: 13,
     fontWeight: '600',
     lineHeight: 18,
@@ -110,14 +109,11 @@ const styles = StyleSheet.create({
     width: 76,
     height: 76,
     borderRadius: 38,
-    backgroundColor: 'rgba(52, 211, 153, 0.1)',
     borderWidth: 3,
-    borderColor: MomentusColors.emeraldNeon,
     alignItems: 'center',
     justifyContent: 'center',
   },
   percentText: {
-    color: MomentusColors.emeraldNeon,
     fontSize: 18,
     fontWeight: 'bold',
   },

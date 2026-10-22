@@ -12,7 +12,7 @@ import {
   Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MomentusColors } from '@/constants/theme';
+import { MomentusColors, getContrastTextColor } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import { getTodayDateString } from '@/constants/initialData';
 import { HabitItem } from '@/types';
@@ -147,58 +147,113 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
             />
 
             {/* Horários */}
-            <View style={styles.timeSectionHeader}>
-              <Text style={[styles.label, { color: theme.textPrimary, marginBottom: 0 }]}>Horário de Execução</Text>
-              {!isTimeInvalid && durationLabel && (
-                <View style={[styles.durationBadge, { backgroundColor: `${theme.primary}18`, borderColor: `${theme.primary}30` }]}>
-                  <Ionicons name="hourglass-outline" size={12} color={theme.primary} />
-                  <Text style={[styles.durationText, { color: theme.primary }]}>{durationLabel}</Text>
+            {isEditMode ? (
+              <>
+                <View style={styles.timeSectionHeader}>
+                  <Text style={[styles.label, { color: theme.textPrimary, marginBottom: 0 }]}>Horário de Execução</Text>
+                  {!isTimeInvalid && durationLabel && (
+                    <View style={[styles.durationBadge, { backgroundColor: `${theme.primary}18`, borderColor: `${theme.primary}30` }]}>
+                      <Ionicons name="hourglass-outline" size={12} color={theme.primary} />
+                      <Text style={[styles.durationText, { color: theme.primary }]}>{durationLabel}</Text>
+                    </View>
+                  )}
                 </View>
-              )}
-            </View>
 
-            <View
-              style={[
-                styles.timeRowCard,
-                {
-                  backgroundColor: theme.surfaceElevated,
-                  borderColor: isTimeInvalid ? MomentusColors.errorRed : theme.outline,
-                },
-              ]}>
-              <TouchableOpacity
-                onPress={() => setShowStartTimePicker(true)}
-                activeOpacity={0.7}
-                style={styles.timeBlockBtn}>
-                <Text style={[styles.timeBlockTag, { color: theme.textSecondary }]}>INÍCIO</Text>
-                <View style={styles.timeValueRow}>
-                  <Ionicons
-                    name="time-outline"
-                    size={16}
-                    color={isTimeInvalid ? MomentusColors.errorRed : theme.primary}
-                  />
-                  <Text style={[styles.timeValueText, { color: theme.textPrimary }]}>{timeStart}</Text>
+                <View
+                  style={[
+                    styles.timeRowCard,
+                    {
+                      backgroundColor: theme.surfaceElevated,
+                      borderColor: isTimeInvalid ? MomentusColors.errorRed : theme.outline,
+                    },
+                  ]}>
+                  <TouchableOpacity
+                    onPress={() => setShowStartTimePicker(true)}
+                    activeOpacity={0.7}
+                    style={styles.timeBlockBtn}>
+                    <Text style={[styles.timeBlockTag, { color: theme.textSecondary }]}>INÍCIO</Text>
+                    <View style={styles.timeValueRow}>
+                      <Ionicons
+                        name="time-outline"
+                        size={16}
+                        color={isTimeInvalid ? MomentusColors.errorRed : theme.primary}
+                      />
+                      <Text style={[styles.timeValueText, { color: theme.textPrimary }]}>{timeStart}</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <View style={styles.timeArrowCol}>
+                    <Ionicons name="arrow-forward" size={16} color={theme.textSecondary} />
+                  </View>
+
+                  <TouchableOpacity
+                    onPress={() => setShowEndTimePicker(true)}
+                    activeOpacity={0.7}
+                    style={styles.timeBlockBtn}>
+                    <Text style={[styles.timeBlockTag, { color: theme.textSecondary }]}>TÉRMINO</Text>
+                    <View style={styles.timeValueRow}>
+                      <Ionicons
+                        name="time-outline"
+                        size={16}
+                        color={isTimeInvalid ? MomentusColors.errorRed : theme.primary}
+                      />
+                      <Text style={[styles.timeValueText, { color: theme.textPrimary }]}>{timeEnd}</Text>
+                    </View>
+                  </TouchableOpacity>
                 </View>
-              </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={[styles.label, { color: theme.textPrimary }]}>Horário</Text>
+                <View style={styles.templateTimeRow}>
+                  <View style={styles.templateTimeCol}>
+                    <Text style={[styles.templateTimeLabel, { color: theme.textSecondary }]}>Início</Text>
+                    <TouchableOpacity
+                      style={[
+                        styles.templateTimeInputTouchable,
+                        {
+                          backgroundColor: theme.surfaceElevated,
+                          borderColor: isTimeInvalid ? MomentusColors.errorRed : theme.outline,
+                        },
+                      ]}
+                      onPress={() => setShowStartTimePicker(true)}
+                      activeOpacity={0.7}>
+                      <Text style={[styles.templateTimeInputText, { color: theme.textPrimary }]}>
+                        {timeStart}
+                      </Text>
+                      <Ionicons
+                        name="time-outline"
+                        size={16}
+                        color={isTimeInvalid ? MomentusColors.errorRed : theme.textSecondary}
+                      />
+                    </TouchableOpacity>
+                  </View>
 
-              <View style={styles.timeArrowCol}>
-                <Ionicons name="arrow-forward" size={16} color={theme.textSecondary} />
-              </View>
-
-              <TouchableOpacity
-                onPress={() => setShowEndTimePicker(true)}
-                activeOpacity={0.7}
-                style={styles.timeBlockBtn}>
-                <Text style={[styles.timeBlockTag, { color: theme.textSecondary }]}>TÉRMINO</Text>
-                <View style={styles.timeValueRow}>
-                  <Ionicons
-                    name="time-outline"
-                    size={16}
-                    color={isTimeInvalid ? MomentusColors.errorRed : theme.primary}
-                  />
-                  <Text style={[styles.timeValueText, { color: theme.textPrimary }]}>{timeEnd}</Text>
+                  <View style={styles.templateTimeCol}>
+                    <Text style={[styles.templateTimeLabel, { color: theme.textSecondary }]}>Término</Text>
+                    <TouchableOpacity
+                      style={[
+                        styles.templateTimeInputTouchable,
+                        {
+                          backgroundColor: theme.surfaceElevated,
+                          borderColor: isTimeInvalid ? MomentusColors.errorRed : theme.outline,
+                        },
+                      ]}
+                      onPress={() => setShowEndTimePicker(true)}
+                      activeOpacity={0.7}>
+                      <Text style={[styles.templateTimeInputText, { color: theme.textPrimary }]}>
+                        {timeEnd}
+                      </Text>
+                      <Ionicons
+                        name="time-outline"
+                        size={16}
+                        color={isTimeInvalid ? MomentusColors.errorRed : theme.textSecondary}
+                      />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </TouchableOpacity>
-            </View>
+              </>
+            )}
 
             {/* Mensagem de Alerta Visual quando inválido */}
             {isTimeInvalid && (
@@ -275,7 +330,7 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
               onPress={handleSave}
               style={[styles.saveBtn, { backgroundColor: theme.primary }, !isFormValid && styles.disabledBtn]}
               disabled={!isFormValid}>
-              <Text style={styles.saveText}>
+              <Text style={[styles.saveText, { color: getContrastTextColor(theme.primary) }]}>
                 {isEditMode ? 'Salvar Alterações' : 'Salvar Rotina'}
               </Text>
             </TouchableOpacity>
@@ -448,6 +503,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  templateTimeRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 10,
+  },
+  templateTimeCol: {
+    flex: 1,
+  },
+  templateTimeLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  templateTimeInputTouchable: {
+    height: 44,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  templateTimeInputText: {
+    fontSize: 15,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
   },
   categoryChips: {
     flexDirection: 'row',

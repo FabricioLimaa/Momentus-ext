@@ -14,7 +14,7 @@ import {
 import { auth as firebaseAuth } from '@/config/firebase';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { MomentusColors } from '@/constants/theme';
+import { MomentusColors, getContrastTextColor } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import { getStreakColor } from '@/constants/initialData';
 import { Achievement, MarketItem } from '@/types';
@@ -209,12 +209,12 @@ export default function AchievementsScreen() {
             <Ionicons
               name="trophy"
               size={16}
-              color={activeTab === 'achievements' ? '#000000' : theme.textSecondary}
+              color={activeTab === 'achievements' ? getContrastTextColor(theme.primary) : theme.textSecondary}
             />
             <Text
               style={[
                 styles.tabText,
-                { color: activeTab === 'achievements' ? '#000000' : theme.textSecondary },
+                { color: activeTab === 'achievements' ? getContrastTextColor(theme.primary) : theme.textSecondary },
                 activeTab === 'achievements' && { fontWeight: '800' },
               ]}>
               Medalhas ({unlockedCount}/{achievements.length})
@@ -231,12 +231,12 @@ export default function AchievementsScreen() {
             <Ionicons
               name="cart"
               size={16}
-              color={activeTab === 'market' ? '#000000' : theme.textSecondary}
+              color={activeTab === 'market' ? getContrastTextColor(theme.primary) : theme.textSecondary}
             />
             <Text
               style={[
                 styles.tabText,
-                { color: activeTab === 'market' ? '#000000' : theme.textSecondary },
+                { color: activeTab === 'market' ? getContrastTextColor(theme.primary) : theme.textSecondary },
                 activeTab === 'market' && { fontWeight: '800' },
               ]}>
               Loja de Stickers
@@ -265,13 +265,13 @@ export default function AchievementsScreen() {
                     style={[
                       styles.iconCircle,
                       ach.unlocked
-                        ? { backgroundColor: 'rgba(52, 211, 153, 0.2)', borderColor: MomentusColors.emeraldNeon }
+                        ? { backgroundColor: `${theme.primary}25`, borderColor: theme.primary }
                         : { backgroundColor: MomentusColors.navyOutline, borderColor: 'transparent' },
                     ]}>
                     <Ionicons
                       name={ach.unlocked ? icon : 'lock-closed'}
                       size={24}
-                      color={ach.unlocked ? MomentusColors.emeraldNeon : MomentusColors.textSecondary}
+                      color={ach.unlocked ? theme.primary : theme.textSecondary}
                     />
                   </View>
 
@@ -340,12 +340,14 @@ export default function AchievementsScreen() {
                         onPress={() => handleBuy(item)}
                         style={[
                           styles.buyBtn,
+                          { backgroundColor: theme.primary },
                           item.isOwned && styles.purchasedBtn,
                         ]}
                         activeOpacity={0.8}>
                         <Text
                           style={[
                             styles.buyBtnText,
+                            { color: getContrastTextColor(theme.primary) },
                             item.isOwned && styles.purchasedBtnText,
                           ]}>
                           {item.isOwned ? 'Adquirido' : 'Resgatar'}
@@ -376,13 +378,13 @@ export default function AchievementsScreen() {
                       style={[
                         styles.modalIconCircle,
                         selectedAchievement.unlocked
-                          ? { backgroundColor: 'rgba(52, 211, 153, 0.2)', borderColor: MomentusColors.emeraldNeon }
+                          ? { backgroundColor: `${theme.primary}25`, borderColor: theme.primary }
                           : { backgroundColor: MomentusColors.navyOutline, borderColor: 'transparent' },
                       ]}>
                       <Ionicons
                         name={selectedAchievement.unlocked ? getIconForAchievement(selectedAchievement.id) : 'lock-closed'}
                         size={36}
-                        color={selectedAchievement.unlocked ? MomentusColors.emeraldNeon : MomentusColors.textSecondary}
+                        color={selectedAchievement.unlocked ? theme.primary : theme.textSecondary}
                       />
                     </View>
                   </View>
@@ -404,10 +406,10 @@ export default function AchievementsScreen() {
                   </View>
 
                   <TouchableOpacity
-                    style={styles.modalCloseBtn}
+                    style={[styles.modalCloseBtn, { backgroundColor: theme.primary }]}
                     onPress={() => setSelectedAchievement(null)}
                     activeOpacity={0.85}>
-                    <Text style={styles.modalCloseBtnText}>Fechar</Text>
+                    <Text style={[styles.modalCloseBtnText, { color: getContrastTextColor(theme.primary) }]}>Fechar</Text>
                   </TouchableOpacity>
                 </>
               )}

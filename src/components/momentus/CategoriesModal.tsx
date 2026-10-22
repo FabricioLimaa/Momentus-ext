@@ -11,7 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MomentusColors } from '@/constants/theme';
+import { MomentusColors, getContrastTextColor } from '@/constants/theme';
 import { GOOGLE_CALENDAR_COLORS } from '@/constants/initialData';
 import { useMomentus } from '@/context/MomentusContext';
 import { Category } from '@/types';
@@ -116,8 +116,10 @@ export const CategoriesModal: React.FC<CategoriesModalProps> = ({ visible, onClo
         </View>
 
         <TouchableOpacity onPress={openCreate} style={[styles.newCategoryBtn, { backgroundColor: theme.primary }]}>
-          <Ionicons name="add-circle" size={20} color="#0F172A" />
-          <Text style={styles.newCategoryBtnText}>Nova Categoria</Text>
+          <Ionicons name="add-circle" size={20} color={getContrastTextColor(theme.primary)} />
+          <Text style={[styles.newCategoryBtnText, { color: getContrastTextColor(theme.primary) }]}>
+            Nova Categoria
+          </Text>
         </TouchableOpacity>
 
         <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
@@ -294,7 +296,9 @@ export const CategoriesModal: React.FC<CategoriesModalProps> = ({ visible, onClo
                   onPress={handleSave}
                   style={[styles.saveSubBtn, { backgroundColor: theme.primary }, !name.trim() && { opacity: 0.5 }]}
                   disabled={!name.trim()}>
-                  <Text style={styles.saveSubText}>Salvar Categoria</Text>
+                  <Text style={[styles.saveSubText, { color: getContrastTextColor(theme.primary) }]}>
+                    Salvar Categoria
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>

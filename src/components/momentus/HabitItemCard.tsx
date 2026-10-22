@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { HabitItem, Category } from '@/types';
-import { MomentusColors } from '@/constants/theme';
+import { MomentusColors, getContrastTextColor } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 
 interface HabitItemCardProps {
@@ -38,7 +38,9 @@ export const HabitItemCard: React.FC<HabitItemCardProps> = ({
           { borderColor: theme.outline },
           habit.completed && { backgroundColor: theme.primary, borderColor: theme.primary },
         ]}>
-        {habit.completed && <Ionicons name="checkmark" size={16} color="#FFF" />}
+        {habit.completed && (
+          <Ionicons name="checkmark" size={16} color={getContrastTextColor(theme.primary)} />
+        )}
       </TouchableOpacity>
 
       {/* Main Info */}

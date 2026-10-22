@@ -5,7 +5,7 @@ import { NewHabitModal } from "@/components/momentus/NewHabitModal";
 import { TimelineEventItem } from "@/components/momentus/TimelineEventItem";
 import { auth as firebaseAuth } from "@/config/firebase";
 import { getStreakColor, getTodayDateString } from "@/constants/initialData";
-import { MomentusColors } from "@/constants/theme";
+import { MomentusColors, getContrastTextColor } from "@/constants/theme";
 import { useMomentus } from "@/context/MomentusContext";
 import { HabitItem } from "@/types";
 import { Ionicons } from "@expo/vector-icons";
@@ -426,14 +426,14 @@ export default function HomeScreen() {
         {/* Floating Action Button (+) */}
         {!isSelectionMode && (
           <TouchableOpacity
-            style={[styles.fab, { backgroundColor: theme.primary }]}
+            style={[styles.fab, { backgroundColor: theme.primary, shadowColor: theme.primary }]}
             activeOpacity={0.85}
             onPress={() => {
               setHabitToEdit(null);
               setIsAddModalVisible(true);
             }}
           >
-            <Ionicons name="add" size={30} color="#000000" />
+            <Ionicons name="add" size={30} color={getContrastTextColor(theme.primary)} />
           </TouchableOpacity>
         )}
 

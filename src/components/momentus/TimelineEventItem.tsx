@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Pressable, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { HabitItem, Category } from '@/types';
-import { MomentusColors } from '@/constants/theme';
+import { MomentusColors, getContrastTextColor } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 
 interface TimelineEventItemProps {
@@ -195,7 +195,9 @@ export const TimelineEventItem: React.FC<TimelineEventItemProps> = ({
               { borderColor: theme.outline },
               isSelected && { backgroundColor: theme.primary, borderColor: theme.primary },
             ]}>
-            {isSelected && <Ionicons name="checkmark" size={16} color="#000000" />}
+            {isSelected && (
+              <Ionicons name="checkmark" size={16} color={getContrastTextColor(theme.primary)} />
+            )}
           </View>
         ) : isChecked ? (
           <Ionicons name="checkmark-circle" size={24} color={theme.primary} />

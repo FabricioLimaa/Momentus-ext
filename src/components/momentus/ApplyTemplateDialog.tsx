@@ -9,7 +9,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MomentusColors } from '@/constants/theme';
+import { MomentusColors, getContrastTextColor } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 
 interface ApplyTemplateDialogProps {
@@ -165,7 +165,7 @@ export const ApplyTemplateDialog: React.FC<ApplyTemplateDialogProps> = ({
                       style={[
                         styles.dayText,
                         { color: theme.textPrimary },
-                        isSelected && styles.dayTextSelected,
+                        isSelected && { color: getContrastTextColor(theme.primary), fontWeight: '800' },
                         isToday && !isSelected && { color: theme.primary, fontWeight: '700' },
                       ]}>
                       {item.dayNumber}
@@ -214,7 +214,9 @@ export const ApplyTemplateDialog: React.FC<ApplyTemplateDialogProps> = ({
                 disabled={selectedDates.length === 0}
                 onPress={() => onConfirm(selectedDates, saveToGoogle)}
                 activeOpacity={0.8}>
-                <Text style={styles.confirmButtonText}>Aplicar</Text>
+                <Text style={[styles.confirmButtonText, { color: getContrastTextColor(theme.primary) }]}>
+                  Aplicar
+                </Text>
               </TouchableOpacity>
             </View>
           </ScrollView>

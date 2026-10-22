@@ -13,8 +13,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { MomentusColors } from '@/constants/theme';
+import { MomentusColors, getContrastTextColor } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
+import { getAppKv, setAppKv } from '@/database/momentusDb';
 
 type FocusMode = 'FOCUS' | 'SHORT_BREAK' | 'LONG_BREAK';
 
@@ -34,6 +35,22 @@ export default function FocusScreen() {
   // Tempo restante em segundos
   const [timeLeft, setTimeLeft] = useState(25 * 60);
   const [totalSeconds, setTotalSeconds] = useState(25 * 60);
+
+  // Carrega durações salvas do SQLite
+  useEffect(() => {
+    getAppKv<{ focus: number; short: number; long: number }>('focus_durations').then((saved) => {
+      if (saved) {
+        const f = saved.focus || 25;
+        const s = saved.short || 5;
+        const l = saved.long || 15;
+        setFocusDurationMinutes(f);
+        setShortBreakMinutes(s);
+        setLongBreakMinutes(l);
+        setTimeLeft(f * 60);
+        setTotalSeconds(f * 60);
+      }
+    });
+  }, []);
 
   // Diálogo de configurações
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -163,6 +180,9 @@ export default function FocusScreen() {
     setLongBreakMinutes(tempLong);
     setShowSettingsModal(false);
 
+    // Persiste no SQLite
+    setAppKv('focus_durations', { focus: tempFocus, short: tempShort, long: tempLong }).catch(() => {});
+
     const secs = getDurationForMode(mode, tempFocus, tempShort, tempLong);
     setTimeLeft(secs);
     setTotalSeconds(secs);
@@ -217,7 +237,7 @@ export default function FocusScreen() {
             <Text
               style={[
                 styles.modeTabText,
-                { color: mode === 'FOCUS' ? '#000000' : theme.textSecondary },
+                { color: mode === 'FOCUS' ? getContrastTextColor(theme.primary) : theme.textSecondary },
                 mode === 'FOCUS' && { fontWeight: '800' },
               ]}>
               Foco ({focusDurationMinutes}m)
@@ -234,7 +254,7 @@ export default function FocusScreen() {
             <Text
               style={[
                 styles.modeTabText,
-                { color: mode === 'SHORT_BREAK' ? '#000000' : theme.textSecondary },
+                { color: mode === 'SHORT_BREAK' ? getContrastTextColor(theme.primary) : theme.textSecondary },
                 mode === 'SHORT_BREAK' && { fontWeight: '800' },
               ]}>
               Curta ({shortBreakMinutes}m)
@@ -251,7 +271,7 @@ export default function FocusScreen() {
             <Text
               style={[
                 styles.modeTabText,
-                { color: mode === 'LONG_BREAK' ? '#000000' : theme.textSecondary },
+                { color: mode === 'LONG_BREAK' ? getContrastTextColor(theme.primary) : theme.textSecondary },
                 mode === 'LONG_BREAK' && { fontWeight: '800' },
               ]}>
               Longa ({longBreakMinutes}m)
@@ -261,7 +281,7 @@ export default function FocusScreen() {
 
         {/* Big Circular Timer Display */}
         <View style={styles.timerCenter}>
-          <View style={[styles.outerCircle, { borderColor: theme.outline }]}>
+          <View style={[styles.outerCircle, { borderColor: `${theme.primary}50`, shadowColor: theme.primary }]}>
             <View style={[styles.innerCircle, { backgroundColor: theme.surface }]}>
               <Text style={[styles.modeStatusLabel, { color: theme.textSecondary }]}>{modeLabel}</Text>
               <Text style={[styles.timerDisplay, { color: theme.textPrimary }]}>{timeFormatted}</Text>
@@ -306,12 +326,12 @@ export default function FocusScreen() {
             <Ionicons
               name={isRunning ? 'pause' : 'play'}
               size={32}
-              color={isRunning ? '#FFFFFF' : '#000000'}
+              color={isRunning ? '#FFFFFF' : getContrastTextColor(theme.primary)}
             />
             <Text
               style={[
                 styles.playBtnText,
-                { color: isRunning ? '#FFFFFF' : '#000000' },
+                { color: isRunning ? '#FFFFFF' : getContrastTextColor(theme.primary) },
               ]}>
               {isRunning ? 'PAUSAR' : 'FOCO'}
             </Text>
@@ -375,30 +395,44 @@ export default function FocusScreen() {
                 { backgroundColor: theme.surface, borderColor: theme.outline },
               ]}>
               <ScrollView showsVerticalScrollIndicator={false}>
-                <Text style={styles.modalTitle}>Configurações de Foco</Text>
-                <Text style={styles.modalSubtitle}>
+                <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Configurações de Foco</Text>
+                <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>
                   Ajuste a duração dos ciclos de produtividade
                 </Text>
 
                 {/* Duração do Foco */}
                 <View style={styles.settingBlock}>
                   <View style={styles.settingHeaderRow}>
-                    <Text style={styles.settingName}>Duração do Foco</Text>
-                    <Text style={styles.settingValueText}>{tempFocus} min</Text>
+                    <Text style={[styles.settingName, { color: theme.textPrimary }]}>Duração do Foco</Text>
+                    <View style={styles.stepperContainer}>
+                      <TouchableOpacity
+                        style={[styles.stepperBtn, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}
+                        onPress={() => setTempFocus((prev) => Math.max(5, prev - 5))}>
+                        <Ionicons name="remove" size={14} color={theme.textPrimary} />
+                      </TouchableOpacity>
+                      <Text style={[styles.settingValueText, { color: theme.primary }]}>{tempFocus} min</Text>
+                      <TouchableOpacity
+                        style={[styles.stepperBtn, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}
+                        onPress={() => setTempFocus((prev) => Math.min(120, prev + 5))}>
+                        <Ionicons name="add" size={14} color={theme.textPrimary} />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                   <View style={styles.pillSelectorRow}>
-                    {[15, 20, 25, 30, 45, 50, 60].map((v) => (
+                    {[15, 20, 25, 30, 45, 50, 60, 90].map((v) => (
                       <TouchableOpacity
                         key={v}
                         style={[
                           styles.presetPill,
-                          tempFocus === v && styles.presetPillActive,
+                          { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
+                          tempFocus === v && { backgroundColor: `${theme.primary}25`, borderColor: theme.primary },
                         ]}
                         onPress={() => setTempFocus(v)}>
                         <Text
                           style={[
                             styles.presetPillText,
-                            tempFocus === v && styles.presetPillTextActive,
+                            { color: theme.textSecondary },
+                            tempFocus === v && { color: theme.primary, fontWeight: '800' },
                           ]}>
                           {v}m
                         </Text>
@@ -410,8 +444,20 @@ export default function FocusScreen() {
                 {/* Pausa Curta */}
                 <View style={styles.settingBlock}>
                   <View style={styles.settingHeaderRow}>
-                    <Text style={styles.settingName}>Pausa Curta</Text>
-                    <Text style={styles.settingValueText}>{tempShort} min</Text>
+                    <Text style={[styles.settingName, { color: theme.textPrimary }]}>Pausa Curta</Text>
+                    <View style={styles.stepperContainer}>
+                      <TouchableOpacity
+                        style={[styles.stepperBtn, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}
+                        onPress={() => setTempShort((prev) => Math.max(1, prev - 1))}>
+                        <Ionicons name="remove" size={14} color={theme.textPrimary} />
+                      </TouchableOpacity>
+                      <Text style={[styles.settingValueText, { color: theme.primary }]}>{tempShort} min</Text>
+                      <TouchableOpacity
+                        style={[styles.stepperBtn, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}
+                        onPress={() => setTempShort((prev) => Math.min(30, prev + 1))}>
+                        <Ionicons name="add" size={14} color={theme.textPrimary} />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                   <View style={styles.pillSelectorRow}>
                     {[3, 5, 8, 10, 15].map((v) => (
@@ -419,13 +465,15 @@ export default function FocusScreen() {
                         key={v}
                         style={[
                           styles.presetPill,
-                          tempShort === v && styles.presetPillActive,
+                          { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
+                          tempShort === v && { backgroundColor: `${theme.primary}25`, borderColor: theme.primary },
                         ]}
                         onPress={() => setTempShort(v)}>
                         <Text
                           style={[
                             styles.presetPillText,
-                            tempShort === v && styles.presetPillTextActive,
+                            { color: theme.textSecondary },
+                            tempShort === v && { color: theme.primary, fontWeight: '800' },
                           ]}>
                           {v}m
                         </Text>
@@ -437,22 +485,36 @@ export default function FocusScreen() {
                 {/* Pausa Longa */}
                 <View style={styles.settingBlock}>
                   <View style={styles.settingHeaderRow}>
-                    <Text style={styles.settingName}>Pausa Longa</Text>
-                    <Text style={styles.settingValueText}>{tempLong} min</Text>
+                    <Text style={[styles.settingName, { color: theme.textPrimary }]}>Pausa Longa</Text>
+                    <View style={styles.stepperContainer}>
+                      <TouchableOpacity
+                        style={[styles.stepperBtn, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}
+                        onPress={() => setTempLong((prev) => Math.max(5, prev - 5))}>
+                        <Ionicons name="remove" size={14} color={theme.textPrimary} />
+                      </TouchableOpacity>
+                      <Text style={[styles.settingValueText, { color: theme.primary }]}>{tempLong} min</Text>
+                      <TouchableOpacity
+                        style={[styles.stepperBtn, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}
+                        onPress={() => setTempLong((prev) => Math.min(60, prev + 5))}>
+                        <Ionicons name="add" size={14} color={theme.textPrimary} />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                   <View style={styles.pillSelectorRow}>
-                    {[10, 15, 20, 25, 30].map((v) => (
+                    {[10, 15, 20, 25, 30, 45].map((v) => (
                       <TouchableOpacity
                         key={v}
                         style={[
                           styles.presetPill,
-                          tempLong === v && styles.presetPillActive,
+                          { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
+                          tempLong === v && { backgroundColor: `${theme.primary}25`, borderColor: theme.primary },
                         ]}
                         onPress={() => setTempLong(v)}>
                         <Text
                           style={[
                             styles.presetPillText,
-                            tempLong === v && styles.presetPillTextActive,
+                            { color: theme.textSecondary },
+                            tempLong === v && { color: theme.primary, fontWeight: '800' },
                           ]}>
                           {v}m
                         </Text>
@@ -465,13 +527,15 @@ export default function FocusScreen() {
                   <TouchableOpacity
                     style={styles.modalCancelBtn}
                     onPress={() => setShowSettingsModal(false)}>
-                    <Text style={styles.modalCancelText}>Cancelar</Text>
+                    <Text style={[styles.modalCancelText, { color: theme.textSecondary }]}>Cancelar</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={styles.modalSaveBtn}
+                    style={[styles.modalSaveBtn, { backgroundColor: theme.primary }]}
                     onPress={handleSaveSettings}>
-                    <Text style={styles.modalSaveText}>Salvar</Text>
+                    <Text style={[styles.modalSaveText, { color: getContrastTextColor(theme.primary) }]}>
+                      Salvar
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </ScrollView>
@@ -547,10 +611,8 @@ const styles = StyleSheet.create({
     borderRadius: 135,
     backgroundColor: 'rgba(30, 41, 59, 0.6)',
     borderWidth: 4,
-    borderColor: 'rgba(52, 211, 153, 0.35)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: MomentusColors.emeraldNeon,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 20,
@@ -704,17 +766,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   settingName: {
     fontSize: 14,
     fontWeight: '700',
     color: MomentusColors.textPrimary,
   },
+  stepperContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  stepperBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   settingValueText: {
     fontSize: 14,
     fontWeight: '800',
-    color: MomentusColors.emeraldNeon,
+    minWidth: 54,
+    textAlign: 'center',
   },
   pillSelectorRow: {
     flexDirection: 'row',
@@ -725,46 +801,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 10,
-    backgroundColor: 'rgba(51, 65, 85, 0.3)',
     borderWidth: 1,
-    borderColor: MomentusColors.navyOutline,
-  },
-  presetPillActive: {
-    backgroundColor: 'rgba(52, 211, 153, 0.2)',
-    borderColor: MomentusColors.emeraldNeon,
   },
   presetPillText: {
     fontSize: 12,
     fontWeight: '600',
-    color: MomentusColors.textSecondary,
-  },
-  presetPillTextActive: {
-    color: MomentusColors.emeraldNeon,
-    fontWeight: '800',
   },
   modalButtonsRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: 12,
-    marginTop: 12,
+    marginTop: 16,
   },
   modalCancelBtn: {
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
   modalCancelText: {
-    color: MomentusColors.textSecondary,
     fontWeight: '600',
     fontSize: 14,
   },
   modalSaveBtn: {
-    backgroundColor: MomentusColors.emeraldNeon,
     paddingHorizontal: 22,
     paddingVertical: 12,
     borderRadius: 14,
   },
   modalSaveText: {
-    color: '#0F172A',
     fontWeight: '800',
     fontSize: 14,
   },
