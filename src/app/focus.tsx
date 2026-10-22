@@ -41,9 +41,9 @@ export default function FocusScreen() {
   useEffect(() => {
     getAppKv<{ focus: number; short: number; long: number }>('focus_durations').then((saved) => {
       if (saved) {
-        const f = saved.focus || 25;
-        const s = saved.short || 5;
-        const l = saved.long || 15;
+        const f = Number(saved.focus) || 25;
+        const s = Number(saved.short) || 5;
+        const l = Number(saved.long) || 15;
         setFocusDurationMinutes(f);
         setShortBreakMinutes(s);
         setLongBreakMinutes(l);
@@ -352,9 +352,9 @@ export default function FocusScreen() {
 
           <TouchableOpacity
             onPress={() => {
-              setTempFocus(focusDurationMinutes);
-              setTempShort(shortBreakMinutes);
-              setTempLong(longBreakMinutes);
+              setTempFocus(Number(focusDurationMinutes) || 25);
+              setTempShort(Number(shortBreakMinutes) || 5);
+              setTempLong(Number(longBreakMinutes) || 15);
               setActiveSettingsTab('FOCUS');
               setShowSettingsModal(true);
             }}
@@ -589,57 +589,10 @@ export default function FocusScreen() {
                 </View>
               </View>
 
-              {/* Stepper de Ajuste Fino */}
-              <View style={[styles.pickerStepperCard, { borderColor: theme.outline }]}>
-                <TouchableOpacity
-                  style={[
-                    styles.pickerStepperBtn,
-                    { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
-                  ]}
-                  onPress={() => {
-                    if (activeSettingsTab === 'FOCUS') {
-                      setTempFocus((prev) => Math.max(5, prev - 5));
-                    } else if (activeSettingsTab === 'SHORT_BREAK') {
-                      setTempShort((prev) => Math.max(1, prev - 1));
-                    } else {
-                      setTempLong((prev) => Math.max(5, prev - 5));
-                    }
-                    triggerHaptic('impact');
-                  }}
-                  activeOpacity={0.7}>
-                  <Ionicons name="remove" size={18} color={theme.textPrimary} />
-                </TouchableOpacity>
-
-                <View style={styles.pickerStepperLabelCol}>
-                  <Text style={[styles.pickerStepperLabel, { color: theme.textSecondary }]}>
-                    {activeSettingsTab === 'SHORT_BREAK' ? 'Ajuste fino ±1 min' : 'Ajuste fino ±5 min'}
-                  </Text>
-                </View>
-
-                <TouchableOpacity
-                  style={[
-                    styles.pickerStepperBtn,
-                    { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
-                  ]}
-                  onPress={() => {
-                    if (activeSettingsTab === 'FOCUS') {
-                      setTempFocus((prev) => Math.min(120, prev + 5));
-                    } else if (activeSettingsTab === 'SHORT_BREAK') {
-                      setTempShort((prev) => Math.min(30, prev + 1));
-                    } else {
-                      setTempLong((prev) => Math.min(60, prev + 5));
-                    }
-                    triggerHaptic('impact');
-                  }}
-                  activeOpacity={0.7}>
-                  <Ionicons name="add" size={18} color={theme.textPrimary} />
-                </TouchableOpacity>
-              </View>
-
-              {/* Chips de Atalho Rápido */}
+              {/* 1. Chips de Opções Selecionáveis (5 opções por ciclo) */}
               <View style={styles.pickerQuickChipsRow}>
                 {(activeSettingsTab === 'FOCUS'
-                  ? [15, 20, 25, 30, 45, 60]
+                  ? [15, 20, 25, 30, 45]
                   : activeSettingsTab === 'SHORT_BREAK'
                     ? [3, 5, 8, 10, 15]
                     : [10, 15, 20, 25, 30]
@@ -678,6 +631,53 @@ export default function FocusScreen() {
                     </TouchableOpacity>
                   );
                 })}
+              </View>
+
+              {/* 2. Stepper de Ajuste Fino (Abaixo das opções selecionáveis) */}
+              <View style={[styles.pickerStepperCard, { borderColor: theme.outline }]}>
+                <TouchableOpacity
+                  style={[
+                    styles.pickerStepperBtn,
+                    { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
+                  ]}
+                  onPress={() => {
+                    if (activeSettingsTab === 'FOCUS') {
+                      setTempFocus((prev) => Math.max(1, Number(prev) - 1));
+                    } else if (activeSettingsTab === 'SHORT_BREAK') {
+                      setTempShort((prev) => Math.max(1, Number(prev) - 1));
+                    } else {
+                      setTempLong((prev) => Math.max(1, Number(prev) - 1));
+                    }
+                    triggerHaptic('impact');
+                  }}
+                  activeOpacity={0.7}>
+                  <Ionicons name="remove" size={18} color={theme.textPrimary} />
+                </TouchableOpacity>
+
+                <View style={styles.pickerStepperLabelCol}>
+                  <Text style={[styles.pickerStepperLabel, { color: theme.textSecondary }]}>
+                    Ajuste fino ±1 min
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  style={[
+                    styles.pickerStepperBtn,
+                    { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
+                  ]}
+                  onPress={() => {
+                    if (activeSettingsTab === 'FOCUS') {
+                      setTempFocus((prev) => Math.min(120, Number(prev) + 1));
+                    } else if (activeSettingsTab === 'SHORT_BREAK') {
+                      setTempShort((prev) => Math.min(30, Number(prev) + 1));
+                    } else {
+                      setTempLong((prev) => Math.min(60, Number(prev) + 1));
+                    }
+                    triggerHaptic('impact');
+                  }}
+                  activeOpacity={0.7}>
+                  <Ionicons name="add" size={18} color={theme.textPrimary} />
+                </TouchableOpacity>
               </View>
 
               {/* Resumo da Sequência Pomodoro */}
