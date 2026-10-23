@@ -3,6 +3,7 @@ import { EventDetailDialog } from "@/components/momentus/EventDetailDialog";
 import { GlassCard } from "@/components/momentus/GlassCard";
 import { NewHabitModal } from "@/components/momentus/NewHabitModal";
 import { TimelineEventItem } from "@/components/momentus/TimelineEventItem";
+import { SplashScreen } from "@/components/momentus/SplashScreen";
 import { auth as firebaseAuth } from "@/config/firebase";
 import { getStreakColor, getTodayDateString } from "@/constants/initialData";
 import { MomentusColors, getContrastTextColor } from "@/constants/theme";
@@ -31,6 +32,7 @@ export default function HomeScreen() {
     categories,
     userProfile,
     theme,
+    isLoaded,
     toggleHabit,
     deleteHabit,
     deleteMultipleHabits,
@@ -146,6 +148,10 @@ export default function HomeScreen() {
       ],
     );
   };
+
+  if (!isLoaded) {
+    return <SplashScreen syncMessage="Preparando seu espaço..." />;
+  }
 
   return (
     <SafeAreaView
