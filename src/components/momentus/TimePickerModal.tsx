@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Modal,
   View,
@@ -7,6 +7,7 @@ import {
   StyleSheet,
   ScrollView,
   Platform,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useMomentus } from '@/context/MomentusContext';
@@ -20,7 +21,7 @@ interface TimePickerModalProps {
   onConfirm: (time: string) => void;
 }
 
-const ITEM_HEIGHT = 44;
+const ITEM_HEIGHT = 40;
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const MINUTES_STEP_5 = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
@@ -33,57 +34,104 @@ export const TimePickerModal: React.FC<TimePickerModalProps> = ({
 }) => {
   const { theme, triggerHaptic } = useMomentus();
 
-  const parseInitial = (timeStr: string) => {
+  const parseInitial = useCallback((timeStr: string) => {
     const parts = (timeStr || '08:00').split(':');
     const h = Math.max(0, Math.min(23, parseInt(parts[0], 10) || 8));
     const m = Math.max(0, Math.min(59, parseInt(parts[1], 10) || 0));
     return { h, m };
-  };
+  }, []);
 
   const [selectedHour, setSelectedHour] = useState<number>(8);
   const [selectedMinute, setSelectedMinute] = useState<number>(0);
+  const [inputText, setInputText] = useState('08:00');
 
   const hourScrollRef = useRef<ScrollView>(null);
   const minuteScrollRef = useRef<ScrollView>(null);
+
+  const scrollWheelTo = useCallback((h: number, m: number, animated = true) => {
+    const hourY = Math.max(0, (h - 1) * ITEM_HEIGHT);
+    const minuteIndex = MINUTES_STEP_5.findIndex((step) => step >= m);
+    const minuteY = Math.max(0, ((minuteIndex >= 0 ? minuteIndex : 0) - 1) * ITEM_HEIGHT);
+    hourScrollRef.current?.scrollTo({ y: hourY, animated });
+    minuteScrollRef.current?.scrollTo({ y: minuteY, animated });
+  }, []);
 
   useEffect(() => {
     if (visible) {
       const { h, m } = parseInitial(initialTime);
       setSelectedHour(h);
       setSelectedMinute(m);
+      const formatted = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      setInputText(formatted);
 
-      // Auto-centraliza suavemente os seletores na hora e minuto atuais
       const timer = setTimeout(() => {
-        const hourY = Math.max(0, (h - 1) * ITEM_HEIGHT);
-        const minuteIndex = MINUTES_STEP_5.findIndex((step) => step >= m);
-        const minuteY = Math.max(0, ((minuteIndex >= 0 ? minuteIndex : 0) - 1) * ITEM_HEIGHT);
-
-        hourScrollRef.current?.scrollTo({ y: hourY, animated: false });
-        minuteScrollRef.current?.scrollTo({ y: minuteY, animated: false });
+        scrollWheelTo(h, m, false);
       }, 60);
 
       return () => clearTimeout(timer);
     }
-  }, [visible, initialTime]);
+  }, [visible, initialTime, parseInitial, scrollWheelTo]);
 
-  const handleConfirm = () => {
+  const handleConfirm = useCallback(() => {
     const hh = String(selectedHour).padStart(2, '0');
     const mm = String(selectedMinute).padStart(2, '0');
     triggerHaptic('success');
     onConfirm(`${hh}:${mm}`);
-  };
+  }, [selectedHour, selectedMinute, triggerHaptic, onConfirm]);
+
+  // Teclado físico no Web (Enter confirma, Escape fecha)
+  useEffect(() => {
+    if (Platform.OS === 'web' && visible) {
+      const handleKeyDown = (e: any) => {
+        if (e.key === 'Enter') {
+          handleConfirm();
+        } else if (e.key === 'Escape') {
+          onDismiss();
+        }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [visible, handleConfirm, onDismiss]);
 
   const handleSelectHour = (h: number) => {
     setSelectedHour(h);
+    const formatted = `${String(h).padStart(2, '0')}:${String(selectedMinute).padStart(2, '0')}`;
+    setInputText(formatted);
     triggerHaptic('impact');
   };
 
   const handleSelectMinute = (m: number) => {
     setSelectedMinute(m);
+    const formatted = `${String(selectedHour).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    setInputText(formatted);
     triggerHaptic('impact');
   };
 
-  // Ajustes rápidos (+15m, +30m, +1h, Agora)
+  const handleDirectInput = (val: string) => {
+    // Permite digitação com máscara HH:mm
+    let clean = val.replace(/[^0-9]/g, '');
+    if (clean.length > 4) clean = clean.substring(0, 4);
+
+    let formatted = clean;
+    if (clean.length >= 3) {
+      formatted = `${clean.substring(0, 2)}:${clean.substring(2)}`;
+    }
+    setInputText(formatted);
+
+    if (clean.length === 4) {
+      const h = parseInt(clean.substring(0, 2), 10);
+      const m = parseInt(clean.substring(2, 4), 10);
+      if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+        setSelectedHour(h);
+        setSelectedMinute(m);
+        scrollWheelTo(h, m, true);
+        triggerHaptic('impact');
+      }
+    }
+  };
+
+  // Ajustes rápidos (+15m, +30m, Agora)
   const handleQuickAdd = (minutesDelta: number) => {
     const totalMinutes = selectedHour * 60 + selectedMinute + minutesDelta;
     const normalized = (totalMinutes % 1440 + 1440) % 1440;
@@ -91,32 +139,24 @@ export const TimePickerModal: React.FC<TimePickerModalProps> = ({
     const newM = normalized % 60;
     setSelectedHour(newH);
     setSelectedMinute(newM);
+    setInputText(`${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`);
     triggerHaptic('impact');
-
-    const hourY = Math.max(0, (newH - 1) * ITEM_HEIGHT);
-    const minuteIndex = MINUTES_STEP_5.findIndex((step) => step >= newM);
-    const minuteY = Math.max(0, ((minuteIndex >= 0 ? minuteIndex : 0) - 1) * ITEM_HEIGHT);
-    hourScrollRef.current?.scrollTo({ y: hourY, animated: true });
-    minuteScrollRef.current?.scrollTo({ y: minuteY, animated: true });
+    scrollWheelTo(newH, newM, true);
   };
 
   const handleSetNow = () => {
     const now = new Date();
     const h = now.getHours();
     const rawM = now.getMinutes();
-    const roundedM = Math.round(rawM / 5) * 5 % 60;
+    const roundedM = (Math.round(rawM / 5) * 5) % 60;
     setSelectedHour(h);
     setSelectedMinute(roundedM);
+    setInputText(`${String(h).padStart(2, '0')}:${String(roundedM).padStart(2, '0')}`);
     triggerHaptic('impact');
-
-    const hourY = Math.max(0, (h - 1) * ITEM_HEIGHT);
-    const minuteIndex = MINUTES_STEP_5.indexOf(roundedM);
-    const minuteY = Math.max(0, ((minuteIndex >= 0 ? minuteIndex : 0) - 1) * ITEM_HEIGHT);
-    hourScrollRef.current?.scrollTo({ y: hourY, animated: true });
-    minuteScrollRef.current?.scrollTo({ y: minuteY, animated: true });
+    scrollWheelTo(h, roundedM, true);
   };
 
-  // Identificação amigável do período do dia
+  // Identificação do período
   const periodLabel = (() => {
     if (selectedHour >= 5 && selectedHour < 12) return 'Manhã ☀️';
     if (selectedHour >= 12 && selectedHour < 18) return 'Tarde 🌤️';
@@ -130,11 +170,11 @@ export const TimePickerModal: React.FC<TimePickerModalProps> = ({
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onDismiss}>
       <View style={styles.overlay}>
         <View style={[styles.dialogContainer, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
-          {/* Cabeçalho */}
+          {/* Cabeçalho Minimalista */}
           <View style={styles.header}>
             <View style={styles.headerLeft}>
               <View style={[styles.headerIconBg, { backgroundColor: `${theme.primary}20` }]}>
-                <Ionicons name="time" size={18} color={theme.primary} />
+                <Ionicons name="time" size={16} color={theme.primary} />
               </View>
               <Text style={[styles.title, { color: theme.textPrimary }]}>{title}</Text>
             </View>
@@ -142,74 +182,40 @@ export const TimePickerModal: React.FC<TimePickerModalProps> = ({
               onPress={onDismiss}
               style={[styles.closeButton, { backgroundColor: theme.surfaceElevated }]}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close" size={18} color={theme.textSecondary} />
+              <Ionicons name="close" size={16} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>
 
-          {/* Display Digital Minimalista */}
+          {/* Display Digital Minimalista com Digitação Direta Inteligente */}
           <View style={[styles.digitalDisplayCard, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}>
-            <View style={styles.digitalRow}>
-              <View style={[styles.digitalPill, { borderColor: `${theme.primary}40`, backgroundColor: `${theme.primary}12` }]}>
-                <Text style={[styles.digitalNumber, { color: theme.textPrimary }]}>
-                  {String(selectedHour).padStart(2, '0')}
-                </Text>
-                <Text style={[styles.digitalTag, { color: theme.primary }]}>HORA</Text>
-              </View>
-
-              <Text style={[styles.digitalDots, { color: theme.primary }]}>:</Text>
-
-              <View style={[styles.digitalPill, { borderColor: `${theme.primary}40`, backgroundColor: `${theme.primary}12` }]}>
-                <Text style={[styles.digitalNumber, { color: theme.textPrimary }]}>
-                  {String(selectedMinute).padStart(2, '0')}
-                </Text>
-                <Text style={[styles.digitalTag, { color: theme.primary }]}>MIN</Text>
-              </View>
-            </View>
-
-            <View style={[styles.periodBadge, { backgroundColor: `${theme.primary}15` }]}>
-              <Text style={[styles.periodText, { color: theme.primary }]}>{periodLabel}</Text>
-            </View>
+            <TextInput
+              style={[
+                styles.digitalInput,
+                {
+                  color: theme.textPrimary,
+                  backgroundColor: theme.isDark ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.7)',
+                  borderColor: `${theme.primary}40`,
+                },
+              ]}
+              value={inputText}
+              onChangeText={handleDirectInput}
+              keyboardType="numbers-and-punctuation"
+              maxLength={5}
+              selectTextOnFocus
+              placeholder="08:00"
+              placeholderTextColor={theme.textSecondary}
+              onSubmitEditing={handleConfirm}
+            />
+            <Text style={[styles.periodHintText, { color: theme.textSecondary }]}>
+              {periodLabel} • Digite ou role abaixo
+            </Text>
           </View>
 
-          {/* Chips de Atalho Rápido */}
-          <View style={styles.quickChipsRow}>
-            <TouchableOpacity
-              style={[styles.quickChip, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}
-              onPress={handleSetNow}
-              activeOpacity={0.7}>
-              <Ionicons name="flash-outline" size={12} color={theme.primary} />
-              <Text style={[styles.quickChipText, { color: theme.textPrimary }]}>Agora</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.quickChip, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}
-              onPress={() => handleQuickAdd(15)}
-              activeOpacity={0.7}>
-              <Text style={[styles.quickChipText, { color: theme.textPrimary }]}>+15 min</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.quickChip, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}
-              onPress={() => handleQuickAdd(30)}
-              activeOpacity={0.7}>
-              <Text style={[styles.quickChipText, { color: theme.textPrimary }]}>+30 min</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.quickChip, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}
-              onPress={() => handleQuickAdd(60)}
-              activeOpacity={0.7}>
-              <Text style={[styles.quickChipText, { color: theme.textPrimary }]}>+1 hora</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Colunas Duplas de Seleção: Horas e Minutos Lado a Lado */}
+          {/* Colunas Duplas de Rolagem Wheel-Like (Horas e Minutos) */}
           <View style={[styles.columnsContainer, { borderColor: theme.outline, backgroundColor: theme.surfaceElevated }]}>
             {/* Coluna Horas */}
             <View style={styles.columnCol}>
-              <View style={styles.columnHeader}>
-                <Text style={[styles.columnHeaderText, { color: theme.textSecondary }]}>HORA</Text>
-              </View>
+              <Text style={[styles.columnHeaderText, { color: theme.textSecondary }]}>HORA</Text>
               <ScrollView
                 ref={hourScrollRef}
                 style={styles.columnScroll}
@@ -240,14 +246,12 @@ export const TimePickerModal: React.FC<TimePickerModalProps> = ({
               </ScrollView>
             </View>
 
-            {/* Separador Vertical Suave */}
+            {/* Divisor vertical */}
             <View style={[styles.columnDivider, { backgroundColor: theme.outline }]} />
 
             {/* Coluna Minutos */}
             <View style={styles.columnCol}>
-              <View style={styles.columnHeader}>
-                <Text style={[styles.columnHeaderText, { color: theme.textSecondary }]}>MINUTO</Text>
-              </View>
+              <Text style={[styles.columnHeaderText, { color: theme.textSecondary }]}>MINUTO</Text>
               <ScrollView
                 ref={minuteScrollRef}
                 style={styles.columnScroll}
@@ -276,26 +280,32 @@ export const TimePickerModal: React.FC<TimePickerModalProps> = ({
                   );
                 })}
               </ScrollView>
-
-              {/* Botões de Ajuste Fino (+/- 1m) */}
-              <View style={[styles.stepperRow, { borderTopColor: theme.outline }]}>
-                <TouchableOpacity
-                  style={[styles.stepperBtn, { backgroundColor: theme.surface, borderColor: theme.outline }]}
-                  onPress={() => handleQuickAdd(-1)}
-                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                  <Ionicons name="remove" size={14} color={theme.textPrimary} />
-                </TouchableOpacity>
-
-                <Text style={[styles.stepperText, { color: theme.textSecondary }]}>±1m</Text>
-
-                <TouchableOpacity
-                  style={[styles.stepperBtn, { backgroundColor: theme.surface, borderColor: theme.outline }]}
-                  onPress={() => handleQuickAdd(1)}
-                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                  <Ionicons name="add" size={14} color={theme.textPrimary} />
-                </TouchableOpacity>
-              </View>
             </View>
+          </View>
+
+          {/* Chips de Atalho Rápido */}
+          <View style={styles.quickChipsRow}>
+            <TouchableOpacity
+              style={[styles.quickChip, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}
+              onPress={handleSetNow}
+              activeOpacity={0.7}>
+              <Ionicons name="flash-outline" size={11} color={theme.primary} />
+              <Text style={[styles.quickChipText, { color: theme.textPrimary }]}>Agora</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.quickChip, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}
+              onPress={() => handleQuickAdd(15)}
+              activeOpacity={0.7}>
+              <Text style={[styles.quickChipText, { color: theme.textPrimary }]}>+15m</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.quickChip, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}
+              onPress={() => handleQuickAdd(30)}
+              activeOpacity={0.7}>
+              <Text style={[styles.quickChipText, { color: theme.textPrimary }]}>+30m</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Botões de Ação */}
@@ -309,7 +319,7 @@ export const TimePickerModal: React.FC<TimePickerModalProps> = ({
               style={[styles.confirmBtn, { backgroundColor: theme.primary }]}
               activeOpacity={0.85}>
               <Ionicons name="checkmark" size={16} color={contrastColor} />
-              <Text style={[styles.confirmBtnText, { color: contrastColor }]}>Confirmar Horário</Text>
+              <Text style={[styles.confirmBtnText, { color: contrastColor }]}>Confirmar</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -328,10 +338,11 @@ const styles = StyleSheet.create({
   },
   dialogContainer: {
     width: '100%',
-    maxWidth: 340,
+    maxWidth: 320,
     borderRadius: 24,
     borderWidth: 1,
-    padding: 18,
+    padding: 16,
+    gap: 12,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -349,203 +360,147 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
+    justifyContent: 'space-between',
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   headerIconBg: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    justifyContent: 'center',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '800',
   },
   closeButton: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   digitalDisplayCard: {
     borderRadius: 16,
     borderWidth: 1,
-    paddingVertical: 10,
+    padding: 10,
+    alignItems: 'center',
+    gap: 4,
+  },
+  digitalInput: {
+    fontSize: 28,
+    fontWeight: '900',
+    fontVariant: ['tabular-nums'],
+    letterSpacing: 2,
+    textAlign: 'center',
     paddingHorizontal: 16,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  digitalRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  digitalPill: {
-    paddingHorizontal: 14,
     paddingVertical: 4,
     borderRadius: 12,
     borderWidth: 1,
-    alignItems: 'center',
+    width: 140,
   },
-  digitalNumber: {
-    fontSize: 28,
-    fontWeight: '800',
-    fontVariant: ['tabular-nums'],
-  },
-  digitalTag: {
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  digitalDots: {
-    fontSize: 26,
-    fontWeight: '800',
-    marginHorizontal: 8,
-  },
-  periodBadge: {
-    marginTop: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  periodText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  quickChipsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 6,
-    marginBottom: 12,
-  },
-  quickChip: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 4,
-    borderRadius: 10,
-    borderWidth: 1,
-    gap: 4,
-  },
-  quickChipText: {
+  periodHintText: {
     fontSize: 11,
     fontWeight: '600',
   },
   columnsContainer: {
     flexDirection: 'row',
-    height: 190,
     borderRadius: 16,
     borderWidth: 1,
+    height: 150,
     overflow: 'hidden',
-    marginBottom: 14,
   },
   columnCol: {
     flex: 1,
-    paddingVertical: 6,
-  },
-  columnHeader: {
     alignItems: 'center',
-    paddingBottom: 4,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(148, 163, 184, 0.2)',
   },
   columnHeaderText: {
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.8,
-  },
-  columnScroll: {
-    flex: 1,
-  },
-  columnScrollContent: {
-    paddingHorizontal: 10,
     paddingVertical: 6,
-    gap: 4,
   },
   columnDivider: {
     width: 1,
     height: '100%',
   },
-  pickerItem: {
-    height: ITEM_HEIGHT - 6,
-    borderRadius: 10,
-    justifyContent: 'center',
+  columnScroll: {
+    flex: 1,
+    width: '100%',
+  },
+  columnScrollContent: {
+    paddingVertical: 4,
     alignItems: 'center',
   },
+  pickerItem: {
+    width: 60,
+    height: ITEM_HEIGHT,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 1,
+  },
   pickerItemSelected: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 2,
+    borderRadius: 12,
   },
   pickerItemText: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
     fontVariant: ['tabular-nums'],
   },
   pickerItemTextSelected: {
-    fontWeight: '800',
+    fontWeight: '900',
   },
-  stepperRow: {
+  quickChipsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingTop: 6,
-    paddingHorizontal: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  stepperBtn: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 1,
-    justifyContent: 'center',
+  quickChip: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+    borderWidth: 1,
   },
-  stepperText: {
-    fontSize: 10,
+  quickChipText: {
+    fontSize: 11,
     fontWeight: '700',
   },
   actionsRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
     alignItems: 'center',
+    justifyContent: 'flex-end',
     gap: 10,
-    paddingTop: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 8,
+    borderTopWidth: 1,
   },
   cancelBtn: {
-    paddingVertical: 8,
     paddingHorizontal: 14,
-    borderRadius: 12,
+    paddingVertical: 8,
   },
   cancelBtnText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   confirmBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 9,
-    paddingHorizontal: 16,
-    borderRadius: 12,
     gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
   },
   confirmBtnText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '800',
   },
 });

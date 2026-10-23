@@ -84,6 +84,17 @@ export default function TemplatesScreen() {
     return parseTimeToMinutes(end) <= parseTimeToMinutes(start);
   };
 
+  const calculateEventDuration = (start: string, end: string) => {
+    if (!start || !end) return null;
+    const diff = parseTimeToMinutes(end) - parseTimeToMinutes(start);
+    if (diff <= 0) return null;
+    const h = Math.floor(diff / 60);
+    const m = diff % 60;
+    if (h > 0 && m > 0) return `${h}h ${m}m`;
+    if (h > 0) return `${h}h`;
+    return `${m}m`;
+  };
+
   const hasInvalidTime = formEvents.some((ev) => isEventTimeInvalid(ev.timeStart, ev.timeEnd));
   const isFormValid =
     formName.trim().length > 0 &&
@@ -635,82 +646,105 @@ export default function TemplatesScreen() {
                   placeholderTextColor={`${theme.textSecondary}80`}
                 />
 
-                {/* Horários */}
+                {/* Faixa Integrada de Horário (Time Range Chip) */}
                 {(() => {
                   const isTimeInvalid = isEventTimeInvalid(ev.timeStart, ev.timeEnd);
+                  const duration = calculateEventDuration(ev.timeStart, ev.timeEnd);
                   return (
-                    <>
-                      <View style={styles.timeRow}>
-                        <View style={styles.timeCol}>
-                          <Text style={[styles.timeLabel, { color: theme.textSecondary }]}>Início</Text>
-                          <TouchableOpacity
-                            style={[
-                              styles.timeInputTouchable,
-                              {
-                                backgroundColor: theme.surfaceElevated,
-                                borderColor: isTimeInvalid ? MomentusColors.errorRed : theme.outline,
-                              },
-                            ]}
-                            onPress={() =>
-                              setTimePickerTarget({
-                                index,
-                                field: 'timeStart',
-                                title: `Hora de Início - Evento ${index + 1}`,
-                                initialTime: ev.timeStart,
-                              })
-                            }
-                            activeOpacity={0.7}>
-                            <Text style={[styles.timeInputText, { color: theme.textPrimary }]}>
+                    <View style={styles.eventTimeRangeWrapper}>
+                      <View
+                        style={[
+                          styles.eventTimeRangeChip,
+                          {
+                            backgroundColor: theme.surfaceElevated,
+                            borderColor: isTimeInvalid ? MomentusColors.errorRed : theme.outline,
+                          },
+                        ]}>
+                        {/* Início */}
+                        <TouchableOpacity
+                          style={styles.eventTimeRangeSubBtn}
+                          onPress={() =>
+                            setTimePickerTarget({
+                              index,
+                              field: 'timeStart',
+                              title: `Hora de Início - Atividade ${index + 1}`,
+                              initialTime: ev.timeStart,
+                            })
+                          }
+                          activeOpacity={0.7}>
+                          <Text style={[styles.eventTimeRangeSubLabel, { color: theme.textSecondary }]}>Início</Text>
+                          <View style={styles.timeValueRow}>
+                            <Text style={[styles.eventTimeRangeValText, { color: theme.textPrimary }]}>
                               {ev.timeStart}
                             </Text>
-                            <Ionicons
-                              name="time-outline"
-                              size={16}
-                              color={isTimeInvalid ? MomentusColors.errorRed : theme.textSecondary}
-                            />
-                          </TouchableOpacity>
+                            <Ionicons name="time-outline" size={13} color={theme.textSecondary} />
+                          </View>
+                        </TouchableOpacity>
+
+                        {/* Seta Divisora */}
+                        <View style={styles.eventTimeRangeArrowBox}>
+                          <Ionicons
+                            name="arrow-forward"
+                            size={14}
+                            color={isTimeInvalid ? MomentusColors.errorRed : theme.primary}
+                          />
                         </View>
 
-                        <View style={styles.timeCol}>
-                          <Text style={[styles.timeLabel, { color: theme.textSecondary }]}>Término</Text>
-                          <TouchableOpacity
-                            style={[
-                              styles.timeInputTouchable,
-                              {
-                                backgroundColor: theme.surfaceElevated,
-                                borderColor: isTimeInvalid ? MomentusColors.errorRed : theme.outline,
-                              },
-                            ]}
-                            onPress={() =>
-                              setTimePickerTarget({
-                                index,
-                                field: 'timeEnd',
-                                title: `Hora de Término - Evento ${index + 1}`,
-                                initialTime: ev.timeEnd,
-                              })
-                            }
-                            activeOpacity={0.7}>
-                            <Text style={[styles.timeInputText, { color: theme.textPrimary }]}>
+                        {/* Término */}
+                        <TouchableOpacity
+                          style={styles.eventTimeRangeSubBtn}
+                          onPress={() =>
+                            setTimePickerTarget({
+                              index,
+                              field: 'timeEnd',
+                              title: `Hora de Término - Atividade ${index + 1}`,
+                              initialTime: ev.timeEnd,
+                            })
+                          }
+                          activeOpacity={0.7}>
+                          <Text style={[styles.eventTimeRangeSubLabel, { color: theme.textSecondary }]}>Término</Text>
+                          <View style={styles.timeValueRow}>
+                            <Text style={[styles.eventTimeRangeValText, { color: theme.textPrimary }]}>
                               {ev.timeEnd}
                             </Text>
-                            <Ionicons
-                              name="time-outline"
-                              size={16}
-                              color={isTimeInvalid ? MomentusColors.errorRed : theme.textSecondary}
-                            />
-                          </TouchableOpacity>
+                            <Ionicons name="time-outline" size={13} color={theme.textSecondary} />
+                          </View>
+                        </TouchableOpacity>
+
+                        {/* Tag de Duração Calculada */}
+                        <View
+                          style={[
+                            styles.eventDurationTag,
+                            {
+                              backgroundColor: isTimeInvalid ? `${MomentusColors.errorRed}15` : `${theme.primary}18`,
+                              borderColor: isTimeInvalid ? `${MomentusColors.errorRed}40` : `${theme.primary}30`,
+                            },
+                          ]}>
+                          <Ionicons
+                            name={isTimeInvalid ? 'alert-circle' : 'hourglass-outline'}
+                            size={11}
+                            color={isTimeInvalid ? MomentusColors.errorRed : theme.primary}
+                          />
+                          <Text
+                            style={[
+                              styles.eventDurationTagText,
+                              { color: isTimeInvalid ? MomentusColors.errorRed : theme.primary },
+                            ]}>
+                            {isTimeInvalid ? 'Inválido' : duration || '30m'}
+                          </Text>
                         </View>
                       </View>
 
+                      {/* Microvalidação sutil */}
                       {isTimeInvalid && (
-                        <View style={styles.errorBanner}>
-                          <Ionicons name="alert-circle" size={14} color={MomentusColors.errorRed} />
-                          <Text style={styles.errorBannerText}>
-                            O horário de término deve ser posterior ao horário de início.
+                        <View style={styles.microErrorRow}>
+                          <Ionicons name="alert-circle" size={12} color={MomentusColors.errorRed} />
+                          <Text style={styles.microErrorText}>
+                            O horário de término deve ser posterior ao início
                           </Text>
                         </View>
                       )}
-                    </>
+                    </View>
                   );
                 })()}
 
@@ -1138,57 +1172,73 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     fontSize: 14,
   },
-  timeRow: {
-    flexDirection: 'row',
-    gap: 12,
+  eventTimeRangeWrapper: {
     marginTop: 10,
   },
-  timeCol: {
+  eventTimeRangeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    gap: 8,
+  },
+  eventTimeRangeSubBtn: {
     flex: 1,
+    paddingVertical: 2,
+  },
+  eventTimeRangeSubLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 2,
   },
   timeLabel: {
     fontSize: 12,
     fontWeight: '600',
     marginBottom: 4,
   },
-  timeInput: {
-    height: 40,
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
+  eventTimeRangeValText: {
     fontSize: 14,
-    textAlign: 'center',
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
   },
-  timeInputTouchable: {
-    height: 42,
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
+  timeValueRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 5,
   },
-  timeInputText: {
-    fontSize: 14,
-    fontWeight: '700',
+  eventTimeRangeArrowBox: {
+    paddingHorizontal: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  errorBanner: {
+  eventDurationTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.3)',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    marginTop: 8,
   },
-  errorBannerText: {
+  eventDurationTagText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  microErrorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 4,
+    paddingHorizontal: 4,
+  },
+  microErrorText: {
     color: MomentusColors.errorRed,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
-    flex: 1,
   },
   disabledBtn: {
     opacity: 0.5,
