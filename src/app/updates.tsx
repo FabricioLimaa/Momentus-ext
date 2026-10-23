@@ -25,33 +25,33 @@ export default function UpdateNotesScreen() {
   const updates = [
     {
       icon: 'sparkles' as const,
-      title: 'Visual Moderno e Confortável',
+      title: 'Novo Visual Moderno e Confortável',
       description:
-        'Aparência mais limpa e organizada, com transições suaves e facilidade para acompanhar tudo o que importa no seu dia.',
+        'Uma interface mais limpa, elegante e agradável para os olhos, com transições suaves para você acompanhar sua rotina com tranquilidade.',
     },
     {
       icon: 'notifications' as const,
-      title: 'Lembretes e Ações Rápidas',
+      title: 'Lembretes Inteligentes para Não Perder o Ritmo',
       description:
-        'Conclua ou adie suas rotinas com apenas um toque diretamente nas notificações, sem precisar abrir o app.',
+        'Conclua ou adie suas tarefas com apenas um toque direto nas notificações, sem precisar abrir o aplicativo.',
     },
     {
       icon: 'cloud-done' as const,
-      title: 'Seus Dados Sempre Salvos',
+      title: 'Seus Dados Salvos com Segurança Máxima',
       description:
-        'Suas rotinas, categorias e medalhas ficam salvas no seu aparelho e sincronizadas com sua conta para nunca perder seu progresso.',
+        'Seus dados ficam salvos com segurança máxima no seu aparelho e sincronizam automaticamente na nuvem para você acessar de qualquer lugar.',
     },
     {
       icon: 'calendar' as const,
-      title: 'Linha do Tempo Completa',
+      title: 'Linha do Tempo e Organização Contínua',
       description:
-        'Acompanhe seus horários de início e término em uma linha contínua e fácil de ler ao longo de toda a semana.',
+        'Acompanhe o início e término das suas atividades em uma faixa contínua, clara e fácil de ler ao longo de toda a semana.',
     },
     {
       icon: 'bag-handle' as const,
-      title: 'Loja de Recompensas e Conquistas',
+      title: 'Recompensas e Conquistas Positivas',
       description:
-        'Ganhe pontos ao concluir hábitos e sessões de foco para personalizar suas categorias com adesivos e cores exclusivas.',
+        'Ganhe pontos e suba de nível ao cumprir hábitos e sessões de foco, personalizando suas categorias com cores e adesivos exclusivos.',
     },
   ];
 
@@ -82,7 +82,7 @@ export default function UpdateNotesScreen() {
           <View style={styles.versionRow}>
             <View style={[styles.versionBadge, { backgroundColor: `${theme.primary}15`, borderColor: theme.primary }]}>
               <Text style={[styles.versionBadgeText, { color: theme.primary }]}>
-                Versão 2.1.0 • Estável e Rápido
+                Versão 2.1.0 • Disponível no Web, Android e iOS
               </Text>
             </View>
 
@@ -144,7 +144,7 @@ export default function UpdateNotesScreen() {
               </Text>
 
               <Text style={[styles.dialogDesc, { color: theme.textSecondary }]}>
-                O Momentus evoluiu! Você já está utilizando a versão multiplataforma mais recente com sincronização em nuvem, SQLite e notificações interativas.
+                O Momentus evoluiu! Você já está utilizando a versão mais recente com seus dados salvos com segurança máxima no aparelho, sincronização contínua na nuvem e lembretes inteligentes.
               </Text>
 
               <TouchableOpacity
@@ -173,12 +173,10 @@ export default function UpdateNotesScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: MomentusColors.navyBackground,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   container: {
     flex: 1,
-    backgroundColor: MomentusColors.navyBackground,
   },
   topBar: {
     flexDirection: 'row',
