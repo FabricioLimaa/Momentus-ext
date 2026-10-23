@@ -13,6 +13,7 @@ import {
 import type { GoogleSignin as GoogleSigninType } from '@react-native-google-signin/google-signin';
 import { Platform, TurboModuleRegistry } from 'react-native';
 import { auth } from '@/config/firebase';
+import { getAppKv, setAppKv } from '@/database/momentusDb';
 
 // Web Client ID configurado no google-services.json do Momentus
 const WEB_CLIENT_ID =
@@ -184,6 +185,32 @@ export async function registerWithEmail(
   }
 }
 
+export async function getGoogleCalendarAccessToken(): Promise<string | null> {
+  try {
+    return await getAppKv<string>('google_access_token');
+  } catch {
+    return null;
+  }
+}
+
+export async function requestGoogleCalendarAccessToken(): Promise<string | null> {
+  if (Platform.OS !== 'web') return null;
+  try {
+    const provider = new GoogleAuthProvider();
+    provider.addScope('https://www.googleapis.com/auth/calendar.events');
+    const userCredential = await signInWithPopup(auth, provider);
+    const credential = GoogleAuthProvider.credentialFromResult(userCredential);
+    const token = credential?.accessToken || null;
+    if (token) {
+      await setAppKv('google_access_token', token).catch(() => {});
+    }
+    return token;
+  } catch (err) {
+    console.warn('Erro ao solicitar token do Google Calendar:', err);
+    return null;
+  }
+}
+
 /**
  * Realiza login com o Google (Popup na Web / Nativo no Android e iOS ou OAuth no Expo Go).
  */
@@ -194,8 +221,13 @@ export async function loginWithGoogle(): Promise<MomentusAuthUser> {
       const provider = new GoogleAuthProvider();
       provider.addScope('profile');
       provider.addScope('email');
+      provider.addScope('https://www.googleapis.com/auth/calendar.events');
       provider.setCustomParameters({ prompt: 'select_account' });
       const userCredential = await signInWithPopup(auth, provider);
+      const credential = GoogleAuthProvider.credentialFromResult(userCredential);
+      if (credential?.accessToken) {
+        await setAppKv('google_access_token', credential.accessToken).catch(() => {});
+      }
       console.log('[AUTH] Login com Google concluído com sucesso:', userCredential.user.email);
       return userCredential.user;
     } catch (err: any) {

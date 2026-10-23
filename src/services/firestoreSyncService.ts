@@ -16,6 +16,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  increment,
   onSnapshot,
   query,
   setDoc,
@@ -331,37 +332,62 @@ export async function syncWithFirestore(
     } catch {}
   }
 
+  // 1. Filtra hábitos locais removendo mocks de teste e ajustando categorias duplicadas
+  const cleanLocalHabits = localHabits
+    .filter((h) => !isMockHabit(h.id, h.title))
+    .map((h) => (duplicateOutrosIds.has(h.categoryId) ? { ...h, categoryId: canonicalOutrosId } : h));
+
   // ========================================================
   // 2. Sincronização de Hábitos Concluídos (HabitoConcluido.kt)
   // ========================================================
   const completedHabitsSnapshot = await getDocs(completedHabitsColRef);
   const cloudCompletedHabitsSet = new Set<string>();
+  const localHabitsMapById = new Map<string, HabitItem>(
+    cleanLocalHabits.map((h) => [h.id, h])
+  );
+  const completedBatch = writeBatch(firestore);
+  let completedChanges = 0;
+
   completedHabitsSnapshot.forEach((d) => {
     const data = d.data();
-    const habitId = data.itemCronogramaId || d.id;
-    cloudCompletedHabitsSet.add(habitId);
+    const rawId = data.itemCronogramaId || d.id;
+    const localHabit = localHabitsMapById.get(rawId) || localHabitsMapById.get(d.id);
+
+    // Se o hábito existe localmente e está desmarcado pelo usuário, remove da nuvem imediatamente
+    if (localHabit && !localHabit.completed) {
+      completedBatch.delete(d.ref);
+      completedChanges++;
+      return;
+    }
+
+    cloudCompletedHabitsSet.add(rawId);
+    cloudCompletedHabitsSet.add(d.id);
+    if (!rawId.startsWith('applied_') && /_[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(rawId)) {
+      cloudCompletedHabitsSet.add(rawId.replace(/_[0-9]{4}-[0-9]{2}-[0-9]{2}$/, ''));
+    }
+  });
+
+  // Atualiza estritamente os hábitos locais e garante integridade bidirecional
+  cleanLocalHabits.forEach((habit) => {
+    if (cloudCompletedHabitsSet.has(habit.id)) {
+      habit.completed = true;
+    }
+    const compRef = doc(completedHabitsColRef, habit.id);
+    if (habit.completed && !cloudCompletedHabitsSet.has(habit.id)) {
+      completedBatch.set(compRef, {
+        itemCronogramaId: habit.id,
+        dataConclusao: dateToMillis(habit.date) || Date.now(),
+      });
+      cloudCompletedHabitsSet.add(habit.id);
+      completedChanges++;
+    } else if (!habit.completed && cloudCompletedHabitsSet.has(habit.id)) {
+      completedBatch.delete(compRef);
+      cloudCompletedHabitsSet.delete(habit.id);
+      completedChanges++;
+    }
   });
 
   try {
-    const completedBatch = writeBatch(firestore);
-    let completedChanges = 0;
-
-    localHabits.forEach((habit) => {
-      const compRef = doc(completedHabitsColRef, habit.id);
-      if (habit.completed && !cloudCompletedHabitsSet.has(habit.id)) {
-        completedBatch.set(compRef, {
-          itemCronogramaId: habit.id,
-          dataConclusao: dateToMillis(habit.date) || Date.now(),
-        });
-        cloudCompletedHabitsSet.add(habit.id);
-        completedChanges++;
-      } else if (!habit.completed && cloudCompletedHabitsSet.has(habit.id)) {
-        completedBatch.delete(compRef);
-        cloudCompletedHabitsSet.delete(habit.id);
-        completedChanges++;
-      }
-    });
-
     if (completedChanges > 0) {
       await completedBatch.commit();
     }
@@ -376,11 +402,6 @@ export async function syncWithFirestore(
   const cloudEventsMap = new Map<string, any>();
   eventsSnapshot.forEach((d) => cloudEventsMap.set(d.id, d.data()));
 
-  // 1. Filtra hábitos locais removendo mocks de teste e ajustando categorias duplicadas
-  const cleanLocalHabits = localHabits
-    .filter((h) => !isMockHabit(h.id, h.title))
-    .map((h) => (duplicateOutrosIds.has(h.categoryId) ? { ...h, categoryId: canonicalOutrosId } : h));
-
   const localEventsMap = new Map<string, HabitItem>(
     cleanLocalHabits.map((h) => [h.id, h]),
   );
@@ -393,7 +414,20 @@ export async function syncWithFirestore(
     }
   });
 
+  // Identifica eventos deletados na nuvem para não ressuscitar
+  const deletedCloudIds = new Set<string>();
+  cloudEventsMap.forEach((cloudItem, id) => {
+    if (cloudItem.isDeleted === true) {
+      deletedCloudIds.add(id);
+    }
+  });
+
   cleanLocalHabits.forEach((habit) => {
+    // Se o hábito já foi marcado como deletado na nuvem, não faz upload
+    if (deletedCloudIds.has(habit.id)) {
+      return;
+    }
+
     const cloudItem = cloudEventsMap.get(habit.id);
     if (!cloudItem) {
       const docRef = doc(eventsColRef, habit.id);
@@ -420,14 +454,6 @@ export async function syncWithFirestore(
 
   // Mapeia eventos que pertencem a templates (templateId != null ou data == null)
   const templateEventsMap = new Map<string, TemplateItem[]>();
-  
-  // Identifica eventos deletados na nuvem para não ressuscitar
-  const deletedCloudIds = new Set<string>();
-  cloudEventsMap.forEach((cloudItem, id) => {
-    if (cloudItem.isDeleted === true) {
-      deletedCloudIds.add(id);
-    }
-  });
 
   const mergedHabits: HabitItem[] = cleanLocalHabits.filter((h) => !deletedCloudIds.has(h.id));
 
@@ -693,11 +719,16 @@ export async function syncWithFirestore(
       };
 
       const cloudPoints =
-        typeof cloudUserData?.points === "number" ? cloudUserData.points : 0;
+        typeof cloudUserData?.points === "number" ? cloudUserData.points : null;
       const cloudStreak =
         typeof cloudUserData?.streak === "number" ? cloudUserData.streak : 0;
-      const mergedPoints = Math.max(baseProfile.totalPoints, cloudPoints);
+
+      // Saldo de pontos (XP): respeita o saldo oficial do Firestore (onde as compras da loja debitam pontos)
+      // Se não houver saldo na nuvem ainda, utiliza o saldo local acumulado
+      const mergedPoints = cloudPoints !== null ? cloudPoints : baseProfile.totalPoints;
       const mergedStreak = Math.max(baseProfile.currentStreak, cloudStreak);
+
+      const effectiveTotalCompleted = cleanLocalHabits.filter((h) => h.completed).length;
 
       const cloudDisplayName =
         typeof cloudUserData?.display_name === "string" &&
@@ -730,6 +761,7 @@ export async function syncWithFirestore(
         isLoggedIn: true,
         totalPoints: mergedPoints,
         currentStreak: mergedStreak,
+        totalCompleted: effectiveTotalCompleted,
       };
 
       // MANTÉM RIGOROSAMENTE APENAS OS CAMPOS DE UserData.kt:
@@ -901,6 +933,7 @@ export async function clearCloudData(userId: string): Promise<boolean> {
 
 /**
  * Escuta atualizações em tempo real no Firestore para um usuário logado.
+ * Escuta tanto a coleção de eventos (ItemCronograma) quanto a de conclusões (HabitoConcluido).
  */
 export function listenToFirestoreSync(
   userId: string,
@@ -912,15 +945,39 @@ export function listenToFirestoreSync(
     userId,
     EVENTS_COLLECTION,
   );
-  return onSnapshot(
+  const completedHabitsColRef = collection(
+    firestore,
+    "users",
+    userId,
+    COMPLETED_HABITS_COLLECTION,
+  );
+
+  const unsubEvents = onSnapshot(
     eventsColRef,
     () => {
       onRemoteChange();
     },
     (err) => {
-      console.warn("Erro no SnapshotListener do Firestore:", err);
+      console.warn("Erro no SnapshotListener de events do Firestore:", err);
     },
   );
+
+  const unsubCompleted = onSnapshot(
+    completedHabitsColRef,
+    () => {
+      onRemoteChange();
+    },
+    (err) => {
+      console.warn("Erro no SnapshotListener de completed_habits do Firestore:", err);
+    },
+  );
+
+  return () => {
+    try {
+      unsubEvents();
+      unsubCompleted();
+    } catch {}
+  };
 }
 
 /**
@@ -1095,7 +1152,9 @@ export async function saveHabitToFirestore(
 }
 
 /**
- * Exclui pontualmente um evento no Firestore do usuário (marca como isDeleted ou deleta documento).
+ * Exclui pontualmente um evento no Firestore do usuário de forma definitiva.
+ * Espelha fielmente ScheduleRepository.kt do app nativo:
+ * firestore.collection("users").document(uid).collection(EVENTS_COLLECTION).document(item.id).delete()
  */
 export async function deleteHabitFromFirestore(
   userId: string,
@@ -1105,19 +1164,76 @@ export async function deleteHabitFromFirestore(
   try {
     const userDocRef = doc(firestore, "users", userId);
     const eventDocRef = doc(collection(userDocRef, EVENTS_COLLECTION), habitId);
-    // Exclui fisicamente o documento da coleção de eventos, igual ao Kotlin:
-    // firestore.collection("users").document(uid).collection(EVENTS_COLLECTION).document(item.id).delete()
-    await deleteDoc(eventDocRef);
-    // Remove também quaisquer registros de conclusão deste hábito
     const compDocRef = doc(collection(userDocRef, COMPLETED_HABITS_COLLECTION), habitId);
-    await deleteDoc(compDocRef).catch(() => {});
+
+    const batch = writeBatch(firestore);
+    batch.delete(eventDocRef);
+    batch.delete(compDocRef);
+    await batch.commit();
   } catch (err) {
     console.warn("Erro ao excluir hábito do Firestore:", err);
   }
 }
 
 /**
+ * Exclui múltiplos eventos no Firestore em lote (batch).
+ */
+export async function deleteMultipleHabitsFromFirestore(
+  userId: string,
+  habitIds: string[],
+): Promise<void> {
+  if (!userId || userId === "local_user" || habitIds.length === 0) return;
+  try {
+    const userDocRef = doc(firestore, "users", userId);
+    const eventsCol = collection(userDocRef, EVENTS_COLLECTION);
+    const compCol = collection(userDocRef, COMPLETED_HABITS_COLLECTION);
+
+    const batch = writeBatch(firestore);
+    habitIds.forEach((id) => {
+      batch.delete(doc(eventsCol, id));
+      batch.delete(doc(compCol, id));
+    });
+    await batch.commit();
+  } catch (err) {
+    console.warn("Erro ao excluir múltiplos hábitos no Firestore:", err);
+  }
+}
+
+/**
+ * Registra a compra de um item da loja no Firestore e deduz os pontos do usuário.
+ * Espelha fielmente MarketRepository.kt:
+ * 1. userRepository.incrementPoints(-(item.finalPrice))
+ * 2. firestore.collection("users").document(uid).collection("inventory").document(item.id).set(...)
+ */
+export async function purchaseMarketItemInFirestore(
+  userId: string,
+  itemId: string,
+  newPoints: number,
+): Promise<void> {
+  if (!userId || userId === "local_user") return;
+  try {
+    const userDocRef = doc(firestore, "users", userId);
+    const inventoryDocRef = doc(
+      collection(userDocRef, INVENTORY_COLLECTION),
+      itemId,
+    );
+
+    const batch = writeBatch(firestore);
+    batch.set(userDocRef, { points: newPoints }, { merge: true });
+    batch.set(inventoryDocRef, {
+      purchasedAt: Date.now(),
+    });
+    await batch.commit();
+  } catch (err) {
+    console.warn("Erro ao registrar compra no Firestore:", err);
+  }
+}
+
+/**
  * Registra ou remove a conclusão de um hábito no Firestore (completed_habits).
+ * Mantém paridade estrita com o app nativo Kotlin (CategoryRepository.kt:411 e 453):
+ * - O doc ID é o itemCronogramaId (habitId).
+ * - O campo dataConclusao é um número (timestamp epoch em ms).
  */
 export async function saveHabitCompletionToFirestore(
   userId: string,
@@ -1128,17 +1244,22 @@ export async function saveHabitCompletionToFirestore(
   if (!userId || userId === "local_user") return;
   try {
     const userDocRef = doc(firestore, "users", userId);
-    const completionDocId = `${habitId}_${completedDate}`;
-    const compDocRef = doc(collection(userDocRef, COMPLETED_HABITS_COLLECTION), completionDocId);
+    // Usa ESTRITAMENTE o habitId como ID do documento, idêntico ao Kotlin:
+    // firestore.collection("users").document(userId).collection("completed_habits").document(itemCronogramaId)
+    const compDocRef = doc(collection(userDocRef, COMPLETED_HABITS_COLLECTION), habitId);
     if (completed) {
+      const dateMillis = dateToMillis(completedDate) || Date.now();
       await setDoc(compDocRef, {
         itemCronogramaId: habitId,
-        dataConclusao: completedDate,
-        dataCriacao: new Date(),
+        dataConclusao: dateMillis,
       });
     } else {
       await deleteDoc(compDocRef);
     }
+
+    // Exclui também eventual registro legado criado no formato antigo `${habitId}_${completedDate}`
+    const legacyDocRef = doc(collection(userDocRef, COMPLETED_HABITS_COLLECTION), `${habitId}_${completedDate}`);
+    await deleteDoc(legacyDocRef).catch(() => {});
   } catch (err) {
     console.warn("Erro ao atualizar conclusão no Firestore:", err);
   }
@@ -1165,6 +1286,44 @@ export async function saveUserProfileToFirestore(
     }
   } catch (err) {
     console.warn("Erro ao salvar perfil no Firestore:", err);
+  }
+}
+
+/**
+ * Salva pontualmente uma conquista desbloqueada no Firestore e incrementa os pontos no perfil.
+ * Mantém paridade com GamificationRepository.kt (unlockAchievement):
+ * - Cria o documento em users/{uid}/unlocked_achievements/{achievementId}
+ * - Atualiza os pontos atômicos com increment(xpReward) no documento users/{uid}
+ */
+export async function saveAchievementUnlockedToFirestore(
+  userId: string,
+  achievementId: string,
+  xpReward: number,
+): Promise<void> {
+  if (!userId || userId === "local_user") return;
+  try {
+    const userDocRef = doc(firestore, "users", userId);
+    const achDocRef = doc(
+      collection(userDocRef, UNLOCKED_ACHIEVEMENTS_COLLECTION),
+      achievementId,
+    );
+
+    await setDoc(achDocRef, {
+      achievementId,
+      dateUnlocked: new Date(),
+    });
+
+    if (xpReward > 0) {
+      await setDoc(
+        userDocRef,
+        {
+          points: increment(xpReward),
+        },
+        { merge: true },
+      );
+    }
+  } catch (err) {
+    console.warn("Erro ao salvar conquista desbloqueada no Firestore:", err);
   }
 }
 

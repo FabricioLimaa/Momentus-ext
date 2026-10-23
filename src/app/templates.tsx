@@ -346,8 +346,8 @@ export default function TemplatesScreen() {
     setSelectedTemplateForApply(null);
 
     Alert.alert(
-      'Template Aplicado! 🚀',
-      `"${templateName}" foi agendado em ${dates.length} dia${dates.length === 1 ? '' : 's'} com sucesso! (+${dates.length * 20} XP)`
+      'Template Aplicado! 📋',
+      `"${templateName}" foi agendado em ${dates.length} dia${dates.length === 1 ? '' : 's'} com sucesso!`
     );
   };
 

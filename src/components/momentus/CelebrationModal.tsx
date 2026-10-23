@@ -88,7 +88,7 @@ export const CelebrationModal: React.FC<CelebrationModalProps> = ({
           </Text>
 
           {/* Points Badge */}
-          {!!pointsEarned && pointsEarned > 0 && (
+          {typeof pointsEarned === 'number' && pointsEarned > 0 ? (
             <View
               style={[
                 styles.pointsBadge,
@@ -99,7 +99,26 @@ export const CelebrationModal: React.FC<CelebrationModalProps> = ({
                 +{pointsEarned} XP Conquistados!
               </Text>
             </View>
-          )}
+          ) : pointsEarned === 0 ? (
+            <View
+              style={[
+                styles.pointsBadge,
+                { backgroundColor: isDark ? 'rgba(148, 163, 184, 0.15)' : '#F1F5F9' },
+              ]}>
+              <Ionicons
+                name="checkmark-done-circle"
+                size={16}
+                color={isDark ? MomentusColors.textSecondary : '#64748B'}
+              />
+              <Text
+                style={[
+                  styles.pointsText,
+                  { color: isDark ? MomentusColors.textSecondary : '#64748B' },
+                ]}>
+                XP diário já validado anteriormente
+              </Text>
+            </View>
+          ) : null}
 
           {/* Action Button */}
           <TouchableOpacity

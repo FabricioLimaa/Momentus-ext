@@ -29,6 +29,12 @@ function TabsNavigator() {
       pathname === '/forgot-password' ||
       pathname === '/onboarding';
 
+    // Se o usuário não estiver autenticado e tentar acessar uma rota interna, direciona para o login
+    if (!isUserLoggedIn && !isExemptRoute) {
+      router.replace('/login' as any);
+      return;
+    }
+
     if (isUserLoggedIn && !isTermsOk && !isExemptRoute) {
       router.replace('/legal?mandatory=true' as any);
     }

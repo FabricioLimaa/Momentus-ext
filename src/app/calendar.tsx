@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Platform,
   StatusBar,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +19,7 @@ import { EventDetailDialog } from '@/components/momentus/EventDetailDialog';
 import { NewHabitModal } from '@/components/momentus/NewHabitModal';
 import { getTodayDateString } from '@/constants/initialData';
 import { HabitItem } from '@/types';
+import { GoogleCalendarEventItem } from '@/services/calendarService';
 
 const WEEKDAYS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
 const WEEKDAYS_FULL = [
@@ -101,6 +103,8 @@ export default function CalendarScreen() {
     deleteHabit,
     theme,
     settings,
+    syncAllHabitsToCalendarAction,
+    fetchGoogleEventsAction,
   } = useMomentus();
 
   const primaryColor = settings.primaryColorHex || theme.primary;
@@ -110,6 +114,45 @@ export default function CalendarScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [habitToEdit, setHabitToEdit] = useState<HabitItem | null>(null);
   const [selectedDetailHabit, setSelectedDetailHabit] = useState<HabitItem | null>(null);
+  const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
+  const [googleEvents, setGoogleEvents] = useState<GoogleCalendarEventItem[]>([]);
+  const [isLoadingGoogleEvents, setIsLoadingGoogleEvents] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    setIsLoadingGoogleEvents(true);
+    fetchGoogleEventsAction(selectedDate)
+      .then((events) => {
+        if (isMounted) setGoogleEvents(events);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (isMounted) setIsLoadingGoogleEvents(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedDate, fetchGoogleEventsAction]);
+
+  const handleSyncGoogleCalendar = async () => {
+    try {
+      setIsSyncingCalendar(true);
+      const count = await syncAllHabitsToCalendarAction();
+      const updated = await fetchGoogleEventsAction(selectedDate);
+      setGoogleEvents(updated);
+      Alert.alert(
+        'Google Agenda',
+        count > 0
+          ? `${count} rotina(s) sincronizada(s) com sucesso no Google Agenda!`
+          : 'Google Agenda sincronizado com sucesso.'
+      );
+    } catch {
+      Alert.alert('Google Agenda', 'Não foi possível sincronizar com o Google Agenda.');
+    } finally {
+      setIsSyncingCalendar(false);
+    }
+  };
 
   // Mês/Ano para a visualização mensal
   const [currentYearMonth, setCurrentYearMonth] = useState(() => {
@@ -301,6 +344,26 @@ export default function CalendarScreen() {
           </View>
 
           <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={[
+                styles.syncGoogleBtn,
+                { backgroundColor: theme.surface, borderColor: theme.outline },
+              ]}
+              onPress={handleSyncGoogleCalendar}
+              disabled={isSyncingCalendar}
+              activeOpacity={0.7}>
+              {isSyncingCalendar ? (
+                <ActivityIndicator size="small" color={primaryColor} />
+              ) : (
+                <View style={styles.syncBtnContent}>
+                  <Ionicons name="logo-google" size={14} color="#4285F4" />
+                  <Text style={[styles.toggleViewText, { color: theme.textPrimary, marginLeft: 4 }]}>
+                    Sincronizar
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
             <TouchableOpacity
               style={[
                 styles.toggleViewBtn,
@@ -637,6 +700,58 @@ export default function CalendarScreen() {
                   />
                 );
               })}
+            </View>
+          )}
+
+          {/* Seção Google Agenda */}
+          {googleEvents.length > 0 && (
+            <View style={styles.googleAgendaSection}>
+              <View style={styles.googleSectionHeader}>
+                <Ionicons name="logo-google" size={16} color="#4285F4" />
+                <Text style={[styles.googleSectionTitle, { color: theme.textPrimary }]}>
+                  Google Agenda ({googleEvents.length})
+                </Text>
+                {isLoadingGoogleEvents && (
+                  <ActivityIndicator size="small" color="#4285F4" style={{ marginLeft: 6 }} />
+                )}
+              </View>
+
+              <View
+                style={[
+                  styles.timelineList,
+                  {
+                    backgroundColor: theme.surface,
+                    borderColor: theme.outline,
+                  },
+                ]}>
+                {googleEvents.map((gEvent, idx) => {
+                  const startTime = gEvent.startDateTime
+                    ? new Date(gEvent.startDateTime).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })
+                    : 'Dia todo';
+                  return (
+                    <View
+                      key={gEvent.id || idx}
+                      style={[
+                        styles.googleEventRow,
+                        idx > 0 && { borderTopWidth: 1, borderTopColor: theme.outline },
+                      ]}>
+                      <View style={styles.googleEventBullet} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.googleEventTitle, { color: theme.textPrimary }]}>
+                          {gEvent.title}
+                        </Text>
+                        <Text style={[styles.googleEventTime, { color: theme.textSecondary }]}>
+                          {startTime}
+                        </Text>
+                      </View>
+                      <Ionicons name="calendar-outline" size={16} color={theme.textSecondary} />
+                    </View>
+                  );
+                })}
+              </View>
             </View>
           )}
 
@@ -1005,5 +1120,54 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
     zIndex: 99,
+  },
+  syncGoogleBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 6,
+  },
+  syncBtnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  googleAgendaSection: {
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  googleSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 10,
+    paddingHorizontal: 4,
+  },
+  googleSectionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  googleEventRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    gap: 10,
+  },
+  googleEventBullet: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#4285F4',
+  },
+  googleEventTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  googleEventTime: {
+    fontSize: 12,
+    marginTop: 2,
   },
 });

@@ -41,6 +41,8 @@ import {
   syncHabitToDeviceCalendar,
   deleteHabitFromDeviceCalendar,
   syncAllHabitsToCalendar,
+  fetchGoogleCalendarEvents,
+  GoogleCalendarEventItem,
 } from '@/services/calendarService';
 import {
   getAllCategories,
@@ -76,8 +78,12 @@ import {
   saveTermsAcceptance,
   saveHabitToFirestore,
   deleteHabitFromFirestore,
+  deleteMultipleHabitsFromFirestore,
+  purchaseMarketItemInFirestore,
   saveHabitCompletionToFirestore,
   saveUserProfileToFirestore,
+  saveAchievementUnlockedToFirestore,
+  listenToFirestoreSync,
 } from '@/services/firestoreSyncService';
 import { CURRENT_TERMS_VERSION } from '@/constants/legalContent';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -150,6 +156,7 @@ interface MomentusContextData {
   clearAllLocalData: () => void;
   clearCloudDataAction: () => Promise<boolean>;
   syncAllHabitsToCalendarAction: () => Promise<number>;
+  fetchGoogleEventsAction: (targetDate?: string) => Promise<GoogleCalendarEventItem[]>;
   exportBackupAction: () => Promise<boolean>;
   importBackupAction: () => Promise<boolean>;
   // Auth Actions
@@ -220,9 +227,20 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     habitTitle: string;
   } | null>(null);
 
+  // Registro das datas cujos pontos de dia completo já foram validados (Anti-Abuse)
+  const [validatedDayDates, setValidatedDayDates] = useState<string[]>([]);
+  const validatedDayDatesRef = useRef<string[]>([]);
+  useEffect(() => {
+    validatedDayDatesRef.current = validatedDayDates;
+  }, [validatedDayDates]);
+
   // Ref para permitir chamada segura de syncCloudAction a partir de callbacks externos
   const syncCloudActionRef = useRef<(targetUid?: string) => Promise<void>>(async () => {});
   const lastLoadedUid = useRef<string | null>(null);
+  // Rastreador de hábitos deletados na sessão para prevenir ressuscitação em corridas de sincronização
+  const deletedHabitIdsRef = useRef<Set<string>>(new Set());
+  // Rastreador de conquistas cujos pontos de XP já foram creditados ao saldo
+  const creditedAchievementIdsRef = useRef<Set<string>>(new Set());
 
   const showCelebration = (title: string, message: string, pointsEarned?: number) => {
     setCelebration({ visible: true, title, message, pointsEarned });
@@ -357,14 +375,46 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
         setHabits(initialHab);
 
-        // Recalcula estritamente os dias 100% concluídos e o streak real a partir do histórico
+        // Recalcula estritamente os hábitos concluídos, dias 100% concluídos e streak real
         const initialCompletedDays = getFullyCompletedDates(initialHab);
-        const realTotalCompleted = initialCompletedDays.length;
+        const realTotalHabitsCompleted = initialHab.filter((h: HabitItem) => h.completed).length;
         const realStreak = calculateStreakFromCompletedDays(initialCompletedDays, getTodayDateString());
+
+        // Carrega datas já validadas de bônus diário para evitar pontos duplicados
+        const savedValidatedDays = await getAppKv<string[]>('validated_day_dates');
+        if (Array.isArray(savedValidatedDays)) {
+          setValidatedDayDates(savedValidatedDays);
+        } else if (initialCompletedDays.length > 0) {
+          setValidatedDayDates(initialCompletedDays);
+          await setAppKv('validated_day_dates', initialCompletedDays).catch(() => {});
+        }
+
+        const cleanAchievements =
+          dbAchievements.length > 0
+            ? dbAchievements
+            : (legacyParsed?.achievements || INITIAL_ACHIEVEMENTS);
+
+        // Garante que conquistas já desbloqueadas tenham seus pontos somados ao saldo do usuário
+        const savedCreditedAchs = await getAppKv<string[]>('credited_achievement_ids');
+        const creditedSet = new Set<string>(Array.isArray(savedCreditedAchs) ? savedCreditedAchs : []);
+        creditedAchievementIdsRef.current = creditedSet;
+
+        let bonusAchievementPoints = 0;
+        cleanAchievements.forEach((ach: Achievement) => {
+          if (ach.unlocked && !creditedSet.has(ach.id)) {
+            bonusAchievementPoints += (ach.xpReward || 0);
+            creditedSet.add(ach.id);
+          }
+        });
+
+        if (bonusAchievementPoints > 0) {
+          await setAppKv('credited_achievement_ids', Array.from(creditedSet)).catch(() => {});
+        }
 
         setUserProfile((p) => ({
           ...p,
-          totalCompleted: realTotalCompleted,
+          totalPoints: p.totalPoints + bonusAchievementPoints,
+          totalCompleted: realTotalHabitsCompleted,
           currentStreak: realStreak,
           bestStreak: Math.max(p.bestStreak, realStreak),
         }));
@@ -373,11 +423,6 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           (t: RoutineTemplate) => !LEGACY_MOCK_TMPL_IDS.has(t.id)
         );
         setTemplates(cleanTemplates);
-
-        const cleanAchievements =
-          dbAchievements.length > 0
-            ? dbAchievements
-            : (legacyParsed?.achievements || INITIAL_ACHIEVEMENTS);
         setAchievements(cleanAchievements);
 
         const cleanMarketItems =
@@ -396,7 +441,13 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     requestNotificationPermissions().catch(() => {});
 
     // Observa mudanças de autenticação do Firebase e sincroniza automaticamente
+    let unsubFirestore: (() => void) | null = null;
     const unsubAuth = onAuthStateChanged(firebaseAuth, async (user) => {
+      if (unsubFirestore) {
+        unsubFirestore();
+        unsubFirestore = null;
+      }
+
       if (!user) {
         setUserProfile((prev) => ({
           ...prev,
@@ -441,6 +492,15 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       } catch (syncErr) {
         console.warn('[AUTH] Aviso ao sincronizar nuvem no onAuthStateChanged:', syncErr);
       }
+
+      // Registra listener em tempo real para sincronizar mudanças feitas no nativo (eventos e conclusões)
+      try {
+        unsubFirestore = listenToFirestoreSync(user.uid, () => {
+          syncCloudActionRef.current(user.uid).catch(() => {});
+        });
+      } catch (err) {
+        console.warn('[FIRESTORE_LISTENER] Falha ao registrar listener em tempo real:', err);
+      }
     });
 
     // Sincronização periódica a cada 60 segundos com a nuvem (equivalente ao SyncWorker.kt)
@@ -453,6 +513,9 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     return () => {
       unsubAuth();
+      if (unsubFirestore) {
+        unsubFirestore();
+      }
       clearInterval(periodicSyncTimer);
     };
   }, []);
@@ -542,42 +605,53 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
         switch (ach.id) {
           case 'FIRST_HABIT':
-            progress = totalCompleted;
-            if (totalCompleted >= 1) shouldUnlock = true;
+            progress = Math.max(ach.progress, totalCompleted);
+            if (progress >= 1) shouldUnlock = true;
             break;
           case 'COMPLETED_10':
-            progress = totalCompleted;
-            if (totalCompleted >= 10) shouldUnlock = true;
+            progress = Math.max(ach.progress, totalCompleted);
+            if (progress >= 10) shouldUnlock = true;
             break;
           case 'COMPLETED_50':
-            progress = totalCompleted;
-            if (totalCompleted >= 50) shouldUnlock = true;
+            progress = Math.max(ach.progress, totalCompleted);
+            if (progress >= 50) shouldUnlock = true;
             break;
           case 'COMPLETED_100':
-            progress = totalCompleted;
-            if (totalCompleted >= 100) shouldUnlock = true;
+            progress = Math.max(ach.progress, totalCompleted);
+            if (progress >= 100) shouldUnlock = true;
             break;
           case 'STREAK_3':
-            progress = streakCount;
-            if (streakCount >= 3) shouldUnlock = true;
+            progress = Math.max(ach.progress, streakCount);
+            if (progress >= 3) shouldUnlock = true;
             break;
           case 'STREAK_7':
-            progress = streakCount;
-            if (streakCount >= 7) shouldUnlock = true;
+            progress = Math.max(ach.progress, streakCount);
+            if (progress >= 7) shouldUnlock = true;
             break;
           case 'STREAK_30':
-            progress = streakCount;
-            if (streakCount >= 30) shouldUnlock = true;
+            progress = Math.max(ach.progress, streakCount);
+            if (progress >= 30) shouldUnlock = true;
             break;
           case 'FIRST_TEMPLATE':
-            progress = totalTemplates;
-            if (totalTemplates >= 1) shouldUnlock = true;
+            progress = Math.max(ach.progress, totalTemplates);
+            if (progress >= 1) shouldUnlock = true;
             break;
         }
 
         if (shouldUnlock) {
           newlyUnlocked = true;
           addPoints(ach.xpReward);
+
+          // Registra a conquista como creditada
+          creditedAchievementIdsRef.current.add(ach.id);
+          setAppKv('credited_achievement_ids', Array.from(creditedAchievementIdsRef.current)).catch(() => {});
+
+          // Salva no Firestore instantaneamente (idêntico ao GamificationRepository.kt do Kotlin)
+          const currentUserId = firebaseAuth.currentUser?.uid;
+          if (currentUserId) {
+            saveAchievementUnlockedToFirestore(currentUserId, ach.id, ach.xpReward).catch(() => {});
+          }
+
           showCelebration(
             'Conquista Desbloqueada! 🏆',
             `Você desbloqueou a medalha: "${ach.title}"`,
@@ -609,8 +683,9 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const toggleHabit = (id: string) => {
     let nextCompleted = false;
     let targetDate = '';
-    let shouldCelebrateDay = false;
-    let nextTotalCompleted = userProfile.totalCompleted;
+    let isDayFullyComplete = false;
+    let isFirstTimeDayValidated = false;
+    let nextTotalHabitsCompleted = 0;
     let nextStreak = userProfile.currentStreak;
 
     setHabits((prev) => {
@@ -632,32 +707,43 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           return {
             ...habit,
             completed: nextCompleted,
-            streak: nextCompleted ? habit.streak + 1 : Math.max(0, habit.streak - 1),
+            streak: nextCompleted ? 1 : 0,
           };
         }
         return habit;
       });
 
-      // Um dia concluído só é computado se 100% das rotinas planejadas daquele dia foram finalizadas
+      // 1. Total de Hábitos Concluídos (reflete estritamente a quantidade real de hábitos marcados)
+      nextTotalHabitsCompleted = updated.filter((h) => h.completed).length;
+
+      // 2. Dias 100% Concluídos e Sequência (Streak de dias seguidos)
       const fullyCompletedDates = getFullyCompletedDates(updated);
-      nextTotalCompleted = fullyCompletedDates.length;
       nextStreak = calculateStreakFromCompletedDays(fullyCompletedDates, getTodayDateString());
 
+      // 3. Verificação de Dia Completo e Anti-Abuse de XP
       if (nextCompleted && targetDate) {
         const dayHabits = updated.filter((h) => h.date === targetDate);
         if (dayHabits.length > 0 && dayHabits.every((h) => h.completed)) {
-          shouldCelebrateDay = true;
+          isDayFullyComplete = true;
+          const currentValidated = validatedDayDatesRef.current;
+          if (!currentValidated.includes(targetDate)) {
+            isFirstTimeDayValidated = true;
+            const nextValidated = [...currentValidated, targetDate];
+            setValidatedDayDates(nextValidated);
+            setAppKv('validated_day_dates', nextValidated).catch(() => {});
+          }
         }
       }
 
       setUserProfile((p) => {
-        const deltaPoints = (nextCompleted ? 15 : -15) + (shouldCelebrateDay ? 25 : 0);
-        const nextPoints = Math.max(0, p.totalPoints + deltaPoints);
+        const habitDeltaPoints = nextCompleted ? 15 : -15;
+        const dayBonusPoints = isFirstTimeDayValidated ? 25 : 0;
+        const nextPoints = Math.max(0, p.totalPoints + habitDeltaPoints + dayBonusPoints);
         const nextBestStreak = Math.max(p.bestStreak, nextStreak);
         const nextProfile: UserProfile = {
           ...p,
           totalPoints: nextPoints,
-          totalCompleted: nextTotalCompleted,
+          totalCompleted: nextTotalHabitsCompleted,
           currentStreak: nextStreak,
           bestStreak: nextBestStreak,
         };
@@ -666,7 +752,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (currentUserId) {
           saveUserProfileToFirestore(currentUserId, {
             totalPoints: nextPoints,
-            totalCompleted: nextTotalCompleted,
+            totalCompleted: nextTotalHabitsCompleted,
             currentStreak: nextStreak,
             bestStreak: nextBestStreak,
           }).catch(() => {});
@@ -678,15 +764,23 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return updated;
     });
 
-    if (shouldCelebrateDay) {
-      showCelebration(
-        'Dia Conquistado! 🌟',
-        'Parabéns! Você concluiu 100% das suas tarefas planejadas.',
-        25
-      );
+    if (isDayFullyComplete) {
+      if (isFirstTimeDayValidated) {
+        showCelebration(
+          'Dia Conquistado! 🌟',
+          'Parabéns! Você concluiu 100% das suas tarefas planejadas.',
+          25
+        );
+      } else {
+        showCelebration(
+          'Dia Conquistado! 🌟',
+          'Parabéns! Suas tarefas do dia estão 100% concluídas.',
+          0
+        );
+      }
     }
 
-    checkAndUnlockAchievements(nextStreak, nextTotalCompleted, templates.length);
+    checkAndUnlockAchievements(nextStreak, nextTotalHabitsCompleted, templates.length);
 
     const currentUserId = firebaseAuth.currentUser?.uid;
     if (currentUserId) {
@@ -703,7 +797,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         saveHabitToFirestore(currentUserId, {
           ...currentHabit,
           completed: nextCompleted,
-          streak: nextCompleted ? currentHabit.streak + 1 : Math.max(0, currentHabit.streak - 1),
+          streak: nextCompleted ? 1 : 0,
         }).catch((err) =>
           console.warn('Erro ao salvar hábito alterado no Firestore:', err)
         );
@@ -750,6 +844,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const deleteHabit = (id: string) => {
+    deletedHabitIdsRef.current.add(id);
     const habitToDelete = habits.find((h) => h.id === id);
     if (habitToDelete) {
       cancelHabitNotifications(id).catch(() => {});
@@ -757,7 +852,32 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         deleteHabitFromDeviceCalendar(habitToDelete.googleCalendarEventId).catch(() => {});
       }
     }
-    setHabits((prev) => prev.filter((h) => h.id !== id));
+
+    setHabits((prev) => {
+      const remaining = prev.filter((h) => h.id !== id);
+      const remainingCompleted = remaining.filter((h) => h.completed).length;
+      const completedDays = getFullyCompletedDates(remaining);
+      const remainingStreak = calculateStreakFromCompletedDays(completedDays, getTodayDateString());
+
+      setUserProfile((p) => {
+        const nextProfile: UserProfile = {
+          ...p,
+          totalCompleted: remainingCompleted,
+          currentStreak: remainingStreak,
+        };
+        const currentUserId = firebaseAuth.currentUser?.uid;
+        if (currentUserId) {
+          saveUserProfileToFirestore(currentUserId, {
+            totalCompleted: remainingCompleted,
+            currentStreak: remainingStreak,
+          }).catch(() => {});
+        }
+        return nextProfile;
+      });
+
+      return remaining;
+    });
+
     deleteHabitDb(id).catch(() => {});
     triggerHaptic('impact');
 
@@ -770,6 +890,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const deleteMultipleHabits = (ids: string[]) => {
+    ids.forEach((id) => deletedHabitIdsRef.current.add(id));
     const idSet = new Set(ids);
     const toDelete = habits.filter((h) => idSet.has(h.id));
     toDelete.forEach((h) => {
@@ -778,17 +899,40 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         deleteHabitFromDeviceCalendar(h.googleCalendarEventId).catch(() => {});
       }
     });
-    setHabits((prev) => prev.filter((h) => !idSet.has(h.id)));
+
+    setHabits((prev) => {
+      const remaining = prev.filter((h) => !idSet.has(h.id));
+      const remainingCompleted = remaining.filter((h) => h.completed).length;
+      const completedDays = getFullyCompletedDates(remaining);
+      const remainingStreak = calculateStreakFromCompletedDays(completedDays, getTodayDateString());
+
+      setUserProfile((p) => {
+        const nextProfile: UserProfile = {
+          ...p,
+          totalCompleted: remainingCompleted,
+          currentStreak: remainingStreak,
+        };
+        const currentUserId = firebaseAuth.currentUser?.uid;
+        if (currentUserId) {
+          saveUserProfileToFirestore(currentUserId, {
+            totalCompleted: remainingCompleted,
+            currentStreak: remainingStreak,
+          }).catch(() => {});
+        }
+        return nextProfile;
+      });
+
+      return remaining;
+    });
+
     deleteMultipleHabitsDb(ids).catch(() => {});
     triggerHaptic('impact');
 
     const currentUserId = firebaseAuth.currentUser?.uid;
     if (currentUserId) {
-      ids.forEach((id) => {
-        deleteHabitFromFirestore(currentUserId, id).catch((err) =>
-          console.warn('Erro ao excluir múltiplos hábitos no Firestore:', err)
-        );
-      });
+      deleteMultipleHabitsFromFirestore(currentUserId, ids).catch((err) =>
+        console.warn('Erro ao excluir múltiplos hábitos no Firestore:', err)
+      );
     }
   };
 
@@ -847,6 +991,8 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     dates.forEach((targetDate) => {
       uniqueTemplateItems.forEach((item) => {
         const deterministicId = `applied_${item.id}_${targetDate}`;
+        // Remove do cache de IDs deletados para permitir re-aplicar o template no mesmo dia
+        deletedHabitIdsRef.current.delete(deterministicId);
         newHabits.push({
           id: deterministicId,
           title: item.title,
@@ -881,7 +1027,6 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return [...adjustedNewHabits, ...filteredPrev];
     });
 
-    addPoints(20 * dates.length);
     soundManager.playSuccessSound();
     triggerHaptic('success');
     checkAndUnlockAchievements(userProfile.currentStreak, userProfile.totalCompleted, templates.length);
@@ -1017,14 +1162,30 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return false;
     }
 
-    setUserProfile((prev) => ({
-      ...prev,
-      totalPoints: prev.totalPoints - item.finalPrice,
-    }));
+    const newPoints = Math.max(0, userProfile.totalPoints - item.finalPrice);
+    const _newLevelInfo = calculateUserLevel(newPoints);
 
-    setMarketItems((prev) =>
-      prev.map((i) => (i.id === itemId ? { ...i, isOwned: true } : i))
-    );
+    setUserProfile((prev) => {
+      const updated: UserProfile = {
+        ...prev,
+        totalPoints: newPoints,
+      };
+      setAppKv('user_profile', updated).catch(() => {});
+      return updated;
+    });
+
+    setMarketItems((prev) => {
+      const updated = prev.map((i) => (i.id === itemId ? { ...i, isOwned: true } : i));
+      setAllMarketItemsDb(updated).catch(() => {});
+      return updated;
+    });
+
+    const currentUid = firebaseAuth.currentUser?.uid;
+    if (currentUid) {
+      purchaseMarketItemInFirestore(currentUid, itemId, newPoints).catch((err) =>
+        console.warn('Erro ao salvar compra de item no Firestore:', err)
+      );
+    }
 
     soundManager.playAchievementSound();
     triggerHaptic('success');
@@ -1160,6 +1321,10 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return syncedCount;
   };
 
+  const fetchGoogleEventsAction = async (targetDate?: string): Promise<GoogleCalendarEventItem[]> => {
+    return await fetchGoogleCalendarEvents(targetDate);
+  };
+
   const login = (email: string, name?: string, photoUrl?: string | null) => {
     setUserProfile((prev) => ({
       ...prev,
@@ -1252,6 +1417,10 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       isLoggedIn: true,
     };
 
+    const activeHabitsToSync = habits.filter(
+      (h) => !deletedHabitIdsRef.current.has(h.id)
+    );
+
     const {
       mergedHabits,
       mergedCategories,
@@ -1263,12 +1432,16 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       cloudTermsVersion,
     } = await syncWithFirestore(
       uid,
-      habits,
+      activeHabitsToSync,
       categories,
       templates,
       achievements,
       marketItems,
       currentProfileWithAuth
+    );
+
+    const finalMergedHabits = mergedHabits.filter(
+      (h) => !deletedHabitIdsRef.current.has(h.id)
     );
 
     const backupTimestamp = formatBackupTimestamp();
@@ -1287,31 +1460,30 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     let effectiveProfile = mergedUserProfile || currentProfileWithAuth;
 
-    // Retro-crédito de XP de conquistas para usuários legados/migrados do app nativo
+    // Garante crédito de XP para cada conquista desbloqueada que ainda não foi contabilizada no saldo
     const unlockedAchievements = mergedAchievements.filter((a) => a.unlocked);
-    const expectedAchievementXp = unlockedAchievements.reduce(
-      (acc, a) => acc + (a.xpReward || 0),
-      0
-    );
+    const creditedSet = creditedAchievementIdsRef.current;
+    let missingAchievementPoints = 0;
 
-    const backfilledKey = `@momentus_achievements_xp_backfilled_${uid}`;
-    const alreadyBackfilled = await AsyncStorage.getItem(backfilledKey);
-
-    if (!alreadyBackfilled && expectedAchievementXp > 0) {
-      if ((effectiveProfile.totalPoints || 0) < expectedAchievementXp) {
-        const bonusPoints = expectedAchievementXp - (effectiveProfile.totalPoints || 0);
-        effectiveProfile = {
-          ...effectiveProfile,
-          totalPoints: effectiveProfile.totalPoints + bonusPoints,
-        };
-        saveUserProfileToFirestore(uid, {
-          totalPoints: effectiveProfile.totalPoints,
-        } as any).catch(() => {});
+    unlockedAchievements.forEach((ach) => {
+      if (!creditedSet.has(ach.id)) {
+        missingAchievementPoints += (ach.xpReward || 0);
+        creditedSet.add(ach.id);
       }
-      await AsyncStorage.setItem(backfilledKey, 'true');
+    });
+
+    if (missingAchievementPoints > 0) {
+      effectiveProfile = {
+        ...effectiveProfile,
+        totalPoints: effectiveProfile.totalPoints + missingAchievementPoints,
+      };
+      saveUserProfileToFirestore(uid, {
+        totalPoints: effectiveProfile.totalPoints,
+      } as any).catch(() => {});
+      await setAppKv('credited_achievement_ids', Array.from(creditedSet)).catch(() => {});
     }
 
-    setHabits(mergedHabits);
+    setHabits(finalMergedHabits);
     setCategories(mergedCategories);
     setTemplates(mergedTemplates);
     setAchievements(mergedAchievements);
@@ -1319,7 +1491,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setUserProfile(effectiveProfile);
     setSettings(updatedSettings);
 
-    await setAllHabitsDb(mergedHabits);
+    await setAllHabitsDb(finalMergedHabits);
     await setAllCategoriesDb(mergedCategories);
     await setAllTemplatesDb(mergedTemplates);
     await setAllAchievementsDb(mergedAchievements);
@@ -1393,6 +1565,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         clearAllLocalData,
         clearCloudDataAction,
         syncAllHabitsToCalendarAction,
+        fetchGoogleEventsAction,
         exportBackupAction,
         importBackupAction,
         login,

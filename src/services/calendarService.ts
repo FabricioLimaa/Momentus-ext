@@ -1,8 +1,18 @@
 import type * as LegacyCalendarTypes from 'expo-calendar/legacy';
 import { Platform } from 'react-native';
 import { HabitItem, Category } from '@/types';
+import { getGoogleCalendarAccessToken } from '@/services/authService';
 
 export const MOMENTUS_CALENDAR_TITLE = 'Momentus - Rotinas';
+
+export interface GoogleCalendarEventItem {
+  id: string;
+  title: string;
+  startDateTime: string;
+  endDateTime?: string;
+  isAllDay: boolean;
+  description?: string;
+}
 
 type LegacyCalendarModule = typeof LegacyCalendarTypes;
 let cachedCalendarModule: LegacyCalendarModule | null | undefined;
@@ -117,13 +127,97 @@ function parseLocalDateTime(dateStr: string, timeStr: string): Date {
 }
 
 /**
- * Sincroniza um hábito para o calendário nativo (Google Calendar no Android / Apple Calendar no iOS).
+ * Sincroniza um hábito para o Google Agenda (Web via REST API v3 / Android & iOS via expo-calendar).
  * Retorna o ID do evento criado ou atualizado.
  */
 export async function syncHabitToDeviceCalendar(
   habit: HabitItem,
   category?: Category
 ): Promise<string | null> {
+  const startDate = parseLocalDateTime(habit.date, habit.timeStart);
+  let endDate = parseLocalDateTime(habit.date, habit.timeEnd || habit.timeStart);
+
+  // Se a data final for menor ou igual à inicial, define duração padrão de 30 minutos
+  if (endDate.getTime() <= startDate.getTime()) {
+    endDate = new Date(startDate.getTime() + 30 * 60 * 1000);
+  }
+
+  const notes = [
+    habit.description || '',
+    category ? `Categoria: ${category.name}` : '',
+    'Gerenciado pelo aplicativo Momentus ✨',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const systemTimeZone =
+    Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Sao_Paulo';
+
+  // Sincronização Web via Google Calendar REST API v3
+  if (Platform.OS === 'web') {
+    const token = await getGoogleCalendarAccessToken();
+    if (!token) return null;
+
+    try {
+      const payload = {
+        summary: habit.title,
+        description: notes,
+        start: {
+          dateTime: startDate.toISOString(),
+          timeZone: systemTimeZone,
+        },
+        end: {
+          dateTime: endDate.toISOString(),
+          timeZone: systemTimeZone,
+        },
+      };
+
+      const eventId = habit.googleCalendarEventId;
+      const url = eventId
+        ? `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`
+        : 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
+      const method = eventId ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        // Se falhou ao atualizar (p. ex. evento não existe mais), tenta criar novo
+        if (eventId && response.status === 404) {
+          const createRes = await fetch(
+            'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(payload),
+            }
+          );
+          if (createRes.ok) {
+            const created = await createRes.json();
+            return created.id || null;
+          }
+        }
+        return null;
+      }
+
+      const resData = await response.json();
+      return resData.id || null;
+    } catch (err) {
+      console.warn('Erro ao salvar evento no Google Agenda (Web):', err);
+      return null;
+    }
+  }
+
+  // Sincronização Mobile nativa via expo-calendar
   const Calendar = getCalendarModule();
   if (!Calendar) return null;
 
@@ -133,24 +227,6 @@ export async function syncHabitToDeviceCalendar(
 
     const calendarId = await getOrCreateMomentusCalendarId();
     if (!calendarId) return null;
-
-    const startDate = parseLocalDateTime(habit.date, habit.timeStart);
-    let endDate = parseLocalDateTime(habit.date, habit.timeEnd || habit.timeStart);
-
-    // Se a data final for menor ou igual à inicial, define duração padrão de 30 minutos
-    if (endDate.getTime() <= startDate.getTime()) {
-      endDate = new Date(startDate.getTime() + 30 * 60 * 1000);
-    }
-
-    const notes = [
-      habit.description || '',
-      category ? `Categoria: ${category.name}` : '',
-      'Gerenciado pelo aplicativo Momentus ✨',
-    ]
-      .filter(Boolean)
-      .join('\n');
-
-    const systemTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
     // Se já possui googleCalendarEventId, tenta atualizar o evento existente
     if (habit.googleCalendarEventId) {
@@ -188,10 +264,28 @@ export async function syncHabitToDeviceCalendar(
 }
 
 /**
- * Remove um evento do calendário nativo do dispositivo.
+ * Remove um evento do Google Agenda ou calendário nativo do dispositivo.
  */
 export async function deleteHabitFromDeviceCalendar(calendarEventId: string): Promise<void> {
-  if (!calendarEventId || Platform.OS === 'web') return;
+  if (!calendarEventId) return;
+
+  if (Platform.OS === 'web') {
+    const token = await getGoogleCalendarAccessToken();
+    if (!token) return;
+    try {
+      await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(calendarEventId)}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+    } catch {}
+    return;
+  }
+
   const Calendar = getCalendarModule();
   if (!Calendar?.deleteEventAsync) return;
 
@@ -204,6 +298,70 @@ export async function deleteHabitFromDeviceCalendar(calendarEventId: string): Pr
 }
 
 /**
+ * Busca eventos do Google Agenda do usuário.
+ * Espelha fielmente GoogleCalendarSourceImpl.kt (fetchEvents) do app nativo.
+ */
+export async function fetchGoogleCalendarEvents(
+  targetDate?: string
+): Promise<GoogleCalendarEventItem[]> {
+  if (Platform.OS === 'web') {
+    const token = await getGoogleCalendarAccessToken();
+    if (!token) return [];
+    try {
+      const minDate = targetDate
+        ? new Date(`${targetDate}T00:00:00Z`).toISOString()
+        : new Date().toISOString();
+      const res = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&orderBy=startTime&timeMin=${encodeURIComponent(minDate)}&maxResults=20`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      if (!res.ok) return [];
+      const data = await res.json();
+      return (data.items || []).map((ev: any) => ({
+        id: ev.id,
+        title: ev.summary || 'Evento',
+        startDateTime: ev.start?.dateTime || ev.start?.date,
+        endDateTime: ev.end?.dateTime || ev.end?.date,
+        isAllDay: !!ev.start?.date,
+        description: ev.description,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  const Calendar = getCalendarModule();
+  if (!Calendar?.getEventsAsync) return [];
+
+  try {
+    const hasPermission = await requestDeviceCalendarPermissions();
+    if (!hasPermission) return [];
+
+    const calendarId = await getOrCreateMomentusCalendarId();
+    if (!calendarId) return [];
+
+    const start = targetDate ? new Date(`${targetDate}T00:00:00`) : new Date();
+    const end = new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const events = await Calendar.getEventsAsync([calendarId], start, end);
+    return events.map((ev) => ({
+      id: ev.id,
+      title: ev.title,
+      startDateTime: typeof ev.startDate === 'string' ? ev.startDate : new Date(ev.startDate).toISOString(),
+      endDateTime: typeof ev.endDate === 'string' ? ev.endDate : new Date(ev.endDate).toISOString(),
+      isAllDay: !!ev.allDay,
+      description: ev.notes,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Sincroniza em lote todos os hábitos marcados com saveToGoogle ou todos os hábitos ativos.
  * Na Web, exporta automaticamente um arquivo .ics compatível com Google Calendar / Apple Calendar / Outlook.
  */
@@ -213,21 +371,11 @@ export async function syncAllHabitsToCalendar(
 ): Promise<{ syncedCount: number; updatedHabits: HabitItem[] }> {
   const categoryMap = new Map<string, Category>(categories.map((c) => [c.id, c]));
 
-  // Suporte Web: na plataforma Web a sincronização ocorre diretamente via nuvem (Firestore),
-  // sem disparar downloads indesejados de arquivos .ics no navegador.
-  if (Platform.OS === 'web') {
-    const activeHabits = habits.filter((h) => h.saveToGoogle || !h.completed);
-    return {
-      syncedCount: activeHabits.length,
-      updatedHabits: habits.map((h) =>
-        h.saveToGoogle || !h.completed ? { ...h, saveToGoogle: true } : h
-      ),
-    };
-  }
-
-  const hasPermission = await requestDeviceCalendarPermissions();
-  if (!hasPermission) {
-    return { syncedCount: 0, updatedHabits: habits };
+  if (Platform.OS !== 'web') {
+    const hasPermission = await requestDeviceCalendarPermissions();
+    if (!hasPermission) {
+      return { syncedCount: 0, updatedHabits: habits };
+    }
   }
 
   let count = 0;
