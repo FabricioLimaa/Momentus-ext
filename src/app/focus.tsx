@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { MomentusColors, getContrastTextColor } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import { getAppKv, setAppKv } from '@/database/momentusDb';
@@ -61,6 +60,13 @@ export default function FocusScreen() {
   const [tempLong, setTempLong] = useState(15);
 
   const timerRef = useRef<any>(null);
+  const endTimeRef = useRef<number | null>(null);
+  const onTimerFinishedRef = useRef<() => void>(() => {});
+  const timeLeftRef = useRef(timeLeft);
+
+  useEffect(() => {
+    timeLeftRef.current = timeLeft;
+  }, [timeLeft]);
 
   const getDurationForMode = useCallback(
     (targetMode: FocusMode, f = focusDurationMinutes, s = shortBreakMinutes, l = longBreakMinutes) => {
@@ -78,29 +84,21 @@ export default function FocusScreen() {
 
   const switchMode = useCallback(
     (newMode: FocusMode) => {
-      if (isRunning) {
-        clearInterval(timerRef.current);
-        setIsRunning(false);
-      }
+      if (timerRef.current) clearInterval(timerRef.current);
+      endTimeRef.current = null;
+      setIsRunning(false);
       setMode(newMode);
       const secs = getDurationForMode(newMode);
       setTimeLeft(secs);
       setTotalSeconds(secs);
-      try {
-        Haptics.selectionAsync();
-      } catch {
-        // Haptics fallback
-      }
+      triggerHaptic('impact');
     },
-    [getDurationForMode, isRunning]
+    [getDurationForMode, triggerHaptic]
   );
 
   const onTimerFinished = useCallback(() => {
-    try {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {
-      // Haptics fallback
-    }
+    triggerHaptic('success');
+    soundManager.playAchievementSound();
 
     if (mode === 'FOCUS') {
       const nextSessions = completedSessions + 1;
@@ -134,46 +132,85 @@ export default function FocusScreen() {
     addFocusMinutes,
     switchMode,
     showCelebration,
+    triggerHaptic,
   ]);
 
+  // Mantém a referência do callback sempre fresca sem reiniciar o timer
   useEffect(() => {
-    if (isRunning) {
-      timerRef.current = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
-            clearInterval(timerRef.current);
-            setIsRunning(false);
-            onTimerFinished();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else {
-      if (timerRef.current) clearInterval(timerRef.current);
+    onTimerFinishedRef.current = onTimerFinished;
+  }, [onTimerFinished]);
+
+  // Temporizador preciso baseado em timestamp absoluto (à prova de re-render e segundo plano)
+  useEffect(() => {
+    if (!isRunning) {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      return;
     }
 
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+    if (!endTimeRef.current) {
+      endTimeRef.current = Date.now() + timeLeftRef.current * 1000;
+    }
+
+    const tick = () => {
+      if (!endTimeRef.current) return;
+      const now = Date.now();
+      const remainingMs = endTimeRef.current - now;
+      const remainingSec = Math.max(0, Math.ceil(remainingMs / 1000));
+
+      setTimeLeft(remainingSec);
+
+      if (remainingSec <= 0) {
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+        endTimeRef.current = null;
+        setIsRunning(false);
+        setTimeout(() => {
+          onTimerFinishedRef.current();
+        }, 50);
+      }
     };
-  }, [isRunning, onTimerFinished]);
+
+    tick();
+    timerRef.current = setInterval(tick, 250);
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [isRunning]);
 
   const toggleTimer = () => {
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } catch {}
-    setIsRunning(!isRunning);
+    triggerHaptic('impact');
+    if (!isRunning) {
+      // Inicia a contagem baseada na hora atual + segundos restantes
+      endTimeRef.current = Date.now() + timeLeft * 1000;
+      setIsRunning(true);
+      soundManager.playSuccessSound();
+    } else {
+      // Pausa a contagem preservando o timeLeft atual
+      endTimeRef.current = null;
+      setIsRunning(false);
+    }
   };
 
   const resetTimer = () => {
-    if (timerRef.current) clearInterval(timerRef.current);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    endTimeRef.current = null;
     setIsRunning(false);
     const secs = getDurationForMode(mode);
     setTimeLeft(secs);
     setTotalSeconds(secs);
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch {}
+    triggerHaptic('impact');
   };
 
   const handleSaveSettings = () => {
@@ -185,10 +222,16 @@ export default function FocusScreen() {
     // Persiste no SQLite
     setAppKv('focus_durations', { focus: tempFocus, short: tempShort, long: tempLong }).catch(() => {});
 
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    endTimeRef.current = null;
+    setIsRunning(false);
+
     const secs = getDurationForMode(mode, tempFocus, tempShort, tempLong);
     setTimeLeft(secs);
     setTotalSeconds(secs);
-    setIsRunning(false);
 
     triggerHaptic('success');
     soundManager.playSuccessSound();
