@@ -437,3 +437,75 @@ export async function cancelAllNotifications(): Promise<void> {
     MomentusLog.notif.warn('Erro ao cancelar todas as notificações:', error);
   }
 }
+
+/**
+ * Agenda uma notificação local precisa para quando um ciclo de foco ou pausa terminar.
+ */
+export async function scheduleFocusNotification(
+  seconds: number,
+  mode: 'FOCUS' | 'SHORT_BREAK' | 'LONG_BREAK',
+  habitTitle?: string
+): Promise<string | undefined> {
+  const Notifications = getNotifications();
+  if (!Notifications || seconds <= 0) return undefined;
+
+  try {
+    const targetDate = new Date(Date.now() + seconds * 1000);
+    const isFocus = mode === 'FOCUS';
+    const title = isFocus
+      ? 'Sessão de Foco Concluída! 🎯'
+      : mode === 'SHORT_BREAK'
+      ? 'Pausa Curta Finalizada! ⚡'
+      : 'Pausa Longa Finalizada! 🔋';
+
+    const body = isFocus
+      ? habitTitle
+        ? `Parabéns! Você completou sua sessão no hábito "${habitTitle}". XP computado!`
+        : 'Parabéns! Você completou seu ciclo de foco. Hora de descansar um pouco!'
+      : 'Hora de retomar as atividades com foco total!';
+
+    return await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        sound: 'default',
+        ...(Platform.OS === 'android' ? { channelId: CHANNEL_TERMINO } : {}),
+        data: {
+          type: 'FOCUS_TIMER_FINISHED',
+          mode,
+          habitTitle,
+        },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: targetDate,
+      },
+    });
+  } catch (error) {
+    MomentusLog.notif.warn('Erro ao agendar notificação de foco:', error);
+    return undefined;
+  }
+}
+
+/**
+ * Cancela a notificação de foco agendada (por id ou limpando todas as do tipo).
+ */
+export async function cancelFocusNotification(notificationId?: string | null): Promise<void> {
+  const Notifications = getNotifications();
+  if (!Notifications) return;
+
+  try {
+    if (notificationId) {
+      await Notifications.cancelScheduledNotificationAsync(notificationId);
+      return;
+    }
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    for (const item of scheduled) {
+      if (item.content.data?.type === 'FOCUS_TIMER_FINISHED') {
+        await Notifications.cancelScheduledNotificationAsync(item.identifier);
+      }
+    }
+  } catch (error) {
+    MomentusLog.notif.warn('Erro ao cancelar notificação de foco:', error);
+  }
+}

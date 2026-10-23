@@ -1285,21 +1285,30 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const timeBonus = Math.floor(minutes / 2);
     const totalGained = sessionBonus + timeBonus;
 
+    let updatedPoints = 0;
+    let updatedFocusMinutes = 0;
+
     setUserProfile((prev) => {
-      const updated = {
+      updatedPoints = prev.totalPoints + totalGained;
+      updatedFocusMinutes = prev.focusMinutesToday + minutes;
+      const updated: UserProfile = {
         ...prev,
-        focusMinutesToday: prev.focusMinutesToday + minutes,
-        totalPoints: prev.totalPoints + totalGained,
+        focusMinutesToday: updatedFocusMinutes,
+        totalPoints: updatedPoints,
       };
-      setAppKv('user_profile', updated).catch(() => {});
+      setAppKv('user_profile', updated).catch((err) =>
+        MomentusLog.db.warn('Erro ao salvar user_profile após foco no SQLite:', err)
+      );
       return updated;
     });
 
     const uid = firebaseAuth.currentUser?.uid;
     if (uid) {
       saveUserProfileToFirestore(uid, {
-        totalPoints: userProfile.totalPoints + totalGained,
-      } as any).catch(() => {});
+        totalPoints: updatedPoints || (userProfile.totalPoints + totalGained),
+      }).catch((err) =>
+        MomentusLog.sync.warn('Erro ao salvar pontos de foco no Firestore:', err)
+      );
     }
 
     soundManager.playAchievementSound();

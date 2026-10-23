@@ -109,6 +109,39 @@ class SoundManager {
       // Falha silenciosa
     }
   }
+
+  private webAudioCtx: any = null;
+
+  /**
+   * Toca um tique-taque sintetizado ultra-suave para concentração (sem dependência de arquivos externos).
+   */
+  public playTickSound() {
+    if (!this.enabled) return;
+    try {
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (!AudioCtx) return;
+        if (!this.webAudioCtx) {
+          this.webAudioCtx = new AudioCtx();
+        }
+        if (this.webAudioCtx.state === 'suspended') {
+          this.webAudioCtx.resume().catch(() => {});
+        }
+        const ctx = this.webAudioCtx;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(700, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(220, ctx.currentTime + 0.025);
+        gain.gain.setValueAtTime(0.035, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.025);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.025);
+      }
+    } catch {}
+  }
 }
 
 export const soundManager = new SoundManager();

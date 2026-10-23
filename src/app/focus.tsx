@@ -9,6 +9,8 @@ import {
   Modal,
   Alert,
   ScrollView,
+  AppState,
+  AppStateStatus,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,6 +19,10 @@ import { useMomentus } from '@/context/MomentusContext';
 import { getTodayDateString } from '@/constants/initialData';
 import { getAppKv, setAppKv } from '@/database/momentusDb';
 import { soundManager } from '@/util/soundManager';
+import {
+  scheduleFocusNotification,
+  cancelFocusNotification,
+} from '@/services/notificationService';
 
 type FocusMode = 'FOCUS' | 'SHORT_BREAK' | 'LONG_BREAK';
 type FocusSettingsTab = 'FOCUS' | 'SHORT_BREAK' | 'LONG_BREAK';
@@ -47,11 +53,21 @@ export default function FocusScreen() {
   const [selectedHabitId, setSelectedHabitId] = useState<string | null>(null);
   const [showHabitPickerModal, setShowHabitPickerModal] = useState(false);
 
+  // Som de foco suave / Tique-taque
+  const [tickingEnabled, setTickingEnabled] = useState(false);
+
   // Tempo restante em segundos
   const [timeLeft, setTimeLeft] = useState(25 * 60);
   const [totalSeconds, setTotalSeconds] = useState(25 * 60);
 
-  // Carrega durações salvas do SQLite
+  const timerRef = useRef<any>(null);
+  const endTimeRef = useRef<number | null>(null);
+  const onTimerFinishedRef = useRef<() => void>(() => {});
+  const timeLeftRef = useRef(timeLeft);
+  const notificationIdRef = useRef<string | null>(null);
+  const lastTickSecondRef = useRef<number>(-1);
+
+  // Carrega configurações salvas do SQLite
   useEffect(() => {
     getAppKv<{ focus: number; short: number; long: number }>('focus_durations').then((saved) => {
       if (saved) {
@@ -65,6 +81,36 @@ export default function FocusScreen() {
         setTotalSeconds(f * 60);
       }
     });
+
+    getAppKv<boolean>('focus_ticking_enabled').then((saved) => {
+      if (typeof saved === 'boolean') {
+        setTickingEnabled(saved);
+      }
+    });
+
+    // Restaura sessão de foco ativa caso o usuário tenha trocado de aba ou recarregado
+    getAppKv<{
+      endTime: number;
+      mode: FocusMode;
+      selectedHabitId?: string | null;
+      totalSeconds: number;
+    }>('active_focus_timer').then((active) => {
+      if (active && active.endTime) {
+        const now = Date.now();
+        const remainingMs = active.endTime - now;
+        const remainingSec = Math.ceil(remainingMs / 1000);
+        if (remainingSec > 0) {
+          setMode(active.mode);
+          if (active.selectedHabitId) setSelectedHabitId(active.selectedHabitId);
+          setTotalSeconds(active.totalSeconds);
+          setTimeLeft(remainingSec);
+          endTimeRef.current = active.endTime;
+          setIsRunning(true);
+        } else {
+          setAppKv('active_focus_timer', null).catch(() => {});
+        }
+      }
+    });
   }, []);
 
   // Diálogo de configurações no estilo TimePickerModal
@@ -74,14 +120,19 @@ export default function FocusScreen() {
   const [tempShort, setTempShort] = useState(5);
   const [tempLong, setTempLong] = useState(15);
 
-  const timerRef = useRef<any>(null);
-  const endTimeRef = useRef<number | null>(null);
-  const onTimerFinishedRef = useRef<() => void>(() => {});
-  const timeLeftRef = useRef(timeLeft);
-
   useEffect(() => {
     timeLeftRef.current = timeLeft;
   }, [timeLeft]);
+
+  const toggleTicking = () => {
+    const next = !tickingEnabled;
+    setTickingEnabled(next);
+    setAppKv('focus_ticking_enabled', next).catch(() => {});
+    triggerHaptic('impact');
+    if (next) {
+      soundManager.playTickSound();
+    }
+  };
 
   const getDurationForMode = useCallback(
     (targetMode: FocusMode, f = focusDurationMinutes, s = shortBreakMinutes, l = longBreakMinutes) => {
@@ -118,6 +169,9 @@ export default function FocusScreen() {
       if (timerRef.current) clearInterval(timerRef.current);
       endTimeRef.current = null;
       setIsRunning(false);
+      cancelFocusNotification(notificationIdRef.current);
+      notificationIdRef.current = null;
+      setAppKv('active_focus_timer', null).catch(() => {});
       setMode(newMode);
       const secs = getDurationForMode(newMode);
       setTimeLeft(secs);
@@ -130,6 +184,9 @@ export default function FocusScreen() {
   const onTimerFinished = useCallback(() => {
     triggerHaptic('success');
     soundManager.playAchievementSound();
+    cancelFocusNotification(notificationIdRef.current);
+    notificationIdRef.current = null;
+    setAppKv('active_focus_timer', null).catch(() => {});
 
     if (mode === 'FOCUS') {
       const nextSessions = completedSessions + 1;
@@ -183,6 +240,32 @@ export default function FocusScreen() {
     onTimerFinishedRef.current = onTimerFinished;
   }, [onTimerFinished]);
 
+  // Ouve alterações no ciclo de vida do app (segundo plano / tela desligada)
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active' && isRunning && endTimeRef.current) {
+        const now = Date.now();
+        const remainingMs = endTimeRef.current - now;
+        const remainingSec = Math.max(0, Math.ceil(remainingMs / 1000));
+        setTimeLeft(remainingSec);
+        if (remainingSec <= 0) {
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+          }
+          endTimeRef.current = null;
+          setIsRunning(false);
+          cancelFocusNotification(notificationIdRef.current);
+          notificationIdRef.current = null;
+          setAppKv('active_focus_timer', null).catch(() => {});
+          onTimerFinishedRef.current();
+        }
+      }
+    };
+    const sub = AppState.addEventListener('change', handleAppStateChange);
+    return () => sub.remove();
+  }, [isRunning]);
+
   // Temporizador preciso baseado em timestamp absoluto (à prova de re-render e segundo plano)
   useEffect(() => {
     if (!isRunning) {
@@ -205,6 +288,14 @@ export default function FocusScreen() {
 
       setTimeLeft(remainingSec);
 
+      // Tique-taque sonoro durante o foco se ativado pelo usuário
+      if (tickingEnabled && mode === 'FOCUS' && remainingSec > 0) {
+        if (lastTickSecondRef.current !== remainingSec) {
+          lastTickSecondRef.current = remainingSec;
+          soundManager.playTickSound();
+        }
+      }
+
       if (remainingSec <= 0) {
         if (timerRef.current) {
           clearInterval(timerRef.current);
@@ -212,6 +303,9 @@ export default function FocusScreen() {
         }
         endTimeRef.current = null;
         setIsRunning(false);
+        cancelFocusNotification(notificationIdRef.current);
+        notificationIdRef.current = null;
+        setAppKv('active_focus_timer', null).catch(() => {});
         setTimeout(() => {
           onTimerFinishedRef.current();
         }, 50);
@@ -227,19 +321,37 @@ export default function FocusScreen() {
         timerRef.current = null;
       }
     };
-  }, [isRunning]);
+  }, [isRunning, mode, tickingEnabled]);
 
   const toggleTimer = () => {
     triggerHaptic('impact');
     if (!isRunning) {
       // Inicia a contagem baseada na hora atual + segundos restantes
-      endTimeRef.current = Date.now() + timeLeft * 1000;
+      const targetEndTime = Date.now() + timeLeft * 1000;
+      endTimeRef.current = targetEndTime;
       setIsRunning(true);
       soundManager.playSuccessSound();
+
+      // Agenda notificação local de término no dispositivo
+      const linkedHabit = habits.find((h) => h.id === selectedHabitId);
+      scheduleFocusNotification(timeLeft, mode, linkedHabit?.title).then((id) => {
+        notificationIdRef.current = id || null;
+      });
+
+      // Persiste sessão ativa no SQLite
+      setAppKv('active_focus_timer', {
+        endTime: targetEndTime,
+        mode,
+        selectedHabitId,
+        totalSeconds,
+      }).catch(() => {});
     } else {
       // Pausa a contagem preservando o timeLeft atual
       endTimeRef.current = null;
       setIsRunning(false);
+      cancelFocusNotification(notificationIdRef.current);
+      notificationIdRef.current = null;
+      setAppKv('active_focus_timer', null).catch(() => {});
     }
   };
 
@@ -250,6 +362,9 @@ export default function FocusScreen() {
     }
     endTimeRef.current = null;
     setIsRunning(false);
+    cancelFocusNotification(notificationIdRef.current);
+    notificationIdRef.current = null;
+    setAppKv('active_focus_timer', null).catch(() => {});
     const secs = getDurationForMode(mode);
     setTimeLeft(secs);
     setTotalSeconds(secs);
@@ -343,15 +458,42 @@ export default function FocusScreen() {
               </Text>
             </View>
 
-            <View
-              style={[
-                styles.xpBadge,
-                { backgroundColor: `${MomentusColors.gold}20`, borderColor: `${MomentusColors.gold}50` },
-              ]}>
-              <Ionicons name="flash" size={12} color={MomentusColors.gold} />
-              <Text style={[styles.xpBadgeText, { color: MomentusColors.gold }]}>
-                +{estimatedXp} XP
-              </Text>
+            <View style={styles.cycleHeaderRight}>
+              <TouchableOpacity
+                style={[
+                  styles.tickingToggleBtn,
+                  {
+                    backgroundColor: tickingEnabled ? `${activeColor}20` : `${theme.textSecondary}15`,
+                    borderColor: tickingEnabled ? activeColor : theme.outline,
+                  },
+                ]}
+                onPress={toggleTicking}
+                activeOpacity={0.7}
+                accessibilityLabel="Alternar som de tique-taque">
+                <Ionicons
+                  name={tickingEnabled ? 'volume-high' : 'volume-mute'}
+                  size={12}
+                  color={tickingEnabled ? activeColor : theme.textSecondary}
+                />
+                <Text
+                  style={[
+                    styles.tickingToggleText,
+                    { color: tickingEnabled ? activeColor : theme.textSecondary },
+                  ]}>
+                  {tickingEnabled ? 'Tique-taque' : 'Mudo'}
+                </Text>
+              </TouchableOpacity>
+
+              <View
+                style={[
+                  styles.xpBadge,
+                  { backgroundColor: `${MomentusColors.gold}20`, borderColor: `${MomentusColors.gold}50` },
+                ]}>
+                <Ionicons name="flash" size={12} color={MomentusColors.gold} />
+                <Text style={[styles.xpBadgeText, { color: MomentusColors.gold }]}>
+                  +{estimatedXp} XP
+                </Text>
+              </View>
             </View>
           </View>
 
@@ -1309,6 +1451,24 @@ const styles = StyleSheet.create({
   xpBadgeText: {
     fontSize: 11,
     fontWeight: '800',
+  },
+  cycleHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  tickingToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  tickingToggleText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   cycleRulerRow: {
     flexDirection: 'row',
