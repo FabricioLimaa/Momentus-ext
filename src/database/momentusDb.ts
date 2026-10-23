@@ -109,7 +109,8 @@ async function initDatabaseSchema(db: SQLite.SQLiteDatabase): Promise<void> {
       date TEXT NOT NULL,
       streak INTEGER NOT NULL DEFAULT 0,
       googleCalendarEventId TEXT,
-      saveToGoogle INTEGER NOT NULL DEFAULT 0
+      saveToGoogle INTEGER NOT NULL DEFAULT 0,
+      templateSourceId TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_habits_date ON habits(date);
@@ -153,6 +154,13 @@ async function initDatabaseSchema(db: SQLite.SQLiteDatabase): Promise<void> {
       value TEXT NOT NULL
     );
   `);
+
+  // Migração segura para colunas adicionadas em novas versões
+  try {
+    await db.execAsync(`ALTER TABLE habits ADD COLUMN templateSourceId TEXT;`);
+  } catch {
+    // Coluna já existente
+  }
 }
 
 // ==========================================
@@ -297,6 +305,7 @@ export async function getAllHabits(): Promise<HabitItem[]> {
       streak: number;
       googleCalendarEventId: string | null;
       saveToGoogle: number;
+      templateSourceId: string | null;
     }>('SELECT * FROM habits ORDER BY date DESC, timeStart ASC');
 
     return rows.map((r) => ({
@@ -311,6 +320,7 @@ export async function getAllHabits(): Promise<HabitItem[]> {
       streak: r.streak,
       googleCalendarEventId: r.googleCalendarEventId,
       saveToGoogle: r.saveToGoogle === 1,
+      templateSourceId: r.templateSourceId ?? null,
     }));
   }, []);
 }
@@ -332,8 +342,8 @@ export async function upsertHabitDb(habit: HabitItem): Promise<void> {
   return enqueueDbOperation(async (db) => {
     await db.runAsync(
       `INSERT OR REPLACE INTO habits 
-       (id, title, description, timeStart, timeEnd, categoryId, completed, date, streak, googleCalendarEventId, saveToGoogle)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, title, description, timeStart, timeEnd, categoryId, completed, date, streak, googleCalendarEventId, saveToGoogle, templateSourceId)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         habit.id,
         habit.title,
@@ -346,6 +356,7 @@ export async function upsertHabitDb(habit: HabitItem): Promise<void> {
         habit.streak,
         habit.googleCalendarEventId ?? null,
         habit.saveToGoogle ? 1 : 0,
+        habit.templateSourceId ?? null,
       ]
     );
   }, undefined);
@@ -408,8 +419,8 @@ export async function setAllHabitsDb(habits: HabitItem[]): Promise<void> {
       for (const habit of habits) {
         await db.runAsync(
           `INSERT INTO habits 
-           (id, title, description, timeStart, timeEnd, categoryId, completed, date, streak, googleCalendarEventId, saveToGoogle)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           (id, title, description, timeStart, timeEnd, categoryId, completed, date, streak, googleCalendarEventId, saveToGoogle, templateSourceId)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             habit.id,
             habit.title,
@@ -422,6 +433,7 @@ export async function setAllHabitsDb(habits: HabitItem[]): Promise<void> {
             habit.streak,
             habit.googleCalendarEventId ?? null,
             habit.saveToGoogle ? 1 : 0,
+            habit.templateSourceId ?? null,
           ]
         );
       }

@@ -140,7 +140,12 @@ interface MomentusContextData {
   updateHabit: (habit: HabitItem) => void;
   // Templates Actions
   applyTemplateToToday: (templateId: string) => void;
-  applyTemplateToDates: (templateId: string, dates: string[], saveToGoogle?: boolean) => void;
+  applyTemplateToDates: (
+    templateId: string,
+    dates: string[],
+    saveToGoogle?: boolean,
+    mode?: 'merge' | 'incremental'
+  ) => void;
   addTemplate: (template: Omit<RoutineTemplate, 'id'>) => void;
   updateTemplate: (template: RoutineTemplate) => void;
   deleteTemplate: (id: string) => void;
@@ -1025,7 +1030,12 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     applyTemplateToDates(templateId, [getTodayDateString()]);
   };
 
-  const applyTemplateToDates = (templateId: string, dates: string[], saveToGoogle?: boolean) => {
+  const applyTemplateToDates = (
+    templateId: string,
+    dates: string[],
+    saveToGoogle?: boolean,
+    mode: 'merge' | 'incremental' = 'merge'
+  ) => {
     const template = templates.find((t) => t.id === templateId);
     if (!template || dates.length === 0) return;
 
@@ -1038,9 +1048,16 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         idx === self.findIndex((t) => `${t.title}-${t.timeStart}-${t.categoryId}` === `${item.title}-${item.timeStart}-${item.categoryId}`)
     );
 
-    dates.forEach((targetDate) => {
-      uniqueTemplateItems.forEach((item) => {
-        const deterministicId = `applied_${item.id}_${targetDate}`;
+    const nowTimestamp = Date.now();
+
+    dates.forEach((targetDate, dateIdx) => {
+      uniqueTemplateItems.forEach((item, itemIdx) => {
+        const itemIdStr = item.id || `item_${itemIdx}`;
+        const deterministicId =
+          mode === 'incremental'
+            ? `applied_${itemIdStr}_${targetDate}_${nowTimestamp}_${dateIdx}_${itemIdx}`
+            : `applied_${itemIdStr}_${targetDate}`;
+
         // Remove do cache de IDs deletados para permitir re-aplicar o template no mesmo dia
         deletedHabitIdsRef.current.delete(deterministicId);
         newHabits.push({
@@ -1054,19 +1071,39 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           date: targetDate,
           streak: 0,
           saveToGoogle: willSaveToCalendar,
+          templateSourceId: template.id,
         });
       });
     });
 
     setHabits((prev) => {
+      if (mode === 'incremental') {
+        // No modo incremental, simplesmente anexa sem sobrescrever nenhum hábito existente
+        return [...newHabits, ...prev];
+      }
+
       const prevMap = new Map(prev.map((p) => [p.id, p]));
       // Preserva o status de conclusão se o hábito já tinha sido concluído anteriormente
       const adjustedNewHabits = newHabits.map((nh) => {
-        const existing = prevMap.get(nh.id);
+        // 1. Procura por ID exato
+        let existing = prevMap.get(nh.id);
+
+        // 2. Se não encontrou por ID exato, procura por correspondência na mesma data por templateSourceId ou mesmo título
+        if (!existing) {
+          existing = prev.find(
+            (p) =>
+              p.date === nh.date &&
+              (p.templateSourceId === template.id || p.id.startsWith('applied_')) &&
+              p.title.trim().toLowerCase() === nh.title.trim().toLowerCase()
+          );
+        }
+
         if (existing && existing.completed) {
           return {
             ...nh,
             completed: true,
+            streak: existing.streak ?? 0,
+            googleCalendarEventId: existing.googleCalendarEventId || nh.googleCalendarEventId,
           };
         }
         return nh;

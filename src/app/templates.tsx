@@ -337,17 +337,26 @@ export default function TemplatesScreen() {
     }
   };
 
-  const handleApplyConfirm = (dates: string[], saveToGoogle: boolean) => {
+  const handleApplyConfirm = (
+    dates: string[],
+    saveToGoogle: boolean,
+    mode: 'merge' | 'incremental' = 'merge'
+  ) => {
     if (!selectedTemplateForApply) return;
 
-    applyTemplateToDates(selectedTemplateForApply.id, dates, saveToGoogle);
+    applyTemplateToDates(selectedTemplateForApply.id, dates, saveToGoogle, mode);
 
     const templateName = selectedTemplateForApply.title;
     setSelectedTemplateForApply(null);
 
+    const modeText =
+      mode === 'incremental'
+        ? `adicionada como novas tarefas em ${dates.length} dia${dates.length === 1 ? '' : 's'}`
+        : `atualizada e agendada em ${dates.length} dia${dates.length === 1 ? '' : 's'}`;
+
     Alert.alert(
-      'Template Aplicado! 📋',
-      `"${templateName}" foi agendado em ${dates.length} dia${dates.length === 1 ? '' : 's'} com sucesso!`
+      'Rotina Aplicada! 📋',
+      `"${templateName}" foi ${modeText} com sucesso!`
     );
   };
 
@@ -810,6 +819,7 @@ export default function TemplatesScreen() {
       {selectedTemplateForApply && (
         <ApplyTemplateDialog
           visible={true}
+          templateId={selectedTemplateForApply.id}
           templateTitle={selectedTemplateForApply.title}
           onDismiss={() => setSelectedTemplateForApply(null)}
           onConfirm={handleApplyConfirm}

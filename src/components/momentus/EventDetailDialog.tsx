@@ -24,11 +24,18 @@ export const EventDetailDialog: React.FC<EventDetailDialogProps> = ({
   onEditClick,
   onDeleteClick,
 }) => {
-  const { theme } = useMomentus();
+  const { theme, templates } = useMomentus();
   if (!event) return null;
 
   const categoryColor = category?.color || MomentusColors.emeraldNeon;
   const stickerIcon = getIconForMarketItem(category?.stickerId);
+
+  const sourceTemplate = templates.find(
+    (t) =>
+      t.id === event.templateSourceId ||
+      event.id.startsWith(`applied_${t.id}_`)
+  );
+  const isFromTemplate = Boolean(event.templateSourceId || sourceTemplate || event.id.startsWith('applied_'));
 
   const displayEndTime = event.timeEnd || (() => {
     try {
@@ -63,7 +70,7 @@ export const EventDetailDialog: React.FC<EventDetailDialogProps> = ({
             {/* 2. Título da Tarefa */}
             <Text style={[styles.eventTitle, { color: theme.textPrimary }]}>{event.title}</Text>
 
-            {/* 3. Categoria em Chip */}
+            {/* 3. Categoria em Chip e Origem */}
             <View style={styles.categoryBadgeRow}>
               <View style={[styles.categoryChip, { backgroundColor: `${categoryColor}15` }]}>
                 <View style={[styles.categoryDot, { backgroundColor: categoryColor }]} />
@@ -71,6 +78,22 @@ export const EventDetailDialog: React.FC<EventDetailDialogProps> = ({
                   {category?.name || 'Geral'}
                 </Text>
               </View>
+
+              {isFromTemplate && (
+                <View
+                  style={[
+                    styles.templateOriginChip,
+                    {
+                      backgroundColor: `${theme.primary}15`,
+                      borderColor: `${theme.primary}40`,
+                    },
+                  ]}>
+                  <Ionicons name="copy-outline" size={12} color={theme.primary} />
+                  <Text style={[styles.templateOriginChipText, { color: theme.primary }]}>
+                    {sourceTemplate ? sourceTemplate.title : 'De Template'}
+                  </Text>
+                </View>
+              )}
             </View>
 
             {/* 4. Data e Horário */}
@@ -207,6 +230,20 @@ const styles = StyleSheet.create({
   },
   categoryChipText: {
     fontSize: 12,
+    fontWeight: '700',
+  },
+  templateOriginChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginLeft: 8,
+  },
+  templateOriginChipText: {
+    fontSize: 11,
     fontWeight: '700',
   },
   timeRow: {

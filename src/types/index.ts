@@ -20,6 +20,7 @@ export interface HabitItem {
   googleCalendarEventId?: string | null;
   saveToGoogle?: boolean;
   isFromGoogleCalendar?: boolean;
+  templateSourceId?: string | null;
 }
 
 export interface TemplateItem {

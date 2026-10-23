@@ -443,7 +443,8 @@ export async function syncWithFirestore(
         horarioTerminoString: formatTimeToIsoLocal(habit.timeEnd || habit.timeStart),
         ordem: 0,
         categoryId: habit.categoryId,
-        templateId: null,
+        templateId: habit.templateSourceId || null,
+        templateSourceId: habit.templateSourceId || null,
         googleCalendarEventId: habit.googleCalendarEventId || null,
         isDeleted: false,
         lastUpdated: new Date(),
@@ -513,6 +514,10 @@ export async function syncWithFirestore(
         streak: 0,
         googleCalendarEventId: cloudItem.googleCalendarEventId || null,
         saveToGoogle: false,
+        templateSourceId:
+          cloudItem.templateSourceId ||
+          cloudItem.templateId ||
+          (id.startsWith('applied_') ? id.split('_')[1] : null),
       });
       result.downloadedEvents++;
     }
@@ -1140,7 +1145,8 @@ export async function saveHabitToFirestore(
         horarioTerminoString: formatTimeToIsoLocal(habit.timeEnd || habit.timeStart),
         ordem: 0,
         categoryId: habit.categoryId,
-        templateId: null,
+        templateId: habit.templateSourceId || null,
+        templateSourceId: habit.templateSourceId || null,
         googleCalendarEventId: habit.googleCalendarEventId || null,
         isDeleted: false,
         lastUpdated: new Date(),
