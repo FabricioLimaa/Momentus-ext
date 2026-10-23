@@ -1,4 +1,5 @@
 import { firestore, auth } from "@/config/firebase";
+import { MomentusLog } from "@/util/logger";
 import { getTodayDateString } from "@/constants/initialData";
 import {
   Achievement,
@@ -392,7 +393,7 @@ export async function syncWithFirestore(
       await completedBatch.commit();
     }
   } catch (err) {
-    console.warn("Aviso ao sincronizar completed_habits no Firestore:", err);
+    MomentusLog.sync.warn("Aviso ao sincronizar completed_habits no Firestore:", err);
   }
 
   // ========================================================
@@ -604,7 +605,7 @@ export async function syncWithFirestore(
       await templateItemsBatch.commit();
     }
   } catch (err) {
-    console.warn("Aviso ao sincronizar templates no Firestore:", err);
+    MomentusLog.sync.warn("Aviso ao sincronizar templates no Firestore:", err);
   }
 
   // ========================================================
@@ -646,7 +647,7 @@ export async function syncWithFirestore(
       return ach;
     });
   } catch (err) {
-    console.warn("Aviso ao sincronizar conquistas no Firestore:", err);
+    MomentusLog.sync.warn("Aviso ao sincronizar conquistas no Firestore:", err);
   }
 
   // ========================================================
@@ -679,7 +680,7 @@ export async function syncWithFirestore(
       isOwned: item.isOwned || cloudInventorySet.has(item.id),
     }));
   } catch (err) {
-    console.warn("Aviso ao sincronizar inventário no Firestore:", err);
+    MomentusLog.sync.warn("Aviso ao sincronizar inventário no Firestore:", err);
   }
 
   // ========================================================
@@ -796,7 +797,7 @@ export async function syncWithFirestore(
       await setDoc(userDocRef, userProfilePayload, { merge: true });
     }
   } catch (err) {
-    console.warn("Aviso ao sincronizar perfil do usuário no Firestore:", err);
+    MomentusLog.sync.warn("Aviso ao sincronizar perfil do usuário no Firestore:", err);
   }
 
   return {
@@ -853,7 +854,7 @@ export async function hasAcceptedTermsCloud(
       };
     }
   } catch (err) {
-    console.warn("Erro ao consultar termos no Firestore:", err);
+    MomentusLog.sync.warn("Erro ao consultar termos no Firestore:", err);
   }
   return { accepted: false, version: 0 };
 }
@@ -958,7 +959,7 @@ export function listenToFirestoreSync(
       onRemoteChange();
     },
     (err) => {
-      console.warn("Erro no SnapshotListener de events do Firestore:", err);
+      MomentusLog.sync.warn("Erro no SnapshotListener de events do Firestore:", err);
     },
   );
 
@@ -968,7 +969,7 @@ export function listenToFirestoreSync(
       onRemoteChange();
     },
     (err) => {
-      console.warn("Erro no SnapshotListener de completed_habits do Firestore:", err);
+      MomentusLog.sync.warn("Erro no SnapshotListener de completed_habits do Firestore:", err);
     },
   );
 
@@ -1013,7 +1014,7 @@ export async function saveCategoryToFirestore(
       } catch {}
     }
   } catch (err) {
-    console.warn("Erro ao salvar categoria no Firestore:", err);
+    MomentusLog.sync.warn("Erro ao salvar categoria no Firestore:", err);
   }
 }
 
@@ -1033,7 +1034,7 @@ export async function deleteCategoryFromFirestore(
       await deleteDoc(metaDocRef);
     } catch {}
   } catch (err) {
-    console.warn("Erro ao excluir categoria do Firestore:", err);
+    MomentusLog.sync.warn("Erro ao excluir categoria do Firestore:", err);
   }
 }
 
@@ -1081,7 +1082,7 @@ export async function saveTemplateToFirestore(
 
     await batch.commit();
   } catch (error) {
-    console.warn("Erro ao salvar template no Firestore:", error);
+    MomentusLog.sync.warn("Erro ao salvar template no Firestore:", error);
   }
 }
 
@@ -1110,7 +1111,7 @@ export async function deleteTemplateFromFirestore(
 
     await batch.commit();
   } catch (error) {
-    console.warn("Erro ao deletar template do Firestore:", error);
+    MomentusLog.sync.warn("Erro ao deletar template do Firestore:", error);
   }
 }
 
@@ -1147,7 +1148,7 @@ export async function saveHabitToFirestore(
       { merge: true },
     );
   } catch (err) {
-    console.warn("Erro ao salvar hábito no Firestore:", err);
+    MomentusLog.sync.warn("Erro ao salvar hábito no Firestore:", err);
   }
 }
 
@@ -1171,7 +1172,7 @@ export async function deleteHabitFromFirestore(
     batch.delete(compDocRef);
     await batch.commit();
   } catch (err) {
-    console.warn("Erro ao excluir hábito do Firestore:", err);
+    MomentusLog.sync.warn("Erro ao excluir hábito do Firestore:", err);
   }
 }
 
@@ -1195,7 +1196,7 @@ export async function deleteMultipleHabitsFromFirestore(
     });
     await batch.commit();
   } catch (err) {
-    console.warn("Erro ao excluir múltiplos hábitos no Firestore:", err);
+    MomentusLog.sync.warn("Erro ao excluir múltiplos hábitos no Firestore:", err);
   }
 }
 
@@ -1225,7 +1226,7 @@ export async function purchaseMarketItemInFirestore(
     });
     await batch.commit();
   } catch (err) {
-    console.warn("Erro ao registrar compra no Firestore:", err);
+    MomentusLog.sync.warn("Erro ao registrar compra no Firestore:", err);
   }
 }
 
@@ -1261,7 +1262,7 @@ export async function saveHabitCompletionToFirestore(
     const legacyDocRef = doc(collection(userDocRef, COMPLETED_HABITS_COLLECTION), `${habitId}_${completedDate}`);
     await deleteDoc(legacyDocRef).catch(() => {});
   } catch (err) {
-    console.warn("Erro ao atualizar conclusão no Firestore:", err);
+    MomentusLog.sync.warn("Erro ao atualizar conclusão no Firestore:", err);
   }
 }
 
@@ -1285,7 +1286,7 @@ export async function saveUserProfileToFirestore(
       await setDoc(userDocRef, payload, { merge: true });
     }
   } catch (err) {
-    console.warn("Erro ao salvar perfil no Firestore:", err);
+    MomentusLog.sync.warn("Erro ao salvar perfil no Firestore:", err);
   }
 }
 
@@ -1323,7 +1324,7 @@ export async function saveAchievementUnlockedToFirestore(
       );
     }
   } catch (err) {
-    console.warn("Erro ao salvar conquista desbloqueada no Firestore:", err);
+    MomentusLog.sync.warn("Erro ao salvar conquista desbloqueada no Firestore:", err);
   }
 }
 

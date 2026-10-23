@@ -14,6 +14,7 @@ import type { GoogleSignin as GoogleSigninType } from '@react-native-google-sign
 import { Platform, TurboModuleRegistry } from 'react-native';
 import { auth } from '@/config/firebase';
 import { getAppKv, setAppKv } from '@/database/momentusDb';
+import { MomentusLog } from '@/util/logger';
 
 // Web Client ID configurado no google-services.json do Momentus
 const WEB_CLIENT_ID =
@@ -107,23 +108,23 @@ function createLocalFallbackUser(email: string, displayName?: string): MomentusA
  * Realiza login com E-mail e Senha no Firebase Auth.
  */
 export async function loginWithEmail(email: string, pass: string): Promise<MomentusAuthUser> {
-  console.log('[AUTH] Autenticando com e-mail:', email.trim());
+  MomentusLog.auth.info('Autenticando com e-mail:', email.trim());
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email.trim(), pass);
-    console.log('[AUTH] Login com e-mail bem-sucedido:', userCredential.user.uid);
+    MomentusLog.auth.info('Login com e-mail bem-sucedido:', userCredential.user.uid);
     return userCredential.user;
   } catch (err) {
-    console.error('[AUTH ERROR] Falha no login com e-mail:', err);
+    MomentusLog.auth.error('Falha no login com e-mail:', err);
     if (isAppCheckBlockedError(err)) {
-      console.warn(
-        '[AUTH WARN] Firebase App Check bloqueou autenticação (auth/firebase-app-check-token-is-invalid). Liberando sessão local de desenvolvimento para:',
+      MomentusLog.auth.warn(
+        'Firebase App Check bloqueou autenticação (auth/firebase-app-check-token-is-invalid). Liberando sessão local de desenvolvimento para:',
         email
       );
       return createLocalFallbackUser(email);
     }
     if (isAndroidKeyBlockedError(err)) {
-      console.warn(
-        '[AUTH WARN] API Key do Firebase restrita a Android nativo. Autenticando em sessão local para:',
+      MomentusLog.auth.warn(
+        'API Key do Firebase restrita a Android nativo. Autenticando em sessão local para:',
         email
       );
       return createLocalFallbackUser(email);
@@ -147,26 +148,26 @@ export async function registerWithEmail(
   pass: string,
   displayName?: string
 ): Promise<MomentusAuthUser> {
-  console.log('[AUTH] Criando nova conta para:', email.trim());
+  MomentusLog.auth.info('Criando nova conta para:', email.trim());
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), pass);
     if (displayName && userCredential.user) {
       await updateProfile(userCredential.user, { displayName });
     }
-    console.log('[AUTH] Conta criada com sucesso:', userCredential.user.uid);
+    MomentusLog.auth.info('Conta criada com sucesso:', userCredential.user.uid);
     return userCredential.user;
   } catch (err) {
-    console.error('[AUTH ERROR] Falha ao criar conta:', err);
+    MomentusLog.auth.error('Falha ao criar conta:', err);
     if (isAppCheckBlockedError(err)) {
-      console.warn(
-        '[AUTH WARN] Firebase App Check bloqueou criação de conta (auth/firebase-app-check-token-is-invalid). Liberando sessão local de desenvolvimento para:',
+      MomentusLog.auth.warn(
+        'Firebase App Check bloqueou criação de conta (auth/firebase-app-check-token-is-invalid). Liberando sessão local de desenvolvimento para:',
         email
       );
       return createLocalFallbackUser(email, displayName);
     }
     if (isAndroidKeyBlockedError(err)) {
-      console.warn(
-        '[AUTH WARN] API Key do Firebase restrita a Android nativo. Criando conta em sessão local para:',
+      MomentusLog.auth.warn(
+        'API Key do Firebase restrita a Android nativo. Criando conta em sessão local para:',
         email
       );
       return createLocalFallbackUser(email, displayName);
@@ -206,7 +207,7 @@ export async function requestGoogleCalendarAccessToken(): Promise<string | null>
     }
     return token;
   } catch (err) {
-    console.warn('Erro ao solicitar token do Google Calendar:', err);
+    MomentusLog.auth.warn('Erro ao solicitar token do Google Calendar:', err);
     return null;
   }
 }
@@ -217,7 +218,7 @@ export async function requestGoogleCalendarAccessToken(): Promise<string | null>
 export async function loginWithGoogle(): Promise<MomentusAuthUser> {
   if (Platform.OS === 'web') {
     try {
-      console.log('[AUTH] Iniciando login com Google na Web...');
+      MomentusLog.auth.info('Iniciando login com Google na Web...');
       const provider = new GoogleAuthProvider();
       provider.addScope('profile');
       provider.addScope('email');
@@ -228,10 +229,10 @@ export async function loginWithGoogle(): Promise<MomentusAuthUser> {
       if (credential?.accessToken) {
         await setAppKv('google_access_token', credential.accessToken).catch(() => {});
       }
-      console.log('[AUTH] Login com Google concluído com sucesso:', userCredential.user.email);
+      MomentusLog.auth.info('Login com Google concluído com sucesso:', userCredential.user.email);
       return userCredential.user;
     } catch (err: any) {
-      console.error('[AUTH ERROR] Falha no login Google Web:', {
+      MomentusLog.auth.error('Falha no login Google Web:', {
         code: err?.code,
         message: err?.message,
         customData: err?.customData,

@@ -25,6 +25,7 @@ import {
 } from '@/constants/initialData';
 import { calculateUserLevel, UserLevelInfo } from '@/domain/userLevel';
 import { soundManager } from '@/util/soundManager';
+import { MomentusLog } from '@/util/logger';
 import { MomentusColors } from '@/constants/theme';
 import { CelebrationModal } from '@/components/momentus/CelebrationModal';
 import { ReminderModal } from '@/components/momentus/ReminderModal';
@@ -433,7 +434,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             : (legacyParsed?.marketItems || INITIAL_MARKET_ITEMS);
         setMarketItems(cleanMarketItems);
       } catch (e) {
-        console.warn('Erro ao carregar dados do banco:', e);
+        MomentusLog.db.warn('Erro ao carregar dados do banco:', e);
       } finally {
         setIsLoaded(true);
       }
@@ -492,7 +493,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         // Sincroniza dados da nuvem (Firestore) do usuário recém-autenticado
         await syncCloudActionRef.current(user.uid);
       } catch (syncErr) {
-        console.warn('[AUTH] Aviso ao sincronizar nuvem no onAuthStateChanged:', syncErr);
+        MomentusLog.auth.warn('Aviso ao sincronizar nuvem no onAuthStateChanged:', syncErr);
       }
 
       // Registra listener em tempo real para sincronizar mudanças feitas no nativo (eventos e conclusões)
@@ -501,7 +502,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           syncCloudActionRef.current(user.uid).catch(() => {});
         });
       } catch (err) {
-        console.warn('[FIRESTORE_LISTENER] Falha ao registrar listener em tempo real:', err);
+        MomentusLog.sync.warn('Falha ao registrar listener em tempo real:', err);
       }
     });
 
@@ -548,7 +549,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         };
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       } catch (e) {
-        console.warn('Erro ao persistir dados do Momentus:', e);
+        MomentusLog.db.warn('Erro ao persistir dados do Momentus:', e);
       }
     }
     saveState();
@@ -792,7 +793,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         targetDate || getTodayDateString(),
         nextCompleted
       ).catch((err) =>
-        console.warn('Erro ao salvar conclusão no Firestore:', err)
+        MomentusLog.sync.warn('Erro ao salvar conclusão no Firestore:', err)
       );
       const currentHabit = habits.find((h) => h.id === id);
       if (currentHabit) {
@@ -801,7 +802,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           completed: nextCompleted,
           streak: nextCompleted ? 1 : 0,
         }).catch((err) =>
-          console.warn('Erro ao salvar hábito alterado no Firestore:', err)
+          MomentusLog.sync.warn('Erro ao salvar hábito alterado no Firestore:', err)
         );
       }
     }
@@ -822,7 +823,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const currentUserId = firebaseAuth.currentUser?.uid;
     if (currentUserId) {
       saveHabitToFirestore(currentUserId, newHabit).catch((err) =>
-        console.warn('Erro ao salvar hábito criado no Firestore:', err)
+        MomentusLog.sync.warn('Erro ao salvar hábito criado no Firestore:', err)
       );
     }
 
@@ -886,7 +887,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const currentUserId = firebaseAuth.currentUser?.uid;
     if (currentUserId) {
       deleteHabitFromFirestore(currentUserId, id).catch((err) =>
-        console.warn('Erro ao excluir hábito no Firestore:', err)
+        MomentusLog.sync.warn('Erro ao excluir hábito no Firestore:', err)
       );
     }
   };
@@ -933,7 +934,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const currentUserId = firebaseAuth.currentUser?.uid;
     if (currentUserId) {
       deleteMultipleHabitsFromFirestore(currentUserId, ids).catch((err) =>
-        console.warn('Erro ao excluir múltiplos hábitos no Firestore:', err)
+        MomentusLog.sync.warn('Erro ao excluir múltiplos hábitos no Firestore:', err)
       );
     }
   };
@@ -945,7 +946,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const currentUserId = firebaseAuth.currentUser?.uid;
     if (currentUserId) {
       saveHabitToFirestore(currentUserId, updated).catch((err) =>
-        console.warn('Erro ao atualizar hábito no Firestore:', err)
+        MomentusLog.sync.warn('Erro ao atualizar hábito no Firestore:', err)
       );
     }
 
@@ -1036,7 +1037,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const currentUserId = firebaseAuth.currentUser?.uid;
     if (currentUserId && newHabits.length > 0) {
       Promise.all(newHabits.map((h) => saveHabitToFirestore(currentUserId, h))).catch((err) =>
-        console.warn('Erro ao salvar hábitos do template no Firestore:', err)
+        MomentusLog.sync.warn('Erro ao salvar hábitos do template no Firestore:', err)
       );
     }
 
@@ -1072,7 +1073,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const currentUserId = firebaseAuth.currentUser?.uid;
     if (currentUserId) {
       saveTemplateToFirestore(currentUserId, newTemplate).catch((err) =>
-        console.warn('Erro ao salvar template criado no Firestore:', err)
+        MomentusLog.sync.warn('Erro ao salvar template criado no Firestore:', err)
       );
     }
   };
@@ -1088,7 +1089,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const currentUserId = firebaseAuth.currentUser?.uid;
     if (currentUserId) {
       saveTemplateToFirestore(currentUserId, enriched).catch((err) =>
-        console.warn('Erro ao atualizar template no Firestore:', err)
+        MomentusLog.sync.warn('Erro ao atualizar template no Firestore:', err)
       );
     }
   };
@@ -1101,7 +1102,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const currentUserId = firebaseAuth.currentUser?.uid;
     if (currentUserId) {
       deleteTemplateFromFirestore(currentUserId, id).catch((err) =>
-        console.warn('Erro ao excluir template do Firestore:', err)
+        MomentusLog.sync.warn('Erro ao excluir template do Firestore:', err)
       );
     }
   };
@@ -1185,7 +1186,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const currentUid = firebaseAuth.currentUser?.uid;
     if (currentUid) {
       purchaseMarketItemInFirestore(currentUid, itemId, newPoints).catch((err) =>
-        console.warn('Erro ao salvar compra de item no Firestore:', err)
+        MomentusLog.sync.warn('Erro ao salvar compra de item no Firestore:', err)
       );
     }
 
@@ -1404,7 +1405,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       try {
         await saveTermsAcceptance(currentUid, CURRENT_TERMS_VERSION);
       } catch (err) {
-        console.warn('Erro ao salvar aceite de termos no Firestore:', err);
+        MomentusLog.sync.warn('Erro ao salvar aceite de termos no Firestore:', err);
       }
     }
 

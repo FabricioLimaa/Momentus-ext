@@ -1,6 +1,7 @@
 import type * as SQLite from 'expo-sqlite';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MomentusLog } from '@/util/logger';
 import {
   Category,
   HabitItem,
@@ -33,7 +34,7 @@ function enqueueDbOperation<T>(
     try {
       return await task(db);
     } catch (err) {
-      console.warn('Erro em operação SQLite:', err);
+      MomentusLog.db.warn('Erro em operação SQLite:', err);
       return fallbackValue;
     }
   });
@@ -70,7 +71,7 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase | null> {
       dbInstance = db;
       return db;
     } catch (err) {
-      console.warn('Falha ao inicializar SQLite nativo, usando fallback em memória/AsyncStorage:', err);
+      MomentusLog.db.warn('Falha ao inicializar SQLite nativo, usando fallback em memória/AsyncStorage:', err);
       dbInitPromise = null;
       return null;
     }
@@ -198,7 +199,7 @@ export async function upsertCategoryDb(category: Category): Promise<void> {
       else cats.push(category);
       await AsyncStorage.setItem('@momentus_categories', JSON.stringify(cats));
     } catch (e) {
-      console.warn('Erro ao salvar categoria no web:', e);
+      MomentusLog.db.warn('Erro ao salvar categoria no web:', e);
     }
     return;
   }
@@ -228,7 +229,7 @@ export async function deleteCategoryDb(id: string): Promise<void> {
         JSON.stringify(cats.filter((c) => c.id !== id))
       );
     } catch (e) {
-      console.warn('Erro ao deletar categoria no web:', e);
+      MomentusLog.db.warn('Erro ao deletar categoria no web:', e);
     }
     return;
   }
@@ -243,7 +244,7 @@ export async function setAllCategoriesDb(categories: Category[]): Promise<void> 
     try {
       await AsyncStorage.setItem('@momentus_categories', JSON.stringify(categories));
     } catch (e) {
-      console.warn('Erro ao salvar todas categorias no web:', e);
+      MomentusLog.db.warn('Erro ao salvar todas categorias no web:', e);
     }
     return;
   }
@@ -323,7 +324,7 @@ export async function upsertHabitDb(habit: HabitItem): Promise<void> {
       else habits.unshift(habit);
       await AsyncStorage.setItem('@momentus_habits', JSON.stringify(habits));
     } catch (e) {
-      console.warn('Erro ao salvar hábito no web:', e);
+      MomentusLog.db.warn('Erro ao salvar hábito no web:', e);
     }
     return;
   }
@@ -359,7 +360,7 @@ export async function deleteHabitDb(id: string): Promise<void> {
         JSON.stringify(habits.filter((h) => h.id !== id))
       );
     } catch (e) {
-      console.warn('Erro ao deletar hábito no web:', e);
+      MomentusLog.db.warn('Erro ao deletar hábito no web:', e);
     }
     return;
   }
@@ -380,7 +381,7 @@ export async function deleteMultipleHabitsDb(ids: string[]): Promise<void> {
         JSON.stringify(habits.filter((h) => !idSet.has(h.id)))
       );
     } catch (e) {
-      console.warn('Erro ao deletar múltiplos hábitos no web:', e);
+      MomentusLog.db.warn('Erro ao deletar múltiplos hábitos no web:', e);
     }
     return;
   }
@@ -396,7 +397,7 @@ export async function setAllHabitsDb(habits: HabitItem[]): Promise<void> {
     try {
       await AsyncStorage.setItem('@momentus_habits', JSON.stringify(habits));
     } catch (e) {
-      console.warn('Erro ao salvar todos os hábitos no web:', e);
+      MomentusLog.db.warn('Erro ao salvar todos os hábitos no web:', e);
     }
     return;
   }
@@ -478,7 +479,7 @@ export async function upsertTemplateDb(template: RoutineTemplate): Promise<void>
       else templates.push(template);
       await AsyncStorage.setItem('@momentus_templates', JSON.stringify(templates));
     } catch (e) {
-      console.warn('Erro ao salvar template no web:', e);
+      MomentusLog.db.warn('Erro ao salvar template no web:', e);
     }
     return;
   }
@@ -508,7 +509,7 @@ export async function deleteTemplateDb(id: string): Promise<void> {
         JSON.stringify(templates.filter((t) => t.id !== id))
       );
     } catch (e) {
-      console.warn('Erro ao deletar template no web:', e);
+      MomentusLog.db.warn('Erro ao deletar template no web:', e);
     }
     return;
   }
@@ -523,7 +524,7 @@ export async function setAllTemplatesDb(templates: RoutineTemplate[]): Promise<v
     try {
       await AsyncStorage.setItem('@momentus_templates', JSON.stringify(templates));
     } catch (e) {
-      console.warn('Erro ao salvar todos os templates no web:', e);
+      MomentusLog.db.warn('Erro ao salvar todos os templates no web:', e);
     }
     return;
   }
@@ -595,7 +596,7 @@ export async function setAllAchievementsDb(achievements: Achievement[]): Promise
     try {
       await AsyncStorage.setItem('@momentus_achievements', JSON.stringify(achievements));
     } catch (e) {
-      console.warn('Erro ao salvar conquistas no web:', e);
+      MomentusLog.db.warn('Erro ao salvar conquistas no web:', e);
     }
     return;
   }
@@ -666,7 +667,7 @@ export async function setAllMarketItemsDb(items: MarketItem[]): Promise<void> {
     try {
       await AsyncStorage.setItem('@momentus_market_items', JSON.stringify(items));
     } catch (e) {
-      console.warn('Erro ao salvar loja no web:', e);
+      MomentusLog.db.warn('Erro ao salvar loja no web:', e);
     }
     return;
   }
@@ -728,7 +729,7 @@ export async function setAppKv<T>(key: string, value: T): Promise<void> {
     try {
       await AsyncStorage.setItem(`@momentus_kv_${key}`, JSON.stringify(value));
     } catch (e) {
-      console.warn('Erro ao salvar key-value no web:', e);
+      MomentusLog.db.warn('Erro ao salvar key-value no web:', e);
     }
     return;
   }
@@ -758,7 +759,7 @@ export async function clearEntireDatabase(): Promise<void> {
         '@momentus_kv_app_settings',
       ]);
     } catch (e) {
-      console.warn('Erro ao limpar banco no web:', e);
+      MomentusLog.db.warn('Erro ao limpar banco no web:', e);
     }
     return;
   }

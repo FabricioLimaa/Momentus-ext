@@ -2,6 +2,7 @@ import type * as LegacyCalendarTypes from 'expo-calendar/legacy';
 import { Platform } from 'react-native';
 import { HabitItem, Category } from '@/types';
 import { getGoogleCalendarAccessToken } from '@/services/authService';
+import { MomentusLog } from '@/util/logger';
 
 export const MOMENTUS_CALENDAR_TITLE = 'Momentus - Rotinas';
 
@@ -83,7 +84,7 @@ function getCalendarModule(): LegacyCalendarModule | null {
     cachedCalendarModule = require('expo-calendar/legacy') as LegacyCalendarModule;
     return cachedCalendarModule;
   } catch (err) {
-    console.warn('Módulo nativo expo-calendar indisponível neste ambiente:', err);
+    MomentusLog.calendar.warn('Módulo nativo expo-calendar indisponível neste ambiente:', err);
     cachedCalendarModule = null;
     return null;
   }
@@ -99,7 +100,7 @@ export async function requestDeviceCalendarPermissions(): Promise<boolean> {
     const res = await Calendar.requestCalendarPermissionsAsync();
     return res.granted;
   } catch (error) {
-    console.warn('Erro ao solicitar permissões de calendário:', error);
+    MomentusLog.calendar.warn('Erro ao solicitar permissões de calendário:', error);
     return false;
   }
 }
@@ -165,7 +166,7 @@ export async function getOrCreateMomentusCalendarId(): Promise<string | null> {
     const anyWritable = calendars.find((c) => c.allowsModifications);
     return anyWritable?.id || calendars[0]?.id || null;
   } catch (error) {
-    console.warn('Erro ao obter calendário:', error);
+    MomentusLog.calendar.warn('Erro ao obter calendário:', error);
     return null;
   }
 }
@@ -267,7 +268,7 @@ export async function syncHabitToDeviceCalendar(
       const resData = await response.json();
       return resData.id || null;
     } catch (err) {
-      console.warn('Erro ao salvar evento no Google Agenda (Web):', err);
+      MomentusLog.calendar.warn('Erro ao salvar evento no Google Agenda (Web):', err);
       return null;
     }
   }
@@ -313,7 +314,7 @@ export async function syncHabitToDeviceCalendar(
 
     return newEventId;
   } catch (error) {
-    console.warn(`Erro ao sincronizar hábito "${habit.title}" com o calendário nativo:`, error);
+    MomentusLog.calendar.warn(`Erro ao sincronizar hábito "${habit.title}" com o calendário nativo:`, error);
     return null;
   }
 }

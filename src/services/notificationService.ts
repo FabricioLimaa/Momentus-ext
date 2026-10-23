@@ -1,6 +1,7 @@
 import type * as NotificationsTypes from 'expo-notifications';
 import { Platform } from 'react-native';
 import { HabitItem } from '@/types';
+import { MomentusLog } from '@/util/logger';
 
 export const CHANNEL_INICIO = 'CHANNEL_INICIO';
 export const CHANNEL_TERMINO = 'CHANNEL_TERMINO';
@@ -107,7 +108,7 @@ function getNotifications(): LocalNotificationsApi | null {
 
     return cachedNotifications;
   } catch (err) {
-    console.warn('Módulo nativo de notificações indisponível neste ambiente:', err);
+    MomentusLog.notif.warn('Módulo nativo de notificações indisponível neste ambiente:', err);
     cachedNotifications = null;
     return null;
   }
@@ -197,7 +198,7 @@ export async function setupNotificationChannels(): Promise<void> {
       },
     ]);
   } catch (err) {
-    console.warn('Erro ao configurar categorias interativas de notificação:', err);
+    MomentusLog.notif.warn('Erro ao configurar categorias interativas de notificação:', err);
   }
 
   if (Platform.OS !== 'android') return;
@@ -225,7 +226,7 @@ export async function setupNotificationChannels(): Promise<void> {
       enableVibrate: true,
     });
   } catch (error) {
-    console.warn('Erro ao configurar canais de notificação:', error);
+    MomentusLog.notif.warn('Erro ao configurar canais de notificação:', error);
   }
 }
 
@@ -263,7 +264,7 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 
     return granted;
   } catch (error) {
-    console.warn('Erro ao solicitar permissões de notificação:', error);
+    MomentusLog.notif.warn('Erro ao solicitar permissões de notificação:', error);
     return false;
   }
 }
@@ -328,7 +329,7 @@ export async function scheduleHabitNotifications(
           },
         });
       } catch (err) {
-        console.warn(`Erro ao agendar notificação de início para "${habit.title}":`, err);
+        MomentusLog.notif.warn(`Erro ao agendar notificação de início para "${habit.title}":`, err);
       }
     }
   }
@@ -358,7 +359,7 @@ export async function scheduleHabitNotifications(
           },
         });
       } catch (err) {
-        console.warn(`Erro ao agendar notificação de término para "${habit.title}":`, err);
+        MomentusLog.notif.warn(`Erro ao agendar notificação de término para "${habit.title}":`, err);
       }
     }
   }
@@ -399,7 +400,7 @@ export async function snoozeHabitNotification(
       },
     });
   } catch (error) {
-    console.warn(`Erro ao adiar notificação do hábito ${habitId}:`, error);
+    MomentusLog.notif.warn(`Erro ao adiar notificação do hábito ${habitId}:`, error);
     return undefined;
   }
 }
@@ -419,7 +420,7 @@ export async function cancelHabitNotifications(habitId: string): Promise<void> {
       }
     }
   } catch (error) {
-    console.warn(`Erro ao cancelar notificações para o hábito ${habitId}:`, error);
+    MomentusLog.notif.warn(`Erro ao cancelar notificações para o hábito ${habitId}:`, error);
   }
 }
 
@@ -433,6 +434,6 @@ export async function cancelAllNotifications(): Promise<void> {
   try {
     await Notifications.cancelAllScheduledNotificationsAsync();
   } catch (error) {
-    console.warn('Erro ao cancelar todas as notificações:', error);
+    MomentusLog.notif.warn('Erro ao cancelar todas as notificações:', error);
   }
 }
