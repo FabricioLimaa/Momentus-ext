@@ -16,7 +16,7 @@ import { useMomentus } from '@/context/MomentusContext';
 type StatsFilter = 'WEEK' | 'MONTH' | 'YEAR';
 
 export default function StatsScreen() {
-  const { habits, categories, theme } = useMomentus();
+  const { habits, categories, theme, userProfile } = useMomentus();
   const [filter, setFilter] = useState<StatsFilter>('WEEK');
 
   const filterDays = useMemo(() => {
@@ -48,11 +48,13 @@ export default function StatsScreen() {
       return new Date(y, m - 1, d);
     };
 
-    const currentCompleted = habits.filter((h) => {
-      if (!h.completed) return false;
+    // Hábitos estritamente pertencentes ao período selecionado
+    const currentPeriodHabits = habits.filter((h) => {
       const d = parseHabitDate(h.date);
       return d >= sinceDate && d <= now;
     });
+
+    const currentCompleted = currentPeriodHabits.filter((h) => h.completed);
 
     const previousCompleted = habits.filter((h) => {
       if (!h.completed) return false;
@@ -93,6 +95,20 @@ export default function StatsScreen() {
     const activeDaysSet = new Set(currentCompleted.map((h) => h.date));
     const activeDays = Math.max(1, activeDaysSet.size);
     const dailyAverage = (currentCount / activeDays).toFixed(1);
+
+    // Dias Perfeitos (dias em que 100% dos hábitos foram completados)
+    const habitsByDay: Record<string, typeof habits> = {};
+    currentPeriodHabits.forEach((h) => {
+      if (!habitsByDay[h.date]) habitsByDay[h.date] = [];
+      habitsByDay[h.date].push(h);
+    });
+    const totalDaysWithHabits = Object.keys(habitsByDay).length;
+    let perfectDaysCount = 0;
+    Object.values(habitsByDay).forEach((dayHabits) => {
+      if (dayHabits.length > 0 && dayHabits.every((h) => h.completed)) {
+        perfectDaysCount++;
+      }
+    });
 
     // Categoria destaque
     const categoryCompletedCount: Record<string, number> = {};
@@ -138,32 +154,45 @@ export default function StatsScreen() {
 
     const maxBarCount = Math.max(1, ...chartBars.map((b) => b.count));
 
-    // Taxa de conclusão por categoria
-    const categoryRates = categories.map((cat) => {
-      const totalInCat = habits.filter((h) => h.categoryId === cat.id).length;
-      const completedInCat = habits.filter((h) => h.categoryId === cat.id && h.completed).length;
-      const rate = totalInCat > 0 ? Math.round((completedInCat / totalInCat) * 100) : 0;
-      return {
-        id: cat.id,
-        name: cat.name,
-        color: cat.color,
-        completed: completedInCat,
-        total: totalInCat,
-        rate,
-      };
-    });
+    // Taxa de conclusão por categoria considerando estritamente o período atual
+    const categoryRates = categories
+      .map((cat) => {
+        const totalInCat = currentPeriodHabits.filter((h) => h.categoryId === cat.id).length;
+        const completedInCat = currentPeriodHabits.filter((h) => h.categoryId === cat.id && h.completed).length;
+        const rate = totalInCat > 0 ? Math.round((completedInCat / totalInCat) * 100) : 0;
+        return {
+          id: cat.id,
+          name: cat.name,
+          color: cat.color,
+          completed: completedInCat,
+          total: totalInCat,
+          rate,
+        };
+      })
+      .sort((a, b) => b.total - a.total);
+
+    // Formatação amigável do tempo de foco acumulado
+    const focusMinutes = userProfile?.focusMinutesToday || 0;
+    const focusFormatted =
+      focusMinutes >= 60
+        ? `${Math.floor(focusMinutes / 60)}h ${focusMinutes % 60 > 0 ? `${focusMinutes % 60}m` : ''}`.trim()
+        : `${focusMinutes} min`;
 
     return {
       currentCount,
       improvement,
-      bestHour: bestHour !== null ? `${bestHour}h` : '08h',
+      bestHour: currentCount > 0 && bestHour !== null ? `${bestHour}h` : '--',
       dailyAverage,
-      bestCategory: bestCategoryObj?.name || 'Geral',
+      bestCategory: currentCount > 0 ? (bestCategoryObj?.name || 'Geral') : '--',
       chartBars,
       maxBarCount,
       categoryRates,
+      perfectDaysCount,
+      totalDaysWithHabits,
+      focusFormatted,
+      focusMinutes,
     };
-  }, [habits, categories, filter, filterDays]);
+  }, [habits, categories, filter, filterDays, userProfile?.focusMinutesToday]);
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
@@ -292,82 +321,159 @@ export default function StatsScreen() {
             </View>
           </View>
 
+          <View style={styles.insightsRow}>
+            {/* Card 5: Dias Perfeitos (100% de Conclusão) */}
+            <View
+              style={[
+                styles.insightCard,
+                { backgroundColor: theme.surface, borderColor: theme.outline },
+              ]}>
+              <View style={styles.insightHeader}>
+                <Ionicons name="trophy" size={20} color={MomentusColors.gold} />
+                <Text style={[styles.insightLabel, { color: theme.textSecondary }]}>Dias Perfeitos</Text>
+              </View>
+              <Text style={[styles.insightValue, { color: theme.textPrimary }]}>
+                {stats.perfectDaysCount}
+                <Text style={{ fontSize: 15, fontWeight: '700', color: theme.textSecondary }}>
+                  {' '}/ {stats.totalDaysWithHabits}
+                </Text>
+              </Text>
+              <Text style={[styles.insightSub, { color: theme.textSecondary }]}>100% de hábitos feitos</Text>
+            </View>
+
+            {/* Card 6: Tempo Total Focado */}
+            <View
+              style={[
+                styles.insightCard,
+                { backgroundColor: theme.surface, borderColor: theme.outline },
+              ]}>
+              <View style={styles.insightHeader}>
+                <Ionicons name="timer-outline" size={20} color={MomentusColors.cyan} />
+                <Text style={[styles.insightLabel, { color: theme.textSecondary }]}>Tempo Focado</Text>
+              </View>
+              <Text numberOfLines={1} style={[styles.insightValue, { color: theme.textPrimary }]}>
+                {stats.focusFormatted}
+              </Text>
+              <Text style={[styles.insightSub, { color: theme.textSecondary }]}>Foco de hoje</Text>
+            </View>
+          </View>
+
           {/* Gráfico de Barras */}
           <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Conclusões por Período</Text>
           <View style={[styles.chartCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
             <View style={styles.chartHeader}>
               <Text style={[styles.chartTitle, { color: theme.textPrimary }]}>Hábitos Finalizados</Text>
-              <Text style={[styles.chartAverage, { color: theme.primary }]}>Média: {stats.dailyAverage} / dia</Text>
+              <Text style={[styles.chartAverage, { color: theme.primary }]}>
+                {stats.currentCount > 0 ? `Média: ${stats.dailyAverage} / dia` : 'Sem registros'}
+              </Text>
             </View>
 
-            <View style={styles.barsContainer}>
-              {stats.chartBars.map((item, index) => {
-                const heightPercent = Math.max(8, Math.round((item.count / stats.maxBarCount) * 100));
-                const isPeak = item.count === stats.maxBarCount && item.count > 0;
-                // Quando exibe categorias (item.color existe), preserva a cor da categoria mesmo em caso de empate
-                const barColor = item.color
-                  ? item.color
-                  : isPeak
-                  ? theme.primary
-                  : theme.outline;
+            {stats.currentCount === 0 ? (
+              <View style={[styles.emptyChartNotice, { backgroundColor: theme.surfaceElevated }]}>
+                <Ionicons name="bar-chart-outline" size={32} color={theme.textSecondary} />
+                <Text style={[styles.emptyChartNoticeTitle, { color: theme.textPrimary }]}>
+                  Nenhum hábito concluído neste período
+                </Text>
+                <Text style={[styles.emptyChartNoticeSub, { color: theme.textSecondary }]}>
+                  Complete suas rotinas do dia para desbloquear seus gráficos de performance!
+                </Text>
+              </View>
+            ) : (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={[
+                  styles.barsContainerScroll,
+                  {
+                    minWidth: '100%',
+                    justifyContent: stats.chartBars.length > 7 ? 'flex-start' : 'space-around',
+                  },
+                ]}>
+                {stats.chartBars.map((item, index) => {
+                  const heightPercent = Math.max(8, Math.round((item.count / stats.maxBarCount) * 100));
+                  const isPeak = item.count === stats.maxBarCount && item.count > 0;
+                  // Quando exibe categorias (item.color existe), preserva a cor da categoria mesmo em caso de empate
+                  const barColor = item.color
+                    ? item.color
+                    : isPeak
+                    ? theme.primary
+                    : theme.outline;
 
-                return (
-                  <View key={index} style={styles.barCol}>
-                    <Text style={[styles.barCountLabel, { color: theme.textSecondary }]}>
-                      {item.count > 0 ? item.count : ''}
-                    </Text>
-                    <View style={[styles.barTrack, { backgroundColor: theme.surfaceElevated }]}>
-                      <View
-                        style={[
-                          styles.barFill,
-                          {
-                            height: `${heightPercent}%`,
-                            backgroundColor: barColor,
-                            borderWidth: isPeak && item.color ? 1.5 : 0,
-                            borderColor: theme.surface,
-                          },
-                        ]}
-                      />
-                    </View>
-                    <Text
+                  return (
+                    <View
+                      key={index}
                       style={[
-                        styles.barDayText,
-                        isPeak && !item.color && { color: theme.primary, fontWeight: '800' },
-                        item.color && { color: theme.textSecondary, fontWeight: isPeak ? '800' : '600' },
+                        styles.barCol,
+                        stats.chartBars.length > 7 && { width: 52, flex: undefined },
                       ]}>
-                      {item.label}
-                    </Text>
-                  </View>
-                );
-              })}
-            </View>
+                      <Text style={[styles.barCountLabel, { color: theme.textSecondary }]}>
+                        {item.count > 0 ? item.count : ''}
+                      </Text>
+                      <View style={[styles.barTrack, { backgroundColor: theme.surfaceElevated }]}>
+                        <View
+                          style={[
+                            styles.barFill,
+                            {
+                              height: `${heightPercent}%`,
+                              backgroundColor: barColor,
+                              borderWidth: isPeak && item.color ? 1.5 : 0,
+                              borderColor: theme.surface,
+                            },
+                          ]}
+                        />
+                      </View>
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.barDayText,
+                          isPeak && !item.color && { color: theme.primary, fontWeight: '800' },
+                          item.color && { color: theme.textSecondary, fontWeight: isPeak ? '800' : '600' },
+                        ]}>
+                        {item.label}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            )}
           </View>
 
           {/* Taxas por Categoria */}
           <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Metas por Categoria</Text>
           <View style={[styles.categoriesProgressCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
-            {stats.categoryRates.map((cat) => (
-              <View key={cat.id} style={styles.catProgressItem}>
-                <View style={styles.catProgressHeader}>
-                  <View style={styles.catNameWithDot}>
-                    <View style={[styles.catSmallDot, { backgroundColor: cat.color }]} />
-                    <Text style={[styles.catProgressTitle, { color: theme.textPrimary }]}>{cat.name}</Text>
-                  </View>
-                  <Text style={[styles.catProgressPercent, { color: cat.color }]}>
-                    {cat.rate}% ({cat.completed}/{cat.total})
-                  </Text>
-                </View>
-
-                <View style={[styles.catProgressBarTrack, { backgroundColor: theme.surfaceElevated }]}>
-                  <View
-                    style={[
-                      styles.catProgressBarFill,
-                      { width: `${cat.rate}%`, backgroundColor: cat.color },
-                    ]}
-                  />
-                </View>
+            {stats.categoryRates.filter((cat) => cat.total > 0).length === 0 ? (
+              <View style={styles.emptyCatContainer}>
+                <Ionicons name="folder-open-outline" size={28} color={theme.textSecondary} />
+                <Text style={[styles.emptyCatText, { color: theme.textSecondary }]}>
+                  Nenhuma categoria com hábitos agendados neste período.
+                </Text>
               </View>
-            ))}
+            ) : (
+              stats.categoryRates
+                .filter((cat) => cat.total > 0)
+                .map((cat) => (
+                  <View key={cat.id} style={styles.catProgressItem}>
+                    <View style={styles.catProgressHeader}>
+                      <View style={styles.catNameWithDot}>
+                        <View style={[styles.catSmallDot, { backgroundColor: cat.color }]} />
+                        <Text style={[styles.catProgressTitle, { color: theme.textPrimary }]}>{cat.name}</Text>
+                      </View>
+                      <Text style={[styles.catProgressPercent, { color: cat.color }]}>
+                        {cat.rate}% ({cat.completed}/{cat.total})
+                      </Text>
+                    </View>
+
+                    <View style={[styles.catProgressBarTrack, { backgroundColor: theme.surfaceElevated }]}>
+                      <View
+                        style={[
+                          styles.catProgressBarFill,
+                          { width: `${cat.rate}%`, backgroundColor: cat.color },
+                        ]}
+                      />
+                    </View>
+                  </View>
+                ))
+            )}
           </View>
 
           <View style={{ height: 40 }} />
@@ -380,12 +486,10 @@ export default function StatsScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: MomentusColors.navyBackground,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   container: {
     flex: 1,
-    backgroundColor: MomentusColors.navyBackground,
   },
   header: {
     paddingHorizontal: 20,
@@ -497,6 +601,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
+  barsContainerScroll: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    height: 140,
+    paddingTop: 10,
+    paddingHorizontal: 4,
+  },
   barsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -532,11 +643,40 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
   },
+  emptyChartNotice: {
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginVertical: 12,
+  },
+  emptyChartNoticeTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  emptyChartNoticeSub: {
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: 12,
+  },
   categoriesProgressCard: {
     borderRadius: 22,
     borderWidth: 1,
     padding: 18,
     gap: 16,
+  },
+  emptyCatContainer: {
+    paddingVertical: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  emptyCatText: {
+    fontSize: 13,
+    textAlign: 'center',
   },
   catProgressItem: {
     gap: 6,
