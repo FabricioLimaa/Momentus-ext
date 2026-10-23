@@ -26,6 +26,12 @@ import {
 import { calculateUserLevel, UserLevelInfo } from '@/domain/userLevel';
 import { soundManager } from '@/util/soundManager';
 import { MomentusLog } from '@/util/logger';
+import {
+  getSecureSession,
+  saveSecureSession,
+  clearSecureSession,
+  setupSilentTokenRefresh,
+} from '@/services/sessionService';
 import { MomentusColors } from '@/constants/theme';
 import { CelebrationModal } from '@/components/momentus/CelebrationModal';
 import { ReminderModal } from '@/components/momentus/ReminderModal';
@@ -269,6 +275,20 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   useEffect(() => {
     async function loadState() {
       try {
+        // 0. Hidratação Instantânea de Perfil (Zero-flicker no F5 / Reabertura via SecureStore / localStorage)
+        const cachedSession = await getSecureSession();
+        if (cachedSession) {
+          lastLoadedUid.current = cachedSession.uid;
+          setUserProfile((prev) => ({
+            ...prev,
+            email: cachedSession.email || prev.email,
+            name: cachedSession.name || prev.name,
+            photoUrl: cachedSession.photoUrl ?? prev.photoUrl,
+            isLoggedIn: true,
+          }));
+          MomentusLog.auth.info('Perfil hidratado instantaneamente da sessão segura:', cachedSession.email || cachedSession.uid);
+        }
+
         // 1. Aguarda a restauração completa da sessão de autenticação do Firebase (evita deslogar ao recarregar F5)
         if (typeof (firebaseAuth as any).authStateReady === 'function') {
           await (firebaseAuth as any).authStateReady().catch(() => {});
@@ -305,6 +325,13 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 name: currentAuth.displayName || effectiveProfile.name,
                 email: currentAuth.email || effectiveProfile.email,
                 photoUrl: currentAuth.photoURL ?? effectiveProfile.photoUrl,
+                isLoggedIn: true,
+              }
+            : cachedSession
+            ? {
+                name: cachedSession.name || effectiveProfile.name,
+                email: cachedSession.email || effectiveProfile.email,
+                photoUrl: cachedSession.photoUrl ?? effectiveProfile.photoUrl,
                 isLoggedIn: true,
               }
             : effectiveProfile.isLoggedIn
@@ -452,10 +479,15 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
 
       if (!user) {
-        setUserProfile((prev) => ({
-          ...prev,
-          isLoggedIn: false,
-        }));
+        const secureSession = await getSecureSession();
+        if (!secureSession) {
+          setUserProfile((prev) => ({
+            ...prev,
+            isLoggedIn: false,
+          }));
+        } else {
+          MomentusLog.auth.debug('Firebase Auth reportou user nulo provisório, preservando sessão local.');
+        }
         return;
       }
 
@@ -476,6 +508,17 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         (user.email ? user.email.split('@')[0] : 'Usuário');
       const activeEmail = user.email || '';
       const activePhoto = user.photoURL || null;
+
+      // Persiste na sessão segura (SecureStore no mobile / localStorage no web) com token JWT
+      const token = await user.getIdToken().catch(() => null);
+      saveSecureSession({
+        uid: user.uid,
+        email: activeEmail,
+        name: activeName,
+        photoUrl: activePhoto,
+        token,
+        lastActive: Date.now(),
+      }).catch(() => {});
 
       setUserProfile((prev) => {
         const nextProfile: UserProfile = {
@@ -514,12 +557,16 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
     }, 60000);
 
+    // Renovação periódica silenciosa do token JWT a cada 45 minutos
+    const cleanupSilentRefresh = setupSilentTokenRefresh();
+
     return () => {
       unsubAuth();
       if (unsubFirestore) {
         unsubFirestore();
       }
       clearInterval(periodicSyncTimer);
+      cleanupSilentRefresh();
     };
   }, []);
 
@@ -1360,11 +1407,23 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const login = (email: string, name?: string, photoUrl?: string | null) => {
+    const activeName = name || email.split('@')[0];
+    const activePhoto = photoUrl !== undefined ? photoUrl : null;
+    const activeUid = firebaseAuth.currentUser?.uid || `local-${Date.now()}`;
+
+    saveSecureSession({
+      uid: activeUid,
+      email,
+      name: activeName,
+      photoUrl: activePhoto,
+      lastActive: Date.now(),
+    }).catch(() => {});
+
     setUserProfile((prev) => ({
       ...prev,
       email,
-      name: name || email.split('@')[0],
-      photoUrl: photoUrl !== undefined ? photoUrl : prev.photoUrl,
+      name: activeName,
+      photoUrl: activePhoto,
       isLoggedIn: true,
     }));
     triggerHaptic('success');
@@ -1372,6 +1431,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const logout = () => {
     lastLoadedUid.current = null;
+    clearSecureSession().catch(() => {});
     logoutUser().catch(() => {});
     clearEntireDatabase().catch(() => {});
     AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
