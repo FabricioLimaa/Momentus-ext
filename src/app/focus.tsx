@@ -11,8 +11,10 @@ import {
   ScrollView,
   AppState,
   AppStateStatus,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Circle, G } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { MomentusColors, getContrastTextColor } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
@@ -66,6 +68,43 @@ export default function FocusScreen() {
   const timeLeftRef = useRef(timeLeft);
   const notificationIdRef = useRef<string | null>(null);
   const lastTickSecondRef = useRef<number>(-1);
+
+  // Animações: Breathing Pulse e Modo Zen (foco sem distrações)
+  const [breathingAnim] = useState(() => new Animated.Value(1));
+  const [zenAnim] = useState(() => new Animated.Value(1));
+
+  // Animação de respiração suave (ciclo rítmico de 5s)
+  useEffect(() => {
+    if (isRunning) {
+      const pulse = Animated.loop(
+        Animated.sequence([
+          Animated.timing(breathingAnim, {
+            toValue: 1.05,
+            duration: 2500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(breathingAnim, {
+            toValue: 1.0,
+            duration: 2500,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      pulse.start();
+      return () => pulse.stop();
+    } else {
+      breathingAnim.setValue(1);
+    }
+  }, [isRunning, breathingAnim]);
+
+  // Modo Zen: reduz suavemente a opacidade de elementos periféricos durante o foco
+  useEffect(() => {
+    Animated.timing(zenAnim, {
+      toValue: isRunning ? 0.35 : 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
+  }, [isRunning, zenAnim]);
 
   // Carrega configurações salvas do SQLite
   useEffect(() => {
@@ -417,13 +456,21 @@ export default function FocusScreen() {
   const modeLabel = (() => {
     switch (mode) {
       case 'FOCUS':
-        return 'Hora de concentrar';
+        return '🎯 Hora de concentrar';
       case 'SHORT_BREAK':
-        return 'Pausa curta • Respire fundo';
+        return '☕ Pausa curta • Respire fundo';
       case 'LONG_BREAK':
-        return 'Pausa longa • Recarregue';
+        return '🔋 Pausa longa • Recarregue as energias';
     }
   })();
+
+  const RING_SIZE = 270;
+  const STROKE_WIDTH = 10;
+  const RADIUS = (RING_SIZE - STROKE_WIDTH) / 2;
+  const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+  const progressFraction = totalSeconds > 0 ? timeLeft / totalSeconds : 0;
+  const strokeDashoffset = CIRCUMFERENCE * (1 - progressFraction);
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <StatusBar
@@ -434,13 +481,15 @@ export default function FocusScreen() {
         style={{ flex: 1, backgroundColor: theme.background }}
         contentContainerStyle={[styles.scrollContent, { backgroundColor: theme.background }]}
         showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: theme.textPrimary }]}>Modo Foco</Text>
-          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-            Técnica Pomodoro com ganho contínuo de XP
-          </Text>
-        </View>
+        {/* Bloco Superior: Cabeçalho, Régua dos 4 Ciclos e Abas (Modo Zen esmaece suavemente durante o foco) */}
+        <Animated.View style={{ opacity: zenAnim }}>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={[styles.title, { color: theme.textPrimary }]}>Modo Foco</Text>
+            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+              Técnica Pomodoro com ganho contínuo de XP
+            </Text>
+          </View>
 
         {/* --- ÁREA DESTACADA: Régua dos 4 Ciclos Pomodoro + Badge de XP + Seletor de Hábito --- */}
         <View
@@ -685,7 +734,7 @@ export default function FocusScreen() {
                 },
                 mode === 'FOCUS' && { fontWeight: '800' },
               ]}>
-              Foco ({focusDurationMinutes}m)
+              🎯 Foco ({focusDurationMinutes}m)
             </Text>
           </TouchableOpacity>
 
@@ -707,7 +756,7 @@ export default function FocusScreen() {
                 },
                 mode === 'SHORT_BREAK' && { fontWeight: '800' },
               ]}>
-              Curta ({shortBreakMinutes}m)
+              ☕ Curta ({shortBreakMinutes}m)
             </Text>
           </TouchableOpacity>
 
@@ -729,24 +778,64 @@ export default function FocusScreen() {
                 },
                 mode === 'LONG_BREAK' && { fontWeight: '800' },
               ]}>
-              Longa ({longBreakMinutes}m)
+              🔋 Longa ({longBreakMinutes}m)
             </Text>
           </TouchableOpacity>
         </View>
+        </Animated.View>
 
-        {/* Big Circular Timer Display */}
+        {/* Big Circular Timer Display com Anel SVG Dinâmico & Breathing Pulse */}
         <View style={styles.timerCenter}>
+          {/* Halo pulsante de respiração externa */}
+          <Animated.View
+            style={[
+              styles.haloCircle,
+              {
+                borderColor: activeColor,
+                transform: [{ scale: breathingAnim }],
+                opacity: isRunning ? 0.35 : 0.12,
+              },
+            ]}
+          />
+
           <View
             style={[
               styles.outerCircle,
               {
-                borderColor: `${activeColor}55`,
+                borderColor: 'transparent',
                 shadowColor: activeColor,
                 backgroundColor: theme.isDark
-                  ? 'rgba(30, 41, 59, 0.6)'
-                  : 'rgba(241, 245, 249, 0.8)',
+                  ? 'rgba(30, 41, 59, 0.65)'
+                  : 'rgba(241, 245, 249, 0.85)',
               },
             ]}>
+            {/* Anel SVG Contínuo com trilha e arco de contagem precisa */}
+            <Svg width={RING_SIZE} height={RING_SIZE} style={StyleSheet.absoluteFill}>
+              <G transform={`rotate(-90 ${RING_SIZE / 2} ${RING_SIZE / 2})`}>
+                <Circle
+                  cx={RING_SIZE / 2}
+                  cy={RING_SIZE / 2}
+                  r={RADIUS}
+                  stroke={theme.isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)'}
+                  strokeWidth={STROKE_WIDTH}
+                  fill="transparent"
+                />
+                {progressFraction > 0 && (
+                  <Circle
+                    cx={RING_SIZE / 2}
+                    cy={RING_SIZE / 2}
+                    r={RADIUS}
+                    stroke={activeColor}
+                    strokeWidth={STROKE_WIDTH}
+                    strokeDasharray={`${CIRCUMFERENCE} ${CIRCUMFERENCE}`}
+                    strokeDashoffset={strokeDashoffset}
+                    strokeLinecap="round"
+                    fill="transparent"
+                  />
+                )}
+              </G>
+            </Svg>
+
             <View
               style={[
                 styles.innerCircle,
@@ -827,46 +916,48 @@ export default function FocusScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Sessão Stats Card */}
-        <View
-          style={[
-            styles.statsCard,
-            { backgroundColor: theme.surface, borderColor: theme.outline },
-          ]}>
-          <View style={styles.statItem}>
-            <Ionicons name="checkmark-done-circle" size={20} color={activeColor} />
-            <Text style={[styles.statValue, { color: theme.textPrimary }]}>
-              {completedSessions}
-            </Text>
-            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
-              Sessões Concluídas
-            </Text>
+        {/* Sessão Stats Card (Modo Zen esmaece suavemente durante o foco) */}
+        <Animated.View style={{ opacity: zenAnim }}>
+          <View
+            style={[
+              styles.statsCard,
+              { backgroundColor: theme.surface, borderColor: theme.outline },
+            ]}>
+            <View style={styles.statItem}>
+              <Ionicons name="checkmark-done-circle" size={20} color={activeColor} />
+              <Text style={[styles.statValue, { color: theme.textPrimary }]}>
+                {completedSessions}
+              </Text>
+              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
+                Sessões Concluídas
+              </Text>
+            </View>
+
+            <View style={[styles.statDivider, { backgroundColor: theme.outline }]} />
+
+            <View style={styles.statItem}>
+              <Ionicons name="flash" size={20} color={MomentusColors.gold} />
+              <Text style={[styles.statValue, { color: theme.textPrimary }]}>
+                +{xpGained} XP
+              </Text>
+              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
+                XP Ganho na Sessão
+              </Text>
+            </View>
+
+            <View style={[styles.statDivider, { backgroundColor: theme.outline }]} />
+
+            <View style={styles.statItem}>
+              <Ionicons name="time-outline" size={20} color={activeColor} />
+              <Text style={[styles.statValue, { color: theme.textPrimary }]}>
+                {userProfile.focusMinutesToday} min
+              </Text>
+              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
+                Foco Hoje
+              </Text>
+            </View>
           </View>
-
-          <View style={[styles.statDivider, { backgroundColor: theme.outline }]} />
-
-          <View style={styles.statItem}>
-            <Ionicons name="flash" size={20} color={MomentusColors.gold} />
-            <Text style={[styles.statValue, { color: theme.textPrimary }]}>
-              +{xpGained} XP
-            </Text>
-            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
-              XP Ganho na Sessão
-            </Text>
-          </View>
-
-          <View style={[styles.statDivider, { backgroundColor: theme.outline }]} />
-
-          <View style={styles.statItem}>
-            <Ionicons name="time-outline" size={20} color={activeColor} />
-            <Text style={[styles.statValue, { color: theme.textPrimary }]}>
-              {userProfile.focusMinutesToday} min
-            </Text>
-            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
-              Foco Hoje
-            </Text>
-          </View>
-        </View>
+        </Animated.View>
 
         {/* Modal de Seleção de Hábito do Dia */}
         <Modal
@@ -1673,13 +1764,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginVertical: 16,
+    position: 'relative',
+  },
+  haloCircle: {
+    position: 'absolute',
+    width: 298,
+    height: 298,
+    borderRadius: 149,
+    borderWidth: 2,
   },
   outerCircle: {
     width: 270,
     height: 270,
     borderRadius: 135,
     backgroundColor: 'rgba(30, 41, 59, 0.6)',
-    borderWidth: 4,
     alignItems: 'center',
     justifyContent: 'center',
     shadowOffset: { width: 0, height: 8 },
