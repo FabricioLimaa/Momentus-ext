@@ -42,6 +42,7 @@ import {
   deleteHabitFromDeviceCalendar,
   syncAllHabitsToCalendar,
   fetchGoogleCalendarEvents,
+  convertGoogleEventsToHabits,
   GoogleCalendarEventItem,
 } from '@/services/calendarService';
 import {
@@ -156,6 +157,7 @@ interface MomentusContextData {
   clearAllLocalData: () => void;
   clearCloudDataAction: () => Promise<boolean>;
   syncAllHabitsToCalendarAction: () => Promise<number>;
+  syncGoogleCalendarToHabitsAction: (targetDate?: string) => Promise<number>;
   fetchGoogleEventsAction: (targetDate?: string) => Promise<GoogleCalendarEventItem[]>;
   exportBackupAction: () => Promise<boolean>;
   importBackupAction: () => Promise<boolean>;
@@ -1321,6 +1323,37 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return syncedCount;
   };
 
+  const syncGoogleCalendarToHabitsAction = async (targetDate?: string): Promise<number> => {
+    try {
+      const gEvents = await fetchGoogleCalendarEvents(targetDate);
+      if (!gEvents || gEvents.length === 0) return 0;
+
+      const converted = convertGoogleEventsToHabits(gEvents, categories, habits);
+      if (converted.length === 0) return 0;
+
+      const convertedMap = new Map<string, HabitItem>();
+      converted.forEach((h) => {
+        if (h.googleCalendarEventId) convertedMap.set(h.googleCalendarEventId, h);
+        convertedMap.set(h.id, h);
+      });
+
+      setHabits((prev) => {
+        const remaining = prev.filter((p) => {
+          if (p.googleCalendarEventId && convertedMap.has(p.googleCalendarEventId)) return false;
+          if (convertedMap.has(p.id)) return false;
+          return true;
+        });
+        const next = [...converted, ...remaining];
+        setAllHabitsDb(next).catch(() => {});
+        return next;
+      });
+
+      return converted.length;
+    } catch {
+      return 0;
+    }
+  };
+
   const fetchGoogleEventsAction = async (targetDate?: string): Promise<GoogleCalendarEventItem[]> => {
     return await fetchGoogleCalendarEvents(targetDate);
   };
@@ -1565,6 +1598,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         clearAllLocalData,
         clearCloudDataAction,
         syncAllHabitsToCalendarAction,
+        syncGoogleCalendarToHabitsAction,
         fetchGoogleEventsAction,
         exportBackupAction,
         importBackupAction,

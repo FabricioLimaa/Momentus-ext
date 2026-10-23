@@ -170,6 +170,13 @@ export const TimelineEventItem: React.FC<TimelineEventItemProps> = ({
               {category?.name || 'Geral'}
             </Text>
           </View>
+
+          {/* Indicador do Google Agenda */}
+          {(item.isFromGoogleCalendar || item.saveToGoogle || !!item.googleCalendarEventId) && (
+            <View style={styles.googleIconBadge}>
+              <Ionicons name="logo-google" size={11} color="#4285F4" />
+            </View>
+          )}
         </View>
 
         <Text style={[styles.timeRangeText, { color: theme.textSecondary }]}>
@@ -322,6 +329,15 @@ const styles = StyleSheet.create({
   checkboxBoxSelected: {
     backgroundColor: MomentusColors.emeraldNeon,
     borderColor: MomentusColors.emeraldNeon,
+  },
+  googleIconBadge: {
+    marginLeft: 6,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: 'rgba(66, 133, 244, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 

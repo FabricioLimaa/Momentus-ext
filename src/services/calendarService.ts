@@ -12,6 +12,59 @@ export interface GoogleCalendarEventItem {
   endDateTime?: string;
   isAllDay: boolean;
   description?: string;
+  colorId?: string;
+}
+
+/**
+ * Paleta oficial de cores do Google Agenda (Event Colors 1 a 11).
+ * Espelha fielmente a paleta de Color.kt do app nativo Kotlin.
+ */
+interface GoogleColorDef {
+  id: string;
+  r: number;
+  g: number;
+  b: number;
+}
+
+const GOOGLE_COLORS: GoogleColorDef[] = [
+  { id: '1', r: 0x79, g: 0x86, b: 0xcb }, // Lavender
+  { id: '2', r: 0x33, g: 0xb6, b: 0x79 }, // Sage
+  { id: '3', r: 0x8e, g: 0x24, b: 0xaa }, // Grape
+  { id: '4', r: 0xe6, g: 0x7c, b: 0x73 }, // Flamingo
+  { id: '5', r: 0xf6, g: 0xbf, b: 0x26 }, // Banana
+  { id: '6', r: 0xf4, g: 0x51, b: 0x1e }, // Tangerine
+  { id: '7', r: 0x03, g: 0x9b, b: 0xe5 }, // Peacock
+  { id: '8', r: 0x61, g: 0x61, b: 0x61 }, // Graphite
+  { id: '9', r: 0x3f, g: 0x51, b: 0xb5 }, // Blueberry
+  { id: '10', r: 0x0b, g: 0x80, b: 0x43 }, // Basil
+  { id: '11', r: 0xd5, g: 0x00, b: 0x00 }, // Tomato
+];
+
+/**
+ * Mapeia qualquer cor hexadecimal (ex: #10B981) para o colorId mais próximo do Google Calendar.
+ */
+export function getGoogleCalendarColorId(colorHex?: string): string {
+  if (!colorHex) return '2';
+  const clean = colorHex.replace('#', '');
+  const r = parseInt(clean.substring(0, 2), 16) || 0;
+  const g = parseInt(clean.substring(2, 4), 16) || 0;
+  const b = parseInt(clean.substring(4, 6), 16) || 0;
+
+  let bestId = '2';
+  let minDistance = Infinity;
+
+  for (const gc of GOOGLE_COLORS) {
+    const dr = r - gc.r;
+    const dg = g - gc.g;
+    const db = b - gc.b;
+    const dist = dr * dr + dg * dg + db * db;
+    if (dist < minDistance) {
+      minDistance = dist;
+      bestId = gc.id;
+    }
+  }
+
+  return bestId;
 }
 
 type LegacyCalendarModule = typeof LegacyCalendarTypes;
@@ -159,9 +212,11 @@ export async function syncHabitToDeviceCalendar(
     if (!token) return null;
 
     try {
-      const payload = {
+      const googleColorId = getGoogleCalendarColorId(category?.color);
+      const payload: Record<string, any> = {
         summary: habit.title,
         description: notes,
+        colorId: googleColorId,
         start: {
           dateTime: startDate.toISOString(),
           timeZone: systemTimeZone,
@@ -329,6 +384,7 @@ export async function fetchGoogleCalendarEvents(
         endDateTime: ev.end?.dateTime || ev.end?.date,
         isAllDay: !!ev.start?.date,
         description: ev.description,
+        colorId: ev.colorId,
       }));
     } catch {
       return [];
@@ -359,6 +415,79 @@ export async function fetchGoogleCalendarEvents(
   } catch {
     return [];
   }
+}
+
+/**
+ * Converte eventos buscados do Google Agenda em instâncias de HabitItem integradas ao Momentus.
+ * Preserva o status de conclusão e IDs locais caso o hábito já exista.
+ */
+export function convertGoogleEventsToHabits(
+  googleEvents: GoogleCalendarEventItem[],
+  categories: Category[],
+  existingHabits: HabitItem[]
+): HabitItem[] {
+  const existingMap = new Map<string, HabitItem>();
+  existingHabits.forEach((h) => {
+    if (h.googleCalendarEventId) {
+      existingMap.set(h.googleCalendarEventId, h);
+    }
+    existingMap.set(h.id, h);
+  });
+
+  const categoryMapByColor = new Map<string, string>();
+  categories.forEach((c) => {
+    const cid = getGoogleCalendarColorId(c.color);
+    if (!categoryMapByColor.has(cid)) {
+      categoryMapByColor.set(cid, c.id);
+    }
+  });
+
+  const defaultCategoryId = categories[0]?.id || 'cat-outros';
+
+  return googleEvents.map((gEvent) => {
+    const existing = existingMap.get(gEvent.id) || existingMap.get(`google_${gEvent.id}`);
+
+    let dateStr = '';
+    let timeStart = '08:00';
+    let timeEnd = '09:00';
+
+    if (gEvent.isAllDay) {
+      dateStr = (gEvent.startDateTime || '').split('T')[0];
+      timeStart = '08:00';
+      timeEnd = '09:00';
+    } else {
+      const dStart = new Date(gEvent.startDateTime);
+      const dEnd = gEvent.endDateTime ? new Date(gEvent.endDateTime) : new Date(dStart.getTime() + 60 * 60 * 1000);
+
+      const y = dStart.getFullYear();
+      const m = String(dStart.getMonth() + 1).padStart(2, '0');
+      const d = String(dStart.getDate()).padStart(2, '0');
+      dateStr = `${y}-${m}-${d}`;
+
+      timeStart = `${String(dStart.getHours()).padStart(2, '0')}:${String(dStart.getMinutes()).padStart(2, '0')}`;
+      timeEnd = `${String(dEnd.getHours()).padStart(2, '0')}:${String(dEnd.getMinutes()).padStart(2, '0')}`;
+    }
+
+    const matchedCatId =
+      existing?.categoryId ||
+      (gEvent.colorId ? categoryMapByColor.get(gEvent.colorId) : null) ||
+      defaultCategoryId;
+
+    return {
+      id: existing ? existing.id : `google_${gEvent.id}`,
+      title: gEvent.title,
+      description: gEvent.description || undefined,
+      timeStart,
+      timeEnd,
+      categoryId: matchedCatId,
+      completed: existing ? existing.completed : false,
+      date: dateStr,
+      streak: existing ? existing.streak : 0,
+      googleCalendarEventId: gEvent.id,
+      saveToGoogle: true,
+      isFromGoogleCalendar: true,
+    };
+  });
 }
 
 /**

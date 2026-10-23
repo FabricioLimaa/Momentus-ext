@@ -19,6 +19,7 @@ export interface HabitItem {
   streak: number;
   googleCalendarEventId?: string | null;
   saveToGoogle?: boolean;
+  isFromGoogleCalendar?: boolean;
 }
 
 export interface TemplateItem {
