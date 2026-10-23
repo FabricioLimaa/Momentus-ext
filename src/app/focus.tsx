@@ -293,6 +293,9 @@ export default function FocusScreen() {
         if (lastTickSecondRef.current !== remainingSec) {
           lastTickSecondRef.current = remainingSec;
           soundManager.playTickSound();
+          if (Platform.OS !== 'web') {
+            triggerHaptic('selection');
+          }
         }
       }
 
@@ -321,7 +324,7 @@ export default function FocusScreen() {
         timerRef.current = null;
       }
     };
-  }, [isRunning, mode, tickingEnabled]);
+  }, [isRunning, mode, tickingEnabled, triggerHaptic]);
 
   const toggleTimer = () => {
     triggerHaptic('impact');

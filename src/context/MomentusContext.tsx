@@ -163,7 +163,7 @@ interface MomentusContextData {
   // Focus Actions
   addFocusMinutes: (minutes: number) => void;
   // Haptics Action
-  triggerHaptic: (type: 'impact' | 'success') => void;
+  triggerHaptic: (type: 'impact' | 'success' | 'selection') => void;
   // Settings Actions
   updateSettings: (newSettings: Partial<AppSettings>) => void;
   clearAllLocalData: () => void;
@@ -323,8 +323,19 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (currentAuth?.uid) {
           lastLoadedUid.current = currentAuth.uid;
         }
+
+        // Reseta focusMinutesToday se for um novo dia calendário
+        const todayDateStr = getTodayDateString();
+        const lastFocusDate = await getAppKv<string>('last_focus_date');
+        let initialFocusMinutes = effectiveProfile.focusMinutesToday || 0;
+        if (lastFocusDate && lastFocusDate !== todayDateStr) {
+          initialFocusMinutes = 0;
+          await setAppKv('last_focus_date', todayDateStr).catch(() => {});
+        }
+
         const enrichedProfile: UserProfile = {
           ...effectiveProfile,
+          focusMinutesToday: initialFocusMinutes,
           ...(currentAuth
             ? {
                 name: currentAuth.displayName || effectiveProfile.name,
@@ -618,19 +629,21 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, [settings.fontSizeMultiplier]);
 
-  const triggerHaptic = (type: 'impact' | 'success') => {
+  const triggerHaptic = (type: 'impact' | 'success' | 'selection') => {
     if (!settings.hapticsEnabled) return;
     try {
       if (Platform.OS === 'web') {
         if (typeof navigator !== 'undefined' && navigator.vibrate) {
-          navigator.vibrate(type === 'impact' ? 20 : [30, 40, 30]);
+          navigator.vibrate(type === 'selection' ? 8 : type === 'impact' ? 20 : [30, 40, 30]);
         }
         return;
       }
-      if (type === 'impact') {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      if (type === 'selection') {
+        Haptics.selectionAsync().catch(() => {});
+      } else if (type === 'impact') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
       } else {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       }
     } catch {}
   };
@@ -1299,6 +1312,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setAppKv('user_profile', updated).catch((err) =>
         MomentusLog.db.warn('Erro ao salvar user_profile após foco no SQLite:', err)
       );
+      setAppKv('last_focus_date', getTodayDateString()).catch(() => {});
       return updated;
     });
 
