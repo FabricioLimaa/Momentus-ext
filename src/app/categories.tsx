@@ -228,12 +228,16 @@ export default function CategoriesScreen() {
               styles.modalCard,
               { backgroundColor: theme.surface, borderColor: theme.outline },
             ]}>
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.modalScrollContent}>
               <View style={styles.modalHeaderRow}>
                 <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
                   {editingCategory ? 'Editar Categoria' : 'Nova Categoria'}
                 </Text>
-                <TouchableOpacity onPress={() => setIsCreateModalOpen(false)}>
+                <TouchableOpacity
+                  onPress={() => setIsCreateModalOpen(false)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                   <Ionicons name="close" size={24} color={theme.textSecondary} />
                 </TouchableOpacity>
               </View>
@@ -258,31 +262,49 @@ export default function CategoriesScreen() {
                 autoFocus
               />
 
-              {/* Seção de Meta Semanal com Switch (Em desenvolvimento) */}
-              <View style={[styles.metaToggleRow, { borderColor: theme.outline, opacity: 0.9 }]}>
-                <View style={{ flex: 1, paddingRight: 8 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <Text style={[styles.metaToggleTitle, { color: theme.textSecondary }]}>
+              {/* Seção Informativa de Meta Semanal (Bloqueada com Badge "Em breve") */}
+              <View
+                style={[
+                  styles.metaCardContainer,
+                  {
+                    backgroundColor: theme.surfaceElevated,
+                    borderColor: theme.outline,
+                  },
+                ]}>
+                <View style={styles.metaCardHeader}>
+                  <View style={styles.metaCardTitleRow}>
+                    <Ionicons name="time-outline" size={17} color={theme.textSecondary} />
+                    <Text style={[styles.metaToggleTitle, { color: theme.textPrimary }]}>
                       Meta Semanal
                     </Text>
-                    <View style={[styles.devBadge, { backgroundColor: `${theme.primary}20`, borderColor: `${theme.primary}40` }]}>
-                      <Text style={[styles.devBadgeText, { color: theme.primary }]}>Em desenvolvimento</Text>
+                    <View
+                      style={[
+                        styles.devBadge,
+                        {
+                          backgroundColor: `${MomentusColors.gold}20`,
+                          borderColor: `${MomentusColors.gold}50`,
+                        },
+                      ]}>
+                      <Ionicons name="lock-closed" size={10} color={MomentusColors.gold} />
+                      <Text style={[styles.devBadgeText, { color: MomentusColors.gold }]}>
+                        Em breve
+                      </Text>
                     </View>
                   </View>
-                  <Text style={[styles.metaToggleSub, { color: MomentusColors.textMuted }]}>
-                    Definição de metas por tempo em breve
-                  </Text>
+                  <Switch
+                    value={false}
+                    disabled={true}
+                    trackColor={{ false: theme.outline, true: theme.primary }}
+                    thumbColor={theme.isDark ? '#475569' : '#94A3B8'}
+                  />
                 </View>
-                <Switch
-                  value={false}
-                  disabled={true}
-                  trackColor={{ false: theme.outline, true: theme.primary + '60' }}
-                  thumbColor={'#64748B'}
-                />
+                <Text style={[styles.metaToggleSub, { color: theme.textSecondary }]}>
+                  O planejamento de metas semanais e relatórios analíticos por categoria serão disponibilizados em uma próxima atualização.
+                </Text>
               </View>
 
               {/* Seletor de Cores do Google Agenda */}
-              <Text style={[styles.inputLabel, { color: theme.textPrimary, marginTop: 16 }]}>
+              <Text style={[styles.inputLabel, { color: theme.textPrimary, marginTop: 18 }]}>
                 Cor da Categoria
               </Text>
               <View style={styles.colorPaletteGrid}>
@@ -292,17 +314,17 @@ export default function CategoriesScreen() {
                     <TouchableOpacity
                       key={item.id}
                       onPress={() => setFormColor(item.color)}
+                      activeOpacity={0.8}
                       style={[
                         styles.colorPaletteItem,
                         { backgroundColor: item.color },
-                        isSelected && {
-                          borderColor: theme.primary,
-                          borderWidth: 3,
-                          transform: [{ scale: 1.15 }],
-                        },
+                        isSelected && [
+                          styles.colorPaletteItemSelected,
+                          { borderColor: theme.primary },
+                        ],
                       ]}>
                       {isSelected && (
-                        <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                        <Ionicons name="checkmark" size={18} color="#FFFFFF" />
                       )}
                     </TouchableOpacity>
                   );
@@ -526,17 +548,43 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 1,
     paddingHorizontal: 20,
-    paddingVertical: 22,
+    paddingTop: 20,
+    paddingBottom: 8,
+  },
+  modalScrollContent: {
+    paddingBottom: 24,
+  },
+  metaCardContainer: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 14,
+    marginTop: 18,
+    marginBottom: 4,
+    gap: 8,
+  },
+  metaCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  metaCardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
   },
   devBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingVertical: 3,
     borderRadius: 8,
     borderWidth: 1,
   },
   devBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '800',
   },
   modalHeaderRow: {
     flexDirection: 'row',
@@ -560,63 +608,46 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 15,
   },
-  metaToggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    marginTop: 18,
-    marginBottom: 12,
-  },
   metaToggleTitle: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '800',
   },
   metaToggleSub: {
     fontSize: 12,
-    marginTop: 2,
-  },
-  metaInputsRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-  },
-  metaInputCol: {
-    flex: 1,
-  },
-  metaInputLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginBottom: 6,
-  },
-  numberInput: {
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 15,
-    textAlign: 'center',
+    lineHeight: 17,
   },
   colorPaletteGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    marginTop: 4,
+    gap: 12,
+    marginTop: 6,
+    paddingVertical: 4,
+    alignItems: 'center',
   },
   colorPaletteItem: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  colorPaletteItemSelected: {
+    borderColor: '#FFFFFF',
+    borderWidth: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 4,
+    elevation: 3,
   },
   stickerRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
-    marginTop: 4,
+    marginTop: 6,
+    paddingVertical: 4,
+    alignItems: 'center',
   },
   stickerItem: {
     width: 44,
