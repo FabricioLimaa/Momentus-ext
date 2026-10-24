@@ -501,9 +501,14 @@ export default function FocusScreen() {
         showsVerticalScrollIndicator={false}>
         {/* Bloco Superior: Cabeçalho com Ações Rápidas, Pílula de Contexto e Abas */}
         <Animated.View style={{ opacity: zenAnim }}>
-          {/* Header Compacto com Ações de Som e Ajustes */}
+          {/* Header com Título Principal, Subtítulo e Ações Rápidas */}
           <View style={styles.header}>
-            <Text style={[styles.title, { color: theme.textPrimary }]}>Foco</Text>
+            <View style={styles.headerTitleCol}>
+              <Text style={[styles.title, { color: theme.textPrimary }]}>Modo Foco</Text>
+              <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+                Técnica Pomodoro com ganho contínuo de XP
+              </Text>
+            </View>
             <View style={styles.headerRightActions}>
               <TouchableOpacity
                 style={[
@@ -560,6 +565,14 @@ export default function FocusScreen() {
                   numberOfLines={1}>
                   {selectedHabit ? selectedHabit.title : 'Foco Geral'}
                 </Text>
+                {selectedHabit?.completed && (
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={14}
+                    color={MomentusColors.emeraldNeon}
+                    style={{ marginLeft: 3 }}
+                  />
+                )}
               </View>
 
               <Text style={[styles.contextPillSep, { color: theme.textSecondary }]}>•</Text>
@@ -1320,11 +1333,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingTop: 4,
   },
+  headerTitleCol: {
+    flex: 1,
+    paddingRight: 12,
+  },
   title: {
     color: MomentusColors.textPrimary,
     fontSize: 24,
     fontWeight: '900',
     letterSpacing: -0.5,
+  },
+  subtitle: {
+    color: MomentusColors.textSecondary,
+    fontSize: 13,
+    marginTop: 2,
   },
   headerRightActions: {
     flexDirection: 'row',
