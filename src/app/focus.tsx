@@ -440,8 +440,6 @@ export default function FocusScreen() {
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
   const timeFormatted = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-  const progressRatio = totalSeconds > 0 ? (totalSeconds - timeLeft) / totalSeconds : 0;
-  const progressPercent = Math.round(progressRatio * 100);
 
   const today = getTodayDateString();
   const todayHabits = habits.filter((h) => h.date === today);
@@ -450,26 +448,46 @@ export default function FocusScreen() {
     ? categories.find((c) => c.id === selectedHabit.categoryId)
     : null;
 
-  const currentCycleInSet = (completedSessions % 4) + 1; // 1, 2, 3, 4
-  const estimatedXp = 10 + Math.floor(focusDurationMinutes / 2);
-
-  const modeLabel = (() => {
-    switch (mode) {
-      case 'FOCUS':
-        return '🎯 Hora de concentrar';
-      case 'SHORT_BREAK':
-        return '☕ Pausa curta • Respire fundo';
-      case 'LONG_BREAK':
-        return '🔋 Pausa longa • Recarregue as energias';
-    }
-  })();
-
   const RING_SIZE = 270;
   const STROKE_WIDTH = 10;
   const RADIUS = (RING_SIZE - STROKE_WIDTH) / 2;
   const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
   const progressFraction = totalSeconds > 0 ? timeLeft / totalSeconds : 0;
   const strokeDashoffset = CIRCUMFERENCE * (1 - progressFraction);
+
+  const openCycleSettings = () => {
+    setTempFocus(Number(focusDurationMinutes) || 25);
+    setTempShort(Number(shortBreakMinutes) || 5);
+    setTempLong(Number(longBreakMinutes) || 15);
+    setActiveSettingsTab('FOCUS');
+    setShowSettingsModal(true);
+    triggerHaptic('impact');
+  };
+
+  const skipCycle = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    endTimeRef.current = null;
+    setIsRunning(false);
+    cancelFocusNotification(notificationIdRef.current);
+    notificationIdRef.current = null;
+    setAppKv('active_focus_timer', null).catch(() => {});
+
+    if (mode === 'FOCUS') {
+      const nextSessions = completedSessions + 1;
+      setCompletedSessions(nextSessions);
+      if (nextSessions % 4 === 0) {
+        switchMode('LONG_BREAK');
+      } else {
+        switchMode('SHORT_BREAK');
+      }
+    } else {
+      switchMode('FOCUS');
+    }
+    triggerHaptic('impact');
+  };
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
@@ -481,41 +499,17 @@ export default function FocusScreen() {
         style={{ flex: 1, backgroundColor: theme.background }}
         contentContainerStyle={[styles.scrollContent, { backgroundColor: theme.background }]}
         showsVerticalScrollIndicator={false}>
-        {/* Bloco Superior: Cabeçalho, Régua dos 4 Ciclos e Abas (Modo Zen esmaece suavemente durante o foco) */}
+        {/* Bloco Superior: Cabeçalho com Ações Rápidas, Pílula de Contexto e Abas */}
         <Animated.View style={{ opacity: zenAnim }}>
-          {/* Header */}
+          {/* Header Compacto com Ações de Som e Ajustes */}
           <View style={styles.header}>
-            <Text style={[styles.title, { color: theme.textPrimary }]}>Modo Foco</Text>
-            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-              Técnica Pomodoro com ganho contínuo de XP
-            </Text>
-          </View>
-
-        {/* --- ÁREA DESTACADA: Régua dos 4 Ciclos Pomodoro + Badge de XP + Seletor de Hábito --- */}
-        <View
-          style={[
-            styles.pomodoroFlowContainer,
-            { backgroundColor: theme.surface, borderColor: theme.outline },
-          ]}>
-          {/* Topo do Card: Indicador da Rodada & Badge de XP */}
-          <View style={styles.cycleHeaderRow}>
-            <View style={styles.cycleInfoLeft}>
-              <Ionicons name="repeat" size={15} color={activeColor} />
-              <Text style={[styles.cycleStatusTitle, { color: theme.textPrimary }]}>
-                {mode === 'FOCUS'
-                  ? `Rodada Pomodoro: Ciclo ${currentCycleInSet} de 4`
-                  : mode === 'SHORT_BREAK'
-                  ? `Pausa Curta (${shortBreakMinutes}m)`
-                  : `Pausa Longa Restauradora (${longBreakMinutes}m)`}
-              </Text>
-            </View>
-
-            <View style={styles.cycleHeaderRight}>
+            <Text style={[styles.title, { color: theme.textPrimary }]}>Foco</Text>
+            <View style={styles.headerRightActions}>
               <TouchableOpacity
                 style={[
-                  styles.tickingToggleBtn,
+                  styles.headerIconBtn,
                   {
-                    backgroundColor: tickingEnabled ? `${activeColor}20` : `${theme.textSecondary}15`,
+                    backgroundColor: tickingEnabled ? `${activeColor}20` : theme.surface,
                     borderColor: tickingEnabled ? activeColor : theme.outline,
                   },
                 ]}
@@ -523,265 +517,119 @@ export default function FocusScreen() {
                 activeOpacity={0.7}
                 accessibilityLabel="Alternar som de tique-taque">
                 <Ionicons
-                  name={tickingEnabled ? 'volume-high' : 'volume-mute'}
-                  size={12}
+                  name={tickingEnabled ? 'volume-high' : 'volume-mute-outline'}
+                  size={18}
                   color={tickingEnabled ? activeColor : theme.textSecondary}
                 />
-                <Text
-                  style={[
-                    styles.tickingToggleText,
-                    { color: tickingEnabled ? activeColor : theme.textSecondary },
-                  ]}>
-                  {tickingEnabled ? 'Tique-taque' : 'Mudo'}
-                </Text>
               </TouchableOpacity>
 
-              <View
-                style={[
-                  styles.xpBadge,
-                  { backgroundColor: `${MomentusColors.gold}20`, borderColor: `${MomentusColors.gold}50` },
-                ]}>
-                <Ionicons name="flash" size={12} color={MomentusColors.gold} />
-                <Text style={[styles.xpBadgeText, { color: MomentusColors.gold }]}>
-                  +{estimatedXp} XP
-                </Text>
-              </View>
+              <TouchableOpacity
+                style={[styles.headerIconBtn, { backgroundColor: theme.surface, borderColor: theme.outline }]}
+                onPress={openCycleSettings}
+                activeOpacity={0.7}
+                accessibilityLabel="Ajustes de ciclo Pomodoro">
+                <Ionicons name="options-outline" size={18} color={theme.textSecondary} />
+              </TouchableOpacity>
             </View>
           </View>
 
-          {/* Régua Visual dos 4 Ciclos da Rodada */}
-          <View style={styles.cycleRulerRow}>
-            {[1, 2, 3, 4].map((cycleNum) => {
-              const isDone = (completedSessions % 4) >= cycleNum;
-              const isCurrent = (completedSessions % 4) + 1 === cycleNum && mode === 'FOCUS';
-              return (
+          {/* Pílula de Contexto Única: Hábito Vinculado & 4 Pontos do Ciclo Pomodoro */}
+          <View style={styles.contextPillWrapper}>
+            <TouchableOpacity
+              style={[
+                styles.contextPill,
+                {
+                  backgroundColor: theme.surface,
+                  borderColor: selectedHabit ? `${selectedCategory?.color || activeColor}60` : theme.outline,
+                },
+              ]}
+              onPress={() => {
+                setShowHabitPickerModal(true);
+                triggerHaptic('impact');
+              }}
+              activeOpacity={0.75}>
+              <View style={styles.contextPillLeft}>
                 <View
-                  key={cycleNum}
                   style={[
-                    styles.cycleCapsule,
-                    {
-                      backgroundColor: isDone
-                        ? `${activeColor}25`
-                        : isCurrent
-                        ? `${activeColor}15`
-                        : theme.isDark
-                        ? 'rgba(255,255,255,0.04)'
-                        : 'rgba(0,0,0,0.03)',
-                      borderColor: isCurrent
-                        ? activeColor
-                        : isDone
-                        ? `${activeColor}60`
-                        : theme.outline,
-                    },
-                  ]}>
-                  {isDone ? (
-                    <Ionicons name="checkmark-sharp" size={13} color={activeColor} />
-                  ) : isCurrent ? (
-                    <Ionicons name="flame" size={13} color={activeColor} />
-                  ) : (
-                    <Text style={[styles.cycleNumberText, { color: theme.textSecondary }]}>
-                      {cycleNum}
-                    </Text>
-                  )}
+                    styles.contextPillDot,
+                    { backgroundColor: selectedCategory?.color || activeColor },
+                  ]}
+                />
+                <Text
+                  style={[styles.contextPillText, { color: theme.textPrimary }]}
+                  numberOfLines={1}>
+                  {selectedHabit ? selectedHabit.title : 'Foco Geral'}
+                </Text>
+              </View>
+
+              <Text style={[styles.contextPillSep, { color: theme.textSecondary }]}>•</Text>
+
+              {/* 4 Pontos Sutis Pomodoro */}
+              <View style={styles.miniCyclesRow}>
+                {[1, 2, 3, 4].map((cycleNum) => {
+                  const isDone = (completedSessions % 4) >= cycleNum;
+                  const isCurrent = (completedSessions % 4) + 1 === cycleNum && mode === 'FOCUS';
+                  return (
+                    <View
+                      key={cycleNum}
+                      style={[
+                        styles.miniCycleDot,
+                        {
+                          backgroundColor: isDone
+                            ? activeColor
+                            : isCurrent
+                            ? `${activeColor}80`
+                            : theme.outline,
+                          transform: [{ scale: isCurrent ? 1.25 : 1 }],
+                        },
+                      ]}
+                    />
+                  );
+                })}
+              </View>
+
+              <Ionicons name="chevron-down" size={14} color={theme.textSecondary} style={{ marginLeft: 2 }} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Tab Switcher: Foco / Pausa Curta / Pausa Longa */}
+          <View
+            style={[
+              styles.modeTabsRow,
+              { backgroundColor: theme.surface, borderColor: theme.outline },
+            ]}>
+            {(['FOCUS', 'SHORT_BREAK', 'LONG_BREAK'] as FocusMode[]).map((tabMode) => {
+              const isCurrent = mode === tabMode;
+              const tabLabels = {
+                FOCUS: `Foco (${focusDurationMinutes}m)`,
+                SHORT_BREAK: `Curta (${shortBreakMinutes}m)`,
+                LONG_BREAK: `Longa (${longBreakMinutes}m)`,
+              };
+              return (
+                <TouchableOpacity
+                  key={tabMode}
+                  style={[
+                    styles.modeTab,
+                    isCurrent && { backgroundColor: getModeColor(tabMode) },
+                  ]}
+                  onPress={() => switchMode(tabMode)}
+                  activeOpacity={0.7}>
                   <Text
                     style={[
-                      styles.cycleLabelText,
+                      styles.modeTabText,
                       {
                         color: isCurrent
-                          ? activeColor
-                          : isDone
-                          ? theme.textPrimary
+                          ? getContrastTextColor(getModeColor(tabMode))
                           : theme.textSecondary,
                         fontWeight: isCurrent ? '800' : '600',
                       },
                     ]}>
-                    {cycleNum === 4 ? 'Ciclo 4 🔋' : `Ciclo ${cycleNum}`}
+                    {tabLabels[tabMode]}
                   </Text>
-                </View>
+                </TouchableOpacity>
               );
             })}
           </View>
-
-          {/* Divisor sutil */}
-          <View style={[styles.flowDivider, { backgroundColor: theme.outline }]} />
-
-          {/* Seletor de Hábito Vinculado */}
-          <TouchableOpacity
-            style={[
-              styles.habitSelectorCard,
-              {
-                backgroundColor: theme.surfaceElevated,
-                borderColor: selectedHabit
-                  ? `${selectedCategory?.color || activeColor}60`
-                  : theme.outline,
-              },
-            ]}
-            onPress={() => setShowHabitPickerModal(true)}
-            activeOpacity={0.75}>
-            <View style={styles.habitSelectorLeft}>
-              <View
-                style={[
-                  styles.habitSelectorIconCircle,
-                  {
-                    backgroundColor: selectedHabit
-                      ? `${selectedCategory?.color || activeColor}22`
-                      : `${theme.textSecondary}15`,
-                  },
-                ]}>
-                <Ionicons
-                  name={selectedHabit ? 'flag' : 'radio-button-off'}
-                  size={16}
-                  color={
-                    selectedHabit
-                      ? selectedCategory?.color || activeColor
-                      : theme.textSecondary
-                  }
-                />
-              </View>
-              <View style={styles.habitSelectorTextCol}>
-                <Text style={[styles.habitSelectorOverline, { color: theme.textSecondary }]}>
-                  {selectedHabit ? 'HÁBITO VINCULADO AO FOCO' : 'VINCULAR A UM HÁBITO'}
-                </Text>
-                <Text
-                  style={[
-                    styles.habitSelectorTitle,
-                    { color: selectedHabit ? theme.textPrimary : theme.textSecondary },
-                  ]}
-                  numberOfLines={1}>
-                  {selectedHabit ? selectedHabit.title : 'Foco Geral (nenhum selecionado)'}
-                </Text>
-                {selectedCategory && (
-                  <View style={styles.categoryPillRow}>
-                    <View
-                      style={[
-                        styles.categoryDot,
-                        { backgroundColor: selectedCategory.color },
-                      ]}
-                    />
-                    <Text
-                      style={[
-                        styles.categoryPillText,
-                        { color: selectedCategory.color },
-                      ]}>
-                      {selectedCategory.name}
-                    </Text>
-                    {selectedHabit?.completed && (
-                      <Text
-                        style={[
-                          styles.completedFlag,
-                          { color: MomentusColors.emeraldNeon },
-                        ]}>
-                        • Concluído hoje ✓
-                      </Text>
-                    )}
-                  </View>
-                )}
-              </View>
-            </View>
-
-            <View style={styles.habitSelectorRight}>
-              {selectedHabit ? (
-                <TouchableOpacity
-                  onPress={(e) => {
-                    e.stopPropagation?.();
-                    setSelectedHabitId(null);
-                    triggerHaptic('impact');
-                  }}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  style={[
-                    styles.removeHabitBtn,
-                    { backgroundColor: theme.surface, borderColor: theme.outline },
-                  ]}>
-                  <Ionicons name="close" size={14} color={theme.textSecondary} />
-                </TouchableOpacity>
-              ) : (
-                <View
-                  style={[
-                    styles.chooseHabitBadge,
-                    { backgroundColor: `${activeColor}18`, borderColor: `${activeColor}40` },
-                  ]}>
-                  <Text style={[styles.chooseHabitBadgeText, { color: activeColor }]}>
-                    Escolher
-                  </Text>
-                  <Ionicons name="chevron-forward" size={12} color={activeColor} />
-                </View>
-              )}
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* Tab Switcher: Foco / Pausa Curta / Pausa Longa */}
-        <View
-          style={[
-            styles.modeTabsRow,
-            { backgroundColor: theme.surface, borderColor: theme.outline },
-          ]}>
-          <TouchableOpacity
-            style={[
-              styles.modeTab,
-              mode === 'FOCUS' && { backgroundColor: getModeColor('FOCUS') },
-            ]}
-            onPress={() => switchMode('FOCUS')}
-            activeOpacity={0.7}>
-            <Text
-              style={[
-                styles.modeTabText,
-                {
-                  color:
-                    mode === 'FOCUS'
-                      ? getContrastTextColor(getModeColor('FOCUS'))
-                      : theme.textSecondary,
-                },
-                mode === 'FOCUS' && { fontWeight: '800' },
-              ]}>
-              🎯 Foco ({focusDurationMinutes}m)
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.modeTab,
-              mode === 'SHORT_BREAK' && { backgroundColor: getModeColor('SHORT_BREAK') },
-            ]}
-            onPress={() => switchMode('SHORT_BREAK')}
-            activeOpacity={0.7}>
-            <Text
-              style={[
-                styles.modeTabText,
-                {
-                  color:
-                    mode === 'SHORT_BREAK'
-                      ? getContrastTextColor(getModeColor('SHORT_BREAK'))
-                      : theme.textSecondary,
-                },
-                mode === 'SHORT_BREAK' && { fontWeight: '800' },
-              ]}>
-              ☕ Curta ({shortBreakMinutes}m)
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.modeTab,
-              mode === 'LONG_BREAK' && { backgroundColor: getModeColor('LONG_BREAK') },
-            ]}
-            onPress={() => switchMode('LONG_BREAK')}
-            activeOpacity={0.7}>
-            <Text
-              style={[
-                styles.modeTabText,
-                {
-                  color:
-                    mode === 'LONG_BREAK'
-                      ? getContrastTextColor(getModeColor('LONG_BREAK'))
-                      : theme.textSecondary,
-                },
-                mode === 'LONG_BREAK' && { fontWeight: '800' },
-              ]}>
-              🔋 Longa ({longBreakMinutes}m)
-            </Text>
-          </TouchableOpacity>
-        </View>
         </Animated.View>
 
         {/* Big Circular Timer Display com Anel SVG Dinâmico & Breathing Pulse */}
@@ -841,32 +689,17 @@ export default function FocusScreen() {
                 styles.innerCircle,
                 { backgroundColor: theme.surface, borderColor: theme.outline },
               ]}>
-              <Text style={[styles.modeStatusLabel, { color: theme.textSecondary }]}>
-                {modeLabel}
+              <Text style={[styles.modeStatusLabel, { color: activeColor }]}>
+                {mode === 'FOCUS' ? 'FOCO' : mode === 'SHORT_BREAK' ? 'PAUSA CURTA' : 'PAUSA LONGA'}
               </Text>
               <Text style={[styles.timerDisplay, { color: theme.textPrimary }]}>
                 {timeFormatted}
               </Text>
-              <View
-                style={[
-                  styles.statusBadge,
-                  isRunning
-                    ? { backgroundColor: `${activeColor}20` }
-                    : { backgroundColor: theme.isDark ? '#283548' : '#F1F5F9' },
-                ]}>
-                <Text
-                  style={[
-                    styles.statusBadgeText,
-                    { color: isRunning ? activeColor : theme.textSecondary },
-                  ]}>
-                  {isRunning ? 'EM ANDAMENTO' : `${progressPercent}% PRONTO`}
-                </Text>
-              </View>
             </View>
           </View>
         </View>
 
-        {/* Controls */}
+        {/* Controls: Reset, Play/Pause Central e Pular/Avançar */}
         <View style={styles.controlsRow}>
           <TouchableOpacity
             onPress={resetTimer}
@@ -874,8 +707,9 @@ export default function FocusScreen() {
               styles.controlIconBtn,
               { backgroundColor: theme.surface, borderColor: theme.outline },
             ]}
-            activeOpacity={0.7}>
-            <Ionicons name="refresh" size={24} color={theme.textSecondary} />
+            activeOpacity={0.7}
+            accessibilityLabel="Reiniciar cronômetro">
+            <Ionicons name="refresh" size={22} color={theme.textSecondary} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -884,10 +718,11 @@ export default function FocusScreen() {
               styles.playBtn,
               { backgroundColor: isRunning ? MomentusColors.dangerRed : activeColor },
             ]}
-            activeOpacity={0.85}>
+            activeOpacity={0.85}
+            accessibilityLabel={isRunning ? 'Pausar foco' : 'Iniciar foco'}>
             <Ionicons
               name={isRunning ? 'pause' : 'play'}
-              size={32}
+              size={28}
               color={isRunning ? '#FFFFFF' : getContrastTextColor(activeColor)}
             />
             <Text
@@ -895,65 +730,47 @@ export default function FocusScreen() {
                 styles.playBtnText,
                 { color: isRunning ? '#FFFFFF' : getContrastTextColor(activeColor) },
               ]}>
-              {isRunning ? 'PAUSAR' : mode === 'FOCUS' ? 'FOCO' : 'PAUSA'}
+              {isRunning ? 'PAUSAR' : 'INICIAR'}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => {
-              setTempFocus(Number(focusDurationMinutes) || 25);
-              setTempShort(Number(shortBreakMinutes) || 5);
-              setTempLong(Number(longBreakMinutes) || 15);
-              setActiveSettingsTab('FOCUS');
-              setShowSettingsModal(true);
-            }}
+            onPress={skipCycle}
             style={[
               styles.controlIconBtn,
               { backgroundColor: theme.surface, borderColor: theme.outline },
             ]}
-            activeOpacity={0.7}>
-            <Ionicons name="settings-outline" size={24} color={theme.textSecondary} />
+            activeOpacity={0.7}
+            accessibilityLabel="Avançar próximo ciclo">
+            <Ionicons name="play-skip-forward-outline" size={22} color={theme.textSecondary} />
           </TouchableOpacity>
         </View>
 
-        {/* Sessão Stats Card (Modo Zen esmaece suavemente durante o foco) */}
+        {/* Sessão Stats Resumo Leve em Linha Única (Modo Zen esmaece suavemente durante o foco) */}
         <Animated.View style={{ opacity: zenAnim }}>
-          <View
-            style={[
-              styles.statsCard,
-              { backgroundColor: theme.surface, borderColor: theme.outline },
-            ]}>
-            <View style={styles.statItem}>
-              <Ionicons name="checkmark-done-circle" size={20} color={activeColor} />
-              <Text style={[styles.statValue, { color: theme.textPrimary }]}>
-                {completedSessions}
-              </Text>
-              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
-                Sessões Concluídas
+          <View style={styles.statsSummaryRow}>
+            <View style={styles.statSummaryItem}>
+              <Ionicons name="checkmark-done-circle-outline" size={15} color={activeColor} />
+              <Text style={[styles.statSummaryText, { color: theme.textSecondary }]}>
+                <Text style={{ fontWeight: '800', color: theme.textPrimary }}>{completedSessions}</Text> ciclos
               </Text>
             </View>
 
-            <View style={[styles.statDivider, { backgroundColor: theme.outline }]} />
+            <Text style={[styles.statSummaryDot, { color: theme.outline }]}>•</Text>
 
-            <View style={styles.statItem}>
-              <Ionicons name="flash" size={20} color={MomentusColors.gold} />
-              <Text style={[styles.statValue, { color: theme.textPrimary }]}>
-                +{xpGained} XP
-              </Text>
-              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
-                XP Ganho na Sessão
+            <View style={styles.statSummaryItem}>
+              <Ionicons name="time-outline" size={15} color={activeColor} />
+              <Text style={[styles.statSummaryText, { color: theme.textSecondary }]}>
+                <Text style={{ fontWeight: '800', color: theme.textPrimary }}>{userProfile.focusMinutesToday}</Text> min hoje
               </Text>
             </View>
 
-            <View style={[styles.statDivider, { backgroundColor: theme.outline }]} />
+            <Text style={[styles.statSummaryDot, { color: theme.outline }]}>•</Text>
 
-            <View style={styles.statItem}>
-              <Ionicons name="time-outline" size={20} color={activeColor} />
-              <Text style={[styles.statValue, { color: theme.textPrimary }]}>
-                {userProfile.focusMinutesToday} min
-              </Text>
-              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
-                Foco Hoje
+            <View style={styles.statSummaryItem}>
+              <Ionicons name="flash-outline" size={15} color={MomentusColors.gold} />
+              <Text style={[styles.statSummaryText, { color: theme.textSecondary }]}>
+                <Text style={{ fontWeight: '800', color: theme.textPrimary }}>+{xpGained}</Text> XP
               </Text>
             </View>
           </View>
@@ -1485,190 +1302,199 @@ export default function FocusScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: MomentusColors.navyBackground,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 32,
+    paddingTop: 8,
+    paddingBottom: 28,
     maxWidth: 540,
     width: '100%',
     alignSelf: 'center',
-    gap: 16,
+    gap: 12,
   },
   header: {
-    paddingTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 4,
   },
   title: {
     color: MomentusColors.textPrimary,
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '900',
     letterSpacing: -0.5,
   },
-  subtitle: {
-    color: MomentusColors.textSecondary,
-    fontSize: 13,
-    marginTop: 2,
-  },
-  pomodoroFlowContainer: {
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 14,
-    gap: 12,
-  },
-  cycleHeaderRow: {
+  headerRightActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 8,
   },
-  cycleInfoLeft: {
+  headerIconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  contextPillWrapper: {
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  contextPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    gap: 8,
+  },
+  contextPillLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    maxWidth: 200,
   },
-  cycleStatusTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 0.2,
+  contextPillDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
-  xpBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  xpBadgeText: {
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  cycleHeaderRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  tickingToggleBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  tickingToggleText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  cycleRulerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  cycleCapsule: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingVertical: 7,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  cycleNumberText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  cycleLabelText: {
-    fontSize: 11,
-  },
-  flowDivider: {
-    height: 1,
-    opacity: 0.5,
-  },
-  habitSelectorCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-    gap: 10,
-  },
-  habitSelectorLeft: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  habitSelectorIconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  habitSelectorTextCol: {
-    flex: 1,
-  },
-  habitSelectorOverline: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-  },
-  habitSelectorTitle: {
+  contextPillText: {
     fontSize: 13,
     fontWeight: '700',
-    marginTop: 1,
   },
-  categoryPillRow: {
+  contextPillSep: {
+    fontSize: 12,
+    opacity: 0.4,
+  },
+  miniCyclesRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    marginTop: 3,
   },
-  categoryDot: {
+  miniCycleDot: {
     width: 7,
     height: 7,
     borderRadius: 3.5,
   },
-  categoryPillText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  completedFlag: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  habitSelectorRight: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  removeHabitBtn: {
-    width: 28,
-    height: 28,
+  modeTabsRow: {
+    flexDirection: 'row',
     borderRadius: 14,
     borderWidth: 1,
+    padding: 3,
+    marginTop: 4,
+  },
+  modeTab: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 11,
+  },
+  modeTabText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  timerCenter: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 14,
+    position: 'relative',
+  },
+  haloCircle: {
+    position: 'absolute',
+    width: 298,
+    height: 298,
+    borderRadius: 149,
+    borderWidth: 2,
+  },
+  outerCircle: {
+    width: 270,
+    height: 270,
+    borderRadius: 135,
+    backgroundColor: 'rgba(30, 41, 59, 0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 6,
+  },
+  innerCircle: {
+    width: 228,
+    height: 228,
+    borderRadius: 114,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  modeStatusLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    marginBottom: 2,
+  },
+  timerDisplay: {
+    fontSize: 52,
+    fontWeight: '900',
+    fontVariant: ['tabular-nums'],
+    marginVertical: 2,
+  },
+  controlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+  },
+  controlIconBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  chooseHabitBadge: {
+  playBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 10,
-    borderWidth: 1,
+    gap: 8,
+    paddingHorizontal: 36,
+    paddingVertical: 14,
+    borderRadius: 28,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  chooseHabitBadgeText: {
-    fontSize: 11,
-    fontWeight: '800',
+  playBtnText: {
+    fontWeight: '900',
+    fontSize: 15,
+    letterSpacing: 0.5,
+  },
+  statsSummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    paddingVertical: 6,
+    marginTop: 4,
+  },
+  statSummaryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  statSummaryText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  statSummaryDot: {
+    fontSize: 12,
   },
   habitPickerContainer: {
     width: '100%',
@@ -1733,158 +1559,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     lineHeight: 18,
-  },
-
-  modeTabsRow: {
-    flexDirection: 'row',
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 4,
-    marginTop: 8,
-  },
-  modeTab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 12,
-  },
-  modeTabActive: {
-    backgroundColor: 'rgba(52, 211, 153, 0.15)',
-  },
-  modeTabText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: MomentusColors.textSecondary,
-  },
-  modeTabTextActive: {
-    color: MomentusColors.emeraldNeon,
-    fontWeight: '800',
-  },
-  timerCenter: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 16,
-    position: 'relative',
-  },
-  haloCircle: {
-    position: 'absolute',
-    width: 298,
-    height: 298,
-    borderRadius: 149,
-    borderWidth: 2,
-  },
-  outerCircle: {
-    width: 270,
-    height: 270,
-    borderRadius: 135,
-    backgroundColor: 'rgba(30, 41, 59, 0.6)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 6,
-  },
-  innerCircle: {
-    width: 228,
-    height: 228,
-    borderRadius: 114,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  modeStatusLabel: {
-    fontSize: 13,
-    color: MomentusColors.textSecondary,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  timerDisplay: {
-    color: MomentusColors.textPrimary,
-    fontSize: 48,
-    fontWeight: '900',
-    fontVariant: ['tabular-nums'],
-    marginVertical: 4,
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginTop: 4,
-  },
-  statusBadgeRunning: {
-    backgroundColor: 'rgba(52, 211, 153, 0.2)',
-  },
-  statusBadgeIdle: {
-    backgroundColor: 'rgba(148, 163, 184, 0.12)',
-  },
-  statusBadgeText: {
-    color: MomentusColors.emeraldNeon,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-  },
-  controlsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 20,
-  },
-  controlIconBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  playBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 26,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.45,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  pauseBtn: {
-    backgroundColor: MomentusColors.gold,
-  },
-  playBtnText: {
-    color: '#0F172A',
-    fontWeight: '900',
-    fontSize: 15,
-  },
-  statsCard: {
-    borderRadius: 20,
-    borderWidth: 1,
-    flexDirection: 'row',
-    paddingVertical: 14,
-    paddingHorizontal: 8,
-    alignItems: 'center',
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 4,
-  },
-  statValue: {
-    color: MomentusColors.textPrimary,
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  statLabel: {
-    color: MomentusColors.textSecondary,
-    fontSize: 10,
-    textAlign: 'center',
-  },
-  statDivider: {
-    width: 1,
-    height: 28,
-    backgroundColor: MomentusColors.navyOutline,
   },
   pickerOverlay: {
     flex: 1,
