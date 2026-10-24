@@ -12,7 +12,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { MomentusColors } from '@/constants/theme';
+import {
+  MomentusColors,
+  LayoutTokens,
+  BorderRadiusTokens,
+  ComponentHeightTokens,
+} from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import {
   LEGAL_DOCUMENTS,
@@ -541,20 +546,22 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: MomentusColors.navyBackground,
+    width: '100%',
+    maxWidth: LayoutTokens.maxContentWidth,
+    alignSelf: 'center',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
+    paddingVertical: LayoutTokens.pagePaddingTop,
     borderBottomWidth: 1,
   },
   backButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
+    width: ComponentHeightTokens.iconButton,
+    height: ComponentHeightTokens.iconButton,
+    borderRadius: ComponentHeightTokens.iconButton / 2,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -633,8 +640,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
     paddingVertical: 16,
+    paddingBottom: LayoutTokens.pagePaddingBottom,
     gap: 14,
   },
   docHeaderCard: {
@@ -841,8 +849,8 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   acceptBtn: {
-    height: 48,
-    borderRadius: 14,
+    height: ComponentHeightTokens.buttonHero,
+    borderRadius: BorderRadiusTokens.button,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',

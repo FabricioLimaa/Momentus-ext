@@ -12,7 +12,13 @@ import {
   Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MomentusColors, getContrastTextColor } from '@/constants/theme';
+import {
+  MomentusColors,
+  getContrastTextColor,
+  LayoutTokens,
+  BorderRadiusTokens,
+  ComponentHeightTokens,
+} from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import { getTodayDateString } from '@/constants/initialData';
 import { HabitItem } from '@/types';
@@ -334,18 +340,25 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.65)',
-    justifyContent: 'flex-end',
+    justifyContent: Platform.OS === 'web' ? 'center' : 'flex-end',
+    alignItems: Platform.OS === 'web' ? 'center' : undefined,
+    padding: Platform.OS === 'web' ? 20 : 0,
   },
   sheetContainer: {
     backgroundColor: MomentusColors.navyBackground,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    borderTopLeftRadius: BorderRadiusTokens.modal,
+    borderTopRightRadius: BorderRadiusTokens.modal,
+    borderBottomLeftRadius: Platform.OS === 'web' ? BorderRadiusTokens.modal : 0,
+    borderBottomRightRadius: Platform.OS === 'web' ? BorderRadiusTokens.modal : 0,
     borderWidth: 1,
     borderColor: MomentusColors.navyOutline,
     paddingTop: 20,
-    paddingHorizontal: 20,
+    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
     paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    width: '100%',
+    maxWidth: LayoutTokens.maxModalSheetWidth,
     maxHeight: '85%',
+    alignSelf: 'center',
   },
   header: {
     flexDirection: 'row',
@@ -359,7 +372,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   closeBtn: {
-    padding: 6,
+    width: ComponentHeightTokens.iconButton,
+    height: ComponentHeightTokens.iconButton,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   body: {
     marginBottom: 16,
@@ -586,10 +602,11 @@ const styles = StyleSheet.create({
   },
   cancelBtn: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: 16,
+    height: ComponentHeightTokens.buttonHero,
+    borderRadius: BorderRadiusTokens.button,
     borderWidth: 1,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   cancelText: {
     fontSize: 15,
@@ -597,9 +614,10 @@ const styles = StyleSheet.create({
   },
   saveBtn: {
     flex: 1.5,
-    paddingVertical: 14,
-    borderRadius: 16,
+    height: ComponentHeightTokens.buttonHero,
+    borderRadius: BorderRadiusTokens.button,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   disabledBtn: {
     opacity: 0.5,

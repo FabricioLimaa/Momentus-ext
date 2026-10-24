@@ -13,7 +13,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { MomentusColors } from '@/constants/theme';
+import {
+  MomentusColors,
+  LayoutTokens,
+  BorderRadiusTokens,
+  ComponentHeightTokens,
+  TypographyTokens,
+} from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import { GlassCard } from '@/components/momentus/GlassCard';
 
@@ -177,39 +183,42 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
+    width: '100%',
+    maxWidth: LayoutTokens.maxContentWidth,
+    alignSelf: 'center',
   },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
+    paddingVertical: LayoutTokens.pagePaddingTop,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: ComponentHeightTokens.iconButton,
+    height: ComponentHeightTokens.iconButton,
+    borderRadius: ComponentHeightTokens.iconButton / 2,
     justifyContent: 'center',
     alignItems: 'center',
   },
   checkUpdateBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: ComponentHeightTokens.iconButton,
+    height: ComponentHeightTokens.iconButton,
+    borderRadius: ComponentHeightTokens.iconButton / 2,
     justifyContent: 'center',
     alignItems: 'center',
   },
   topBarTitle: {
-    fontSize: 18,
-    fontWeight: '800',
+    ...TypographyTokens.screenTitle,
     color: MomentusColors.textPrimary,
   },
   scroll: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
     paddingTop: 8,
+    paddingBottom: LayoutTokens.pagePaddingBottom,
   },
   mainTitle: {
     fontSize: 28,
@@ -319,8 +328,8 @@ const styles = StyleSheet.create({
   },
   dialogCard: {
     width: '100%',
-    maxWidth: 380,
-    borderRadius: 32,
+    maxWidth: LayoutTokens.maxDialogWidth,
+    borderRadius: BorderRadiusTokens.modal,
     borderWidth: 1,
     padding: 24,
     alignItems: 'center',

@@ -14,7 +14,13 @@ import {
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MomentusColors } from '@/constants/theme';
+import {
+  MomentusColors,
+  LayoutTokens,
+  BorderRadiusTokens,
+  ComponentHeightTokens,
+  TypographyTokens,
+} from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import { registerWithEmail } from '@/services/authService';
 import { SplashScreen } from '@/components/momentus/SplashScreen';
@@ -241,23 +247,27 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: ComponentHeightTokens.iconButton,
+    height: ComponentHeightTokens.iconButton,
+    borderRadius: ComponentHeightTokens.iconButton / 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '800',
+    ...TypographyTokens.screenTitle,
     color: MomentusColors.textPrimary,
   },
   placeholder: {
-    width: 40,
+    width: ComponentHeightTokens.iconButton,
   },
   scrollContent: {
-    paddingHorizontal: 28,
+    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
+    paddingTop: LayoutTokens.pagePaddingTop,
+    paddingBottom: LayoutTokens.pagePaddingBottom,
     alignItems: 'center',
+    width: '100%',
+    maxWidth: LayoutTokens.maxAuthWidth,
+    alignSelf: 'center',
   },
   logoCircle: {
     width: 72,
@@ -300,11 +310,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: MomentusColors.navySurface,
-    borderRadius: 16,
+    borderRadius: BorderRadiusTokens.input,
     borderWidth: 1,
     borderColor: MomentusColors.navyOutline,
     paddingHorizontal: 16,
-    height: 54,
+    height: ComponentHeightTokens.input,
   },
   inputIcon: {
     marginRight: 12,
@@ -328,8 +338,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   submitButton: {
-    height: 56,
-    borderRadius: 16,
+    height: ComponentHeightTokens.buttonHero,
+    borderRadius: BorderRadiusTokens.input,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 16,

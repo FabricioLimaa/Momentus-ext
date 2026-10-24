@@ -14,7 +14,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { MomentusColors } from '@/constants/theme';
+import {
+  MomentusColors,
+  LayoutTokens,
+  BorderRadiusTokens,
+  ComponentHeightTokens,
+  TypographyTokens,
+} from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import { ApplyTemplateDialog } from '@/components/momentus/ApplyTemplateDialog';
 import { TimePickerModal } from '@/components/momentus/TimePickerModal';
@@ -885,24 +891,26 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
+    width: '100%',
+    maxWidth: LayoutTokens.maxContentWidth,
+    alignSelf: 'center',
   },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
+    paddingVertical: LayoutTokens.pagePaddingTop,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: ComponentHeightTokens.iconButton,
+    height: ComponentHeightTokens.iconButton,
     justifyContent: 'center',
     alignItems: 'center',
   },
   topBarTitle: {
-    fontSize: 20,
-    fontWeight: '900',
+    ...TypographyTokens.screenTitle,
     flex: 1,
     marginLeft: 8,
   },
@@ -910,9 +918,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: BorderRadiusTokens.control,
   },
   importTopBtnText: {
     fontSize: 14,
@@ -922,8 +930,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 16,
-    paddingBottom: 100,
+    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
+    paddingTop: 16,
+    paddingBottom: LayoutTokens.pagePaddingBottom,
   },
   emptyContainer: {
     alignItems: 'center',
@@ -964,7 +973,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   templateCard: {
-    borderRadius: 20,
+    borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
     padding: 18,
     marginBottom: 16,
@@ -1066,8 +1075,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    height: 48,
-    borderRadius: 14,
+    height: ComponentHeightTokens.buttonHero,
+    borderRadius: BorderRadiusTokens.button,
   },
   applyButtonText: {
     color: '#0F172A',
@@ -1076,11 +1085,11 @@ const styles = StyleSheet.create({
   },
   fabButton: {
     position: 'absolute',
-    right: 20,
+    right: LayoutTokens.pagePaddingHorizontal,
     bottom: 24,
-    width: 58,
-    height: 58,
-    borderRadius: 29,
+    width: ComponentHeightTokens.fab,
+    height: ComponentHeightTokens.fab,
+    borderRadius: ComponentHeightTokens.fab / 2,
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 6,
@@ -1091,6 +1100,9 @@ const styles = StyleSheet.create({
   },
   formModalSafe: {
     flex: 1,
+    width: '100%',
+    maxWidth: LayoutTokens.maxModalSheetWidth,
+    alignSelf: 'center',
   },
   formModalHeader: {
     flexDirection: 'row',

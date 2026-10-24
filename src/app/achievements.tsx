@@ -14,7 +14,12 @@ import {
 import { auth as firebaseAuth } from '@/config/firebase';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { MomentusColors, getContrastTextColor } from '@/constants/theme';
+import {
+  MomentusColors,
+  getContrastTextColor,
+  LayoutTokens,
+  BorderRadiusTokens,
+} from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import { getStreakColor } from '@/constants/initialData';
 import { Achievement, MarketItem } from '@/types';
@@ -433,14 +438,16 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: MomentusColors.navyBackground,
+    width: '100%',
+    maxWidth: LayoutTokens.maxContentWidth,
+    alignSelf: 'center',
   },
   profileCard: {
-    marginHorizontal: 20,
-    marginTop: 10,
+    marginHorizontal: LayoutTokens.pagePaddingHorizontal,
+    marginTop: LayoutTokens.pagePaddingTop,
     marginBottom: 16,
     backgroundColor: MomentusColors.navySurface,
-    borderRadius: 24,
+    borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
     borderColor: MomentusColors.navyOutline,
     padding: 18,
@@ -542,9 +549,9 @@ const styles = StyleSheet.create({
   },
   tabSwitcher: {
     flexDirection: 'row',
-    marginHorizontal: 20,
+    marginHorizontal: LayoutTokens.pagePaddingHorizontal,
     backgroundColor: MomentusColors.navySurface,
-    borderRadius: 16,
+    borderRadius: BorderRadiusTokens.input,
     padding: 4,
     borderWidth: 1,
     borderColor: MomentusColors.navyOutline,
@@ -556,7 +563,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 10,
-    borderRadius: 12,
+    borderRadius: BorderRadiusTokens.control,
     gap: 6,
   },
   tabBtnActive: {
@@ -575,7 +582,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
+    paddingBottom: LayoutTokens.pagePaddingBottom,
   },
   itemCard: {
     borderRadius: 20,
@@ -706,8 +714,8 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     width: '100%',
-    maxWidth: 380,
-    borderRadius: 28,
+    maxWidth: LayoutTokens.maxDialogWidth,
+    borderRadius: BorderRadiusTokens.modal,
     borderWidth: 1,
     padding: 24,
     alignItems: 'center',

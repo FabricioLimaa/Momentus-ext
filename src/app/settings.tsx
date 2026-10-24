@@ -14,7 +14,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { MomentusColors, getContrastTextColor } from '@/constants/theme';
+import {
+  MomentusColors,
+  getContrastTextColor,
+  LayoutTokens,
+  ComponentHeightTokens,
+  TypographyTokens,
+} from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 
 // Paleta completa de personalização com o Verde Esmeralda Neon como primeira opção
@@ -538,38 +544,39 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: MomentusColors.navyBackground,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   container: {
     flex: 1,
-    backgroundColor: MomentusColors.navyBackground,
+    width: '100%',
+    maxWidth: LayoutTokens.maxContentWidth,
+    alignSelf: 'center',
   },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
+    paddingVertical: LayoutTokens.pagePaddingTop,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: ComponentHeightTokens.iconButton,
+    height: ComponentHeightTokens.iconButton,
+    borderRadius: ComponentHeightTokens.iconButton / 2,
     justifyContent: 'center',
     alignItems: 'center',
   },
   topBarTitle: {
-    fontSize: 18,
-    fontWeight: '800',
+    ...TypographyTokens.screenTitle,
     color: MomentusColors.textPrimary,
   },
   scroll: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
     paddingTop: 8,
+    paddingBottom: LayoutTokens.pagePaddingBottom,
   },
   sectionHeader: {
     flexDirection: 'row',

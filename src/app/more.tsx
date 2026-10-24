@@ -14,18 +14,19 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { MomentusColors } from '@/constants/theme';
+import {
+  MomentusColors,
+  LayoutTokens,
+  BorderRadiusTokens,
+  TypographyTokens,
+} from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
-import { CategoriesModal } from '@/components/momentus/CategoriesModal';
-import { SettingsModal } from '@/components/momentus/SettingsModal';
 
 import { auth as firebaseAuth } from '@/config/firebase';
 
 export default function MoreScreen() {
   const router = useRouter();
   const { userProfile, userLevel, logout, theme } = useMomentus();
-  const [categoriesModalVisible, setCategoriesModalVisible] = useState(false);
-  const [settingsModalVisible, setSettingsModalVisible] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
 
   const authUser = firebaseAuth.currentUser;
@@ -236,16 +237,6 @@ export default function MoreScreen() {
 
           <View style={{ height: 40 }} />
         </ScrollView>
-
-        <CategoriesModal
-          visible={categoriesModalVisible}
-          onClose={() => setCategoriesModalVisible(false)}
-        />
-
-        <SettingsModal
-          visible={settingsModalVisible}
-          onClose={() => setSettingsModalVisible(false)}
-        />
       </View>
     </SafeAreaView>
   );
@@ -254,38 +245,38 @@ export default function MoreScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: MomentusColors.navyBackground,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   container: {
     flex: 1,
-    backgroundColor: MomentusColors.navyBackground,
+    width: '100%',
+    maxWidth: LayoutTokens.maxContentWidth,
+    alignSelf: 'center',
   },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
+    paddingTop: LayoutTokens.pagePaddingTop,
     marginBottom: 16,
   },
   title: {
+    ...TypographyTokens.screenTitle,
     color: MomentusColors.textPrimary,
-    fontSize: 24,
-    fontWeight: '900',
   },
   subtitle: {
+    ...TypographyTokens.screenSubtitle,
     color: MomentusColors.textSecondary,
-    fontSize: 13,
     marginTop: 2,
   },
   scroll: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 60,
+    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
+    paddingBottom: LayoutTokens.pagePaddingBottom,
   },
   profileCard: {
     backgroundColor: MomentusColors.navySurface,
-    borderRadius: 22,
+    borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
     borderColor: MomentusColors.navyOutline,
     padding: 18,
@@ -340,7 +331,7 @@ const styles = StyleSheet.create({
   },
   menuGroup: {
     backgroundColor: MomentusColors.navySurface,
-    borderRadius: 22,
+    borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
     borderColor: MomentusColors.navyOutline,
     paddingVertical: 6,
@@ -388,8 +379,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(239, 68, 68, 0.1)',
     borderWidth: 1,
     borderColor: 'rgba(239, 68, 68, 0.3)',
-    paddingVertical: 14,
-    borderRadius: 18,
+    height: 52,
+    borderRadius: BorderRadiusTokens.button,
     gap: 8,
     marginTop: 8,
   },

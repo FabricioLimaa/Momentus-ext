@@ -16,7 +16,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMomentus } from '@/context/MomentusContext';
 import { Category } from '@/types';
 import { GOOGLE_CALENDAR_COLORS } from '@/constants/initialData';
-import { MomentusColors } from '@/constants/theme';
+import {
+  MomentusColors,
+  LayoutTokens,
+  BorderRadiusTokens,
+  ComponentHeightTokens,
+  TypographyTokens,
+} from '@/constants/theme';
 
 export default function CategoriesScreen() {
   const insets = useSafeAreaInsets();
@@ -445,30 +451,38 @@ export default function CategoriesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    width: '100%',
+    maxWidth: LayoutTokens.maxContentWidth,
+    alignSelf: 'center',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
+    paddingTop: LayoutTokens.pagePaddingTop,
     paddingBottom: 12,
   },
   backButton: {
     padding: 6,
+    width: ComponentHeightTokens.iconButton,
+    height: ComponentHeightTokens.iconButton,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '800',
+    ...TypographyTokens.screenTitle,
   },
   placeholder: {
-    width: 32,
+    width: ComponentHeightTokens.iconButton,
   },
   scrollContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
     paddingTop: 8,
+    paddingBottom: LayoutTokens.pagePaddingBottom,
   },
   subtitle: {
-    fontSize: 15,
+    ...TypographyTokens.screenSubtitle,
     marginBottom: 20,
   },
   newCategoryBtn: {
@@ -476,8 +490,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    height: 52,
-    borderRadius: 16,
+    height: ComponentHeightTokens.buttonHero,
+    borderRadius: BorderRadiusTokens.button,
     marginBottom: 24,
   },
   newCategoryBtnText: {
@@ -543,9 +557,9 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     width: '100%',
-    maxWidth: 480,
+    maxWidth: LayoutTokens.maxModalSheetWidth,
     maxHeight: '90%',
-    borderRadius: 24,
+    borderRadius: BorderRadiusTokens.modal,
     borderWidth: 1,
     paddingHorizontal: 20,
     paddingTop: 20,
@@ -686,8 +700,8 @@ const styles = StyleSheet.create({
   },
   deleteDialogCard: {
     width: '100%',
-    maxWidth: 400,
-    borderRadius: 24,
+    maxWidth: LayoutTokens.maxDialogWidth,
+    borderRadius: BorderRadiusTokens.modal,
     borderWidth: 1,
     padding: 24,
   },

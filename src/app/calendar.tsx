@@ -11,7 +11,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { MomentusColors, getContrastTextColor } from '@/constants/theme';
+import {
+  MomentusColors,
+  getContrastTextColor,
+  LayoutTokens,
+  BorderRadiusTokens,
+  ComponentHeightTokens,
+  TypographyTokens,
+} from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import { TimelineEventItem } from '@/components/momentus/TimelineEventItem';
 import { EventDetailDialog } from '@/components/momentus/EventDetailDialog';
@@ -707,10 +714,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: MomentusColors.navyBackground,
+    width: '100%',
+    maxWidth: LayoutTokens.maxContentWidth,
+    alignSelf: 'center',
   },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
+    paddingTop: LayoutTokens.pagePaddingTop,
     marginBottom: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -722,13 +732,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   title: {
+    ...TypographyTokens.screenTitle,
     color: MomentusColors.textPrimary,
-    fontSize: 24,
-    fontWeight: '900',
   },
   subtitle: {
+    ...TypographyTokens.screenSubtitle,
     color: MomentusColors.textSecondary,
-    fontSize: 13,
     marginTop: 2,
   },
   toggleViewBtn: {
@@ -737,7 +746,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 7,
-    borderRadius: 14,
+    borderRadius: BorderRadiusTokens.control,
     borderWidth: 1,
   },
   toggleViewText: {
@@ -745,24 +754,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   monthCard: {
-    marginHorizontal: 16,
+    marginHorizontal: LayoutTokens.pagePaddingHorizontal,
     marginBottom: 14,
-    borderRadius: 20,
+    borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
     padding: 12,
-    maxWidth: 480,
-    alignSelf: 'center',
-    width: '92%',
   },
   weekCard: {
-    marginHorizontal: 16,
+    marginHorizontal: LayoutTokens.pagePaddingHorizontal,
     marginBottom: 14,
-    borderRadius: 20,
+    borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
     padding: 12,
-    maxWidth: 480,
-    alignSelf: 'center',
-    width: '92%',
   },
   calendarNavRow: {
     flexDirection: 'row',
@@ -879,14 +882,11 @@ const styles = StyleSheet.create({
     lineHeight: 9,
   },
   summaryCard: {
-    marginHorizontal: 16,
+    marginHorizontal: LayoutTokens.pagePaddingHorizontal,
     marginBottom: 14,
-    borderRadius: 20,
+    borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
     padding: 14,
-    maxWidth: 480,
-    alignSelf: 'center',
-    width: '92%',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -945,12 +945,10 @@ const styles = StyleSheet.create({
   },
   habitsScroll: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
   },
   habitsContent: {
-    paddingBottom: 24,
-    maxWidth: 480,
-    alignSelf: 'center',
+    paddingBottom: LayoutTokens.pagePaddingBottom,
     width: '100%',
   },
   emptyView: {
@@ -958,16 +956,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 48,
     paddingHorizontal: 24,
+    borderRadius: BorderRadiusTokens.card,
   },
   emptyTitle: {
-    fontSize: 16,
-    fontWeight: '700',
+    ...TypographyTokens.cardTitle,
     marginTop: 12,
     marginBottom: 4,
     textAlign: 'center',
   },
   emptySubtitle: {
-    fontSize: 13,
+    ...TypographyTokens.screenSubtitle,
     textAlign: 'center',
     marginBottom: 20,
     lineHeight: 18,
@@ -979,14 +977,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 14,
+    borderRadius: BorderRadiusTokens.control,
   },
   emptyActionText: {
     fontSize: 13,
     fontWeight: '700',
   },
   timelineList: {
-    borderRadius: 24,
+    borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
     paddingVertical: 10,
     paddingHorizontal: 8,
@@ -999,10 +997,10 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     bottom: 24,
-    right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    right: LayoutTokens.pagePaddingHorizontal,
+    width: ComponentHeightTokens.fab,
+    height: ComponentHeightTokens.fab,
+    borderRadius: ComponentHeightTokens.fab / 2,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000000',

@@ -11,7 +11,11 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useMomentus } from '@/context/MomentusContext';
-import { getContrastTextColor } from '@/constants/theme';
+import {
+  getContrastTextColor,
+  BorderRadiusTokens,
+  ComponentHeightTokens,
+} from '@/constants/theme';
 
 interface TimePickerModalProps {
   visible: boolean;
@@ -338,10 +342,10 @@ const styles = StyleSheet.create({
   },
   dialogContainer: {
     width: '100%',
-    maxWidth: 320,
-    borderRadius: 24,
+    maxWidth: 340,
+    borderRadius: BorderRadiusTokens.modal,
     borderWidth: 1,
-    padding: 16,
+    padding: 18,
     gap: 12,
     ...Platform.select({
       ios: {
@@ -369,9 +373,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   headerIconBg: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -380,9 +384,9 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   closeButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: ComponentHeightTokens.iconButton,
+    height: ComponentHeightTokens.iconButton,
+    borderRadius: ComponentHeightTokens.iconButton / 2,
     alignItems: 'center',
     justifyContent: 'center',
   },

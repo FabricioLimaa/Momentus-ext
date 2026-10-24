@@ -95,3 +95,102 @@ export const Spacing = {
 
 export const BottomTabInset = Platform.select({ ios: 50, android: 70 }) ?? 0;
 export const MaxContentWidth = 800;
+
+/**
+ * Design Tokens Oficiais do Momentus (Multiplataforma: Web, Android e iOS)
+ */
+export const LayoutTokens = {
+  /** Largura máxima padrão para telas de conteúdo (Home, Agenda, Stats, Menu, etc.) */
+  maxContentWidth: 680,
+  /** Largura máxima para fluxos focados / leitura imersiva (Modo Foco) */
+  maxFocusWidth: 540,
+  /** Largura máxima para autenticação e formulários estreitos (Login, Cadastro, Recuperar Senha) */
+  maxAuthWidth: 440,
+  /** Largura máxima para diálogos flutuantes centrais (Modais informativos e de confirmação) */
+  maxDialogWidth: 420,
+  /** Largura máxima para formulários modais e bottom sheets no desktop */
+  maxModalSheetWidth: 520,
+  /** Padding horizontal padrão do aplicativo em smartphones */
+  pagePaddingHorizontal: 20,
+  /** Padding vertical padrão de topo do conteúdo */
+  pagePaddingTop: 16,
+  /** Espaçamento de rodapé para garantir que o FAB ou barra inferior não cubram conteúdo */
+  pagePaddingBottom: Platform.select({ ios: 100, android: 96, default: 80 }) ?? 80,
+} as const;
+
+export const SpacingTokens = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 24,
+  section: 32,
+} as const;
+
+export const BorderRadiusTokens = {
+  xs: 6,
+  sm: 10,
+  control: 12,
+  input: 16,
+  button: 16,
+  card: 20,
+  modal: 28,
+  pill: 9999,
+} as const;
+
+export const ComponentHeightTokens = {
+  buttonHero: 52,
+  buttonModal: 48,
+  input: 52,
+  iconButton: 44,
+  chip: 38,
+  fab: 58,
+} as const;
+
+export const TypographyTokens = {
+  heroTitle: {
+    fontSize: 32,
+    fontWeight: '900' as const,
+    letterSpacing: -0.5,
+    lineHeight: 38,
+  },
+  screenTitle: {
+    fontSize: 24,
+    fontWeight: '900' as const,
+    letterSpacing: -0.3,
+    lineHeight: 30,
+  },
+  screenSubtitle: {
+    fontSize: 13,
+    fontWeight: '500' as const,
+    lineHeight: 18,
+  },
+  sectionHeader: {
+    fontSize: 18,
+    fontWeight: '800' as const,
+    lineHeight: 24,
+  },
+  cardTitle: {
+    fontSize: 15,
+    fontWeight: '800' as const,
+    lineHeight: 22,
+  },
+  bodyText: {
+    fontSize: 14,
+    fontWeight: '500' as const,
+    lineHeight: 20,
+  },
+  caption: {
+    fontSize: 12,
+    fontWeight: '600' as const,
+    lineHeight: 16,
+  },
+  micro: {
+    fontSize: 10,
+    fontWeight: '800' as const,
+    letterSpacing: 0.5,
+    lineHeight: 14,
+  },
+} as const;
+

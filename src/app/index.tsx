@@ -6,7 +6,14 @@ import { TimelineEventItem } from "@/components/momentus/TimelineEventItem";
 import { SplashScreen } from "@/components/momentus/SplashScreen";
 import { auth as firebaseAuth } from "@/config/firebase";
 import { getStreakColor, getTodayDateString } from "@/constants/initialData";
-import { MomentusColors, getContrastTextColor } from "@/constants/theme";
+import {
+  MomentusColors,
+  getContrastTextColor,
+  LayoutTokens,
+  BorderRadiusTokens,
+  ComponentHeightTokens,
+  TypographyTokens,
+} from "@/constants/theme";
 import { useMomentus } from "@/context/MomentusContext";
 import { HabitItem } from "@/types";
 import { Ionicons } from "@expo/vector-icons";
@@ -490,12 +497,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: MomentusColors.navyBackground,
+    width: "100%",
+    maxWidth: LayoutTokens.maxContentWidth,
+    alignSelf: "center",
   },
   selectionTopBar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
+    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
     paddingVertical: 12,
     backgroundColor: MomentusColors.navySurface,
     borderBottomWidth: 1,
@@ -511,9 +521,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   iconButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: ComponentHeightTokens.chip,
+    height: ComponentHeightTokens.chip,
+    borderRadius: ComponentHeightTokens.chip / 2,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -521,8 +531,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
+    paddingTop: LayoutTokens.pagePaddingTop,
+    paddingBottom: LayoutTokens.pagePaddingBottom,
   },
   homeHeader: {
     flexDirection: "row",
@@ -657,46 +668,43 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: "800",
+    ...TypographyTokens.sectionHeader,
     color: MomentusColors.textPrimary,
   },
   sectionCountText: {
-    fontSize: 13,
-    fontWeight: "600",
+    ...TypographyTokens.screenSubtitle,
     color: MomentusColors.textSecondary,
   },
   emptyContainer: {
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 48,
-    borderRadius: 24,
+    borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
     marginTop: 8,
   },
   emptyTitle: {
-    fontSize: 16,
-    fontWeight: "700",
+    ...TypographyTokens.cardTitle,
     color: MomentusColors.textPrimary,
     marginTop: 12,
   },
   emptySubtitle: {
-    fontSize: 13,
+    ...TypographyTokens.screenSubtitle,
     color: MomentusColors.textSecondary,
     marginTop: 4,
   },
   timelineList: {
-    borderRadius: 24,
+    borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
     paddingVertical: 12,
   },
   fab: {
     position: "absolute",
-    right: 20,
+    right: LayoutTokens.pagePaddingHorizontal,
     bottom: 24,
-    width: 58,
-    height: 58,
-    borderRadius: 29,
+    width: ComponentHeightTokens.fab,
+    height: ComponentHeightTokens.fab,
+    borderRadius: ComponentHeightTokens.fab / 2,
     justifyContent: "center",
     alignItems: "center",
     shadowOffset: { width: 0, height: 6 },

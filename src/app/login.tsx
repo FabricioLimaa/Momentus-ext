@@ -15,7 +15,11 @@ import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MomentusColors } from '@/constants/theme';
+import {
+  MomentusColors,
+  LayoutTokens,
+  TypographyTokens,
+} from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import {
   loginWithGoogle,
@@ -355,10 +359,15 @@ const styles = StyleSheet.create({
     backgroundColor: MomentusColors.navyBackground,
   },
   scrollContent: {
-    paddingHorizontal: 28,
+    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
+    paddingTop: LayoutTokens.pagePaddingTop,
+    paddingBottom: LayoutTokens.pagePaddingBottom,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: '100%',
+    width: '100%',
+    maxWidth: LayoutTokens.maxAuthWidth,
+    alignSelf: 'center',
   },
   logoContainer: {
     alignItems: 'center',
@@ -385,10 +394,8 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   brandTitle: {
-    fontSize: 34,
-    fontWeight: '900',
+    ...TypographyTokens.heroTitle,
     color: MomentusColors.textPrimary,
-    letterSpacing: -0.5,
   },
   brandSubtitle: {
     fontSize: 15,

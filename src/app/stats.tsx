@@ -10,7 +10,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { MomentusColors, getContrastTextColor } from '@/constants/theme';
+import {
+  MomentusColors,
+  getContrastTextColor,
+  LayoutTokens,
+  BorderRadiusTokens,
+  TypographyTokens,
+} from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 
 type StatsFilter = 'WEEK' | 'MONTH' | 'YEAR';
@@ -490,33 +496,35 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
+    width: '100%',
+    maxWidth: LayoutTokens.maxContentWidth,
+    alignSelf: 'center',
   },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
+    paddingTop: LayoutTokens.pagePaddingTop,
     marginBottom: 16,
   },
   title: {
+    ...TypographyTokens.screenTitle,
     color: MomentusColors.textPrimary,
-    fontSize: 24,
-    fontWeight: '900',
   },
   subtitle: {
+    ...TypographyTokens.screenSubtitle,
     color: MomentusColors.textSecondary,
-    fontSize: 13,
     marginTop: 2,
   },
   scroll: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 60,
+    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
+    paddingBottom: LayoutTokens.pagePaddingBottom,
   },
   filterRow: {
     flexDirection: 'row',
     backgroundColor: MomentusColors.navySurface,
-    borderRadius: 14,
+    borderRadius: BorderRadiusTokens.input,
     padding: 4,
     borderWidth: 1,
     borderColor: MomentusColors.navyOutline,
@@ -525,7 +533,7 @@ const styles = StyleSheet.create({
   filterBtn: {
     flex: 1,
     paddingVertical: 8,
-    borderRadius: 10,
+    borderRadius: BorderRadiusTokens.sm,
     alignItems: 'center',
   },
   filterBtnActive: {
@@ -582,7 +590,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   chartCard: {
-    borderRadius: 22,
+    borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
     padding: 18,
     marginBottom: 20,
@@ -663,7 +671,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   categoriesProgressCard: {
-    borderRadius: 22,
+    borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
     padding: 18,
     gap: 16,
