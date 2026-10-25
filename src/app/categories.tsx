@@ -134,6 +134,8 @@ export default function CategoriesScreen() {
         <TouchableOpacity
           onPress={() => router.back()}
           style={styles.backButton}
+          accessibilityRole="button"
+          accessibilityLabel="Voltar"
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Ionicons name="arrow-back" size={24} color={theme.textPrimary} />
         </TouchableOpacity>
@@ -266,6 +268,7 @@ export default function CategoriesScreen() {
                 placeholder="Ex: Trabalho, Estudos, Saúde..."
                 placeholderTextColor={MomentusColors.textMuted}
                 autoFocus
+                maxLength={40}
               />
 
               {/* Seção Informativa de Meta Semanal (Bloqueada com Badge "Em breve") */}
@@ -390,7 +393,9 @@ export default function CategoriesScreen() {
               <View style={styles.modalButtonsRow}>
                 <TouchableOpacity
                   style={[styles.modalCancelBtn, { borderColor: theme.outline }]}
-                  onPress={() => setIsCreateModalOpen(false)}>
+                  onPress={() => setIsCreateModalOpen(false)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancelar criação ou edição">
                   <Text style={[styles.modalCancelBtnText, { color: theme.textSecondary }]}>
                     Cancelar
                   </Text>
@@ -398,7 +403,9 @@ export default function CategoriesScreen() {
 
                 <TouchableOpacity
                   style={[styles.modalSaveBtn, { backgroundColor: theme.primary }]}
-                  onPress={handleSaveCategory}>
+                  onPress={handleSaveCategory}
+                  accessibilityRole="button"
+                  accessibilityLabel="Salvar categoria">
                   <Text style={styles.modalSaveBtnText}>Salvar</Text>
                 </TouchableOpacity>
               </View>

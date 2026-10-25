@@ -57,6 +57,36 @@ export type MomentusAuthUser = User & {
 };
 
 /**
+ * Traduz códigos de erro do Firebase Auth para mensagens amigáveis em português.
+ */
+export function getFriendlyAuthErrorMessage(err: unknown): string {
+  const code = (err as any)?.code ? String((err as any).code) : '';
+  switch (code) {
+    case 'auth/invalid-email':
+      return 'O endereço de e-mail informado é inválido.';
+    case 'auth/user-disabled':
+      return 'Esta conta de usuário foi desativada.';
+    case 'auth/user-not-found':
+      return 'Não encontramos nenhuma conta cadastrada com este e-mail.';
+    case 'auth/wrong-password':
+    case 'auth/invalid-credential':
+      return 'E-mail ou senha incorretos. Verifique suas credenciais.';
+    case 'auth/email-already-in-use':
+      return 'Este e-mail já está cadastrado em outra conta.';
+    case 'auth/weak-password':
+      return 'A senha é muito fraca. Digite pelo menos 6 caracteres.';
+    case 'auth/network-request-failed':
+      return 'Falha na conexão com a internet. Verifique sua rede e tente novamente.';
+    case 'auth/too-many-requests':
+      return 'Muitas tentativas sem sucesso. Aguarde alguns instantes antes de tentar novamente.';
+    case 'auth/popup-closed-by-user':
+      return 'A janela de autenticação foi fechada antes de concluir o acesso.';
+    default:
+      return (err as any)?.message || 'Ocorreu um erro ao processar sua solicitação.';
+  }
+}
+
+/**
  * Detecta se o erro retornado pelo Firebase Identity Toolkit decorre da restrição
  * "Apps para Android" configurada na API Key do Google Cloud Console
  * (`auth/requests-from-this-android-client-application-<empty>-are-blocked.`).

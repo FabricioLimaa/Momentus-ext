@@ -25,6 +25,7 @@ import {
   loginWithGoogle,
   loginWithApple,
   loginWithEmail,
+  getFriendlyAuthErrorMessage,
 } from '@/services/authService';
 import { hasAcceptedTermsCloud } from '@/services/firestoreSyncService';
 import { CURRENT_TERMS_VERSION } from '@/constants/legalContent';
@@ -86,7 +87,7 @@ export default function LoginScreen() {
       if (err.message !== 'SIGN_IN_CANCELLED' && err.code !== 'SIGN_IN_CANCELLED') {
         Alert.alert(
           'Erro ao entrar com Google',
-          err.message || 'Verifique sua conexão ou tente novamente.'
+          getFriendlyAuthErrorMessage(err)
         );
       }
     }
@@ -114,7 +115,7 @@ export default function LoginScreen() {
       setLoading(false);
       setIsPostLoginSyncing(false);
       if (err.code !== 'ERR_REQUEST_CANCELED') {
-        Alert.alert('Erro ao entrar com Apple', err.message || 'Não foi possível autenticar.');
+        Alert.alert('Erro ao entrar com Apple', getFriendlyAuthErrorMessage(err));
       }
     }
   };
@@ -149,7 +150,7 @@ export default function LoginScreen() {
     } catch (err: any) {
       setLoading(false);
       setIsPostLoginSyncing(false);
-      Alert.alert('Erro no login', err.message || 'E-mail ou senha incorretos.');
+      Alert.alert('Erro no login', getFriendlyAuthErrorMessage(err));
     }
   };
 

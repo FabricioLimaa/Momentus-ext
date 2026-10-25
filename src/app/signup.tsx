@@ -22,7 +22,7 @@ import {
   TypographyTokens,
 } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
-import { registerWithEmail } from '@/services/authService';
+import { registerWithEmail, getFriendlyAuthErrorMessage } from '@/services/authService';
 import { SplashScreen } from '@/components/momentus/SplashScreen';
 
 export default function SignUpScreen() {
@@ -81,7 +81,7 @@ export default function SignUpScreen() {
     } catch (err: any) {
       setLoading(false);
       setIsPostSignUpSyncing(false);
-      Alert.alert('Erro ao criar conta', err.message || 'Verifique seus dados e tente novamente.');
+      Alert.alert('Erro ao criar conta', getFriendlyAuthErrorMessage(err));
     }
   };
 

@@ -592,6 +592,7 @@ export default function TemplatesScreen() {
               onChangeText={setFormName}
               placeholder="ex: Dia de Trabalho, Fim de Semana"
               placeholderTextColor={`${theme.textSecondary}80`}
+              maxLength={60}
             />
 
             {/* Descrição do Template */}
@@ -604,6 +605,7 @@ export default function TemplatesScreen() {
               onChangeText={setFormDescription}
               placeholder="Ex: Rotina focada em estudos e foco..."
               placeholderTextColor={`${theme.textSecondary}80`}
+              maxLength={200}
             />
 
             {/* Eventos da Rotina */}
@@ -628,7 +630,9 @@ export default function TemplatesScreen() {
                   {formEvents.length > 1 ? (
                     <TouchableOpacity
                       onPress={() => handleRemoveEventField(index)}
-                      activeOpacity={0.7}>
+                      activeOpacity={0.7}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Remover evento ${index + 1}`}>
                       <Ionicons name="trash-outline" size={18} color={MomentusColors.errorRed} />
                     </TouchableOpacity>
                   ) : null}
@@ -641,6 +645,7 @@ export default function TemplatesScreen() {
                   onChangeText={(val) => handleUpdateEventField(index, { title: val })}
                   placeholder="Título da atividade *"
                   placeholderTextColor={`${theme.textSecondary}80`}
+                  maxLength={80}
                 />
 
                 {/* Descrição do Evento */}
@@ -650,6 +655,7 @@ export default function TemplatesScreen() {
                   onChangeText={(val) => handleUpdateEventField(index, { description: val })}
                   placeholder="Descrição da atividade (opcional)"
                   placeholderTextColor={`${theme.textSecondary}80`}
+                  maxLength={200}
                 />
 
                 {/* Faixa Integrada de Horário (Time Range Chip) */}

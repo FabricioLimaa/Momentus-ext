@@ -137,7 +137,11 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
         <View style={[styles.sheetContainer, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
           <View style={styles.header}>
             <Text style={[styles.title, { color: theme.textPrimary }]}>{isEditMode ? 'Editar Rotina' : 'Nova Rotina'}</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+            <TouchableOpacity
+              onPress={onClose}
+              style={styles.closeBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Fechar modal">
               <Ionicons name="close" size={22} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>
@@ -151,6 +155,7 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
               placeholderTextColor={MomentusColors.textMuted}
               value={title}
               onChangeText={setTitle}
+              maxLength={80}
             />
 
             {/* Seletor Integrado de Faixa de Horário (Time Range Chip) */}
@@ -269,6 +274,7 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
               onChangeText={setDescription}
               multiline
               numberOfLines={3}
+              maxLength={250}
             />
 
             {/* Google Calendar Switch */}
@@ -293,14 +299,18 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
               style={[
                 styles.cancelBtn,
                 { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
-              ]}>
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Cancelar">
               <Text style={[styles.cancelText, { color: theme.textSecondary }]}>Cancelar</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={handleSave}
               style={[styles.saveBtn, { backgroundColor: theme.primary }, !isFormValid && styles.disabledBtn]}
-              disabled={!isFormValid}>
+              disabled={!isFormValid}
+              accessibilityRole="button"
+              accessibilityLabel={isEditMode ? 'Salvar Alterações' : 'Salvar Rotina'}>
               <Text style={[styles.saveText, { color: getContrastTextColor(theme.primary) }]}>
                 {isEditMode ? 'Salvar Alterações' : 'Salvar Rotina'}
               </Text>

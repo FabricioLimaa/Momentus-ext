@@ -22,7 +22,7 @@ import {
   TypographyTokens,
 } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
-import { sendPasswordReset } from '@/services/authService';
+import { sendPasswordReset, getFriendlyAuthErrorMessage } from '@/services/authService';
 
 export default function ForgotPasswordScreen() {
   const insets = useSafeAreaInsets();
@@ -56,7 +56,7 @@ export default function ForgotPasswordScreen() {
       );
     } catch (err: any) {
       setLoading(false);
-      Alert.alert('Erro', err.message || 'Não foi possível enviar o e-mail de redefinição.');
+      Alert.alert('Erro', getFriendlyAuthErrorMessage(err));
     }
   };
 
