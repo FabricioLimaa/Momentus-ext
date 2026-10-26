@@ -9,6 +9,10 @@ import {
   TextInput,
   Switch,
   Alert,
+  SafeAreaView,
+  StatusBar,
+  Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,7 +30,7 @@ import {
 
 export default function CategoriesScreen() {
   const insets = useSafeAreaInsets();
-  const { categories, marketItems, upsertCategory, deleteCategory, theme } = useMomentus();
+  const { categories, habits, marketItems, upsertCategory, deleteCategory, theme } = useMomentus();
 
   // Estados dos Diálogos
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -40,6 +44,11 @@ export default function CategoriesScreen() {
   const [isMetaEnabled, setIsMetaEnabled] = useState(false);
   const [metaHours, setMetaHours] = useState('0');
   const [metaMinutes, setMetaMinutes] = useState('0');
+
+  // Identifica categoria do sistema / protegida (Outros)
+  const isSystemCategory = (cat: Category) => {
+    return cat.id === 'cat-outros' || cat.name.trim().toLowerCase() === 'outros';
+  };
 
   // Filtra apenas stickers que o usuário realmente possui (isOwned === true)
   const ownedStickers = marketItems.filter(
@@ -127,335 +136,414 @@ export default function CategoriesScreen() {
     return sticker?.iconName || 'bookmark';
   };
 
+  // Quantidade de rotinas afetadas no modal de exclusão
+  const deletingCategoryHabitsCount = deletingCategory
+    ? habits.filter((h) => h.categoryId === deletingCategory.id).length
+    : 0;
+
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      {/* Top Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.backButton}
-          accessibilityRole="button"
-          accessibilityLabel="Voltar"
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Ionicons name="arrow-back" size={24} color={theme.textPrimary} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Gerenciar Categorias</Text>
-        <View style={styles.placeholder} />
-      </View>
-
-      <ScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: insets.bottom + 32 },
-        ]}
-        showsVerticalScrollIndicator={false}>
-        <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-          Crie suas categorias do seu jeito
-        </Text>
-
-        {/* Botão Nova Categoria */}
-        <TouchableOpacity
-          style={[styles.newCategoryBtn, { backgroundColor: theme.primary }]}
-          onPress={handleOpenCreateModal}
-          activeOpacity={0.85}>
-          <Ionicons name="add" size={22} color="#0F172A" />
-          <Text style={styles.newCategoryBtnText}>Nova Categoria</Text>
-        </TouchableOpacity>
-
-        {/* Lista de Categorias */}
-        <View style={styles.categoryList}>
-          {categories.map((cat) => {
-            const stickerIcon = getStickerIconName(cat.stickerId);
-            const metaMinutos = cat.metaMinutosSemanal || 0;
-            const metaH = Math.floor(metaMinutos / 60);
-            const metaM = metaMinutos % 60;
-
-            return (
-              <View
-                key={cat.id}
-                style={[
-                  styles.categoryCard,
-                  { backgroundColor: theme.surface, borderColor: theme.outline },
-                ]}>
-                <View style={styles.cardMainRow}>
-                  <View style={styles.cardLeft}>
-                    <View
-                      style={[
-                        styles.colorCircle,
-                        { backgroundColor: cat.color || '#616161' },
-                      ]}>
-                      {stickerIcon ? (
-                        <Ionicons name={stickerIcon} size={16} color="#FFFFFF" />
-                      ) : null}
-                    </View>
-                    <Text
-                      numberOfLines={1}
-                      style={[styles.categoryName, { color: theme.textPrimary }]}>
-                      {cat.name}
-                    </Text>
-                  </View>
-
-                  <View style={styles.cardActions}>
-                    <TouchableOpacity
-                      onPress={() => handleOpenEditModal(cat)}
-                      style={styles.actionIconBtn}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                      <Ionicons name="pencil" size={18} color={theme.primary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => setDeletingCategory(cat)}
-                      style={styles.actionIconBtn}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                      <Ionicons name="trash-outline" size={18} color="#EF4444" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {metaMinutos > 0 && (
-                  <View style={styles.metaRow}>
-                    <Text style={[styles.metaText, { color: theme.textSecondary }]}>
-                      Meta Semanal: {metaH}h {metaM}m
-                    </Text>
-                  </View>
-                )}
-              </View>
-            );
-          })}
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+      <StatusBar
+        barStyle={theme.isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={theme.background}
+      />
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        {/* Top Header */}
+        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backButton}
+            accessibilityRole="button"
+            accessibilityLabel="Voltar"
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="arrow-back" size={24} color={theme.textPrimary} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Gerenciar Categorias</Text>
+          <View style={styles.placeholder} />
         </View>
-      </ScrollView>
 
-      {/* Modal de Criação / Edição de Categoria */}
-      <Modal
-        visible={isCreateModalOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setIsCreateModalOpen(false)}>
-        <View style={styles.modalOverlay}>
-          <View
-            style={[
-              styles.modalCard,
-              { backgroundColor: theme.surface, borderColor: theme.outline },
-            ]}>
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.modalScrollContent}>
-              <View style={styles.modalHeaderRow}>
-                <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
-                  {editingCategory ? 'Editar Categoria' : 'Nova Categoria'}
-                </Text>
-                <TouchableOpacity
-                  onPress={() => setIsCreateModalOpen(false)}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Ionicons name="close" size={24} color={theme.textSecondary} />
-                </TouchableOpacity>
-              </View>
+        <ScrollView
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: insets.bottom + 32 },
+          ]}
+          showsVerticalScrollIndicator={false}>
+          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+            Crie suas categorias do seu jeito
+          </Text>
 
-              {/* Nome */}
-              <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>
-                Nome da Categoria *
-              </Text>
-              <TextInput
-                style={[
-                  styles.textInput,
-                  {
-                    backgroundColor: theme.surfaceElevated,
-                    borderColor: theme.outline,
-                    color: theme.textPrimary,
-                  },
-                ]}
-                value={formName}
-                onChangeText={setFormName}
-                placeholder="Ex: Trabalho, Estudos, Saúde..."
-                placeholderTextColor={MomentusColors.textMuted}
-                autoFocus
-                maxLength={40}
-              />
+          {/* Botão Nova Categoria */}
+          <TouchableOpacity
+            style={[styles.newCategoryBtn, { backgroundColor: theme.primary }]}
+            onPress={handleOpenCreateModal}
+            activeOpacity={0.85}>
+            <Ionicons name="add" size={22} color="#0F172A" />
+            <Text style={styles.newCategoryBtnText}>Nova Categoria</Text>
+          </TouchableOpacity>
 
-              {/* Seção Informativa de Meta Semanal (Bloqueada com Badge "Em breve") */}
-              <View
-                style={[
-                  styles.metaCardContainer,
-                  {
-                    backgroundColor: theme.surfaceElevated,
-                    borderColor: theme.outline,
-                  },
-                ]}>
-                <View style={styles.metaCardHeader}>
-                  <View style={styles.metaCardTitleRow}>
-                    <Ionicons name="time-outline" size={17} color={theme.textSecondary} />
-                    <Text style={[styles.metaToggleTitle, { color: theme.textPrimary }]}>
-                      Meta Semanal
-                    </Text>
-                    <View
-                      style={[
-                        styles.devBadge,
-                        {
-                          backgroundColor: `${MomentusColors.gold}20`,
-                          borderColor: `${MomentusColors.gold}50`,
-                        },
-                      ]}>
-                      <Ionicons name="lock-closed" size={10} color={MomentusColors.gold} />
-                      <Text style={[styles.devBadgeText, { color: MomentusColors.gold }]}>
-                        Em breve
+          {/* Lista de Categorias */}
+          <View style={styles.categoryList}>
+            {categories.map((cat) => {
+              const stickerIcon = getStickerIconName(cat.stickerId);
+              const metaMinutos = cat.metaMinutosSemanal || 0;
+              const metaH = Math.floor(metaMinutos / 60);
+              const metaM = metaMinutos % 60;
+              const isSystem = isSystemCategory(cat);
+              const linkedHabitsCount = habits.filter((h) => h.categoryId === cat.id).length;
+
+              return (
+                <View
+                  key={cat.id}
+                  style={[
+                    styles.categoryCard,
+                    { backgroundColor: theme.surface, borderColor: theme.outline },
+                  ]}>
+                  <View style={styles.cardMainRow}>
+                    <View style={styles.cardLeft}>
+                      <View
+                        style={[
+                          styles.colorCircle,
+                          { backgroundColor: cat.color || '#616161' },
+                        ]}>
+                        {stickerIcon ? (
+                          <Ionicons name={stickerIcon} size={16} color="#FFFFFF" />
+                        ) : null}
+                      </View>
+                      <View style={styles.categoryTitleCol}>
+                        <View style={styles.nameRow}>
+                          <Text
+                            numberOfLines={1}
+                            style={[styles.categoryName, { color: theme.textPrimary }]}>
+                            {cat.name}
+                          </Text>
+                          {isSystem && (
+                            <View
+                              style={[
+                                styles.systemBadge,
+                                {
+                                  backgroundColor: `${theme.primary}18`,
+                                  borderColor: `${theme.primary}40`,
+                                },
+                              ]}>
+                              <Text style={[styles.systemBadgeText, { color: theme.primary }]}>
+                                Padrão
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={[styles.categoryHabitCount, { color: theme.textSecondary }]}>
+                          {linkedHabitsCount === 0
+                            ? 'Nenhuma rotina vinculada'
+                            : `${linkedHabitsCount} rotina${linkedHabitsCount === 1 ? '' : 's'} vinculada${linkedHabitsCount === 1 ? '' : 's'}`}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.cardActions}>
+                      <TouchableOpacity
+                        onPress={() => handleOpenEditModal(cat)}
+                        style={styles.actionIconBtn}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Editar categoria ${cat.name}`}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <Ionicons name="pencil" size={18} color={theme.primary} />
+                      </TouchableOpacity>
+                      {!isSystem ? (
+                        <TouchableOpacity
+                          onPress={() => setDeletingCategory(cat)}
+                          style={styles.actionIconBtn}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Excluir categoria ${cat.name}`}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                          <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                        </TouchableOpacity>
+                      ) : (
+                        <View
+                          style={styles.actionIconDisabled}
+                          accessibilityLabel="Categoria padrão do sistema protegida">
+                          <Ionicons name="lock-closed-outline" size={16} color={theme.textSecondary} />
+                        </View>
+                      )}
+                    </View>
+                  </View>
+
+                  {metaMinutos > 0 && (
+                    <View style={styles.metaRow}>
+                      <Text style={[styles.metaText, { color: theme.textSecondary }]}>
+                        Meta Semanal: {metaH}h {metaM}m
                       </Text>
                     </View>
-                  </View>
-                  <Switch
-                    value={false}
-                    disabled={true}
-                    trackColor={{ false: theme.outline, true: theme.primary }}
-                    thumbColor={theme.isDark ? '#475569' : '#94A3B8'}
-                  />
+                  )}
                 </View>
-                <Text style={[styles.metaToggleSub, { color: theme.textSecondary }]}>
-                  O planejamento de metas semanais e relatórios analíticos por categoria serão disponibilizados em uma próxima atualização.
-                </Text>
-              </View>
+              );
+            })}
+          </View>
+        </ScrollView>
 
-              {/* Seletor de Cores do Google Agenda */}
-              <Text style={[styles.inputLabel, { color: theme.textPrimary, marginTop: 18 }]}>
-                Cor da Categoria
-              </Text>
-              <View style={styles.colorPaletteGrid}>
-                {GOOGLE_CALENDAR_COLORS.map((item) => {
-                  const isSelected = formColor.toUpperCase() === item.color.toUpperCase();
-                  return (
-                    <TouchableOpacity
-                      key={item.id}
-                      onPress={() => setFormColor(item.color)}
-                      activeOpacity={0.8}
-                      style={[
-                        styles.colorPaletteItem,
-                        { backgroundColor: item.color },
-                        isSelected && [
-                          styles.colorPaletteItemSelected,
-                          { borderColor: theme.primary },
-                        ],
-                      ]}>
-                      {isSelected && (
-                        <Ionicons name="checkmark" size={18} color="#FFFFFF" />
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              {/* Seletor de Stickers Adquiridos */}
-              {ownedStickers.length > 0 && (
-                <View style={{ marginTop: 16 }}>
-                  <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>
-                    Sticker Exclusivo
+        {/* Modal de Criação / Edição de Categoria */}
+        <Modal
+          visible={isCreateModalOpen}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setIsCreateModalOpen(false)}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.modalOverlay}>
+            <View
+              style={[
+                styles.modalCard,
+                { backgroundColor: theme.surface, borderColor: theme.outline },
+              ]}>
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.modalScrollContent}>
+                <View style={styles.modalHeaderRow}>
+                  <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
+                    {editingCategory ? 'Editar Categoria' : 'Nova Categoria'}
                   </Text>
-                  <View style={styles.stickerRow}>
-                    <TouchableOpacity
-                      onPress={() => setFormStickerId(null)}
-                      style={[
-                        styles.stickerItem,
-                        {
-                          backgroundColor: theme.surfaceElevated,
-                          borderColor:
-                            formStickerId === null ? theme.primary : theme.outline,
-                        },
-                      ]}>
-                      <Ionicons
-                        name="ban"
-                        size={18}
-                        color={formStickerId === null ? theme.primary : theme.textSecondary}
-                      />
-                    </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setIsCreateModalOpen(false)}
+                    style={styles.closeBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel="Fechar formulário"
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name="close" size={24} color={theme.textSecondary} />
+                  </TouchableOpacity>
+                </View>
 
-                    {ownedStickers.map((stk) => {
-                      const isSelected = formStickerId === stk.id;
-                      return (
-                        <TouchableOpacity
-                          key={stk.id}
-                          onPress={() => setFormStickerId(stk.id)}
-                          style={[
-                            styles.stickerItem,
-                            {
-                              backgroundColor: theme.surfaceElevated,
-                              borderColor: isSelected ? theme.primary : theme.outline,
-                            },
-                          ]}>
-                          <Ionicons
-                            name={(stk.iconName as any) || 'sparkles'}
-                            size={18}
-                            color={isSelected ? theme.primary : theme.textPrimary}
-                          />
-                        </TouchableOpacity>
-                      );
-                    })}
+                {/* Nome */}
+                <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>
+                  Nome da Categoria *
+                </Text>
+                <TextInput
+                  style={[
+                    styles.textInput,
+                    {
+                      backgroundColor: theme.surfaceElevated,
+                      borderColor: theme.outline,
+                      color: theme.textPrimary,
+                    },
+                  ]}
+                  value={formName}
+                  onChangeText={setFormName}
+                  placeholder="Ex: Trabalho, Estudos, Saúde..."
+                  placeholderTextColor={MomentusColors.textMuted}
+                  autoFocus
+                  maxLength={40}
+                />
+
+                {/* Seção Informativa de Meta Semanal (Bloqueada com Badge "Em breve") */}
+                <View
+                  style={[
+                    styles.metaCardContainer,
+                    {
+                      backgroundColor: theme.surfaceElevated,
+                      borderColor: theme.outline,
+                    },
+                  ]}>
+                  <View style={styles.metaCardHeader}>
+                    <View style={styles.metaCardTitleRow}>
+                      <Ionicons name="time-outline" size={17} color={theme.textSecondary} />
+                      <Text style={[styles.metaToggleTitle, { color: theme.textPrimary }]}>
+                        Meta Semanal
+                      </Text>
+                      <View
+                        style={[
+                          styles.devBadge,
+                          {
+                            backgroundColor: `${MomentusColors.gold}20`,
+                            borderColor: `${MomentusColors.gold}50`,
+                          },
+                        ]}>
+                        <Ionicons name="lock-closed" size={10} color={MomentusColors.gold} />
+                        <Text style={[styles.devBadgeText, { color: MomentusColors.gold }]}>
+                          Em breve
+                        </Text>
+                      </View>
+                    </View>
+                    <Switch
+                      value={false}
+                      disabled={true}
+                      trackColor={{ false: theme.outline, true: theme.primary }}
+                      thumbColor={theme.isDark ? '#475569' : '#94A3B8'}
+                    />
                   </View>
+                  <Text style={[styles.metaToggleSub, { color: theme.textSecondary }]}>
+                    O planejamento de metas semanais e relatórios analíticos por categoria serão disponibilizados em uma próxima atualização.
+                  </Text>
+                </View>
+
+                {/* Seletor de Cores do Google Agenda */}
+                <Text style={[styles.inputLabel, { color: theme.textPrimary, marginTop: 18 }]}>
+                  Cor da Categoria
+                </Text>
+                <View style={styles.colorPaletteGrid}>
+                  {GOOGLE_CALENDAR_COLORS.map((item) => {
+                    const isSelected = formColor.toUpperCase() === item.color.toUpperCase();
+                    return (
+                      <TouchableOpacity
+                        key={item.id}
+                        onPress={() => setFormColor(item.color)}
+                        activeOpacity={0.8}
+                        style={[
+                          styles.colorPaletteItem,
+                          { backgroundColor: item.color },
+                          isSelected && [
+                            styles.colorPaletteItemSelected,
+                            { borderColor: theme.primary },
+                          ],
+                        ]}>
+                        {isSelected && (
+                          <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {/* Seletor de Stickers Adquiridos */}
+                {ownedStickers.length > 0 && (
+                  <View style={{ marginTop: 16 }}>
+                    <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>
+                      Sticker Exclusivo
+                    </Text>
+                    <View style={styles.stickerRow}>
+                      <TouchableOpacity
+                        onPress={() => setFormStickerId(null)}
+                        style={[
+                          styles.stickerItem,
+                          {
+                            backgroundColor: theme.surfaceElevated,
+                            borderColor:
+                              formStickerId === null ? theme.primary : theme.outline,
+                          },
+                        ]}>
+                        <Ionicons
+                          name="ban"
+                          size={18}
+                          color={formStickerId === null ? theme.primary : theme.textSecondary}
+                        />
+                      </TouchableOpacity>
+
+                      {ownedStickers.map((stk) => {
+                        const isSelected = formStickerId === stk.id;
+                        return (
+                          <TouchableOpacity
+                            key={stk.id}
+                            onPress={() => setFormStickerId(stk.id)}
+                            style={[
+                              styles.stickerItem,
+                              {
+                                backgroundColor: theme.surfaceElevated,
+                                borderColor: isSelected ? theme.primary : theme.outline,
+                              },
+                            ]}>
+                            <Ionicons
+                              name={(stk.iconName as any) || 'sparkles'}
+                              size={18}
+                              color={isSelected ? theme.primary : theme.textPrimary}
+                            />
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
+
+                {/* Botões do Modal */}
+                <View style={styles.modalButtonsRow}>
+                  <TouchableOpacity
+                    style={[styles.modalCancelBtn, { borderColor: theme.outline }]}
+                    onPress={() => setIsCreateModalOpen(false)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Cancelar criação ou edição">
+                    <Text style={[styles.modalCancelBtnText, { color: theme.textSecondary }]}>
+                      Cancelar
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.modalSaveBtn, { backgroundColor: theme.primary }]}
+                    onPress={handleSaveCategory}
+                    accessibilityRole="button"
+                    accessibilityLabel="Salvar categoria">
+                    <Text style={styles.modalSaveBtnText}>Salvar</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
+
+        {/* Modal de Confirmação de Exclusão */}
+        <Modal
+          visible={!!deletingCategory}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setDeletingCategory(null)}>
+          <View style={styles.modalOverlay}>
+            <View
+              style={[
+                styles.deleteDialogCard,
+                { backgroundColor: theme.surface, borderColor: theme.outline },
+              ]}>
+              <Text style={[styles.deleteDialogTitle, { color: theme.textPrimary }]}>
+                Excluir Categoria
+              </Text>
+              <Text style={[styles.deleteDialogDesc, { color: theme.textSecondary }]}>
+                Tem certeza que deseja excluir a categoria &quot;{deletingCategory?.name}&quot;?
+              </Text>
+
+              {deletingCategoryHabitsCount > 0 && (
+                <View
+                  style={[
+                    styles.deleteWarningBox,
+                    {
+                      backgroundColor: 'rgba(245, 158, 11, 0.12)',
+                      borderColor: 'rgba(245, 158, 11, 0.35)',
+                    },
+                  ]}>
+                  <Ionicons name="alert-circle-outline" size={18} color={MomentusColors.fireStreak} />
+                  <Text style={[styles.deleteWarningText, { color: theme.textPrimary }]}>
+                    Esta categoria possui{' '}
+                    <Text style={{ fontWeight: '800' }}>
+                      {deletingCategoryHabitsCount} rotina{deletingCategoryHabitsCount === 1 ? '' : 's'}
+                    </Text>
+                    . Ao excluir, elas serão transferidas automaticamente para a categoria{' '}
+                    <Text style={{ fontWeight: '800' }}>Outros</Text>.
+                  </Text>
                 </View>
               )}
 
-              {/* Botões do Modal */}
               <View style={styles.modalButtonsRow}>
                 <TouchableOpacity
                   style={[styles.modalCancelBtn, { borderColor: theme.outline }]}
-                  onPress={() => setIsCreateModalOpen(false)}
-                  accessibilityRole="button"
-                  accessibilityLabel="Cancelar criação ou edição">
+                  onPress={() => setDeletingCategory(null)}>
                   <Text style={[styles.modalCancelBtnText, { color: theme.textSecondary }]}>
                     Cancelar
                   </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.modalSaveBtn, { backgroundColor: theme.primary }]}
-                  onPress={handleSaveCategory}
-                  accessibilityRole="button"
-                  accessibilityLabel="Salvar categoria">
-                  <Text style={styles.modalSaveBtnText}>Salvar</Text>
+                  style={[styles.modalDeleteBtn, { backgroundColor: '#EF4444' }]}
+                  onPress={handleConfirmDelete}>
+                  <Text style={styles.modalDeleteBtnText}>Excluir</Text>
                 </TouchableOpacity>
               </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Modal de Confirmação de Exclusão */}
-      <Modal
-        visible={!!deletingCategory}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setDeletingCategory(null)}>
-        <View style={styles.modalOverlay}>
-          <View
-            style={[
-              styles.deleteDialogCard,
-              { backgroundColor: theme.surface, borderColor: theme.outline },
-            ]}>
-            <Text style={[styles.deleteDialogTitle, { color: theme.textPrimary }]}>
-              Excluir Categoria
-            </Text>
-            <Text style={[styles.deleteDialogDesc, { color: theme.textSecondary }]}>
-              Tem certeza que deseja excluir a categoria &quot;{deletingCategory?.name}&quot;?
-            </Text>
-
-            <View style={styles.modalButtonsRow}>
-              <TouchableOpacity
-                style={[styles.modalCancelBtn, { borderColor: theme.outline }]}
-                onPress={() => setDeletingCategory(null)}>
-                <Text style={[styles.modalCancelBtnText, { color: theme.textSecondary }]}>
-                  Cancelar
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalDeleteBtn, { backgroundColor: '#EF4444' }]}
-                onPress={handleConfirmDelete}>
-                <Text style={styles.modalDeleteBtnText}>Excluir</Text>
-              </TouchableOpacity>
             </View>
           </View>
-        </View>
-      </Modal>
-    </View>
+        </Modal>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    width: '100%',
+    backgroundColor: MomentusColors.navyBackground,
+  },
   container: {
     flex: 1,
     width: '100%',
@@ -476,6 +564,7 @@ const styles = StyleSheet.create({
     height: ComponentHeightTokens.iconButton,
     justifyContent: 'center',
     alignItems: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
   },
   headerTitle: {
     ...TypographyTokens.screenTitle,
@@ -500,6 +589,7 @@ const styles = StyleSheet.create({
     height: ComponentHeightTokens.buttonHero,
     borderRadius: BorderRadiusTokens.button,
     marginBottom: 24,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
   },
   newCategoryBtnText: {
     color: '#0F172A',
@@ -526,24 +616,56 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   colorCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  categoryTitleCol: {
+    flex: 1,
+    gap: 2,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
   },
   categoryName: {
     fontSize: 16,
     fontWeight: '700',
-    flex: 1,
+  },
+  categoryHabitCount: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  systemBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  systemBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
   },
   cardActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   actionIconBtn: {
-    padding: 6,
+    padding: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
+  },
+  actionIconDisabled: {
+    padding: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    opacity: 0.45,
   },
   metaRow: {
     marginTop: 10,
@@ -574,6 +696,9 @@ const styles = StyleSheet.create({
   },
   modalScrollContent: {
     paddingBottom: 24,
+  },
+  closeBtn: {
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
   },
   metaCardContainer: {
     borderRadius: 16,
@@ -653,6 +778,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: 'transparent',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
   },
   colorPaletteItemSelected: {
     borderColor: '#FFFFFF',
@@ -677,6 +803,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
   },
   modalButtonsRow: {
     flexDirection: 'row',
@@ -689,6 +816,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     alignItems: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
   },
   modalCancelBtnText: {
     fontSize: 15,
@@ -699,6 +827,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 16,
     alignItems: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
   },
   modalSaveBtnText: {
     color: '#0F172A',
@@ -711,21 +840,35 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadiusTokens.modal,
     borderWidth: 1,
     padding: 24,
+    gap: 14,
   },
   deleteDialogTitle: {
     fontSize: 18,
     fontWeight: '800',
-    marginBottom: 8,
   },
   deleteDialogDesc: {
     fontSize: 14,
     lineHeight: 20,
+  },
+  deleteWarningBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  deleteWarningText: {
+    fontSize: 13,
+    lineHeight: 18,
+    flex: 1,
   },
   modalDeleteBtn: {
     flex: 1,
     paddingVertical: 14,
     borderRadius: 16,
     alignItems: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
   },
   modalDeleteBtnText: {
     color: '#FFFFFF',

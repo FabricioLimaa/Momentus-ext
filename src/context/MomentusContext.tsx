@@ -1317,9 +1317,46 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const deleteCategory = (id: string) => {
+    // 1. Protege a categoria padrao do sistema ('Outros') contra exclusao
+    const catToDelete = categories.find((c) => c.id === id);
+    if (
+      catToDelete &&
+      (catToDelete.id === 'cat-outros' || catToDelete.name.trim().toLowerCase() === 'outros')
+    ) {
+      return;
+    }
+
+    // 2. Identifica a categoria canonica de fallback (Outros)
+    const outrosCat =
+      categories.find((c) => c.name.trim().toLowerCase() === 'outros') ||
+      INITIAL_CATEGORIES[0];
+    const fallbackCatId = outrosCat ? outrosCat.id : 'cat-outros';
+
+    // 3. Atualiza estado e banco de categorias
     setCategories((prev) => {
       const remaining = prev.filter((c) => c.id !== id);
-      return remaining.length > 0 ? remaining : INITIAL_CATEGORIES;
+      const finalCats = remaining.length > 0 ? remaining : INITIAL_CATEGORIES;
+      setAllCategoriesDb(finalCats).catch(() => {});
+      return finalCats;
+    });
+
+    // 4. Reatribui com seguranca todos os habitos vinculados para a categoria de fallback
+    setHabits((prev) => {
+      let hasChanges = false;
+      const currentUid = firebaseAuth.currentUser?.uid;
+      const updatedHabits = prev.map((h) => {
+        if (h.categoryId === id) {
+          hasChanges = true;
+          const reassigned = { ...h, categoryId: fallbackCatId };
+          upsertHabitDb(reassigned).catch(() => {});
+          if (currentUid) {
+            saveHabitToFirestore(currentUid, reassigned).catch(() => {});
+          }
+          return reassigned;
+        }
+        return h;
+      });
+      return hasChanges ? updatedHabits : prev;
     });
 
     const currentUid = firebaseAuth.currentUser?.uid;
