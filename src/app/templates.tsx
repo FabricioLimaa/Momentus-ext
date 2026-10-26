@@ -10,6 +10,8 @@ import {
   TextInput,
   Alert,
   Share,
+  Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -52,6 +54,7 @@ export default function TemplatesScreen() {
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [deletingTemplate, setDeletingTemplate] = useState<RoutineTemplate | null>(null);
 
   // Estados do formulário de criação/edição
   const [formName, setFormName] = useState('');
@@ -229,23 +232,16 @@ export default function TemplatesScreen() {
   };
 
   const handleDeleteTemplateConfirm = (template: RoutineTemplate) => {
-    Alert.alert(
-      'Deletar Template',
-      `Você tem certeza que quer deletar o template "${template.title}"? Essa ação não pode ser desfeita.`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'DELETAR',
-          style: 'destructive',
-          onPress: () => {
-            deleteTemplate(template.id);
-            if (editingTemplateId === template.id) {
-              setIsFormModalOpen(false);
-            }
-          },
-        },
-      ]
-    );
+    setDeletingTemplate(template);
+  };
+
+  const handleExecuteDeleteTemplate = () => {
+    if (!deletingTemplate) return;
+    deleteTemplate(deletingTemplate.id);
+    if (editingTemplateId === deletingTemplate.id) {
+      setIsFormModalOpen(false);
+    }
+    setDeletingTemplate(null);
   };
 
   const handleShareTemplate = async (template: RoutineTemplate) => {
@@ -437,6 +433,21 @@ export default function TemplatesScreen() {
               const previewEvents = sortedEvents.slice(0, 4);
               const remainingCount = template.items.length - 4;
 
+              const totalDurationMinutes = template.items.reduce((acc, it) => {
+                const start = parseTimeToMinutes(it.timeStart);
+                const end = parseTimeToMinutes(it.timeEnd || it.timeStart);
+                const diff = end - start;
+                return acc + (diff > 0 ? diff : 0);
+              }, 0);
+              const formattedTotalDuration = (() => {
+                if (totalDurationMinutes <= 0) return `${template.items.length * 30}m total`;
+                const h = Math.floor(totalDurationMinutes / 60);
+                const m = totalDurationMinutes % 60;
+                if (h > 0 && m > 0) return `${h}h ${m}m total`;
+                if (h > 0) return `${h}h total`;
+                return `${m}m total`;
+              })();
+
               return (
                 <View
                   key={template.id}
@@ -485,11 +496,11 @@ export default function TemplatesScreen() {
                     </View>
                   </View>
 
-                  {/* Chips de Status (conforme nativo) */}
+                  {/* Chips de Status (Duração real, Complexidade e Eficácia) */}
                   <View style={styles.statChipsRow}>
                     <View style={[styles.statChip, { backgroundColor: `${theme.textSecondary}10`, borderColor: theme.outline }]}>
                       <Ionicons name="time-outline" size={12} color={theme.primary} />
-                      <Text style={[styles.statChipText, { color: theme.textPrimary }]}>Novo template</Text>
+                      <Text style={[styles.statChipText, { color: theme.textPrimary }]}>{formattedTotalDuration}</Text>
                     </View>
                     <View style={[styles.statChip, { backgroundColor: `${theme.textSecondary}10`, borderColor: theme.outline }]}>
                       <Ionicons name="trending-up-outline" size={12} color={theme.primary} />
@@ -497,7 +508,9 @@ export default function TemplatesScreen() {
                     </View>
                     <View style={[styles.statChip, { backgroundColor: `${theme.textSecondary}10`, borderColor: theme.outline }]}>
                       <Ionicons name="star" size={12} color={theme.primary} />
-                      <Text style={[styles.statChipText, { color: theme.textPrimary }]}>Eficaz</Text>
+                      <Text style={[styles.statChipText, { color: theme.textPrimary }]}>
+                        {template.items.length >= 5 ? 'Alta Eficácia' : 'Eficaz'}
+                      </Text>
                     </View>
                   </View>
 
@@ -566,256 +579,273 @@ export default function TemplatesScreen() {
         transparent={false}
         onRequestClose={() => setIsFormModalOpen(false)}>
         <SafeAreaView style={[styles.formModalSafe, { backgroundColor: theme.background }]}>
-          <View style={[styles.formModalHeader, { borderBottomColor: theme.outline }]}>
-            <View>
-              <Text style={[styles.formModalTitle, { color: theme.textPrimary }]}>
-                {editingTemplateId ? 'Editar Template' : 'Criar Template'}
-              </Text>
-              <Text style={[styles.formModalSubtitle, { color: theme.textSecondary }]}>
-                Defina uma rotina com múltiplos eventos
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={[styles.modalCloseBtn, { backgroundColor: `${theme.textSecondary}15` }]}
-              onPress={() => setIsFormModalOpen(false)}
-              activeOpacity={0.7}>
-              <Ionicons name="close" size={20} color={theme.textPrimary} />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={styles.formScroll} contentContainerStyle={styles.formScrollContent}>
-            {/* Nome do Template */}
-            <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>Nome do Template *</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: theme.surface, borderColor: theme.outline, color: theme.textPrimary }]}
-              value={formName}
-              onChangeText={setFormName}
-              placeholder="ex: Dia de Trabalho, Fim de Semana"
-              placeholderTextColor={`${theme.textSecondary}80`}
-              maxLength={60}
-            />
-
-            {/* Descrição do Template */}
-            <Text style={[styles.inputLabel, { color: theme.textPrimary, marginTop: 16 }]}>
-              Descrição do Template (opcional)
-            </Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: theme.surface, borderColor: theme.outline, color: theme.textPrimary }]}
-              value={formDescription}
-              onChangeText={setFormDescription}
-              placeholder="Ex: Rotina focada em estudos e foco..."
-              placeholderTextColor={`${theme.textSecondary}80`}
-              maxLength={200}
-            />
-
-            {/* Eventos da Rotina */}
-            <View style={styles.eventsHeaderRow}>
-              <Text style={[styles.sectionTitle, { color: theme.primary }]}>Eventos da Rotina</Text>
-              <Text style={[styles.sectionCount, { color: theme.textSecondary }]}>
-                {formEvents.length} evento{formEvents.length === 1 ? '' : 's'}
-              </Text>
+          <StatusBar
+            barStyle={theme.isDark ? 'light-content' : 'dark-content'}
+            backgroundColor={theme.background}
+          />
+          <View style={[styles.formModalContainer, { backgroundColor: theme.background }]}>
+            <View style={[styles.formModalHeader, { borderBottomColor: theme.outline }]}>
+              <View>
+                <Text style={[styles.formModalTitle, { color: theme.textPrimary }]}>
+                  {editingTemplateId ? 'Editar Template' : 'Criar Template'}
+                </Text>
+                <Text style={[styles.formModalSubtitle, { color: theme.textSecondary }]}>
+                  Defina uma rotina com múltiplos eventos
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.modalCloseBtn, { backgroundColor: `${theme.textSecondary}15` }]}
+                onPress={() => setIsFormModalOpen(false)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Fechar formulário">
+                <Ionicons name="close" size={20} color={theme.textPrimary} />
+              </TouchableOpacity>
             </View>
 
-            {formEvents.map((ev, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.eventFormCard,
-                  { backgroundColor: theme.surface, borderColor: theme.outline },
-                ]}>
-                <View style={styles.eventFormCardHeader}>
-                  <Text style={[styles.eventFormIndex, { color: theme.primary }]}>
-                    Evento {index + 1}
-                  </Text>
-                  {formEvents.length > 1 ? (
-                    <TouchableOpacity
-                      onPress={() => handleRemoveEventField(index)}
-                      activeOpacity={0.7}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Remover evento ${index + 1}`}>
-                      <Ionicons name="trash-outline" size={18} color={MomentusColors.errorRed} />
-                    </TouchableOpacity>
-                  ) : null}
-                </View>
-
-                {/* Título do Evento */}
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              style={{ flex: 1 }}>
+              <ScrollView
+                style={styles.formScroll}
+                contentContainerStyle={styles.formScrollContent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}>
+                {/* Nome do Template */}
+                <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>Nome do Template *</Text>
                 <TextInput
-                  style={[styles.eventInput, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary }]}
-                  value={ev.title}
-                  onChangeText={(val) => handleUpdateEventField(index, { title: val })}
-                  placeholder="Título da atividade *"
+                  style={[styles.input, { backgroundColor: theme.surface, borderColor: theme.outline, color: theme.textPrimary }]}
+                  value={formName}
+                  onChangeText={setFormName}
+                  placeholder="ex: Dia de Trabalho, Fim de Semana"
                   placeholderTextColor={`${theme.textSecondary}80`}
-                  maxLength={80}
+                  maxLength={60}
                 />
 
-                {/* Descrição do Evento */}
+                {/* Descrição do Template */}
+                <Text style={[styles.inputLabel, { color: theme.textPrimary, marginTop: 16 }]}>
+                  Descrição do Template (opcional)
+                </Text>
                 <TextInput
-                  style={[styles.eventInput, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary, marginTop: 8 }]}
-                  value={ev.description}
-                  onChangeText={(val) => handleUpdateEventField(index, { description: val })}
-                  placeholder="Descrição da atividade (opcional)"
+                  style={[styles.input, { backgroundColor: theme.surface, borderColor: theme.outline, color: theme.textPrimary }]}
+                  value={formDescription}
+                  onChangeText={setFormDescription}
+                  placeholder="Ex: Rotina focada em estudos e foco..."
                   placeholderTextColor={`${theme.textSecondary}80`}
                   maxLength={200}
                 />
 
-                {/* Faixa Integrada de Horário (Time Range Chip) */}
-                {(() => {
-                  const isTimeInvalid = isEventTimeInvalid(ev.timeStart, ev.timeEnd);
-                  const duration = calculateEventDuration(ev.timeStart, ev.timeEnd);
-                  return (
-                    <View style={styles.eventTimeRangeWrapper}>
-                      <View
-                        style={[
-                          styles.eventTimeRangeChip,
-                          {
-                            backgroundColor: theme.surfaceElevated,
-                            borderColor: isTimeInvalid ? MomentusColors.errorRed : theme.outline,
-                          },
-                        ]}>
-                        {/* Início */}
+                {/* Eventos da Rotina */}
+                <View style={styles.eventsHeaderRow}>
+                  <Text style={[styles.sectionTitle, { color: theme.primary }]}>Eventos da Rotina</Text>
+                  <Text style={[styles.sectionCount, { color: theme.textSecondary }]}>
+                    {formEvents.length} evento{formEvents.length === 1 ? '' : 's'}
+                  </Text>
+                </View>
+
+                {formEvents.map((ev, index) => (
+                  <View
+                    key={index}
+                    style={[
+                      styles.eventFormCard,
+                      { backgroundColor: theme.surface, borderColor: theme.outline },
+                    ]}>
+                    <View style={styles.eventFormCardHeader}>
+                      <Text style={[styles.eventFormIndex, { color: theme.primary }]}>
+                        Evento {index + 1}
+                      </Text>
+                      {formEvents.length > 1 ? (
                         <TouchableOpacity
-                          style={styles.eventTimeRangeSubBtn}
-                          onPress={() =>
-                            setTimePickerTarget({
-                              index,
-                              field: 'timeStart',
-                              title: `Hora de Início - Atividade ${index + 1}`,
-                              initialTime: ev.timeStart,
-                            })
-                          }
-                          activeOpacity={0.7}>
-                          <Text style={[styles.eventTimeRangeSubLabel, { color: theme.textSecondary }]}>Início</Text>
-                          <View style={styles.timeValueRow}>
-                            <Text style={[styles.eventTimeRangeValText, { color: theme.textPrimary }]}>
-                              {ev.timeStart}
-                            </Text>
-                            <Ionicons name="time-outline" size={13} color={theme.textSecondary} />
-                          </View>
+                          onPress={() => handleRemoveEventField(index)}
+                          style={styles.removeEventBtn}
+                          activeOpacity={0.7}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Remover evento ${index + 1}`}>
+                          <Ionicons name="trash-outline" size={18} color={MomentusColors.errorRed} />
                         </TouchableOpacity>
-
-                        {/* Seta Divisora */}
-                        <View style={styles.eventTimeRangeArrowBox}>
-                          <Ionicons
-                            name="arrow-forward"
-                            size={14}
-                            color={isTimeInvalid ? MomentusColors.errorRed : theme.primary}
-                          />
-                        </View>
-
-                        {/* Término */}
-                        <TouchableOpacity
-                          style={styles.eventTimeRangeSubBtn}
-                          onPress={() =>
-                            setTimePickerTarget({
-                              index,
-                              field: 'timeEnd',
-                              title: `Hora de Término - Atividade ${index + 1}`,
-                              initialTime: ev.timeEnd,
-                            })
-                          }
-                          activeOpacity={0.7}>
-                          <Text style={[styles.eventTimeRangeSubLabel, { color: theme.textSecondary }]}>Término</Text>
-                          <View style={styles.timeValueRow}>
-                            <Text style={[styles.eventTimeRangeValText, { color: theme.textPrimary }]}>
-                              {ev.timeEnd}
-                            </Text>
-                            <Ionicons name="time-outline" size={13} color={theme.textSecondary} />
-                          </View>
-                        </TouchableOpacity>
-
-                        {/* Tag de Duração Calculada */}
-                        <View
-                          style={[
-                            styles.eventDurationTag,
-                            {
-                              backgroundColor: isTimeInvalid ? `${MomentusColors.errorRed}15` : `${theme.primary}18`,
-                              borderColor: isTimeInvalid ? `${MomentusColors.errorRed}40` : `${theme.primary}30`,
-                            },
-                          ]}>
-                          <Ionicons
-                            name={isTimeInvalid ? 'alert-circle' : 'hourglass-outline'}
-                            size={11}
-                            color={isTimeInvalid ? MomentusColors.errorRed : theme.primary}
-                          />
-                          <Text
-                            style={[
-                              styles.eventDurationTagText,
-                              { color: isTimeInvalid ? MomentusColors.errorRed : theme.primary },
-                            ]}>
-                            {isTimeInvalid ? 'Inválido' : duration || '30m'}
-                          </Text>
-                        </View>
-                      </View>
-
-                      {/* Microvalidação sutil */}
-                      {isTimeInvalid && (
-                        <View style={styles.microErrorRow}>
-                          <Ionicons name="alert-circle" size={12} color={MomentusColors.errorRed} />
-                          <Text style={styles.microErrorText}>
-                            O horário de término deve ser posterior ao início
-                          </Text>
-                        </View>
-                      )}
+                      ) : null}
                     </View>
-                  );
-                })()}
 
-                {/* Categoria */}
-                <Text style={[styles.timeLabel, { color: theme.textSecondary, marginTop: 10, marginBottom: 6 }]}>
-                  Categoria
+                    {/* Título do Evento */}
+                    <TextInput
+                      style={[styles.eventInput, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary }]}
+                      value={ev.title}
+                      onChangeText={(val) => handleUpdateEventField(index, { title: val })}
+                      placeholder="Título da atividade *"
+                      placeholderTextColor={`${theme.textSecondary}80`}
+                      maxLength={80}
+                    />
+
+                    {/* Descrição do Evento */}
+                    <TextInput
+                      style={[styles.eventInput, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary, marginTop: 8 }]}
+                      value={ev.description}
+                      onChangeText={(val) => handleUpdateEventField(index, { description: val })}
+                      placeholder="Descrição da atividade (opcional)"
+                      placeholderTextColor={`${theme.textSecondary}80`}
+                      maxLength={200}
+                    />
+
+                    {/* Faixa Integrada de Horário (Time Range Chip) */}
+                    {(() => {
+                      const isTimeInvalid = isEventTimeInvalid(ev.timeStart, ev.timeEnd);
+                      const duration = calculateEventDuration(ev.timeStart, ev.timeEnd);
+                      return (
+                        <View style={styles.eventTimeRangeWrapper}>
+                          <View
+                            style={[
+                              styles.eventTimeRangeChip,
+                              {
+                                backgroundColor: theme.surfaceElevated,
+                                borderColor: isTimeInvalid ? MomentusColors.errorRed : theme.outline,
+                              },
+                            ]}>
+                            {/* Início */}
+                            <TouchableOpacity
+                              style={styles.eventTimeRangeSubBtn}
+                              onPress={() =>
+                                setTimePickerTarget({
+                                  index,
+                                  field: 'timeStart',
+                                  title: `Hora de Início - Atividade ${index + 1}`,
+                                  initialTime: ev.timeStart,
+                                })
+                              }
+                              activeOpacity={0.7}>
+                              <Text style={[styles.eventTimeRangeSubLabel, { color: theme.textSecondary }]}>Início</Text>
+                              <View style={styles.timeValueRow}>
+                                <Text style={[styles.eventTimeRangeValText, { color: theme.textPrimary }]}>
+                                  {ev.timeStart}
+                                </Text>
+                                <Ionicons name="time-outline" size={13} color={theme.textSecondary} />
+                              </View>
+                            </TouchableOpacity>
+
+                            {/* Seta Divisora */}
+                            <View style={styles.eventTimeRangeArrowBox}>
+                              <Ionicons
+                                name="arrow-forward"
+                                size={14}
+                                color={isTimeInvalid ? MomentusColors.errorRed : theme.primary}
+                              />
+                            </View>
+
+                            {/* Término */}
+                            <TouchableOpacity
+                              style={styles.eventTimeRangeSubBtn}
+                              onPress={() =>
+                                setTimePickerTarget({
+                                  index,
+                                  field: 'timeEnd',
+                                  title: `Hora de Término - Atividade ${index + 1}`,
+                                  initialTime: ev.timeEnd,
+                                })
+                              }
+                              activeOpacity={0.7}>
+                              <Text style={[styles.eventTimeRangeSubLabel, { color: theme.textSecondary }]}>Término</Text>
+                              <View style={styles.timeValueRow}>
+                                <Text style={[styles.eventTimeRangeValText, { color: theme.textPrimary }]}>
+                                  {ev.timeEnd}
+                                </Text>
+                                <Ionicons name="time-outline" size={13} color={theme.textSecondary} />
+                              </View>
+                            </TouchableOpacity>
+
+                            {/* Tag de Duração Calculada */}
+                            <View
+                              style={[
+                                styles.eventDurationTag,
+                                {
+                                  backgroundColor: isTimeInvalid ? `${MomentusColors.errorRed}15` : `${theme.primary}18`,
+                                  borderColor: isTimeInvalid ? `${MomentusColors.errorRed}40` : `${theme.primary}30`,
+                                },
+                              ]}>
+                              <Ionicons
+                                name={isTimeInvalid ? 'alert-circle' : 'hourglass-outline'}
+                                size={11}
+                                color={isTimeInvalid ? MomentusColors.errorRed : theme.primary}
+                              />
+                              <Text
+                                style={[
+                                  styles.eventDurationTagText,
+                                  { color: isTimeInvalid ? MomentusColors.errorRed : theme.primary },
+                                ]}>
+                                {isTimeInvalid ? 'Inválido' : duration || '30m'}
+                              </Text>
+                            </View>
+                          </View>
+
+                          {/* Microvalidação sutil */}
+                          {isTimeInvalid && (
+                            <View style={styles.microErrorRow}>
+                              <Ionicons name="alert-circle" size={12} color={MomentusColors.errorRed} />
+                              <Text style={styles.microErrorText}>
+                                O horário de término deve ser posterior ao início
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      );
+                    })()}
+
+                    {/* Categoria */}
+                    <Text style={[styles.timeLabel, { color: theme.textSecondary, marginTop: 10, marginBottom: 6 }]}>
+                      Categoria
+                    </Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
+                      {categories.map((cat) => {
+                        const isSelected = ev.categoryId === cat.id;
+                        return (
+                          <TouchableOpacity
+                            key={cat.id}
+                            style={[
+                              styles.categoryChip,
+                              {
+                                backgroundColor: isSelected ? `${cat.color}30` : theme.surfaceElevated,
+                                borderColor: isSelected ? cat.color : theme.outline,
+                              },
+                            ]}
+                            onPress={() => handleUpdateEventField(index, { categoryId: cat.id })}
+                            activeOpacity={0.7}>
+                            <View style={[styles.chipDot, { backgroundColor: cat.color }]} />
+                            <Text style={[styles.chipText, { color: isSelected ? cat.color : theme.textPrimary }]}>
+                              {cat.name}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                ))}
+
+                {/* Botão Adicionar Evento */}
+                <TouchableOpacity
+                  style={[styles.addEventBtn, { borderColor: theme.primary }]}
+                  onPress={handleAddEventField}
+                  activeOpacity={0.7}>
+                  <Ionicons name="add" size={18} color={theme.primary} />
+                  <Text style={[styles.addEventBtnText, { color: theme.primary }]}>Adicionar Evento</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </KeyboardAvoidingView>
+
+            {/* Footer com Botão de Confirmação */}
+            <View style={[styles.formModalFooter, { borderTopColor: theme.outline }]}>
+              <TouchableOpacity
+                style={[
+                  styles.saveTemplateBtn,
+                  { backgroundColor: theme.primary },
+                  !isFormValid && styles.disabledBtn,
+                ]}
+                onPress={handleSaveFormTemplate}
+                disabled={!isFormValid}
+                activeOpacity={0.85}>
+                <Ionicons name="checkmark" size={20} color="#0F172A" />
+                <Text style={styles.saveTemplateBtnText}>
+                  {editingTemplateId ? 'Salvar Alterações' : 'Criar Template'}
                 </Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
-                  {categories.map((cat) => {
-                    const isSelected = ev.categoryId === cat.id;
-                    return (
-                      <TouchableOpacity
-                        key={cat.id}
-                        style={[
-                          styles.categoryChip,
-                          {
-                            backgroundColor: isSelected ? `${cat.color}30` : theme.surfaceElevated,
-                            borderColor: isSelected ? cat.color : theme.outline,
-                          },
-                        ]}
-                        onPress={() => handleUpdateEventField(index, { categoryId: cat.id })}
-                        activeOpacity={0.7}>
-                        <View style={[styles.chipDot, { backgroundColor: cat.color }]} />
-                        <Text style={[styles.chipText, { color: isSelected ? cat.color : theme.textPrimary }]}>
-                          {cat.name}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            ))}
-
-            {/* Botão Adicionar Evento */}
-            <TouchableOpacity
-              style={[styles.addEventBtn, { borderColor: theme.primary }]}
-              onPress={handleAddEventField}
-              activeOpacity={0.7}>
-              <Ionicons name="add" size={18} color={theme.primary} />
-              <Text style={[styles.addEventBtnText, { color: theme.primary }]}>Adicionar Evento</Text>
-            </TouchableOpacity>
-          </ScrollView>
-
-          {/* Footer com Botão de Confirmação */}
-          <View style={[styles.formModalFooter, { borderTopColor: theme.outline }]}>
-            <TouchableOpacity
-              style={[
-                styles.saveTemplateBtn,
-                { backgroundColor: theme.primary },
-                !isFormValid && styles.disabledBtn,
-              ]}
-              onPress={handleSaveFormTemplate}
-              disabled={!isFormValid}
-              activeOpacity={0.85}>
-              <Ionicons name="checkmark" size={20} color="#0F172A" />
-              <Text style={styles.saveTemplateBtnText}>
-                {editingTemplateId ? 'Salvar Alterações' : 'Criar Template'}
-              </Text>
-            </TouchableOpacity>
+              </TouchableOpacity>
+            </View>
           </View>
         </SafeAreaView>
       </Modal>
@@ -887,6 +917,39 @@ export default function TemplatesScreen() {
           }}
         />
       )}
+
+      {/* Modal Dedicado de Exclusão de Template */}
+      <Modal
+        visible={!!deletingTemplate}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDeletingTemplate(null)}>
+        <View style={styles.deleteOverlay}>
+          <View style={[styles.deleteDialogCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+            <View style={styles.deleteIconCircle}>
+              <Ionicons name="trash-outline" size={28} color={MomentusColors.errorRed} />
+            </View>
+            <Text style={[styles.deleteDialogTitle, { color: theme.textPrimary }]}>Excluir Template</Text>
+            <Text style={[styles.deleteDialogDesc, { color: theme.textSecondary }]}>
+              Tem certeza que deseja excluir o template &quot;{deletingTemplate?.title}&quot;? Esta rotina de {deletingTemplate?.items.length} atividades será permanentemente removida.
+            </Text>
+            <View style={styles.deleteButtonsRow}>
+              <TouchableOpacity
+                style={[styles.deleteCancelBtn, { borderColor: theme.outline, backgroundColor: theme.surfaceElevated }]}
+                onPress={() => setDeletingTemplate(null)}
+                activeOpacity={0.7}>
+                <Text style={[styles.deleteCancelBtnText, { color: theme.textSecondary }]}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.deleteConfirmBtn, { backgroundColor: MomentusColors.errorRed }]}
+                onPress={handleExecuteDeleteTemplate}
+                activeOpacity={0.85}>
+                <Text style={styles.deleteConfirmBtnText}>Excluir</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -894,6 +957,8 @@ export default function TemplatesScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+    width: '100%',
+    backgroundColor: MomentusColors.navyBackground,
   },
   container: {
     flex: 1,
@@ -914,6 +979,7 @@ const styles = StyleSheet.create({
     height: ComponentHeightTokens.iconButton,
     justifyContent: 'center',
     alignItems: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   topBarTitle: {
     ...TypographyTokens.screenTitle,
@@ -927,6 +993,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: BorderRadiusTokens.control,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   importTopBtnText: {
     fontSize: 14,
@@ -972,6 +1039,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 14,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   emptyCreateBtnText: {
     color: '#0F172A',
@@ -1018,6 +1086,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   statChipsRow: {
     flexDirection: 'row',
@@ -1083,6 +1152,7 @@ const styles = StyleSheet.create({
     gap: 8,
     height: ComponentHeightTokens.buttonHero,
     borderRadius: BorderRadiusTokens.button,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   applyButtonText: {
     color: '#0F172A',
@@ -1103,8 +1173,14 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   formModalSafe: {
+    flex: 1,
+    width: '100%',
+    backgroundColor: MomentusColors.navyBackground,
+  },
+  formModalContainer: {
     flex: 1,
     width: '100%',
     maxWidth: LayoutTokens.maxModalSheetWidth,
@@ -1132,6 +1208,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   formScroll: {
     flex: 1,
@@ -1183,6 +1260,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
   },
+  removeEventBtn: {
+    padding: 4,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  },
   eventInput: {
     height: 44,
     borderWidth: 1,
@@ -1205,6 +1286,7 @@ const styles = StyleSheet.create({
   eventTimeRangeSubBtn: {
     flex: 1,
     paddingVertical: 2,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   eventTimeRangeSubLabel: {
     fontSize: 9,
@@ -1273,6 +1355,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     marginRight: 8,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   chipDot: {
     width: 8,
@@ -1294,6 +1377,7 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     marginTop: 8,
     marginBottom: 20,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   addEventBtnText: {
     fontSize: 14,
@@ -1310,6 +1394,7 @@ const styles = StyleSheet.create({
     gap: 8,
     height: 50,
     borderRadius: 14,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   saveTemplateBtnText: {
     color: '#0F172A',
@@ -1356,6 +1441,7 @@ const styles = StyleSheet.create({
   importCancelBtn: {
     paddingHorizontal: 16,
     paddingVertical: 10,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   importCancelBtnText: {
     fontSize: 14,
@@ -1365,9 +1451,77 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 10,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   importConfirmBtnText: {
     color: '#0F172A',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  deleteOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  deleteDialogCard: {
+    width: '100%',
+    maxWidth: 420,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 24,
+    alignItems: 'center',
+  },
+  deleteIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: `${MomentusColors.errorRed}15`,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  deleteDialogTitle: {
+    fontSize: 19,
+    fontWeight: '900',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  deleteDialogDesc: {
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginBottom: 22,
+  },
+  deleteButtonsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  deleteCancelBtn: {
+    flex: 1,
+    height: 46,
+    borderRadius: 12,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  },
+  deleteCancelBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  deleteConfirmBtn: {
+    flex: 1,
+    height: 46,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  },
+  deleteConfirmBtnText: {
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '800',
   },
