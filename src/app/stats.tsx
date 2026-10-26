@@ -18,12 +18,14 @@ import {
   TypographyTokens,
 } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
+import { WeeklySummaryModal } from '@/components/momentus/WeeklySummaryModal';
 
 type StatsFilter = 'WEEK' | 'MONTH' | 'YEAR';
 
 export default function StatsScreen() {
-  const { habits, categories, theme, userProfile } = useMomentus();
+  const { habits, categories, theme, userProfile, userLevel } = useMomentus();
   const [filter, setFilter] = useState<StatsFilter>('WEEK');
+  const [isStoriesModalOpen, setIsStoriesModalOpen] = useState(false);
 
   const filterDays = useMemo(() => {
     switch (filter) {
@@ -200,6 +202,26 @@ export default function StatsScreen() {
     };
   }, [habits, categories, filter, filterDays, userProfile?.focusMinutesToday]);
 
+  const storiesStats = useMemo(() => {
+    const periodLabel =
+      filter === 'WEEK'
+        ? 'Semana Atual'
+        : filter === 'MONTH'
+        ? 'Mês Atual'
+        : 'Ano Atual';
+
+    return {
+      periodLabel,
+      perfectDaysCount: stats.perfectDaysCount,
+      totalDaysWithHabits: stats.totalDaysWithHabits,
+      currentCount: stats.currentCount,
+      focusFormatted: stats.focusFormatted,
+      bestCategory: stats.bestCategory,
+      improvement: stats.improvement,
+      dailyAverage: stats.dailyAverage,
+    };
+  }, [filter, stats]);
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <StatusBar
@@ -208,10 +230,21 @@ export default function StatsScreen() {
       />
       <View style={[styles.container, { backgroundColor: theme.background }]}>
         <View style={styles.header}>
-          <Text style={[styles.title, { color: theme.textPrimary }]}>Análise de Performance</Text>
-          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-            Insights de consistência e produtividade
-          </Text>
+          <View style={styles.headerTitleRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.title, { color: theme.textPrimary }]}>Análise de Performance</Text>
+              <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+                Insights de consistência e produtividade
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.headerShareBtn, { backgroundColor: theme.surface, borderColor: theme.outline }]}
+              onPress={() => setIsStoriesModalOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Compartilhar resumo semanal nos stories">
+              <Ionicons name="sparkles" size={18} color={theme.primary} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <ScrollView
@@ -248,6 +281,49 @@ export default function StatsScreen() {
               );
             })}
           </View>
+
+          {/* Banner de Compartilhamento Stories 9:16 */}
+          <TouchableOpacity
+            style={[
+              styles.shareBanner,
+              {
+                backgroundColor: theme.surface,
+                borderColor: `${theme.primary}40`,
+              },
+            ]}
+            onPress={() => setIsStoriesModalOpen(true)}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Abrir resumo em Stories 9:16">
+            <View style={styles.shareBannerLeft}>
+              <View style={[styles.shareIconBox, { backgroundColor: `${theme.primary}18` }]}>
+                <Ionicons name="sparkles" size={20} color={theme.primary} />
+              </View>
+              <View style={styles.shareBannerTextCol}>
+                <View style={styles.shareBannerTitleRow}>
+                  <Text style={[styles.shareBannerTitle, { color: theme.textPrimary }]}>
+                    Resumo da Semana
+                  </Text>
+                  <View
+                    style={[
+                      styles.storiesPill,
+                      {
+                        backgroundColor: `${MomentusColors.gold}20`,
+                        borderColor: `${MomentusColors.gold}50`,
+                      },
+                    ]}>
+                    <Text style={[styles.storiesPillText, { color: MomentusColors.gold }]}>
+                      STORIES 9:16
+                    </Text>
+                  </View>
+                </View>
+                <Text style={[styles.shareBannerSub, { color: theme.textSecondary }]}>
+                  Gere seu cartão visual para Instagram e WhatsApp
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
+          </TouchableOpacity>
 
           {/* Cards de Métricas Principais */}
           <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
@@ -484,6 +560,16 @@ export default function StatsScreen() {
 
           <View style={{ height: 40 }} />
         </ScrollView>
+
+        {/* Modal de Resumo Semanal Stories 9:16 */}
+        <WeeklySummaryModal
+          visible={isStoriesModalOpen}
+          onClose={() => setIsStoriesModalOpen(false)}
+          stats={storiesStats}
+          userProfile={userProfile}
+          userLevel={userLevel}
+          primaryColor={theme.primary}
+        />
       </View>
     </SafeAreaView>
   );
@@ -722,5 +808,73 @@ const styles = StyleSheet.create({
   catProgressBarFill: {
     height: '100%',
     borderRadius: 3,
+  },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerShareBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  shareBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 14,
+    borderRadius: BorderRadiusTokens.card,
+    borderWidth: 1,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  shareBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  shareIconBox: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  shareBannerTextCol: {
+    flex: 1,
+    gap: 2,
+  },
+  shareBannerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  shareBannerTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  storiesPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  storiesPillText: {
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  shareBannerSub: {
+    fontSize: 12,
+    fontWeight: '500',
   },
 });
