@@ -219,7 +219,7 @@ export default function SignUpScreen() {
 
           {/* Link Já tem conta */}
           <TouchableOpacity
-            onPress={() => router.push('/login')}
+            onPress={() => router.push('/')}
             style={styles.loginLinkButton}>
             <Text style={styles.loginLinkText}>
               Já tem uma conta?{' '}

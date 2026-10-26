@@ -38,7 +38,7 @@ export default function OnboardingScreen() {
   const [currentPage, setCurrentPage] = useState(0);
 
   const handleFinish = () => {
-    router.replace('/login' as any);
+    router.replace('/' as any);
   };
 
   const handleNext = () => {

@@ -23,15 +23,22 @@ function TabsNavigator() {
       (settings.termsAcceptedVersion ?? 0) >= CURRENT_TERMS_VERSION;
 
     const isExemptRoute =
-      pathname === '/legal' ||
+      pathname === '/' ||
       pathname === '/login' ||
       pathname === '/signup' ||
       pathname === '/forgot-password' ||
+      pathname === '/legal' ||
       pathname === '/onboarding';
 
-    // Se o usuário não estiver autenticado e tentar acessar uma rota interna, direciona para o login
+    // Se o usuário não estiver autenticado e tentar acessar uma rota interna, direciona para o login na raiz /
     if (!isUserLoggedIn && !isExemptRoute) {
-      router.replace('/login' as any);
+      router.replace('/');
+      return;
+    }
+
+    // Se o usuário já estiver autenticado e tentar acessar / ou /login, direciona para /home
+    if (isUserLoggedIn && (pathname === '/' || pathname === '/login')) {
+      router.replace('/home');
       return;
     }
 
@@ -47,20 +54,30 @@ function TabsNavigator() {
     router,
   ]);
 
+  const isAuthScreen =
+    pathname === '/' ||
+    pathname === '/login' ||
+    pathname === '/signup' ||
+    pathname === '/forgot-password' ||
+    pathname === '/onboarding' ||
+    (pathname === '/legal' && (!settings.termsAccepted || (settings.termsAcceptedVersion ?? 0) < CURRENT_TERMS_VERSION));
+
   return (
     <>
       <StatusBar style={theme.isDark ? 'light' : 'dark'} />
       <Tabs
         screenOptions={{
           headerShown: false,
-          tabBarStyle: {
-            backgroundColor: theme.surface,
-            borderTopColor: theme.outline,
-            borderTopWidth: 1,
-            height: Platform.OS === 'ios' ? 88 : Platform.OS === 'web' ? 76 : 68,
-            paddingBottom: Platform.OS === 'ios' ? 28 : Platform.OS === 'web' ? 12 : 10,
-            paddingTop: 8,
-          },
+          tabBarStyle: isAuthScreen
+            ? { display: 'none' }
+            : {
+                backgroundColor: theme.surface,
+                borderTopColor: theme.outline,
+                borderTopWidth: 1,
+                height: Platform.OS === 'ios' ? 88 : Platform.OS === 'web' ? 76 : 68,
+                paddingBottom: Platform.OS === 'ios' ? 28 : Platform.OS === 'web' ? 12 : 10,
+                paddingTop: 8,
+              },
           tabBarItemStyle: {
             paddingHorizontal: 2,
             justifyContent: 'center',
@@ -77,7 +94,7 @@ function TabsNavigator() {
         }}>
         {/* Telas Principais da Barra Inferior */}
         <Tabs.Screen
-          name="index"
+          name="home"
           options={{
             title: 'Hoje',
             tabBarIcon: ({ color, size }) => (
@@ -123,6 +140,13 @@ function TabsNavigator() {
         />
 
         {/* Telas Secundárias e Modais de Fluxo */}
+        <Tabs.Screen
+          name="index"
+          options={{
+            href: null,
+            tabBarStyle: { display: 'none' },
+          }}
+        />
         <Tabs.Screen
           name="templates"
           options={{

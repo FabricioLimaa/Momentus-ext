@@ -1,715 +1,573 @@
-import { CircularProgressRing } from "@/components/momentus/CircularProgressRing";
-import { EventDetailDialog } from "@/components/momentus/EventDetailDialog";
-import { GlassCard } from "@/components/momentus/GlassCard";
-import { NewHabitModal } from "@/components/momentus/NewHabitModal";
-import { TimelineEventItem } from "@/components/momentus/TimelineEventItem";
-import { SplashScreen } from "@/components/momentus/SplashScreen";
-import { auth as firebaseAuth } from "@/config/firebase";
-import { getStreakColor, getTodayDateString } from "@/constants/initialData";
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+  Alert,
+} from 'react-native';
+import { router } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   MomentusColors,
-  getContrastTextColor,
   LayoutTokens,
-  BorderRadiusTokens,
-  ComponentHeightTokens,
   TypographyTokens,
-} from "@/constants/theme";
-import { useMomentus } from "@/context/MomentusContext";
-import { HabitItem } from "@/types";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { useMemo, useState } from "react";
+} from '@/constants/theme';
+import { useMomentus } from '@/context/MomentusContext';
 import {
-    Alert,
-    Image,
-    Platform,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+  loginWithGoogle,
+  loginWithApple,
+  loginWithEmail,
+  getFriendlyAuthErrorMessage,
+} from '@/services/authService';
+import { hasAcceptedTermsCloud } from '@/services/firestoreSyncService';
+import { CURRENT_TERMS_VERSION } from '@/constants/legalContent';
+import { SplashScreen } from '@/components/momentus/SplashScreen';
+import { auth as firebaseAuth } from '@/config/firebase';
 
-export default function HomeScreen() {
-  const router = useRouter();
-  const {
-    habits,
-    categories,
-    userProfile,
-    theme,
-    isLoaded,
-    toggleHabit,
-    deleteHabit,
-    deleteMultipleHabits,
-  } = useMomentus();
+export default function IndexScreen() {
+  const insets = useSafeAreaInsets();
+  const { login, settings, syncCloudAction, userProfile, isLoaded } = useMomentus();
 
-  // Estados de modais
-  const [isAddModalVisible, setIsAddModalVisible] = useState(false);
-  const [habitToEdit, setHabitToEdit] = useState<HabitItem | null>(null);
-  const [selectedDetailHabit, setSelectedDetailHabit] =
-    useState<HabitItem | null>(null);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showEmailFields, setShowEmailFields] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [isPostLoginSyncing, setIsPostLoginSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState('Sincronizando suas rotinas...');
 
-  // Estados de seleção múltipla
-  const [isSelectionMode, setIsSelectionMode] = useState(false);
-  const [selectedHabitIds, setSelectedHabitIds] = useState<string[]>([]);
-  const [avatarError, setAvatarError] = useState(false);
+  const primaryColor = settings.primaryColorHex || MomentusColors.emeraldNeon;
 
-  const authUser = firebaseAuth.currentUser;
-  const resolvedName =
-    userProfile.name && userProfile.name !== "Usuário"
-      ? userProfile.name
-      : authUser?.displayName?.trim() || userProfile.name || "Explorador";
-  const userName = resolvedName.split(" ")[0] || "Explorador";
-  const displayPhoto = userProfile.photoUrl || authUser?.photoURL || null;
+  const isUserLoggedIn = userProfile.isLoggedIn || !!firebaseAuth.currentUser;
 
-  const todayStr = getTodayDateString();
-  const todayHabits = useMemo(() => {
-    return habits
-      .filter((h) => h.date === todayStr)
-      .sort((a, b) => a.timeStart.localeCompare(b.timeStart));
-  }, [habits, todayStr]);
+  // Se o usuário já estiver autenticado ao acessar a raiz /, redireciona imediatamente para /home
+  useEffect(() => {
+    if (isLoaded && isUserLoggedIn) {
+      router.replace('/home');
+    }
+  }, [isLoaded, isUserLoggedIn]);
 
-  const totalToday = todayHabits.length;
-  const completionsToday = todayHabits.filter((h) => h.completed).length;
-  const progress = totalToday > 0 ? completionsToday / totalToday : 0;
+  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const isPasswordValid = password.length >= 6;
 
-  // Frase motivacional idêntica ao Jetpack Compose HomeScreen.kt
-  const motivationalText = useMemo(() => {
-    if (totalToday === 0) return "Dia livre! Que tal planejar algo novo? ✨";
-    if (completionsToday === 0) return "Vamos começar? O primeiro passo! 🚀";
-    if (progress < 0.5) return "Ótimo começo! Continue focado. 💪";
-    if (progress < 1.0)
-      return "Mais da metade concluído! Você está quase lá. ⚡";
-    return "Dia perfeito! Você conquistou todas as suas metas! 🏆";
-  }, [totalToday, completionsToday, progress]);
-
-  // Saudação por horário
-  const greeting = useMemo(() => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Bom dia,";
-    if (hour < 18) return "Boa tarde,";
-    return "Boa noite,";
-  }, []);
-
-  // Toggle seleção múltipla
-  const handleToggleSelectHabit = (id: string) => {
-    setSelectedHabitIds((prev) => {
-      const next = prev.includes(id)
-        ? prev.filter((item) => item !== id)
-        : [...prev, id];
-      if (next.length === 0) {
-        setIsSelectionMode(false);
+  const navigatePostLogin = async (uid: string) => {
+    try {
+      const { accepted, version } = await hasAcceptedTermsCloud(uid);
+      if (!accepted || version < CURRENT_TERMS_VERSION) {
+        setIsPostLoginSyncing(false);
+        router.replace('/legal?mandatory=true' as any);
+        return;
       }
-      return next;
-    });
+    } catch (err) {
+      console.warn('Erro ao verificar termos pós login:', err);
+    }
+    setIsPostLoginSyncing(false);
+    router.replace('/home');
   };
 
-  const handleSelectAll = () => {
-    if (selectedHabitIds.length === todayHabits.length) {
-      setSelectedHabitIds([]);
-    } else {
-      setSelectedHabitIds(todayHabits.map((h) => h.id));
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    try {
+      const user = await loginWithGoogle();
+      setIsPostLoginSyncing(true);
+      setSyncMessage('Carregando suas rotinas...');
+      login(
+        user.email || 'usuario@gmail.com',
+        user.displayName || undefined,
+        user.photoURL || undefined
+      );
+      try {
+        await syncCloudAction(user.uid);
+      } catch (syncErr) {
+        console.warn('Erro ao sincronizar dados do Firestore após login:', syncErr);
+      }
+      setLoading(false);
+      await navigatePostLogin(user.uid);
+    } catch (err: any) {
+      setLoading(false);
+      setIsPostLoginSyncing(false);
+      if (err.message !== 'SIGN_IN_CANCELLED' && err.code !== 'SIGN_IN_CANCELLED') {
+        Alert.alert(
+          'Erro ao entrar com Google',
+          getFriendlyAuthErrorMessage(err)
+        );
+      }
     }
   };
 
-  const handleClearSelection = () => {
-    setIsSelectionMode(false);
-    setSelectedHabitIds([]);
+  const handleAppleSignIn = async () => {
+    setLoading(true);
+    try {
+      const user = await loginWithApple();
+      setIsPostLoginSyncing(true);
+      setSyncMessage('Carregando suas rotinas...');
+      login(
+        user.email || 'usuario@apple.com',
+        user.displayName || undefined,
+        user.photoURL || undefined
+      );
+      try {
+        await syncCloudAction(user.uid);
+      } catch (syncErr) {
+        console.warn('Erro ao sincronizar dados do Firestore após login Apple:', syncErr);
+      }
+      setLoading(false);
+      await navigatePostLogin(user.uid);
+    } catch (err: any) {
+      setLoading(false);
+      setIsPostLoginSyncing(false);
+      if (err.code !== 'ERR_REQUEST_CANCELED') {
+        Alert.alert('Erro ao entrar com Apple', getFriendlyAuthErrorMessage(err));
+      }
+    }
   };
 
-  const handleConfirmDeleteSelected = () => {
-    if (selectedHabitIds.length === 0) return;
-    Alert.alert(
-      "Excluir Selecionadas",
-      `Tem certeza que deseja excluir as ${selectedHabitIds.length} rotinas selecionadas?`,
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Excluir Todas",
-          style: "destructive",
-          onPress: () => {
-            deleteMultipleHabits(selectedHabitIds);
-            handleClearSelection();
-          },
-        },
-      ],
-    );
+  const handleEmailSignIn = async () => {
+    if (!isEmailValid) {
+      Alert.alert('Erro', 'Por favor, insira um e-mail válido.');
+      return;
+    }
+    if (!isPasswordValid) {
+      Alert.alert('Erro', 'A senha deve ter pelo menos 6 caracteres.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const user = await loginWithEmail(email, password);
+      setIsPostLoginSyncing(true);
+      setSyncMessage('Carregando suas rotinas...');
+      login(
+        user.email || email,
+        user.displayName || undefined,
+        user.photoURL || undefined
+      );
+      try {
+        await syncCloudAction(user.uid);
+      } catch (syncErr) {
+        console.warn('Erro ao sincronizar dados na nuvem:', syncErr);
+      }
+      setLoading(false);
+      await navigatePostLogin(user.uid);
+    } catch (err: any) {
+      setLoading(false);
+      setIsPostLoginSyncing(false);
+      Alert.alert('Erro no login', getFriendlyAuthErrorMessage(err));
+    }
   };
 
-  const handleConfirmDeleteSingle = (habit: HabitItem) => {
-    Alert.alert(
-      "Excluir Rotina",
-      "Deseja realmente remover esta rotina? Esta ação não poderá ser desfeita.",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Excluir",
-          style: "destructive",
-          onPress: () => {
-            deleteHabit(habit.id);
-            setSelectedDetailHabit(null);
-          },
-        },
-      ],
-    );
-  };
-
-  if (!isLoaded) {
-    return <SplashScreen syncMessage="Preparando seu espaço..." />;
+  if (!isLoaded || (isLoaded && isUserLoggedIn) || isPostLoginSyncing) {
+    return <SplashScreen syncMessage={isPostLoginSyncing ? syncMessage : 'Carregando...'} />;
   }
 
   return (
-    <SafeAreaView
-      style={[styles.safeArea, { backgroundColor: theme.background }]}
-    >
-      <StatusBar
-        barStyle={theme.isDark ? "light-content" : "dark-content"}
-        backgroundColor={theme.background}
-      />
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
-        {/* TopBar no modo de seleção múltipla */}
-        {isSelectionMode ? (
-          <View
-            style={[
-              styles.selectionTopBar,
-              {
-                backgroundColor: theme.surface,
-                borderBottomColor: theme.outline,
-              },
-            ]}
-          >
-            <TouchableOpacity
-              onPress={handleClearSelection}
-              style={styles.iconButton}
-            >
-              <Ionicons name="close" size={24} color={theme.textPrimary} />
-            </TouchableOpacity>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 20 },
+        ]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled">
+        {/* Glow & Logo */}
+        <View style={styles.logoContainer}>
+          <View style={[styles.logoGlow, { backgroundColor: primaryColor + '25' }]} />
+          <LinearGradient
+            colors={[primaryColor, MomentusColors.emeraldDark]}
+            style={styles.logoBadge}>
+            <Ionicons name="sparkles" size={44} color="#000000" />
+          </LinearGradient>
+        </View>
 
-            <Text
-              style={[styles.selectionCountText, { color: theme.textPrimary }]}
-            >
-              {selectedHabitIds.length} selecionada
-              {selectedHabitIds.length === 1 ? "" : "s"}
-            </Text>
+        {/* Brand Titles */}
+        <Text style={styles.brandTitle}>Momentus</Text>
+        <Text style={styles.brandSubtitle}>Organize suas metas, conquiste seu dia.</Text>
 
-            <View style={styles.selectionActions}>
-              <TouchableOpacity
-                onPress={handleSelectAll}
-                style={styles.iconButton}
-              >
-                <Ionicons
-                  name={
-                    selectedHabitIds.length === todayHabits.length &&
-                    todayHabits.length > 0
-                      ? "checkbox"
-                      : "checkbox-outline"
-                  }
-                  size={22}
-                  color={theme.primary}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={handleConfirmDeleteSelected}
-                disabled={selectedHabitIds.length === 0}
-                style={[
-                  styles.iconButton,
-                  selectedHabitIds.length === 0 && { opacity: 0.4 },
-                ]}
-              >
-                <Ionicons
-                  name="trash-outline"
-                  size={22}
-                  color={MomentusColors.errorRed}
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : null}
-
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* 1. Header de Saudação (Mockup 3) */}
-          <View style={styles.homeHeader}>
-            <TouchableOpacity
-              onPress={() => router.push("/more" as any)}
-              style={styles.userProfileGreetingRow}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.homeAvatar, { borderColor: theme.primary, backgroundColor: `${theme.primary}18` }]}>
-                {displayPhoto && !avatarError ? (
-                  <Image
-                    source={{ uri: displayPhoto }}
-                    style={styles.homeAvatarImage}
-                    resizeMode="cover"
-                    onError={() => setAvatarError(true)}
-                    {...(Platform.OS === "web"
-                      ? { referrerPolicy: "no-referrer" }
-                      : {})}
-                  />
-                ) : (
-                  <Text
-                    style={[styles.homeAvatarText, { color: theme.primary }]}
-                  >
-                    {resolvedName ? resolvedName.charAt(0).toUpperCase() : "U"}
-                  </Text>
-                )}
-              </View>
-              <View>
-                <Text
-                  style={[styles.greetingText, { color: theme.textSecondary }]}
-                >
-                  {greeting}
-                </Text>
-                <Text
-                  style={[styles.userNameText, { color: theme.textPrimary }]}
-                >
-                  {userName} 👋
-                </Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => router.push("/updates" as any)}
-              style={[
-                styles.notificationButton,
-                { backgroundColor: theme.surface, borderColor: theme.outline },
-              ]}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name="notifications-outline"
-                size={22}
-                color={theme.textPrimary}
-              />
-            </TouchableOpacity>
-          </View>
-
-          {/* 2. Card de Streak & Progresso Circular (Mockup 3) */}
+        <View style={styles.authActionsContainer}>
+          {/* Botão Google com Gradiente */}
           <TouchableOpacity
             activeOpacity={0.85}
-            onPress={() => router.push("/achievements" as any)}
-            style={styles.streakCardContainer}
-          >
-            <GlassCard
-              style={[
-                styles.streakGlassCard,
-                {
-                  backgroundColor: theme.glassCard,
-                  borderColor: theme.glassBorder,
-                },
-              ]}
-            >
-              <View style={styles.streakCardRow}>
-                <View style={styles.streakInfoCol}>
-                  <Text
-                    style={[styles.streakLabel, { color: theme.textSecondary }]}
-                  >
-                    Sequência Atual
-                  </Text>
-                  <View style={styles.streakNumberRow}>
-                    <Ionicons
-                      name="flame"
-                      size={28}
-                      color={getStreakColor(userProfile.currentStreak)}
-                    />
-                    <Text
-                      style={[
-                        styles.streakNumberText,
-                        { color: theme.textPrimary },
-                      ]}
-                    >
-                      {userProfile.currentStreak} dias
-                    </Text>
-                  </View>
-                  <Text
-                    style={[
-                      styles.motivationalText,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {motivationalText}
-                  </Text>
-                </View>
-
-                {/* Progresso circular funcional */}
-                <View style={styles.circularProgressContainer}>
-                  <CircularProgressRing
-                    progress={progress}
-                    size={78}
-                    strokeWidth={8}
-                    color={theme.primary}
-                  />
-                </View>
-              </View>
-            </GlassCard>
+            onPress={handleGoogleSignIn}
+            disabled={loading}
+            style={styles.googleButtonWrapper}>
+            <LinearGradient
+              colors={[primaryColor, '#10B981']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.googleGradient}>
+              {loading && !showEmailFields ? (
+                <ActivityIndicator color="#000000" />
+              ) : (
+                <>
+                  <Ionicons name="logo-google" size={20} color="#000000" />
+                  <Text style={styles.googleButtonText}>Entrar com Google</Text>
+                </>
+              )}
+            </LinearGradient>
           </TouchableOpacity>
 
-          {/* 3. Seção "Seu dia" com Timeline Vertical */}
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
-              Seu dia
-            </Text>
-            <View style={styles.sectionHeaderRight}>
-              <Text
-                style={[
-                  styles.sectionCountText,
-                  { color: theme.textSecondary },
-                ]}
-              >
-                {completionsToday}/{totalToday} concluídas
-              </Text>
-            </View>
-          </View>
+          {/* Botão Apple no iOS */}
+          {Platform.OS === 'ios' && (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={handleAppleSignIn}
+              disabled={loading}
+              style={[styles.emailOutlineButton, { backgroundColor: '#000000', borderColor: '#334155', marginBottom: 12 }]}>
+              <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
+              <Text style={[styles.emailOutlineButtonText, { color: '#FFFFFF' }]}>Continuar com Apple</Text>
+            </TouchableOpacity>
+          )}
 
-          {todayHabits.length === 0 ? (
-            <View
-              style={[
-                styles.emptyContainer,
-                { backgroundColor: theme.surface, borderColor: theme.outline },
-              ]}
-            >
-              <Ionicons
-                name="calendar-outline"
-                size={48}
-                color={theme.textSecondary}
-              />
-              <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
-                Nada agendado para hoje
+          {/* Aviso informativo de login no navegador iOS (iPhone/iPad) */}
+          {Platform.OS === 'web' && typeof navigator !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent) && (
+            <View style={styles.iosWebNoticeBox}>
+              <Ionicons name="information-circle-outline" size={16} color={primaryColor} />
+              <Text style={styles.iosWebNoticeText}>
+                Acesso via navegador no iPhone / iPad:{' '}
+                <Text style={{ color: primaryColor, fontWeight: '700' }}>Em desenvolvimento</Text>. Para melhor experiência, utilize o login por e-mail ou o aplicativo móvel.
               </Text>
-              <Text
-                style={[styles.emptySubtitle, { color: theme.textSecondary }]}
-              >
-                Toque no + para começar sua jornada.
-              </Text>
-            </View>
-          ) : (
-            <View style={[styles.timelineList, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
-              {todayHabits.map((habit, index) => {
-                const category = categories.find(
-                  (c) => c.id === habit.categoryId,
-                ) || {
-                  id: "default",
-                  name: "Geral",
-                  color: theme.primary,
-                };
-
-                const isSelected = selectedHabitIds.includes(habit.id);
-
-                return (
-                  <TimelineEventItem
-                    key={habit.id}
-                    item={habit}
-                    category={category}
-                    isChecked={habit.completed}
-                    isFirst={index === 0}
-                    isLast={index === todayHabits.length - 1}
-                    isSelected={isSelected}
-                    isSelectionMode={isSelectionMode}
-                    onCheckedChange={() => toggleHabit(habit.id)}
-                    onClick={() => {
-                      if (isSelectionMode) {
-                        handleToggleSelectHabit(habit.id);
-                      } else {
-                        setSelectedDetailHabit(habit);
-                      }
-                    }}
-                    onLongClick={() => {
-                      if (!isSelectionMode) {
-                        setIsSelectionMode(true);
-                        setSelectedHabitIds([habit.id]);
-                      } else {
-                        handleToggleSelectHabit(habit.id);
-                      }
-                    }}
-                  />
-                );
-              })}
             </View>
           )}
 
-          <View style={{ height: 90 }} />
-        </ScrollView>
-
-        {/* Floating Action Button (+) */}
-        {!isSelectionMode && (
+          {/* Botão Alternar E-mail */}
           <TouchableOpacity
-            style={[styles.fab, { backgroundColor: theme.primary, shadowColor: theme.primary }]}
-            activeOpacity={0.85}
-            onPress={() => {
-              setHabitToEdit(null);
-              setIsAddModalVisible(true);
-            }}
-          >
-            <Ionicons name="add" size={30} color={getContrastTextColor(theme.primary)} />
+            activeOpacity={0.8}
+            onPress={() => setShowEmailFields((prev) => !prev)}
+            style={styles.emailOutlineButton}>
+            <Ionicons name="mail-outline" size={20} color={MomentusColors.textPrimary} />
+            <Text style={styles.emailOutlineButtonText}>Entrar com E-mail</Text>
           </TouchableOpacity>
-        )}
 
-        {/* Modal de Detalhes do Evento */}
-        <EventDetailDialog
-          visible={!!selectedDetailHabit}
-          event={selectedDetailHabit}
-          category={
-            selectedDetailHabit
-              ? categories.find((c) => c.id === selectedDetailHabit.categoryId)
-              : undefined
-          }
-          onDismiss={() => setSelectedDetailHabit(null)}
-          onEditClick={() => {
-            const h = selectedDetailHabit;
-            setSelectedDetailHabit(null);
-            setHabitToEdit(h);
-            setIsAddModalVisible(true);
-          }}
-          onDeleteClick={() => {
-            if (selectedDetailHabit) {
-              handleConfirmDeleteSingle(selectedDetailHabit);
-            }
-          }}
-        />
+          {/* Campos de Login por E-mail (Acordeão) */}
+          {showEmailFields && (
+            <View style={styles.emailFieldsBox}>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="mail" size={20} color={primaryColor} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="E-mail"
+                  placeholderTextColor={MomentusColors.textSecondary}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  value={email}
+                  onChangeText={setEmail}
+                />
+              </View>
 
-        {/* Modal de Criação / Edição de Rotina */}
-        <NewHabitModal
-          visible={isAddModalVisible}
-          habitToEdit={habitToEdit}
-          initialDate={todayStr}
-          onClose={() => {
-            setIsAddModalVisible(false);
-            setHabitToEdit(null);
-          }}
-        />
-      </View>
-    </SafeAreaView>
+              <View style={styles.inputWrapper}>
+                <Ionicons
+                  name="lock-closed"
+                  size={20}
+                  color={primaryColor}
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Senha"
+                  placeholderTextColor={MomentusColors.textSecondary}
+                  secureTextEntry
+                  value={password}
+                  onChangeText={setPassword}
+                />
+              </View>
+
+              {/* Opções: Lembrar-me e Esqueceu a Senha */}
+              <View style={styles.optionsRow}>
+                <TouchableOpacity
+                  style={styles.checkboxRow}
+                  activeOpacity={0.8}
+                  onPress={() => setRememberMe((prev) => !prev)}>
+                  <Ionicons
+                    name={rememberMe ? 'checkbox' : 'square-outline'}
+                    size={22}
+                    color={rememberMe ? primaryColor : MomentusColors.textSecondary}
+                  />
+                  <Text style={styles.rememberMeText}>Lembrar-me</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => router.push('/forgot-password')}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Text style={[styles.forgotPasswordText, { color: primaryColor }]}>
+                    Esqueceu a senha?
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Botão Entrar com E-mail */}
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={handleEmailSignIn}
+                disabled={loading || !isEmailValid || !isPasswordValid}
+                style={[
+                  styles.submitButton,
+                  {
+                    backgroundColor:
+                      isEmailValid && isPasswordValid ? primaryColor : MomentusColors.navyOutline,
+                  },
+                ]}>
+                {loading ? (
+                  <ActivityIndicator color="#000000" />
+                ) : (
+                  <Text
+                    style={[
+                      styles.submitButtonText,
+                      {
+                        color:
+                          isEmailValid && isPasswordValid
+                            ? '#000000'
+                            : MomentusColors.textSecondary,
+                      },
+                    ]}>
+                    Entrar
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        {/* Social Proof */}
+        <View style={styles.socialProofContainer}>
+          <Text style={styles.socialProofSub}>Comece gratuitamente</Text>
+          <Text style={styles.socialProofMain}>
+            +10.000 pessoas já estão{' '}
+            <Text style={[styles.socialProofHighlight, { color: primaryColor }]}>
+              transformando
+            </Text>
+            {'\n'}suas rotinas.
+          </Text>
+        </View>
+
+        {/* Link Criar Conta */}
+        <View style={styles.signUpRow}>
+          <Text style={styles.signUpQuestion}>Não tem uma conta?</Text>
+          <TouchableOpacity onPress={() => router.push('/signup')}>
+            <Text style={[styles.signUpLink, { color: primaryColor }]}> Crie uma aqui</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Versão */}
+        <Text style={styles.versionText}>Versão: 2.1.0</Text>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: MomentusColors.navyBackground,
-    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
-  },
   container: {
     flex: 1,
     backgroundColor: MomentusColors.navyBackground,
-    width: "100%",
-    maxWidth: LayoutTokens.maxContentWidth,
-    alignSelf: "center",
-  },
-  selectionTopBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
-    paddingVertical: 12,
-    backgroundColor: MomentusColors.navySurface,
-    borderBottomWidth: 1,
-    borderBottomColor: MomentusColors.navyOutline,
-  },
-  selectionCountText: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: MomentusColors.textPrimary,
-  },
-  selectionActions: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  iconButton: {
-    width: ComponentHeightTokens.chip,
-    height: ComponentHeightTokens.chip,
-    borderRadius: ComponentHeightTokens.chip / 2,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  scrollView: {
-    flex: 1,
   },
   scrollContent: {
     paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
     paddingTop: LayoutTokens.pagePaddingTop,
     paddingBottom: LayoutTokens.pagePaddingBottom,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '100%',
+    width: '100%',
+    maxWidth: LayoutTokens.maxAuthWidth,
+    alignSelf: 'center',
   },
-  homeHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 24,
+  logoContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+    marginTop: 10,
   },
-  userProfileGreetingRow: {
-    flexDirection: "row",
-    alignItems: "center",
+  logoGlow: {
+    position: 'absolute',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+  },
+  logoBadge: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: MomentusColors.emeraldNeon,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  brandTitle: {
+    ...TypographyTokens.heroTitle,
+    color: MomentusColors.textPrimary,
+  },
+  brandSubtitle: {
+    fontSize: 15,
+    color: MomentusColors.textSecondary,
+    textAlign: 'center',
+    marginTop: 6,
+    marginBottom: 44,
+  },
+  authActionsContainer: {
+    width: '100%',
+    gap: 14,
+  },
+  googleButtonWrapper: {
+    width: '100%',
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: MomentusColors.emeraldNeon,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  googleGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 56,
     gap: 12,
   },
-  homeAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 2,
-    justifyContent: "center",
-    alignItems: "center",
-    overflow: "hidden",
+  googleButtonText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#000000',
   },
-  homeAvatarImage: {
-    width: "100%",
-    height: "100%",
-  },
-  homeAvatarText: {
-    fontSize: 20,
-    fontWeight: "800",
-  },
-  greetingText: {
-    fontSize: 14,
-    color: MomentusColors.textSecondary,
-    fontWeight: "600",
-  },
-  userNameText: {
-    fontSize: 24,
-    fontWeight: "900",
-    color: MomentusColors.textPrimary,
-    marginTop: 2,
-  },
-  notificationButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: MomentusColors.navySurface,
+  emailOutlineButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 56,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: MomentusColors.navyOutline,
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: MomentusColors.navySurface,
+    gap: 12,
   },
-  streakCardContainer: {
-    marginBottom: 32,
+  emailOutlineButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: MomentusColors.textPrimary,
   },
-  streakGlassCard: {
-    padding: 20,
+  iosWebNoticeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 10,
+    width: '100%',
   },
-  streakCardRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  streakInfoCol: {
-    flex: 1,
-    paddingRight: 12,
-  },
-  streakLabel: {
-    fontSize: 13,
+  iosWebNoticeText: {
+    fontSize: 12,
     color: MomentusColors.textSecondary,
-    fontWeight: "600",
+    flex: 1,
+    lineHeight: 16,
   },
-  streakNumberRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
+  emailFieldsBox: {
+    width: '100%',
+    marginTop: 10,
+    gap: 14,
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: MomentusColors.navySurface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: MomentusColors.navyOutline,
+    paddingHorizontal: 16,
+    height: 56,
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  input: {
+    flex: 1,
+    color: MomentusColors.textPrimary,
+    fontSize: 15,
+  },
+  optionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
     marginVertical: 4,
   },
-  streakNumberText: {
-    fontSize: 22,
-    fontWeight: "900",
-    color: MomentusColors.textPrimary,
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  motivationalText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: MomentusColors.emeraldNeon,
-    marginTop: 2,
-    lineHeight: 18,
+  rememberMeText: {
+    fontSize: 14,
+    color: MomentusColors.textSecondary,
+    fontWeight: '500',
   },
-  circularProgressContainer: {
-    width: 80,
-    height: 80,
-    justifyContent: "center",
-    alignItems: "center",
+  forgotPasswordText: {
+    fontSize: 14,
+    fontWeight: '700',
   },
-  circularProgressRing: {
-    width: 74,
-    height: 74,
-    borderRadius: 37,
-    borderWidth: 6,
-    borderColor: MomentusColors.emeraldNeon,
-    backgroundColor: "rgba(52, 211, 153, 0.08)",
-    justifyContent: "center",
-    alignItems: "center",
+  submitButton: {
+    height: 56,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 6,
   },
-  progressPercentageText: {
+  submitButtonText: {
     fontSize: 16,
-    fontWeight: "800",
-    color: MomentusColors.textPrimary,
+    fontWeight: '800',
   },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
+  socialProofContainer: {
+    alignItems: 'center',
+    marginTop: 44,
+    marginBottom: 24,
   },
-  sectionHeaderRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  selectModeBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  selectModeBtnText: {
+  socialProofSub: {
     fontSize: 12,
-    fontWeight: "700",
+    color: MomentusColors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 4,
   },
-  sectionTitle: {
-    ...TypographyTokens.sectionHeader,
-    color: MomentusColors.textPrimary,
+  socialProofMain: {
+    fontSize: 14,
+    color: MomentusColors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
   },
-  sectionCountText: {
-    ...TypographyTokens.screenSubtitle,
+  socialProofHighlight: {
+    fontWeight: '800',
+  },
+  signUpRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 28,
+  },
+  signUpQuestion: {
+    fontSize: 14,
     color: MomentusColors.textSecondary,
   },
-  emptyContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 48,
-    borderRadius: BorderRadiusTokens.card,
-    borderWidth: 1,
-    marginTop: 8,
+  signUpLink: {
+    fontSize: 14,
+    fontWeight: '800',
   },
-  emptyTitle: {
-    ...TypographyTokens.cardTitle,
-    color: MomentusColors.textPrimary,
-    marginTop: 12,
-  },
-  emptySubtitle: {
-    ...TypographyTokens.screenSubtitle,
+  versionText: {
+    fontSize: 12,
     color: MomentusColors.textSecondary,
-    marginTop: 4,
-  },
-  timelineList: {
-    borderRadius: BorderRadiusTokens.card,
-    borderWidth: 1,
-    paddingVertical: 12,
-  },
-  fab: {
-    position: "absolute",
-    right: LayoutTokens.pagePaddingHorizontal,
-    bottom: 24,
-    width: ComponentHeightTokens.fab,
-    height: ComponentHeightTokens.fab,
-    borderRadius: ComponentHeightTokens.fab / 2,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.45,
-    shadowRadius: 10,
-    elevation: 8,
+    opacity: 0.4,
   },
 });

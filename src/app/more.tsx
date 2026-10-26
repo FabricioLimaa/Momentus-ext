@@ -45,7 +45,7 @@ export default function MoreScreen() {
         style: 'destructive',
         onPress: () => {
           logout();
-          router.replace('/login');
+          router.replace('/');
         },
       },
     ]);

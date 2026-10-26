@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -55,6 +56,7 @@ export const WeeklySummaryModal: React.FC<WeeklySummaryModalProps> = ({
 }) => {
   const cardRef = useRef<View>(null);
   const [isSharing, setIsSharing] = useState(false);
+  const [avatarError, setAvatarError] = useState(false);
 
   const screenWidth = Dimensions.get('window').width;
   const cardWidth = Math.min(screenWidth - 48, 330);
@@ -76,6 +78,7 @@ export const WeeklySummaryModal: React.FC<WeeklySummaryModalProps> = ({
 
   const userName = userProfile?.name?.trim() || 'Você';
   const userInitial = userName.charAt(0).toUpperCase();
+  const userPhoto = userProfile?.photoUrl || null;
   const rankTitle = userLevel ? `Nível ${userLevel.level} • ${userLevel.rankName}` : 'Produtivo';
   const rankColor = userLevel?.rankColor || MomentusColors.gold;
 
@@ -95,7 +98,7 @@ export const WeeklySummaryModal: React.FC<WeeklySummaryModalProps> = ({
       setIsSharing(true);
 
       if (Platform.OS === 'web') {
-        // Captura no ambiente Web via html2canvas (suportado por react-native-view-shot)
+        // Captura no ambiente Web garantindo fundo escuro sem bordas brancas
         const dataUri = await captureRef(cardRef, {
           format: 'png',
           quality: 1.0,
@@ -132,11 +135,11 @@ export const WeeklySummaryModal: React.FC<WeeklySummaryModalProps> = ({
           document.body.removeChild(downloadLink);
           Alert.alert(
             'Imagem Baixada!',
-            'Seu cartão de Stories foi salvo. Você já pode publicar no Instagram, WhatsApp ou onde desejar!'
+            'Seu cartão de Stories foi salvo sem bordas. Você já pode publicar no Instagram, WhatsApp ou onde desejar!'
           );
         }
       } else {
-        // Mobile nativo (Android e iOS): gera arquivo temporário e abre folha nativa
+        // Mobile nativo (Android e iOS): gera arquivo PNG limpo e abre folha nativa
         const uri = await captureRef(cardRef, {
           format: 'png',
           quality: 1.0,
@@ -186,140 +189,149 @@ export const WeeklySummaryModal: React.FC<WeeklySummaryModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          {/* Cartão de Stories Proporção 9:16 (Área Capturada) */}
-          <View
-            ref={cardRef}
-            collapsable={false}
-            style={[
-              styles.cardContainer,
-              {
-                width: cardWidth,
-                height: cardHeight,
-                borderColor: 'rgba(255, 255, 255, 0.12)',
-              },
-            ]}>
-            <LinearGradient
-              colors={['#070B18', '#0F172A', '#050811']}
-              start={{ x: 0.1, y: 0.0 }}
-              end={{ x: 0.9, y: 1.0 }}
-              style={styles.cardGradient}>
-              {/* Efeito Glow Ambiente no Topo */}
-              <View
-                style={[
-                  styles.ambientGlow,
-                  {
-                    backgroundColor: primaryColor,
-                    shadowColor: primaryColor,
-                  },
-                ]}
-              />
+          {/* Wrapper com sombra para exibição em tela sem sangramento na captura */}
+          <View style={[styles.cardShadowWrapper, { width: cardWidth, height: cardHeight }]}>
+            {/* Cartão de Stories Proporção 9:16 (Área Estrita Capturada) */}
+            <View
+              ref={cardRef}
+              collapsable={false}
+              style={[
+                styles.cardContainer,
+                {
+                  width: cardWidth,
+                  height: cardHeight,
+                },
+              ]}>
+              <LinearGradient
+                colors={['#070B18', '#0F172A', '#050811']}
+                start={{ x: 0.1, y: 0.0 }}
+                end={{ x: 0.9, y: 1.0 }}
+                style={styles.cardGradient}>
+                {/* Efeito Glow Ambiente no Topo */}
+                <View
+                  style={[
+                    styles.ambientGlow,
+                    {
+                      backgroundColor: primaryColor,
+                    },
+                  ]}
+                />
 
-              {/* Topo do Cartão: Badge de Marca & Período */}
-              <View style={styles.cardHeader}>
-                <View style={[styles.brandPill, { borderColor: `${primaryColor}40` }]}>
-                  <Ionicons name="flash" size={11} color={primaryColor} />
-                  <Text style={[styles.brandText, { color: primaryColor }]}>MOMENTUS</Text>
-                  <View style={styles.brandDot} />
-                  <Text style={styles.brandSub}>STORIES</Text>
-                </View>
-                <Text style={styles.periodText}>{stats.periodLabel}</Text>
-              </View>
-
-              {/* Perfil & Nível */}
-              <View style={styles.profileSection}>
-                <View style={[styles.avatarCircle, { borderColor: primaryColor }]}>
-                  <Text style={styles.avatarInitial}>{userInitial}</Text>
-                </View>
-                <View style={styles.profileInfo}>
-                  <Text numberOfLines={1} style={styles.profileName}>
-                    {userName}
-                  </Text>
-                  <View style={[styles.rankBadge, { backgroundColor: `${rankColor}20` }]}>
-                    <Ionicons name="trophy" size={11} color={rankColor} />
-                    <Text style={[styles.rankText, { color: rankColor }]}>{rankTitle}</Text>
+                {/* Topo do Cartão: Badge de Marca & Período */}
+                <View style={styles.cardHeader}>
+                  <View style={[styles.brandPill, { borderColor: `${primaryColor}40` }]}>
+                    <Ionicons name="flash" size={11} color={primaryColor} />
+                    <Text style={[styles.brandText, { color: primaryColor }]}>MOMENTUS</Text>
+                    <View style={styles.brandDot} />
+                    <Text style={styles.brandSub}>STORIES</Text>
                   </View>
+                  <Text style={styles.periodText}>{stats.periodLabel}</Text>
                 </View>
-              </View>
 
-              {/* Destaque Central: Dias Perfeitos (Hero Metric) */}
-              <View style={styles.heroCard}>
-                <LinearGradient
-                  colors={['rgba(255, 255, 255, 0.07)', 'rgba(255, 255, 255, 0.02)']}
-                  style={styles.heroCardGradient}>
-                  <View style={styles.heroHeaderRow}>
-                    <View style={styles.heroIconBox}>
-                      <Ionicons name="flame" size={22} color={MomentusColors.gold} />
-                    </View>
-                    <View style={styles.heroTextBox}>
-                      <Text style={styles.heroLabel}>DIAS PERFEITOS</Text>
-                      <Text style={styles.heroSubLabel}>100% dos hábitos concluídos</Text>
+                {/* Perfil & Nível com Foto do Usuário se Disponível */}
+                <View style={styles.profileSection}>
+                  <View style={[styles.avatarCircle, { borderColor: primaryColor }]}>
+                    {userPhoto && !avatarError ? (
+                      <Image
+                        source={{ uri: userPhoto }}
+                        style={styles.avatarImage}
+                        onError={() => setAvatarError(true)}
+                      />
+                    ) : (
+                      <Text style={styles.avatarInitial}>{userInitial}</Text>
+                    )}
+                  </View>
+                  <View style={styles.profileInfo}>
+                    <Text numberOfLines={1} style={styles.profileName}>
+                      {userName}
+                    </Text>
+                    <View style={[styles.rankBadge, { backgroundColor: `${rankColor}20` }]}>
+                      <Ionicons name="trophy" size={11} color={rankColor} />
+                      <Text style={[styles.rankText, { color: rankColor }]}>{rankTitle}</Text>
                     </View>
                   </View>
+                </View>
 
-                  <View style={styles.heroScoreRow}>
-                    <Text style={[styles.heroScoreNumber, { color: primaryColor }]}>
-                      {stats.perfectDaysCount}
-                    </Text>
-                    <Text style={styles.heroScoreTotal}>
-                      / {stats.totalDaysWithHabits || 7} dias
-                    </Text>
+                {/* Destaque Central: Dias Perfeitos (Hero Metric) */}
+                <View style={styles.heroCard}>
+                  <LinearGradient
+                    colors={['rgba(255, 255, 255, 0.07)', 'rgba(255, 255, 255, 0.02)']}
+                    style={styles.heroCardGradient}>
+                    <View style={styles.heroHeaderRow}>
+                      <View style={styles.heroIconBox}>
+                        <Ionicons name="flame" size={22} color={MomentusColors.gold} />
+                      </View>
+                      <View style={styles.heroTextBox}>
+                        <Text style={styles.heroLabel}>DIAS PERFEITOS</Text>
+                        <Text style={styles.heroSubLabel}>100% dos hábitos concluídos</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.heroScoreRow}>
+                      <Text style={[styles.heroScoreNumber, { color: primaryColor }]}>
+                        {stats.perfectDaysCount}
+                      </Text>
+                      <Text style={styles.heroScoreTotal}>
+                        / {stats.totalDaysWithHabits || 7} dias
+                      </Text>
+                    </View>
+                  </LinearGradient>
+                </View>
+
+                {/* Grid 2x2 de Métricas Complementares */}
+                <View style={styles.metricsGrid}>
+                  {/* 1: Hábitos Feitos */}
+                  <View style={styles.metricTile}>
+                    <Ionicons name="checkmark-done-circle" size={17} color={primaryColor} />
+                    <Text style={styles.metricValue}>{stats.currentCount}</Text>
+                    <Text style={styles.metricLabel}>Hábitos Feitos</Text>
                   </View>
-                </LinearGradient>
-              </View>
 
-              {/* Grid 2x2 de Métricas Complementares */}
-              <View style={styles.metricsGrid}>
-                {/* 1: Hábitos Feitos */}
-                <View style={styles.metricTile}>
-                  <Ionicons name="checkmark-done-circle" size={17} color={primaryColor} />
-                  <Text style={styles.metricValue}>{stats.currentCount}</Text>
-                  <Text style={styles.metricLabel}>Hábitos Feitos</Text>
+                  {/* 2: Tempo Focado */}
+                  <View style={styles.metricTile}>
+                    <Ionicons name="timer-outline" size={17} color={MomentusColors.cyan} />
+                    <Text numberOfLines={1} style={styles.metricValue}>
+                      {stats.focusFormatted}
+                    </Text>
+                    <Text style={styles.metricLabel}>Foco Imersivo</Text>
+                  </View>
+
+                  {/* 3: Categoria Top */}
+                  <View style={styles.metricTile}>
+                    <Ionicons name="star" size={17} color={MomentusColors.gold} />
+                    <Text numberOfLines={1} style={styles.metricValue}>
+                      {stats.bestCategory}
+                    </Text>
+                    <Text style={styles.metricLabel}>Maior Foco</Text>
+                  </View>
+
+                  {/* 4: Evolução */}
+                  <View style={styles.metricTile}>
+                    <Ionicons
+                      name={stats.improvement >= 0 ? 'trending-up' : 'trending-down'}
+                      size={17}
+                      color={stats.improvement >= 0 ? primaryColor : MomentusColors.errorRed}
+                    />
+                    <Text style={styles.metricValue}>
+                      {stats.improvement > 0 ? `+${stats.improvement}%` : `${stats.improvement}%`}
+                    </Text>
+                    <Text style={styles.metricLabel}>Consistência</Text>
+                  </View>
                 </View>
 
-                {/* 2: Tempo Focado */}
-                <View style={styles.metricTile}>
-                  <Ionicons name="timer-outline" size={17} color={MomentusColors.cyan} />
-                  <Text numberOfLines={1} style={styles.metricValue}>
-                    {stats.focusFormatted}
-                  </Text>
-                  <Text style={styles.metricLabel}>Foco Imersivo</Text>
+                {/* Frase Motivacional */}
+                <View style={styles.quoteBox}>
+                  <Ionicons name="chatbubble-ellipses-outline" size={14} color="rgba(255, 255, 255, 0.4)" />
+                  <Text style={styles.quoteText}>{motivationalQuote}</Text>
                 </View>
 
-                {/* 3: Categoria Top */}
-                <View style={styles.metricTile}>
-                  <Ionicons name="star" size={17} color={MomentusColors.gold} />
-                  <Text numberOfLines={1} style={styles.metricValue}>
-                    {stats.bestCategory}
-                  </Text>
-                  <Text style={styles.metricLabel}>Maior Foco</Text>
+                {/* Rodapé do Cartão com URL Oficial */}
+                <View style={styles.cardFooter}>
+                  <Text style={styles.footerTagline}>Organize sua rotina. Vença o dia.</Text>
+                  <Text style={styles.footerLink}>app.momentusapp.com.br</Text>
                 </View>
-
-                {/* 4: Evolução */}
-                <View style={styles.metricTile}>
-                  <Ionicons
-                    name={stats.improvement >= 0 ? 'trending-up' : 'trending-down'}
-                    size={17}
-                    color={stats.improvement >= 0 ? primaryColor : MomentusColors.errorRed}
-                  />
-                  <Text style={styles.metricValue}>
-                    {stats.improvement > 0 ? `+${stats.improvement}%` : `${stats.improvement}%`}
-                  </Text>
-                  <Text style={styles.metricLabel}>Consistência</Text>
-                </View>
-              </View>
-
-              {/* Frase Motivacional */}
-              <View style={styles.quoteBox}>
-                <Ionicons name="chatbubble-ellipses-outline" size={14} color="rgba(255, 255, 255, 0.4)" />
-                <Text style={styles.quoteText}>{motivationalQuote}</Text>
-              </View>
-
-              {/* Rodapé do Cartão */}
-              <View style={styles.cardFooter}>
-                <Text style={styles.footerTagline}>Organize sua rotina. Vença o dia.</Text>
-                <Text style={styles.footerLink}>momentus.site</Text>
-              </View>
-            </LinearGradient>
+              </LinearGradient>
+            </View>
           </View>
 
           {/* Botões de Ação do Modal */}
@@ -410,15 +422,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  cardContainer: {
+  cardShadowWrapper: {
     borderRadius: BorderRadiusTokens.modal,
-    borderWidth: 1,
-    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 16 },
     shadowOpacity: 0.55,
     shadowRadius: 28,
     elevation: 12,
+  },
+  cardContainer: {
+    borderRadius: BorderRadiusTokens.modal,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    overflow: 'hidden',
+    backgroundColor: '#070B18', // Garante que nunca haverá borda branca na captura
   },
   cardGradient: {
     flex: 1,
@@ -426,6 +443,7 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     justifyContent: 'space-between',
     position: 'relative',
+    backgroundColor: '#070B18',
   },
   ambientGlow: {
     position: 'absolute',
@@ -489,6 +507,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 22,
   },
   avatarInitial: {
     color: '#F8FAFC',
@@ -667,3 +691,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
+

@@ -70,7 +70,7 @@ export default function LegalScreen() {
           style: 'destructive',
           onPress: async () => {
             await declineTermsAction();
-            router.replace('/login');
+            router.replace('/');
           },
         },
       ]
@@ -99,7 +99,7 @@ export default function LegalScreen() {
         [
           {
             text: isPt ? 'Continuar' : 'Continue',
-            onPress: () => router.replace('/'),
+            onPress: () => router.replace('/home'),
           },
         ]
       );

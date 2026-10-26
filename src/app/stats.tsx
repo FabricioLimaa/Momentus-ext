@@ -202,25 +202,79 @@ export default function StatsScreen() {
     };
   }, [habits, categories, filter, filterDays, userProfile?.focusMinutesToday]);
 
+  // Estatísticas estritamente calculadas para a semana atual (7 dias) para o cartão Stories 9:16
   const storiesStats = useMemo(() => {
-    const periodLabel =
-      filter === 'WEEK'
-        ? 'Semana Atual'
-        : filter === 'MONTH'
-        ? 'Mês Atual'
-        : 'Ano Atual';
+    const now = new Date();
+    const sevenDaysAgo = new Date(now);
+    sevenDaysAgo.setDate(now.getDate() - 6);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+
+    const parseHabitDate = (dateStr: string) => {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      return new Date(y, m - 1, d);
+    };
+
+    // Hábitos estritamente dos últimos 7 dias da semana
+    const weekHabits = habits.filter((h) => {
+      const d = parseHabitDate(h.date);
+      return d >= sevenDaysAgo && d <= now;
+    });
+
+    const weekCompleted = weekHabits.filter((h) => h.completed);
+
+    // Dias Perfeitos na semana (100% de hábitos cumpridos)
+    const habitsByDay: Record<string, typeof habits> = {};
+    weekHabits.forEach((h) => {
+      if (!habitsByDay[h.date]) habitsByDay[h.date] = [];
+      habitsByDay[h.date].push(h);
+    });
+
+    let perfectDaysCount = 0;
+    Object.values(habitsByDay).forEach((dayHabits) => {
+      if (dayHabits.length > 0 && dayHabits.every((h) => h.completed)) {
+        perfectDaysCount++;
+      }
+    });
+
+    // Categoria destaque da semana
+    const catCounts: Record<string, number> = {};
+    weekCompleted.forEach((h) => {
+      catCounts[h.categoryId] = (catCounts[h.categoryId] || 0) + 1;
+    });
+
+    let topCatId: string | null = null;
+    let maxCount = 0;
+    Object.entries(catCounts).forEach(([catId, count]) => {
+      if (count > maxCount) {
+        maxCount = count;
+        topCatId = catId;
+      }
+    });
+    const topCat = categories.find((c) => c.id === topCatId);
+
+    // Formatação de data do período semanal (Ex: "Semana: 20 a 26 de Out")
+    const startDay = sevenDaysAgo.getDate();
+    const endDay = now.getDate();
+    const endMonthName = now
+      .toLocaleDateString('pt-BR', { month: 'short' })
+      .replace('.', '')
+      .toUpperCase();
+    const periodLabel = `SEMANA • ${startDay} A ${endDay} ${endMonthName}`;
+
+    const totalDaysWithHabits = Math.max(1, Object.keys(habitsByDay).length);
+    const dailyAverage = (weekCompleted.length / totalDaysWithHabits).toFixed(1);
 
     return {
       periodLabel,
-      perfectDaysCount: stats.perfectDaysCount,
-      totalDaysWithHabits: stats.totalDaysWithHabits,
-      currentCount: stats.currentCount,
+      perfectDaysCount,
+      totalDaysWithHabits,
+      currentCount: weekCompleted.length,
       focusFormatted: stats.focusFormatted,
-      bestCategory: stats.bestCategory,
+      bestCategory: weekCompleted.length > 0 ? (topCat?.name || 'Geral') : '--',
       improvement: stats.improvement,
-      dailyAverage: stats.dailyAverage,
+      dailyAverage,
     };
-  }, [filter, stats]);
+  }, [habits, categories, stats.focusFormatted, stats.improvement]);
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
