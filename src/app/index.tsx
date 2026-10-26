@@ -30,7 +30,6 @@ import {
 import { hasAcceptedTermsCloud } from '@/services/firestoreSyncService';
 import { CURRENT_TERMS_VERSION } from '@/constants/legalContent';
 import { SplashScreen } from '@/components/momentus/SplashScreen';
-import { auth as firebaseAuth } from '@/config/firebase';
 
 export default function IndexScreen() {
   const insets = useSafeAreaInsets();
@@ -46,7 +45,7 @@ export default function IndexScreen() {
 
   const primaryColor = settings.primaryColorHex || MomentusColors.emeraldNeon;
 
-  const isUserLoggedIn = userProfile.isLoggedIn || !!firebaseAuth.currentUser;
+  const isUserLoggedIn = !!userProfile.isLoggedIn;
 
   // Se o usuário já estiver autenticado ao acessar a raiz /, redireciona imediatamente para /home
   useEffect(() => {

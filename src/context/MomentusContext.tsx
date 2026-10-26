@@ -177,7 +177,7 @@ interface MomentusContextData {
   importBackupAction: () => Promise<boolean>;
   // Auth Actions
   login: (email: string, name?: string, photoUrl?: string | null) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
   syncCloudAction: (targetUid?: string) => Promise<void>;
   // Legal Actions
   acceptTermsAction: () => Promise<void>;
@@ -1597,18 +1597,18 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     triggerHaptic('success');
   };
 
-  const logout = () => {
+  const logout = async (): Promise<void> => {
     lastLoadedUid.current = null;
-    clearSecureSession().catch(() => {});
-    logoutUser().catch(() => {});
-    clearEntireDatabase().catch(() => {});
-    AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
+    setUserProfile(INITIAL_USER_PROFILE);
+    await clearSecureSession().catch(() => {});
+    await logoutUser().catch(() => {});
+    await clearEntireDatabase().catch(() => {});
+    await AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
     setHabits([]);
     setCategories(INITIAL_CATEGORIES);
     setTemplates([]);
     setAchievements(INITIAL_ACHIEVEMENTS);
     setMarketItems(INITIAL_MARKET_ITEMS);
-    setUserProfile(INITIAL_USER_PROFILE);
     triggerHaptic('impact');
   };
 

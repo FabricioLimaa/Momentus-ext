@@ -6,7 +6,6 @@ import { Platform } from 'react-native';
 import { MomentusColors } from '@/constants/theme';
 import { MomentusProvider, useMomentus } from '@/context/MomentusContext';
 import { CURRENT_TERMS_VERSION } from '@/constants/legalContent';
-import { auth as firebaseAuth } from '@/config/firebase';
 
 function TabsNavigator() {
   const router = useRouter();
@@ -17,7 +16,7 @@ function TabsNavigator() {
   useEffect(() => {
     if (!isLoaded) return;
 
-    const isUserLoggedIn = userProfile.isLoggedIn || !!firebaseAuth.currentUser;
+    const isUserLoggedIn = !!userProfile.isLoggedIn;
     const isTermsOk =
       !!settings.termsAccepted &&
       (settings.termsAcceptedVersion ?? 0) >= CURRENT_TERMS_VERSION;
