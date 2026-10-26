@@ -252,20 +252,10 @@ export default function StatsScreen() {
     });
     const topCat = categories.find((c) => c.id === topCatId);
 
-    // Formatação de data do período semanal (Ex: "Semana: 20 a 26 de Out")
-    const startDay = sevenDaysAgo.getDate();
-    const endDay = now.getDate();
-    const endMonthName = now
-      .toLocaleDateString('pt-BR', { month: 'short' })
-      .replace('.', '')
-      .toUpperCase();
-    const periodLabel = `SEMANA • ${startDay} A ${endDay} ${endMonthName}`;
-
     const totalDaysWithHabits = Math.max(1, Object.keys(habitsByDay).length);
     const dailyAverage = (weekCompleted.length / totalDaysWithHabits).toFixed(1);
 
     return {
-      periodLabel,
       perfectDaysCount,
       totalDaysWithHabits,
       currentCount: weekCompleted.length,
