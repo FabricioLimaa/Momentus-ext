@@ -934,6 +934,20 @@ export async function clearCloudData(userId: string): Promise<boolean> {
     clearedAny = true;
   } catch {}
 
+  // Recria apenas a categoria padrao 'Outros' no Firestore
+  try {
+    const defaultCatDocRef = doc(collection(userDocRef, CATEGORIES_COLLECTION), "cat-outros");
+    await setDoc(defaultCatDocRef, {
+      id: "cat-outros",
+      nome: "Outros",
+      corHex: "#616161",
+      stickerId: null,
+      metaMinutosSemanal: null,
+      isDeleted: false,
+      lastUpdated: new Date(),
+    });
+  } catch {}
+
   return clearedAny;
 }
 

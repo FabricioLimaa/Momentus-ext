@@ -1449,17 +1449,49 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const clearAllLocalData = () => {
-    // Cancela todas as notificações locais agendadas
+    // 1. Cancela todas as notificações locais agendadas
     cancelAllNotifications().catch(() => {});
+    // 2. Limpa hábitos
     setHabits([]);
+    // 3. Mantém exclusivamente a categoria padrão 'Outros'
     setCategories(INITIAL_CATEGORIES);
-    setTemplates(INITIAL_TEMPLATES);
-    setAchievements(INITIAL_ACHIEVEMENTS);
-    setMarketItems(INITIAL_MARKET_ITEMS);
-    setUserProfile(INITIAL_USER_PROFILE);
+    // 4. Exclui todos os templates por completo (sem recolocar mocks)
+    setTemplates([]);
+    // 5. Reseta conquistas
+    const resetAchievements = INITIAL_ACHIEVEMENTS.map((a) => ({
+      ...a,
+      unlocked: false,
+      progress: 0,
+      unlockedAt: undefined,
+    }));
+    setAchievements(resetAchievements);
+    // 6. Reseta completamente o inventário de itens da loja (nenhum possuído)
+    const resetMarket = INITIAL_MARKET_ITEMS.map((item) => ({
+      ...item,
+      isOwned: false,
+    }));
+    setMarketItems(resetMarket);
+    // 7. Zera pontuação e estatísticas preservando a sessão de autenticação se houver
+    setUserProfile((prev) => ({
+      ...INITIAL_USER_PROFILE,
+      name: prev.name,
+      email: prev.email,
+      photoUrl: prev.photoUrl,
+      isLoggedIn: prev.isLoggedIn,
+      totalPoints: 0,
+      currentStreak: 0,
+      bestStreak: 0,
+      totalCompleted: 0,
+      focusMinutesToday: 0,
+    }));
     setSettings(INITIAL_SETTINGS);
-    AsyncStorage.removeItem(STORAGE_KEY);
+    AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
     clearEntireDatabase().catch(() => {});
+    // 8. Grava a base inicial limpa no banco local SQLite
+    setAllCategoriesDb(INITIAL_CATEGORIES).catch(() => {});
+    setAllTemplatesDb([]).catch(() => {});
+    setAllMarketItemsDb(resetMarket).catch(() => {});
+    setAllAchievementsDb(resetAchievements).catch(() => {});
     triggerHaptic('impact');
   };
 
@@ -1470,6 +1502,8 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
     const ok = await clearCloudData(currentUser.uid);
     if (ok) {
+      // Garante que a nuvem fique alinhada com a categoria padrão 'Outros'
+      await saveCategoryToFirestore(currentUser.uid, INITIAL_CATEGORIES[0]).catch(() => {});
       triggerHaptic('impact');
     }
     return ok;

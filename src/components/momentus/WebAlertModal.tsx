@@ -98,6 +98,16 @@ export const WebAlertModal: React.FC<WebAlertModalProps> = ({ isDark, primaryCol
     }, 10);
   };
 
+  const hasDestructive = alertState.buttons.some((b) => b.style === 'destructive');
+  const isDanger =
+    hasDestructive ||
+    /excluir|limpar|apagar|remover|atenção|erro|danger/i.test(alertState.title);
+
+  const iconName = isDanger ? 'trash-outline' : 'information-circle';
+  const iconColor = isDanger ? MomentusColors.errorRed : primaryColor;
+  const iconBg = isDanger ? 'rgba(239, 68, 68, 0.16)' : `${primaryColor}20`;
+  const isMultiButtonColumn = alertState.buttons.length > 2;
+
   return (
     <Modal
       visible={alertState.visible}
@@ -113,8 +123,8 @@ export const WebAlertModal: React.FC<WebAlertModalProps> = ({ isDark, primaryCol
               borderColor: isDark ? MomentusColors.navyOutline : '#E2E8F0',
             },
           ]}>
-          <View style={[styles.iconCircle, { backgroundColor: `${primaryColor}20` }]}>
-            <Ionicons name="information-circle" size={28} color={primaryColor} />
+          <View style={[styles.iconCircle, { backgroundColor: iconBg }]}>
+            <Ionicons name={iconName} size={28} color={iconColor} />
           </View>
 
           <Text
@@ -135,7 +145,11 @@ export const WebAlertModal: React.FC<WebAlertModalProps> = ({ isDark, primaryCol
             </Text>
           )}
 
-          <View style={styles.buttonsRow}>
+          <View
+            style={[
+              styles.buttonsRow,
+              isMultiButtonColumn && { flexDirection: 'column', gap: 8 },
+            ]}>
             {alertState.buttons.map((btn, idx) => {
               const isCancel = btn.style === 'cancel';
               const isDestructive = btn.style === 'destructive';
@@ -147,6 +161,8 @@ export const WebAlertModal: React.FC<WebAlertModalProps> = ({ isDark, primaryCol
                   onPress={() => handleButtonPress(btn)}
                   style={[
                     styles.button,
+                    isMultiButtonColumn && { width: '100%', flex: 0 },
+                    Platform.OS === 'web' && ({ cursor: 'pointer' } as any),
                     isCancel
                       ? {
                           backgroundColor: isDark
