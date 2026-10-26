@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -122,10 +122,15 @@ export default function CalendarScreen() {
   const [habitToEdit, setHabitToEdit] = useState<HabitItem | null>(null);
   const [selectedDetailHabit, setSelectedDetailHabit] = useState<HabitItem | null>(null);
 
-  // Sincroniza silenciosamente os eventos da Google Agenda em background e os mescla na lista
+  // Sincroniza silenciosamente os eventos da Google Agenda em background apenas se ativado
+  // e apenas uma vez por data selecionada, evitando loops e desmarcações involuntárias
+  const lastSyncedDateRef = useRef<string>('');
   useEffect(() => {
+    if (!settings.googleCalendarSyncEnabled) return;
+    if (lastSyncedDateRef.current === selectedDate) return;
+    lastSyncedDateRef.current = selectedDate;
     syncGoogleCalendarToHabitsAction(selectedDate).catch(() => {});
-  }, [selectedDate, syncGoogleCalendarToHabitsAction]);
+  }, [selectedDate, settings.googleCalendarSyncEnabled, syncGoogleCalendarToHabitsAction]);
 
   // Mês/Ano para a visualização mensal
   const [currentYearMonth, setCurrentYearMonth] = useState(() => {

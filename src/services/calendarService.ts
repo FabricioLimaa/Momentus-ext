@@ -428,11 +428,19 @@ export function convertGoogleEventsToHabits(
   existingHabits: HabitItem[]
 ): HabitItem[] {
   const existingMap = new Map<string, HabitItem>();
+  const signatureMap = new Map<string, HabitItem>();
+
   existingHabits.forEach((h) => {
     if (h.googleCalendarEventId) {
       existingMap.set(h.googleCalendarEventId, h);
     }
     existingMap.set(h.id, h);
+    // Assinatura única baseada em data + horário de início + título normalizado
+    const normTitle = (h.title || '').trim().toLowerCase();
+    const sig = `${h.date}_${h.timeStart}_${normTitle}`;
+    if (!signatureMap.has(sig)) {
+      signatureMap.set(sig, h);
+    }
   });
 
   const categoryMapByColor = new Map<string, string>();
@@ -446,8 +454,6 @@ export function convertGoogleEventsToHabits(
   const defaultCategoryId = categories[0]?.id || 'cat-outros';
 
   return googleEvents.map((gEvent) => {
-    const existing = existingMap.get(gEvent.id) || existingMap.get(`google_${gEvent.id}`);
-
     let dateStr = '';
     let timeStart = '08:00';
     let timeEnd = '09:00';
@@ -469,6 +475,15 @@ export function convertGoogleEventsToHabits(
       timeEnd = `${String(dEnd.getHours()).padStart(2, '0')}:${String(dEnd.getMinutes()).padStart(2, '0')}`;
     }
 
+    const normGTitle = (gEvent.title || '').trim().toLowerCase();
+    const gSig = `${dateStr}_${timeStart}_${normGTitle}`;
+
+    // Procura por ID do Google, por ID local prefixado ou por assinatura idêntica (data + hora + título)
+    const existing =
+      existingMap.get(gEvent.id) ||
+      existingMap.get(`google_${gEvent.id}`) ||
+      signatureMap.get(gSig);
+
     const matchedCatId =
       existing?.categoryId ||
       (gEvent.colorId ? categoryMapByColor.get(gEvent.colorId) : null) ||
@@ -477,7 +492,7 @@ export function convertGoogleEventsToHabits(
     return {
       id: existing ? existing.id : `google_${gEvent.id}`,
       title: gEvent.title,
-      description: gEvent.description || undefined,
+      description: gEvent.description || existing?.description || undefined,
       timeStart,
       timeEnd,
       categoryId: matchedCatId,
@@ -487,6 +502,7 @@ export function convertGoogleEventsToHabits(
       googleCalendarEventId: gEvent.id,
       saveToGoogle: true,
       isFromGoogleCalendar: true,
+      templateSourceId: existing?.templateSourceId ?? null,
     };
   });
 }

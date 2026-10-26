@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useMemo, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useColorScheme, Alert, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
@@ -56,6 +56,7 @@ import {
   getAllCategories,
   setAllCategoriesDb,
   getAllHabits,
+  upsertHabitDb,
   setAllHabitsDb,
   deleteHabitDb,
   deleteMultipleHabitsDb,
@@ -255,6 +256,12 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const deletedHabitIdsRef = useRef<Set<string>>(new Set());
   // Rastreador de conquistas cujos pontos de XP já foram creditados ao saldo
   const creditedAchievementIdsRef = useRef<Set<string>>(new Set());
+  // Trava para evitar execuções concorrentes de sincronização com o Google Agenda
+  const isSyncingGoogleCalendarRef = useRef<boolean>(false);
+  const categoriesRef = useRef(categories);
+  useEffect(() => {
+    categoriesRef.current = categories;
+  }, [categories]);
 
   const showCelebration = (title: string, message: string, pointsEarned?: number) => {
     setCelebration({ visible: true, title, message, pointsEarned });
@@ -850,6 +857,15 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     checkAndUnlockAchievements(nextStreak, nextTotalHabitsCompleted, templates.length);
 
+    const currentHabit = habits.find((h) => h.id === id);
+    if (currentHabit) {
+      upsertHabitDb({
+        ...currentHabit,
+        completed: nextCompleted,
+        streak: nextCompleted ? 1 : 0,
+      }).catch(() => {});
+    }
+
     const currentUserId = firebaseAuth.currentUser?.uid;
     if (currentUserId) {
       saveHabitCompletionToFirestore(
@@ -860,7 +876,6 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       ).catch((err) =>
         MomentusLog.sync.warn('Erro ao salvar conclusão no Firestore:', err)
       );
-      const currentHabit = habits.find((h) => h.id === id);
       if (currentHabit) {
         saveHabitToFirestore(currentUserId, {
           ...currentHabit,
@@ -882,6 +897,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
 
     setHabits((prev) => [newHabit, ...prev]);
+    upsertHabitDb(newHabit).catch(() => {});
     triggerHaptic('success');
 
     // 1. Grava no Firestore atomicamente
@@ -902,9 +918,18 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       syncHabitToDeviceCalendar(newHabit, category)
         .then((eventId) => {
           if (eventId) {
+            const syncedHabit = {
+              ...newHabit,
+              googleCalendarEventId: eventId,
+              saveToGoogle: true,
+            };
             setHabits((prev) =>
-              prev.map((h) => (h.id === newHabit.id ? { ...h, googleCalendarEventId: eventId, saveToGoogle: true } : h))
+              prev.map((h) => (h.id === newHabit.id ? syncedHabit : h))
             );
+            upsertHabitDb(syncedHabit).catch(() => {});
+            if (currentUserId) {
+              saveHabitToFirestore(currentUserId, syncedHabit).catch(() => {});
+            }
           }
         })
         .catch(() => {});
@@ -1006,6 +1031,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const updateHabit = (updated: HabitItem) => {
     setHabits((prev) => prev.map((h) => (h.id === updated.id ? updated : h)));
+    upsertHabitDb(updated).catch(() => {});
     triggerHaptic('impact');
 
     const currentUserId = firebaseAuth.currentUser?.uid;
@@ -1030,9 +1056,14 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       syncHabitToDeviceCalendar(updated, category)
         .then((eventId) => {
           if (eventId && eventId !== updated.googleCalendarEventId) {
+            const synced = { ...updated, googleCalendarEventId: eventId, saveToGoogle: true };
             setHabits((prev) =>
-              prev.map((h) => (h.id === updated.id ? { ...h, googleCalendarEventId: eventId } : h))
+              prev.map((h) => (h.id === updated.id ? synced : h))
             );
+            upsertHabitDb(synced).catch(() => {});
+            if (currentUserId) {
+              saveHabitToFirestore(currentUserId, synced).catch(() => {});
+            }
           }
         })
         .catch(() => {});
@@ -1132,6 +1163,9 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     checkAndUnlockAchievements(userProfile.currentStreak, userProfile.totalCompleted, templates.length);
 
     const currentUserId = firebaseAuth.currentUser?.uid;
+    if (newHabits.length > 0) {
+      newHabits.forEach((h) => upsertHabitDb(h).catch(() => {}));
+    }
     if (currentUserId && newHabits.length > 0) {
       Promise.all(newHabits.map((h) => saveHabitToFirestore(currentUserId, h))).catch((err) =>
         MomentusLog.sync.warn('Erro ao salvar hábitos do template no Firestore:', err)
@@ -1146,9 +1180,14 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         syncHabitToDeviceCalendar(h, cat)
           .then((eventId) => {
             if (eventId) {
+              const syncedItem = { ...h, googleCalendarEventId: eventId, saveToGoogle: true };
               setHabits((prev) =>
-                prev.map((item) => (item.id === h.id ? { ...item, googleCalendarEventId: eventId } : item))
+                prev.map((item) => (item.id === h.id ? syncedItem : item))
               );
+              upsertHabitDb(syncedItem).catch(() => {});
+              if (currentUserId) {
+                saveHabitToFirestore(currentUserId, syncedItem).catch(() => {});
+              }
             }
           })
           .catch(() => {});
@@ -1431,36 +1470,60 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return syncedCount;
   };
 
-  const syncGoogleCalendarToHabitsAction = async (targetDate?: string): Promise<number> => {
+  const syncGoogleCalendarToHabitsAction = useCallback(async (targetDate?: string): Promise<number> => {
+    // Evita execuções simultâneas ou reentrâncias
+    if (isSyncingGoogleCalendarRef.current) {
+      return 0;
+    }
+    isSyncingGoogleCalendarRef.current = true;
+
     try {
       const gEvents = await fetchGoogleCalendarEvents(targetDate);
       if (!gEvents || gEvents.length === 0) return 0;
 
-      const converted = convertGoogleEventsToHabits(gEvents, categories, habits);
-      if (converted.length === 0) return 0;
-
-      const convertedMap = new Map<string, HabitItem>();
-      converted.forEach((h) => {
-        if (h.googleCalendarEventId) convertedMap.set(h.googleCalendarEventId, h);
-        convertedMap.set(h.id, h);
-      });
+      let convertedTotal = 0;
 
       setHabits((prev) => {
+        // Usa o estado MAIS RECENTE 'prev' para converter, garantindo que toggles de conclusão nunca sejam sobrescritos
+        const converted = convertGoogleEventsToHabits(gEvents, categoriesRef.current, prev);
+        if (converted.length === 0) return prev;
+        convertedTotal = converted.length;
+
+        const convertedIds = new Set<string>();
+        const convertedEventIds = new Set<string>();
+        const convertedSignatures = new Set<string>();
+
+        converted.forEach((h) => {
+          convertedIds.add(h.id);
+          if (h.googleCalendarEventId) {
+            convertedEventIds.add(h.googleCalendarEventId);
+          }
+          const normTitle = (h.title || '').trim().toLowerCase();
+          convertedSignatures.add(`${h.date}_${h.timeStart}_${normTitle}`);
+        });
+
+        // Remove duplicatas locais caso o evento já tenha sido integrado ou compartilhe a mesma data/horário/título
         const remaining = prev.filter((p) => {
-          if (p.googleCalendarEventId && convertedMap.has(p.googleCalendarEventId)) return false;
-          if (convertedMap.has(p.id)) return false;
+          if (convertedIds.has(p.id)) return false;
+          if (p.googleCalendarEventId && convertedEventIds.has(p.googleCalendarEventId)) return false;
+          const pSig = `${p.date}_${p.timeStart}_${(p.title || '').trim().toLowerCase()}`;
+          if (convertedSignatures.has(pSig)) return false;
           return true;
         });
+
         const next = [...converted, ...remaining];
         setAllHabitsDb(next).catch(() => {});
         return next;
       });
 
-      return converted.length;
-    } catch {
+      return convertedTotal;
+    } catch (err) {
+      MomentusLog.calendar.warn('Erro ao sincronizar rotinas com o Google Agenda:', err);
       return 0;
+    } finally {
+      isSyncingGoogleCalendarRef.current = false;
     }
-  };
+  }, []);
 
   const fetchGoogleEventsAction = async (targetDate?: string): Promise<GoogleCalendarEventItem[]> => {
     return await fetchGoogleCalendarEvents(targetDate);
