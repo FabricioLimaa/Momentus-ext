@@ -8,6 +8,7 @@ import {
   Platform,
   StatusBar,
   Alert,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -115,6 +116,8 @@ export default function CalendarScreen() {
   const todayStr = getTodayDateString();
 
   const [isMonthView, setIsMonthView] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [habitToEdit, setHabitToEdit] = useState<HabitItem | null>(null);
   const [selectedDetailHabit, setSelectedDetailHabit] = useState<HabitItem | null>(null);
@@ -295,6 +298,89 @@ export default function CalendarScreen() {
     );
   };
 
+  // Termo de busca normalizado (sem acentos e minúsculas) para busca instantânea em memória
+  const normalizedSearchTerm = useMemo(() => {
+    return searchQuery
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+  }, [searchQuery]);
+
+  // Hábitos que correspondem ao termo de busca (no título, observação ou nome da categoria)
+  const matchingHabits = useMemo(() => {
+    if (!normalizedSearchTerm) return [];
+    return habits.filter((h) => {
+      const titleNorm = (h.title || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+      const descNorm = (h.description || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+      const cat = categories.find((c) => c.id === h.categoryId);
+      const catNorm = (cat?.name || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+      return (
+        titleNorm.includes(normalizedSearchTerm) ||
+        descNorm.includes(normalizedSearchTerm) ||
+        catNorm.includes(normalizedSearchTerm)
+      );
+    });
+  }, [habits, categories, normalizedSearchTerm]);
+
+  // Conjunto de datas com ocorrências do termo pesquisado
+  const matchingDatesSet = useMemo(() => {
+    return new Set(matchingHabits.map((h) => h.date));
+  }, [matchingHabits]);
+
+  // Contagem de dias com ocorrências no mês atualmente visualizado
+  const monthMatchingDaysCount = useMemo(() => {
+    if (!normalizedSearchTerm) return 0;
+    const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
+    let count = 0;
+    matchingDatesSet.forEach((dateStr) => {
+      if (dateStr.startsWith(monthPrefix)) {
+        count++;
+      }
+    });
+    return count;
+  }, [normalizedSearchTerm, matchingDatesSet, year, month]);
+
+  // Contagem de dias com ocorrências na semana atualmente visualizada
+  const weekMatchingDaysCount = useMemo(() => {
+    if (!normalizedSearchTerm) return 0;
+    return currentWeekDays.filter((d) => matchingDatesSet.has(d.dateStr)).length;
+  }, [normalizedSearchTerm, currentWeekDays, matchingDatesSet]);
+
+  // Rotinas filtradas para a timeline do dia selecionado
+  const displayHabits = useMemo(() => {
+    if (!normalizedSearchTerm) return habitsForDate;
+    return habitsForDate.filter((h) => {
+      const titleNorm = (h.title || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+      const descNorm = (h.description || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+      const cat = categories.find((c) => c.id === h.categoryId);
+      const catNorm = (cat?.name || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+      return (
+        titleNorm.includes(normalizedSearchTerm) ||
+        descNorm.includes(normalizedSearchTerm) ||
+        catNorm.includes(normalizedSearchTerm)
+      );
+    });
+  }, [habitsForDate, normalizedSearchTerm, categories]);
+
   const isCurrentWeekShowingToday = currentWeekDays.some((d) => d.dateStr === todayStr);
 
   return (
@@ -306,7 +392,7 @@ export default function CalendarScreen() {
       <View style={[styles.container, { backgroundColor: theme.background }]}>
         {/* Header Principal */}
         <View style={styles.header}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={[styles.title, { color: theme.textPrimary }]}>Agenda & Rotinas</Text>
             <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
               Sincronizado com seus blocos e metas
@@ -316,10 +402,37 @@ export default function CalendarScreen() {
           <View style={styles.headerActions}>
             <TouchableOpacity
               style={[
+                styles.searchToggleBtn,
+                {
+                  backgroundColor: isSearchOpen ? `${primaryColor}20` : theme.surface,
+                  borderColor: isSearchOpen ? primaryColor : theme.outline,
+                },
+              ]}
+              onPress={() => {
+                const nextState = !isSearchOpen;
+                setIsSearchOpen(nextState);
+                if (!nextState) {
+                  setSearchQuery('');
+                }
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={isSearchOpen ? 'Fechar busca' : 'Buscar rotinas'}
+              activeOpacity={0.7}>
+              <Ionicons
+                name={isSearchOpen ? 'close' : 'search'}
+                size={18}
+                color={isSearchOpen ? primaryColor : theme.textPrimary}
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
                 styles.toggleViewBtn,
                 { backgroundColor: theme.surface, borderColor: theme.outline },
               ]}
               onPress={() => setIsMonthView(!isMonthView)}
+              accessibilityRole="button"
+              accessibilityLabel={`Mudar visualização para ${isMonthView ? 'Semana' : 'Mês'}`}
               activeOpacity={0.7}>
               <Ionicons
                 name={isMonthView ? 'calendar-outline' : 'grid-outline'}
@@ -332,6 +445,75 @@ export default function CalendarScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Barra de Busca Retrátil */}
+        {isSearchOpen && (
+          <View style={styles.searchBarWrapper}>
+            <View
+              style={[
+                styles.searchBarContainer,
+                {
+                  backgroundColor: theme.surface,
+                  borderColor: searchQuery.trim() ? primaryColor : theme.outline,
+                },
+              ]}>
+              <Ionicons name="search" size={18} color={theme.textSecondary} style={{ marginRight: 8 }} />
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Buscar por rotina, nota ou categoria..."
+                placeholderTextColor={theme.textSecondary}
+                style={[styles.searchInput, { color: theme.textPrimary }]}
+                autoFocus
+                returnKeyType="search"
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => setSearchQuery('')}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Limpar busca">
+                  <Ionicons name="close-circle" size={18} color={theme.textSecondary} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Contador de Ocorrências e Feedback Contextual */}
+            {normalizedSearchTerm.length > 0 && (
+              <View style={styles.searchFeedbackRow}>
+                <View
+                  style={[
+                    styles.searchBadge,
+                    {
+                      backgroundColor: `${primaryColor}15`,
+                      borderColor: `${primaryColor}35`,
+                    },
+                  ]}>
+                  <Ionicons name="calendar-outline" size={12} color={primaryColor} />
+                  <Text style={[styles.searchBadgeText, { color: primaryColor }]}>
+                    {isMonthView
+                      ? monthMatchingDaysCount === 0
+                        ? 'Nenhuma ocorrência neste mês'
+                        : `Encontrado em ${monthMatchingDaysCount} ${
+                            monthMatchingDaysCount === 1 ? 'dia' : 'dias'
+                          } neste mês`
+                      : weekMatchingDaysCount === 0
+                      ? 'Nenhuma ocorrência nesta semana'
+                      : `Encontrado em ${weekMatchingDaysCount} ${
+                          weekMatchingDaysCount === 1 ? 'dia' : 'dias'
+                        } nesta semana`}
+                  </Text>
+                </View>
+
+                {matchingHabits.length > 0 && (
+                  <Text style={[styles.searchTotalText, { color: theme.textSecondary }]}>
+                    {matchingHabits.length} {matchingHabits.length === 1 ? 'ocorrência' : 'ocorrências no total'}
+                  </Text>
+                )}
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Visualização de Mês ou Semana */}
         {isMonthView ? (
@@ -383,6 +565,8 @@ export default function CalendarScreen() {
                 }
                 const isSelected = selectedDate === item.dateStr;
                 const isToday = todayStr === item.dateStr;
+                const hasMatch = matchingDatesSet.has(item.dateStr);
+                const isSearchActive = Boolean(normalizedSearchTerm);
                 const { pins, hasMore } = getDayPinsInfo(item.dateStr);
                 const contrastSelected = getContrastTextColor(primaryColor);
 
@@ -394,6 +578,14 @@ export default function CalendarScreen() {
                       styles.dayGridCell,
                       isSelected && { backgroundColor: primaryColor },
                       isToday && !isSelected && { borderColor: primaryColor, borderWidth: 1.5 },
+                      isSearchActive && hasMatch && !isSelected && {
+                        backgroundColor: `${primaryColor}20`,
+                        borderColor: primaryColor,
+                        borderWidth: 1.5,
+                      },
+                      isSearchActive && !hasMatch && !isSelected && {
+                        opacity: 0.3,
+                      },
                     ]}
                     activeOpacity={0.7}>
                     <Text
@@ -402,6 +594,10 @@ export default function CalendarScreen() {
                         { color: isSelected ? contrastSelected : theme.textPrimary },
                         isSelected && { fontWeight: '800' },
                         isToday && !isSelected && { color: primaryColor, fontWeight: '700' },
+                        isSearchActive && hasMatch && !isSelected && {
+                          color: primaryColor,
+                          fontWeight: '800',
+                        },
                       ]}>
                       {item.dayNumber}
                     </Text>
@@ -464,6 +660,8 @@ export default function CalendarScreen() {
               {currentWeekDays.map((item) => {
                 const isSelected = selectedDate === item.dateStr;
                 const isToday = todayStr === item.dateStr;
+                const hasMatch = matchingDatesSet.has(item.dateStr);
+                const isSearchActive = Boolean(normalizedSearchTerm);
                 const { pins, hasMore } = getDayPinsInfo(item.dateStr);
                 const contrastSelected = getContrastTextColor(primaryColor);
 
@@ -482,6 +680,14 @@ export default function CalendarScreen() {
                         borderColor: primaryColor,
                         borderWidth: 1.5,
                       },
+                      isSearchActive && hasMatch && !isSelected && {
+                        backgroundColor: `${primaryColor}20`,
+                        borderColor: primaryColor,
+                        borderWidth: 1.5,
+                      },
+                      isSearchActive && !hasMatch && !isSelected && {
+                        opacity: 0.3,
+                      },
                     ]}
                     activeOpacity={0.7}>
                     <Text
@@ -490,6 +696,10 @@ export default function CalendarScreen() {
                         { color: theme.textSecondary },
                         isSelected && { color: contrastSelected, fontWeight: '800' },
                         isToday && !isSelected && { color: primaryColor, fontWeight: '700' },
+                        isSearchActive && hasMatch && !isSelected && {
+                          color: primaryColor,
+                          fontWeight: '800',
+                        },
                       ]}>
                       {item.dayName}
                     </Text>
@@ -498,6 +708,11 @@ export default function CalendarScreen() {
                         styles.weekDayNumber,
                         { color: theme.textPrimary },
                         isSelected && { color: contrastSelected, fontWeight: '900' },
+                        isToday && !isSelected && { color: primaryColor, fontWeight: '700' },
+                        isSearchActive && hasMatch && !isSelected && {
+                          color: primaryColor,
+                          fontWeight: '900',
+                        },
                       ]}>
                       {item.dayNumber}
                     </Text>
@@ -518,9 +733,12 @@ export default function CalendarScreen() {
 
         {/* Resumo Humanizado do Dia Selecionado com Barra de Progresso */}
         {(() => {
+          const isSearchActive = Boolean(normalizedSearchTerm);
+          const activeList = isSearchActive ? displayHabits : habitsForDate;
+          const displayCompleted = activeList.filter((h) => h.completed).length;
           const progressPercent =
-            habitsForDate.length > 0 ? Math.round((completedCount / habitsForDate.length) * 100) : 0;
-          const allCompleted = habitsForDate.length > 0 && completedCount === habitsForDate.length;
+            activeList.length > 0 ? Math.round((displayCompleted / activeList.length) * 100) : 0;
+          const allCompleted = activeList.length > 0 && displayCompleted === activeList.length;
 
           return (
             <View
@@ -531,21 +749,27 @@ export default function CalendarScreen() {
               <View style={styles.summaryTopRow}>
                 <View style={styles.summaryLeft}>
                   <View style={[styles.summaryIconBox, { backgroundColor: `${primaryColor}20` }]}>
-                    <Ionicons name="calendar" size={18} color={primaryColor} />
+                    <Ionicons name={isSearchActive ? 'search' : 'calendar'} size={18} color={primaryColor} />
                   </View>
                   <View style={styles.summaryTextGroup}>
                     <Text style={[styles.summaryDateText, { color: theme.textPrimary }]}>
                       {formatHumanCalendarDate(selectedDate, selectedDate === todayStr)}
                     </Text>
                     <Text style={[styles.summaryHabitsCount, { color: theme.textSecondary }]}>
-                      {habitsForDate.length === 0
+                      {isSearchActive
+                        ? activeList.length === 0
+                          ? 'Nenhuma rotina com o termo nesta data'
+                          : `${activeList.length} ${
+                              activeList.length === 1 ? 'rotina encontrada' : 'rotinas encontradas'
+                            } (${displayCompleted} concluída${displayCompleted === 1 ? '' : 's'})`
+                        : habitsForDate.length === 0
                         ? 'Nenhuma atividade agendada'
                         : `${completedCount} de ${habitsForDate.length} concluídas`}
                     </Text>
                   </View>
                 </View>
 
-                {habitsForDate.length > 0 && (
+                {activeList.length > 0 && (
                   <View
                     style={[
                       styles.progressBadge,
@@ -572,7 +796,7 @@ export default function CalendarScreen() {
               </View>
 
               {/* Barra de Progresso do Dia */}
-              {habitsForDate.length > 0 && (
+              {activeList.length > 0 && (
                 <View
                   style={[
                     styles.progressBarTrack,
@@ -598,27 +822,50 @@ export default function CalendarScreen() {
           style={styles.habitsScroll}
           contentContainerStyle={styles.habitsContent}
           showsVerticalScrollIndicator={false}>
-          {habitsForDate.length === 0 ? (
+          {displayHabits.length === 0 ? (
             <View style={styles.emptyView}>
-              <Ionicons name="sparkles-outline" size={42} color={MomentusColors.textSecondary} />
+              <Ionicons
+                name={normalizedSearchTerm ? 'search-outline' : 'sparkles-outline'}
+                size={42}
+                color={MomentusColors.textSecondary}
+              />
               <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
-                Nenhum evento neste dia
+                {normalizedSearchTerm ? 'Nenhuma rotina encontrada' : 'Nenhum evento neste dia'}
               </Text>
               <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-                Aproveite o tempo livre ou planeje uma nova rotina.
+                {normalizedSearchTerm
+                  ? `Não há rotinas com "${searchQuery}" em ${formatHumanCalendarDate(
+                      selectedDate,
+                      selectedDate === todayStr
+                    )}.`
+                  : 'Aproveite o tempo livre ou planeje uma nova rotina.'}
               </Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setHabitToEdit(null);
-                  setModalVisible(true);
-                }}
-                style={[styles.emptyActionBtn, { borderColor: primaryColor }]}
-                activeOpacity={0.8}>
-                <Ionicons name="add-circle" size={18} color={primaryColor} />
-                <Text style={[styles.emptyActionText, { color: primaryColor }]}>
-                  Criar para esta data
-                </Text>
-              </TouchableOpacity>
+              {normalizedSearchTerm ? (
+                <TouchableOpacity
+                  onPress={() => setSearchQuery('')}
+                  style={[styles.emptyActionBtn, { borderColor: primaryColor }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Limpar busca"
+                  activeOpacity={0.8}>
+                  <Ionicons name="refresh" size={18} color={primaryColor} />
+                  <Text style={[styles.emptyActionText, { color: primaryColor }]}>
+                    Limpar filtro de busca
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  onPress={() => {
+                    setHabitToEdit(null);
+                    setModalVisible(true);
+                  }}
+                  style={[styles.emptyActionBtn, { borderColor: primaryColor }]}
+                  activeOpacity={0.8}>
+                  <Ionicons name="add-circle" size={18} color={primaryColor} />
+                  <Text style={[styles.emptyActionText, { color: primaryColor }]}>
+                    Criar para esta data
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           ) : (
             <View
@@ -629,7 +876,7 @@ export default function CalendarScreen() {
                   borderColor: theme.outline,
                 },
               ]}>
-              {habitsForDate.map((habit, index) => {
+              {displayHabits.map((habit, index) => {
                 const category = categories.find((c) => c.id === habit.categoryId) || {
                   id: 'cat-outros',
                   name: 'Outros',
@@ -643,7 +890,7 @@ export default function CalendarScreen() {
                     category={category}
                     isChecked={habit.completed}
                     isFirst={index === 0}
-                    isLast={index === habitsForDate.length - 1}
+                    isLast={index === displayHabits.length - 1}
                     onCheckedChange={() => toggleHabit(habit.id)}
                     onClick={() => setSelectedDetailHabit(habit)}
                     onLongClick={() => {}}
@@ -740,6 +987,17 @@ const styles = StyleSheet.create({
     color: MomentusColors.textSecondary,
     marginTop: 2,
   },
+  searchToggleBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: BorderRadiusTokens.control,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...Platform.select({
+      web: { cursor: 'pointer' },
+    }),
+  },
   toggleViewBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -748,10 +1006,57 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     borderRadius: BorderRadiusTokens.control,
     borderWidth: 1,
+    ...Platform.select({
+      web: { cursor: 'pointer' },
+    }),
   },
   toggleViewText: {
     fontSize: 12,
     fontWeight: '700',
+  },
+  searchBarWrapper: {
+    marginHorizontal: LayoutTokens.pagePaddingHorizontal,
+    marginBottom: 14,
+  },
+  searchBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: BorderRadiusTokens.input,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    height: ComponentHeightTokens.input || 48,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    height: '100%',
+    ...Platform.select({
+      web: { outlineStyle: 'none' as any },
+    }),
+  },
+  searchFeedbackRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    paddingHorizontal: 2,
+  },
+  searchBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: BorderRadiusTokens.xs,
+    borderWidth: 1,
+  },
+  searchBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  searchTotalText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   monthCard: {
     marginHorizontal: LayoutTokens.pagePaddingHorizontal,
