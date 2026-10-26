@@ -50,6 +50,7 @@ import {
   syncAllHabitsToCalendar,
   fetchGoogleCalendarEvents,
   convertGoogleEventsToHabits,
+  deduplicateHabits,
   GoogleCalendarEventItem,
 } from '@/services/calendarService';
 import {
@@ -414,7 +415,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         ]);
 
         const rawHab: HabitItem[] = dbHabits.length > 0 ? dbHabits : (legacyParsed?.habits || []);
-        const initialHab = rawHab
+        const filteredHab = rawHab
           .filter(
             (h: HabitItem) =>
               !LEGACY_MOCK_HABIT_IDS.has(h.id) &&
@@ -425,6 +426,17 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               ? { ...h, categoryId: canonicalOutrosId }
               : h
           );
+
+        // Deduplica e unifica instâncias duplicadas pré-existentes na base local e nuvem
+        const { cleanHabits: initialHab, removedIds: loadRemovedIds } = deduplicateHabits(filteredHab);
+        if (loadRemovedIds.length > 0) {
+          loadRemovedIds.forEach((rid) => {
+            deleteHabitDb(rid).catch(() => {});
+            if (currentAuth?.uid) {
+              deleteHabitFromFirestore(currentAuth.uid, rid).catch(() => {});
+            }
+          });
+        }
 
         setHabits(initialHab);
 
@@ -923,9 +935,21 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               googleCalendarEventId: eventId,
               saveToGoogle: true,
             };
-            setHabits((prev) =>
-              prev.map((h) => (h.id === newHabit.id ? syncedHabit : h))
-            );
+            setHabits((prev) => {
+              // Previne duplicata caso uma importação paralela do Google Agenda tenha gerado google_${eventId}
+              const cleaned = prev.filter((h) => h.id !== `google_${eventId}`);
+              const updated = cleaned.map((h) => (h.id === newHabit.id ? syncedHabit : h));
+              const { cleanHabits, removedIds } = deduplicateHabits(updated);
+              if (removedIds.length > 0) {
+                removedIds.forEach((rid) => {
+                  deleteHabitDb(rid).catch(() => {});
+                  if (currentUserId) {
+                    deleteHabitFromFirestore(currentUserId, rid).catch(() => {});
+                  }
+                });
+              }
+              return cleanHabits;
+            });
             upsertHabitDb(syncedHabit).catch(() => {});
             if (currentUserId) {
               saveHabitToFirestore(currentUserId, syncedHabit).catch(() => {});
@@ -1057,9 +1081,20 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         .then((eventId) => {
           if (eventId && eventId !== updated.googleCalendarEventId) {
             const synced = { ...updated, googleCalendarEventId: eventId, saveToGoogle: true };
-            setHabits((prev) =>
-              prev.map((h) => (h.id === updated.id ? synced : h))
-            );
+            setHabits((prev) => {
+              const cleaned = prev.filter((h) => h.id !== `google_${eventId}`);
+              const mapped = cleaned.map((h) => (h.id === updated.id ? synced : h));
+              const { cleanHabits, removedIds } = deduplicateHabits(mapped);
+              if (removedIds.length > 0) {
+                removedIds.forEach((rid) => {
+                  deleteHabitDb(rid).catch(() => {});
+                  if (currentUserId) {
+                    deleteHabitFromFirestore(currentUserId, rid).catch(() => {});
+                  }
+                });
+              }
+              return cleanHabits;
+            });
             upsertHabitDb(synced).catch(() => {});
             if (currentUserId) {
               saveHabitToFirestore(currentUserId, synced).catch(() => {});
@@ -1512,8 +1547,18 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         });
 
         const next = [...converted, ...remaining];
-        setAllHabitsDb(next).catch(() => {});
-        return next;
+        const { cleanHabits, removedIds } = deduplicateHabits(next);
+        if (removedIds.length > 0) {
+          const currentUserId = firebaseAuth.currentUser?.uid;
+          removedIds.forEach((rid) => {
+            deleteHabitDb(rid).catch(() => {});
+            if (currentUserId) {
+              deleteHabitFromFirestore(currentUserId, rid).catch(() => {});
+            }
+          });
+        }
+        setAllHabitsDb(cleanHabits).catch(() => {});
+        return cleanHabits;
       });
 
       return convertedTotal;
@@ -1660,6 +1705,13 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const finalMergedHabits = mergedHabits.filter(
       (h) => !deletedHabitIdsRef.current.has(h.id)
     );
+    const { cleanHabits: cleanMergedHabits, removedIds: cloudRemovedIds } = deduplicateHabits(finalMergedHabits);
+    if (cloudRemovedIds.length > 0) {
+      cloudRemovedIds.forEach((rid) => {
+        deleteHabitDb(rid).catch(() => {});
+        if (uid) deleteHabitFromFirestore(uid, rid).catch(() => {});
+      });
+    }
 
     const backupTimestamp = formatBackupTimestamp();
     const termsAcceptedCombined = settings.termsAccepted || cloudTermsAccepted;
@@ -1700,7 +1752,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       await setAppKv('credited_achievement_ids', Array.from(creditedSet)).catch(() => {});
     }
 
-    setHabits(finalMergedHabits);
+    setHabits(cleanMergedHabits);
     setCategories(mergedCategories);
     setTemplates(mergedTemplates);
     setAchievements(mergedAchievements);
@@ -1708,7 +1760,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setUserProfile(effectiveProfile);
     setSettings(updatedSettings);
 
-    await setAllHabitsDb(finalMergedHabits);
+    await setAllHabitsDb(cleanMergedHabits);
     await setAllCategoriesDb(mergedCategories);
     await setAllTemplatesDb(mergedTemplates);
     await setAllAchievementsDb(mergedAchievements);

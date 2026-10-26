@@ -197,6 +197,7 @@ export async function syncHabitToDeviceCalendar(
   }
 
   const notes = [
+    `[momentus_id:${habit.id}]`,
     habit.description || '',
     category ? `Categoria: ${category.name}` : '',
     'Gerenciado pelo aplicativo Momentus ✨',
@@ -429,17 +430,21 @@ export function convertGoogleEventsToHabits(
 ): HabitItem[] {
   const existingMap = new Map<string, HabitItem>();
   const signatureMap = new Map<string, HabitItem>();
+  const dateTitleMap = new Map<string, HabitItem>();
 
   existingHabits.forEach((h) => {
     if (h.googleCalendarEventId) {
-      existingMap.set(h.googleCalendarEventId, h);
+      existingMap.set(String(h.googleCalendarEventId), h);
     }
     existingMap.set(h.id, h);
-    // Assinatura única baseada em data + horário de início + título normalizado
     const normTitle = (h.title || '').trim().toLowerCase();
     const sig = `${h.date}_${h.timeStart}_${normTitle}`;
     if (!signatureMap.has(sig)) {
       signatureMap.set(sig, h);
+    }
+    const dateTitleKey = `${h.date}_${normTitle}`;
+    if (!dateTitleMap.has(dateTitleKey)) {
+      dateTitleMap.set(dateTitleKey, h);
     }
   });
 
@@ -477,22 +482,35 @@ export function convertGoogleEventsToHabits(
 
     const normGTitle = (gEvent.title || '').trim().toLowerCase();
     const gSig = `${dateStr}_${timeStart}_${normGTitle}`;
+    const gDateTitleKey = `${dateStr}_${normGTitle}`;
 
-    // Procura por ID do Google, por ID local prefixado ou por assinatura idêntica (data + hora + título)
+    // Extrai identificador nativo do Momentus gravado nas notas se disponível
+    const match = (gEvent.description || '').match(/\[momentus_id:([^\]]+)\]/);
+    const embeddedHabitId = match ? match[1] : null;
+
+    // Procura por ID embarcado, ID do Google, ID local prefixado, assinatura exata ou Data + Título
     const existing =
-      existingMap.get(gEvent.id) ||
+      (embeddedHabitId ? existingMap.get(embeddedHabitId) : null) ||
+      existingMap.get(String(gEvent.id)) ||
       existingMap.get(`google_${gEvent.id}`) ||
-      signatureMap.get(gSig);
+      signatureMap.get(gSig) ||
+      dateTitleMap.get(gDateTitleKey);
 
     const matchedCatId =
       existing?.categoryId ||
       (gEvent.colorId ? categoryMapByColor.get(gEvent.colorId) : null) ||
       defaultCategoryId;
 
+    // Limpa metadados internos da descrição ao exibir para o usuário
+    const cleanDescription = (gEvent.description || '')
+      .replace(/\[momentus_id:[^\]]+\]\n?/g, '')
+      .replace(/Gerenciado pelo aplicativo Momentus ✨\n?/g, '')
+      .trim();
+
     return {
       id: existing ? existing.id : `google_${gEvent.id}`,
       title: gEvent.title,
-      description: gEvent.description || existing?.description || undefined,
+      description: cleanDescription || existing?.description || undefined,
       timeStart,
       timeEnd,
       categoryId: matchedCatId,
@@ -505,6 +523,88 @@ export function convertGoogleEventsToHabits(
       templateSourceId: existing?.templateSourceId ?? null,
     };
   });
+}
+
+/**
+ * Remove hábitos duplicados resultantes de concorrência ou sincronização com o Google Calendar / Firestore.
+ * Prioriza instâncias nativas/locais ('h-...') sobre instâncias importadas ('google_...'),
+ * fundindo status de conclusão e vínculos de evento.
+ */
+export function deduplicateHabits(habits: HabitItem[]): {
+  cleanHabits: HabitItem[];
+  removedIds: string[];
+} {
+  const cleanHabits: HabitItem[] = [];
+  const removedIds: string[] = [];
+  const seenEventIds = new Map<string, HabitItem>();
+  const seenDateTitles = new Map<string, HabitItem>();
+  const seenIds = new Set<string>();
+
+  for (const habit of habits) {
+    if (!habit || !habit.id) continue;
+    if (seenIds.has(habit.id)) {
+      removedIds.push(habit.id);
+      continue;
+    }
+
+    const normTitle = (habit.title || '').trim().toLowerCase();
+    const dateTitleKey = `${habit.date}_${normTitle}`;
+    const eventIdKey = habit.googleCalendarEventId ? String(habit.googleCalendarEventId) : null;
+
+    // Verifica se já existe um hábito correspondente por ID do evento Google ou por Data + Título
+    const existing =
+      (eventIdKey ? seenEventIds.get(eventIdKey) : null) ||
+      seenDateTitles.get(dateTitleKey);
+
+    if (existing) {
+      // Se o item anterior for 'google_' e o atual for local, substitui pelo local preservando status
+      const isExistingGoogle = existing.id.startsWith('google_');
+      const isCurrentGoogle = habit.id.startsWith('google_');
+
+      if (isExistingGoogle && !isCurrentGoogle) {
+        const idx = cleanHabits.findIndex((h) => h.id === existing.id);
+        if (idx >= 0) {
+          const merged: HabitItem = {
+            ...habit,
+            completed: habit.completed || existing.completed,
+            streak: Math.max(habit.streak || 0, existing.streak || 0),
+            googleCalendarEventId: habit.googleCalendarEventId || existing.googleCalendarEventId,
+            saveToGoogle: true,
+            isFromGoogleCalendar: true,
+          };
+          cleanHabits[idx] = merged;
+          removedIds.push(existing.id);
+          seenIds.delete(existing.id);
+          seenIds.add(merged.id);
+          if (merged.googleCalendarEventId) {
+            seenEventIds.set(String(merged.googleCalendarEventId), merged);
+          }
+          seenDateTitles.set(dateTitleKey, merged);
+          continue;
+        }
+      } else {
+        // O item existente é preferível: absorve dados do atual e descarta o atual
+        existing.completed = existing.completed || habit.completed;
+        existing.streak = Math.max(existing.streak || 0, habit.streak || 0);
+        if (!existing.googleCalendarEventId && habit.googleCalendarEventId) {
+          existing.googleCalendarEventId = habit.googleCalendarEventId;
+        }
+        existing.saveToGoogle = existing.saveToGoogle || habit.saveToGoogle;
+        removedIds.push(habit.id);
+        continue;
+      }
+    }
+
+    // Primeiro item válido para esta chave
+    seenIds.add(habit.id);
+    if (eventIdKey) {
+      seenEventIds.set(eventIdKey, habit);
+    }
+    seenDateTitles.set(dateTitleKey, habit);
+    cleanHabits.push({ ...habit });
+  }
+
+  return { cleanHabits, removedIds };
 }
 
 /**
