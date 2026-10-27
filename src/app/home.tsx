@@ -187,6 +187,7 @@ export default function HomeScreen() {
   return (
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: theme.background }]}
+      edges={['top']}
     >
       <StatusBar
         barStyle={theme.isDark ? "light-content" : "dark-content"}
@@ -644,7 +645,7 @@ export default function HomeScreen() {
             </View>
           )}
 
-          <View style={{ height: 20 }} />
+          <View style={{ height: 90 }} />
         </ScrollView>
 
         {/* Floating Action Button (+) Sempre Visível com Z-Index Elevado */}
@@ -723,7 +724,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: MomentusColors.navyBackground,
     paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
-    ...(Platform.OS === "web" ? { minHeight: "100vh" as any } : {}),
   },
   container: {
     flex: 1,
@@ -1040,19 +1040,20 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   fab: {
-    position: "absolute",
+    position: 'absolute',
+    bottom: 24,
     right: LayoutTokens.pagePaddingHorizontal,
-    bottom: Platform.OS === "ios" ? 28 : 22,
     width: ComponentHeightTokens.fab,
     height: ComponentHeightTokens.fab,
     borderRadius: ComponentHeightTokens.fab / 2,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.45,
-    shadowRadius: 10,
-    elevation: 10,
-    zIndex: 9999,
-    ...(Platform.OS === "web" ? { cursor: "pointer" as any } : {}),
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+    zIndex: 99,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
   },
 });

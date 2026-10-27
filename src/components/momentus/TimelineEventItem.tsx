@@ -102,6 +102,12 @@ export const TimelineEventItem: React.FC<TimelineEventItemProps> = ({
       style={[
         styles.container,
         isSelected && { backgroundColor: `${theme.primary}20`, borderRadius: 12 },
+        isOngoing && !isChecked && !isSelected && {
+          backgroundColor: `${theme.primary}12`,
+          borderColor: `${theme.primary}35`,
+          borderWidth: 1,
+          borderRadius: 12,
+        },
         Platform.OS === 'web' && ({ cursor: 'pointer' } as any),
       ]}>
       {/* 1. Horário de Início */}
