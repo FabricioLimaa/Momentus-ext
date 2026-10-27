@@ -235,7 +235,20 @@ export default function MoreScreen() {
             <Text style={styles.logoutText}>Sair da Conta</Text>
           </TouchableOpacity>
 
-          <View style={{ height: 40 }} />
+          {/* Assinatura Oficial da Marca */}
+          <View style={styles.brandFooterContainer}>
+            <Image
+              source={
+                theme.isDark
+                  ? require('@/../assets/images/brand/logo-horizontal-dark-transparent.png')
+                  : require('@/../assets/images/brand/logo-horizontal-light-transparent.png')
+              }
+              style={styles.brandFooterLogo}
+              resizeMode="contain"
+            />
+          </View>
+
+          <View style={{ height: 20 }} />
         </ScrollView>
       </View>
     </SafeAreaView>
@@ -388,6 +401,17 @@ const styles = StyleSheet.create({
     color: MomentusColors.error,
     fontWeight: 'bold',
     fontSize: 14,
+  },
+  brandFooterContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 24,
+    marginBottom: 8,
+  },
+  brandFooterLogo: {
+    width: 140,
+    height: 38,
+    opacity: 0.85,
   },
 });
 

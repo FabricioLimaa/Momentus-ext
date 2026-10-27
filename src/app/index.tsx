@@ -12,6 +12,7 @@ import {
   Alert,
   LayoutAnimation,
   UIManager,
+  Image,
 } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -44,7 +45,7 @@ if (
 
 export default function IndexScreen() {
   const insets = useSafeAreaInsets();
-  const { login, settings, syncCloudAction, userProfile, isLoaded } = useMomentus();
+  const { login, settings, syncCloudAction, userProfile, isLoaded, theme } = useMomentus();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -227,7 +228,7 @@ export default function IndexScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: theme.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
         contentContainerStyle={[
@@ -236,19 +237,36 @@ export default function IndexScreen() {
         ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled">
-        {/* Glow & Logo */}
+        {/* Glow & Logo Oficial da Marca */}
         <View style={styles.logoContainer}>
-          <View style={[styles.logoGlow, { backgroundColor: primaryColor + '25' }]} />
-          <LinearGradient
-            colors={[primaryColor, MomentusColors.emeraldDark]}
-            style={styles.logoBadge}>
-            <Ionicons name="sparkles" size={44} color="#000000" />
-          </LinearGradient>
+          <View
+            style={[
+              styles.logoGlow,
+              { backgroundColor: primaryColor + (theme.isDark ? '25' : '15') },
+            ]}
+          />
+          <View
+            style={[
+              styles.logoBadge,
+              {
+                backgroundColor: theme.isDark ? '#001A40' : '#FFFFFF',
+                borderColor: `${primaryColor}40`,
+                borderWidth: 1.5,
+              },
+            ]}>
+            <Image
+              source={require('@/../assets/images/brand/symbol-transparent.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
+          </View>
         </View>
 
-        {/* Brand Titles */}
-        <Text style={styles.brandTitle}>Momentus</Text>
-        <Text style={styles.brandSubtitle}>Organize suas metas, conquiste seu dia.</Text>
+        {/* Brand Titles com suporte a modo claro/escuro */}
+        <Text style={[styles.brandTitle, { color: theme.textPrimary }]}>Momentus</Text>
+        <Text style={[styles.brandSubtitle, { color: theme.textSecondary }]}>
+          Organize suas metas, conquiste seu dia.
+        </Text>
 
         <View style={styles.authActionsContainer}>
           {/* Botão Google com Gradiente */}
@@ -281,7 +299,14 @@ export default function IndexScreen() {
               activeOpacity={0.85}
               onPress={handleAppleSignIn}
               disabled={loading}
-              style={[styles.emailOutlineButton, { backgroundColor: '#000000', borderColor: '#334155', marginBottom: 12 }]}
+              style={[
+                styles.emailOutlineButton,
+                {
+                  backgroundColor: theme.isDark ? '#000000' : '#0F172A',
+                  borderColor: theme.outline,
+                  marginBottom: 12,
+                },
+              ]}
               accessibilityRole="button"
               accessibilityLabel="Continuar com a Apple">
               <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
@@ -291,9 +316,9 @@ export default function IndexScreen() {
 
           {/* Aviso informativo de login no navegador iOS (iPhone/iPad) */}
           {Platform.OS === 'web' && typeof navigator !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent) && (
-            <View style={styles.iosWebNoticeBox}>
+            <View style={[styles.iosWebNoticeBox, { borderColor: theme.outline }]}>
               <Ionicons name="information-circle-outline" size={16} color={primaryColor} />
-              <Text style={styles.iosWebNoticeText}>
+              <Text style={[styles.iosWebNoticeText, { color: theme.textSecondary }]}>
                 Acesso via navegador no iPhone / iPad:{' '}
                 <Text style={{ color: primaryColor, fontWeight: '700' }}>Em desenvolvimento</Text>. Para melhor experiência, utilize o login por e-mail ou o aplicativo móvel.
               </Text>
@@ -305,23 +330,30 @@ export default function IndexScreen() {
             activeOpacity={0.8}
             onPress={toggleEmailFields}
             disabled={loading}
-            style={styles.emailOutlineButton}
+            style={[
+              styles.emailOutlineButton,
+              { backgroundColor: theme.surface, borderColor: theme.outline },
+            ]}
             accessibilityRole="button"
             accessibilityLabel="Entrar com e-mail">
-            <Ionicons name="mail-outline" size={20} color={MomentusColors.textPrimary} />
-            <Text style={styles.emailOutlineButtonText}>Entrar com E-mail</Text>
+            <Ionicons name="mail-outline" size={20} color={theme.textPrimary} />
+            <Text style={[styles.emailOutlineButtonText, { color: theme.textPrimary }]}>Entrar com E-mail</Text>
           </TouchableOpacity>
 
           {/* Campos de Login por E-mail (Acordeão) */}
           {showEmailFields && (
             <View style={styles.emailFieldsBox}>
               <View style={styles.inputBlock}>
-                <View style={styles.inputWrapper}>
+                <View
+                  style={[
+                    styles.inputWrapper,
+                    { backgroundColor: theme.surface, borderColor: theme.outline },
+                  ]}>
                   <Ionicons name="mail" size={20} color={primaryColor} style={styles.inputIcon} />
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, { color: theme.textPrimary }]}
                     placeholder="E-mail"
-                    placeholderTextColor={MomentusColors.textSecondary}
+                    placeholderTextColor={theme.textSecondary}
                     keyboardType="email-address"
                     autoCapitalize="none"
                     autoComplete="email"
@@ -338,7 +370,7 @@ export default function IndexScreen() {
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       accessibilityRole="button"
                       accessibilityLabel="Limpar e-mail">
-                      <Ionicons name="close-circle" size={18} color={`${MomentusColors.textSecondary}80`} />
+                      <Ionicons name="close-circle" size={18} color={`${theme.textSecondary}80`} />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -348,7 +380,11 @@ export default function IndexScreen() {
               </View>
 
               <View style={styles.inputBlock}>
-                <View style={styles.inputWrapper}>
+                <View
+                  style={[
+                    styles.inputWrapper,
+                    { backgroundColor: theme.surface, borderColor: theme.outline },
+                  ]}>
                   <Ionicons
                     name="lock-closed"
                     size={20}
@@ -357,9 +393,9 @@ export default function IndexScreen() {
                   />
                   <TextInput
                     ref={passwordInputRef}
-                    style={styles.input}
+                    style={[styles.input, { color: theme.textPrimary }]}
                     placeholder="Senha"
-                    placeholderTextColor={MomentusColors.textSecondary}
+                    placeholderTextColor={theme.textSecondary}
                     secureTextEntry={!showPassword}
                     autoCapitalize="none"
                     autoComplete="current-password"
@@ -382,7 +418,7 @@ export default function IndexScreen() {
                     <Ionicons
                       name={showPassword ? 'eye-off-outline' : 'eye-outline'}
                       size={20}
-                      color={MomentusColors.textSecondary}
+                      color={theme.textSecondary}
                     />
                   </TouchableOpacity>
                 </View>
@@ -402,9 +438,9 @@ export default function IndexScreen() {
                   <Ionicons
                     name={rememberMe ? 'checkbox' : 'square-outline'}
                     size={22}
-                    color={rememberMe ? primaryColor : MomentusColors.textSecondary}
+                    color={rememberMe ? primaryColor : theme.textSecondary}
                   />
-                  <Text style={styles.rememberMeText}>Lembrar-me</Text>
+                  <Text style={[styles.rememberMeText, { color: theme.textSecondary }]}>Lembrar-me</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -433,7 +469,7 @@ export default function IndexScreen() {
                   styles.submitButton,
                   {
                     backgroundColor:
-                      isEmailValid && isPasswordValid ? primaryColor : MomentusColors.navyOutline,
+                      isEmailValid && isPasswordValid ? primaryColor : (theme.isDark ? MomentusColors.navyOutline : '#CBD5E1'),
                   },
                 ]}
                 accessibilityRole="button"
@@ -448,7 +484,7 @@ export default function IndexScreen() {
                         color:
                           isEmailValid && isPasswordValid
                             ? '#000000'
-                            : MomentusColors.textSecondary,
+                            : theme.textSecondary,
                       },
                     ]}>
                     Entrar
@@ -461,8 +497,8 @@ export default function IndexScreen() {
 
         {/* Social Proof */}
         <View style={styles.socialProofContainer}>
-          <Text style={styles.socialProofSub}>Comece gratuitamente</Text>
-          <Text style={styles.socialProofMain}>
+          <Text style={[styles.socialProofSub, { color: theme.textSecondary }]}>Comece gratuitamente</Text>
+          <Text style={[styles.socialProofMain, { color: theme.textSecondary }]}>
             +10.000 pessoas já estão{' '}
             <Text style={[styles.socialProofHighlight, { color: primaryColor }]}>
               transformando
@@ -473,7 +509,7 @@ export default function IndexScreen() {
 
         {/* Link Criar Conta */}
         <View style={styles.signUpRow}>
-          <Text style={styles.signUpQuestion}>Não tem uma conta?</Text>
+          <Text style={[styles.signUpQuestion, { color: theme.textSecondary }]}>Não tem uma conta?</Text>
           <TouchableOpacity
             onPress={() => router.push('/signup')}
             style={styles.signUpLinkBtn}
@@ -484,7 +520,7 @@ export default function IndexScreen() {
         </View>
 
         {/* Versão Dinâmica */}
-        <Text style={styles.versionText}>Versão: {appVersion}</Text>
+        <Text style={[styles.versionText, { color: theme.textSecondary }]}>Versão: {appVersion}</Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -494,7 +530,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     width: '100%',
-    backgroundColor: MomentusColors.navyBackground,
   },
   scrollContent: {
     paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
@@ -520,9 +555,9 @@ const styles = StyleSheet.create({
     borderRadius: 60,
   },
   logoBadge: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: MomentusColors.emeraldNeon,
@@ -531,13 +566,15 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 8,
   },
+  logoImage: {
+    width: 58,
+    height: 58,
+  },
   brandTitle: {
     ...TypographyTokens.heroTitle,
-    color: MomentusColors.textPrimary,
   },
   brandSubtitle: {
     fontSize: 15,
-    color: MomentusColors.textSecondary,
     textAlign: 'center',
     marginTop: 6,
     marginBottom: 44,
@@ -576,22 +613,18 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: MomentusColors.navyOutline,
-    backgroundColor: MomentusColors.navySurface,
     gap: 12,
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   emailOutlineButtonText: {
     fontSize: 16,
     fontWeight: '700',
-    color: MomentusColors.textPrimary,
   },
   iosWebNoticeBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 12,
@@ -601,7 +634,6 @@ const styles = StyleSheet.create({
   },
   iosWebNoticeText: {
     fontSize: 12,
-    color: MomentusColors.textSecondary,
     flex: 1,
     lineHeight: 16,
   },
@@ -616,10 +648,8 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: MomentusColors.navySurface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: MomentusColors.navyOutline,
     paddingHorizontal: 16,
     height: 56,
   },
@@ -628,7 +658,6 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    color: MomentusColors.textPrimary,
     fontSize: 15,
   },
   fieldActionBtn: {
@@ -659,7 +688,6 @@ const styles = StyleSheet.create({
   },
   rememberMeText: {
     fontSize: 14,
-    color: MomentusColors.textSecondary,
     fontWeight: '500',
   },
   forgotPasswordBtn: {
@@ -688,14 +716,12 @@ const styles = StyleSheet.create({
   },
   socialProofSub: {
     fontSize: 12,
-    color: MomentusColors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: 4,
   },
   socialProofMain: {
     fontSize: 14,
-    color: MomentusColors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -709,7 +735,6 @@ const styles = StyleSheet.create({
   },
   signUpQuestion: {
     fontSize: 14,
-    color: MomentusColors.textSecondary,
   },
   signUpLinkBtn: {
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
@@ -720,7 +745,6 @@ const styles = StyleSheet.create({
   },
   versionText: {
     fontSize: 12,
-    color: MomentusColors.textSecondary,
     opacity: 0.4,
   },
 });

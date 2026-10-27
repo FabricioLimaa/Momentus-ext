@@ -245,7 +245,11 @@ export const WeeklySummaryModal: React.FC<WeeklySummaryModalProps> = ({
                       { borderColor: `${primaryColor}40` },
                     ]}
                   >
-                    <Ionicons name="flash" size={11} color={primaryColor} />
+                    <Image
+                      source={require('@/../assets/images/brand/symbol-transparent.png')}
+                      style={{ width: 14, height: 14 }}
+                      resizeMode="contain"
+                    />
                     <Text style={[styles.brandText, { color: primaryColor }]}>
                       MOMENTUS
                     </Text>

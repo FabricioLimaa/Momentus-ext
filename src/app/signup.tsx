@@ -10,6 +10,7 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  Image,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,7 +28,7 @@ import { SplashScreen } from '@/components/momentus/SplashScreen';
 
 export default function SignUpScreen() {
   const insets = useSafeAreaInsets();
-  const { login, settings, syncCloudAction } = useMomentus();
+  const { login, settings, syncCloudAction, theme } = useMomentus();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -106,7 +107,7 @@ export default function SignUpScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: theme.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       {/* Top Header */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
@@ -129,13 +130,26 @@ export default function SignUpScreen() {
         ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled">
-        {/* Mini Logo */}
-        <View style={[styles.logoCircle, { borderColor: primaryColor + '30' }]}>
-          <Ionicons name="sparkles" size={32} color={primaryColor} />
+        {/* Mini Logo Oficial da Marca */}
+        <View
+          style={[
+            styles.logoCircle,
+            {
+              backgroundColor: theme.isDark ? '#001A40' : '#FFFFFF',
+              borderColor: `${primaryColor}40`,
+            },
+          ]}>
+          <Image
+            source={require('@/../assets/images/brand/symbol-transparent.png')}
+            style={styles.logoSymbolImage}
+            resizeMode="contain"
+          />
         </View>
 
-        <Text style={styles.title}>Junte-se ao Momentus</Text>
-        <Text style={styles.subtitle}>Comece sua jornada de produtividade hoje.</Text>
+        <Text style={[styles.title, { color: theme.textPrimary }]}>Junte-se ao Momentus</Text>
+        <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+          Comece sua jornada de produtividade hoje.
+        </Text>
 
         <View style={styles.formContainer}>
           {/* Nome */}
@@ -381,12 +395,20 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: MomentusColors.navySurface,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 12,
     marginBottom: 20,
+    elevation: 4,
+    shadowColor: MomentusColors.emeraldNeon,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+  },
+  logoSymbolImage: {
+    width: 44,
+    height: 44,
   },
   title: {
     fontSize: 24,
