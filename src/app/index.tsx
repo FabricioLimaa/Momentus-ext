@@ -55,6 +55,8 @@ export default function IndexScreen() {
   const [loading, setLoading] = useState(false);
   const [isPostLoginSyncing, setIsPostLoginSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState('Sincronizando suas rotinas...');
+  const [syncProgress, setSyncProgress] = useState<number>(0);
+  const [isSyncReady, setIsSyncReady] = useState<boolean>(false);
 
   const passwordInputRef = useRef<TextInput>(null);
 
@@ -114,24 +116,76 @@ export default function IndexScreen() {
     router.replace('/home');
   };
 
+  /**
+   * Fluxo Orquestrado Pós-Login:
+   * Etapas dinâmicas transparentes, barra de progresso fluida, proteção contra timeout e delay agradável.
+   */
+  const executePostLoginFlow = async (user: {
+    uid: string;
+    email?: string | null;
+    displayName?: string | null;
+    photoURL?: string | null;
+  }) => {
+    setIsPostLoginSyncing(true);
+    setIsSyncReady(false);
+    setSyncProgress(15);
+    setSyncMessage('Autenticando sessão segura...');
+
+    // 1. Atualiza perfil no contexto local
+    login(
+      user.email || 'usuario@momentus.com',
+      user.displayName || undefined,
+      user.photoURL || undefined
+    );
+
+    await new Promise((r) => setTimeout(r, 220));
+
+    // 2. Etapa: Buscando rotinas e categorias
+    setSyncProgress(45);
+    setSyncMessage('Buscando rotinas e categorias...');
+
+    // 3. Etapa: Sincronização com proteção contra timeout (Sugestão E)
+    try {
+      const syncTimeoutPromise = new Promise<{ isTimeout: boolean }>((resolve) =>
+        setTimeout(() => resolve({ isTimeout: true }), 4000)
+      );
+      const syncPromise = syncCloudAction(user.uid).then(() => ({ isTimeout: false }));
+
+      const result = await Promise.race([syncPromise, syncTimeoutPromise]);
+
+      if (result.isTimeout) {
+        setSyncMessage('Conexão lenta detectada. Carregando dados locais...');
+        await new Promise((r) => setTimeout(r, 600));
+      }
+    } catch (syncErr) {
+      console.warn('Erro ou timeout ao sincronizar nuvem pós login:', syncErr);
+    }
+
+    // 4. Etapa: Sincronizando conquistas e progresso
+    setSyncProgress(80);
+    setSyncMessage('Sincronizando conquistas e progresso...');
+    await new Promise((r) => setTimeout(r, 250));
+
+    // 5. Etapa: Tudo pronto! (100% com checkmark de sucesso)
+    const rawName = user.displayName?.trim() || user.email?.split('@')[0] || '';
+    const firstName = rawName.split(' ')[0] ? `, ${rawName.split(' ')[0]}` : '';
+    setSyncProgress(100);
+    setIsSyncReady(true);
+    setSyncMessage(`Tudo pronto! Bem-vindo(a)${firstName} ✨`);
+
+    // Delay confortável para percepção do sucesso e certeza de carregamento
+    await new Promise((r) => setTimeout(r, 850));
+
+    // 6. Transição final para a tela correspondente
+    await navigatePostLogin(user.uid);
+  };
+
   const handleGoogleSignIn = async () => {
     setLoading(true);
     try {
       const user = await loginWithGoogle();
-      setIsPostLoginSyncing(true);
-      setSyncMessage('Carregando suas rotinas...');
-      login(
-        user.email || 'usuario@gmail.com',
-        user.displayName || undefined,
-        user.photoURL || undefined
-      );
-      try {
-        await syncCloudAction(user.uid);
-      } catch (syncErr) {
-        console.warn('Erro ao sincronizar dados do Firestore após login:', syncErr);
-      }
       setLoading(false);
-      await navigatePostLogin(user.uid);
+      await executePostLoginFlow(user);
     } catch (err: any) {
       setLoading(false);
       setIsPostLoginSyncing(false);
@@ -148,20 +202,8 @@ export default function IndexScreen() {
     setLoading(true);
     try {
       const user = await loginWithApple();
-      setIsPostLoginSyncing(true);
-      setSyncMessage('Carregando suas rotinas...');
-      login(
-        user.email || 'usuario@apple.com',
-        user.displayName || undefined,
-        user.photoURL || undefined
-      );
-      try {
-        await syncCloudAction(user.uid);
-      } catch (syncErr) {
-        console.warn('Erro ao sincronizar dados do Firestore após login Apple:', syncErr);
-      }
       setLoading(false);
-      await navigatePostLogin(user.uid);
+      await executePostLoginFlow(user);
     } catch (err: any) {
       setLoading(false);
       setIsPostLoginSyncing(false);
@@ -201,20 +243,8 @@ export default function IndexScreen() {
       }
 
       const user = await loginWithEmail(email.trim(), password);
-      setIsPostLoginSyncing(true);
-      setSyncMessage('Carregando suas rotinas...');
-      login(
-        user.email || email.trim(),
-        user.displayName || undefined,
-        user.photoURL || undefined
-      );
-      try {
-        await syncCloudAction(user.uid);
-      } catch (syncErr) {
-        console.warn('Erro ao sincronizar dados na nuvem:', syncErr);
-      }
       setLoading(false);
-      await navigatePostLogin(user.uid);
+      await executePostLoginFlow(user);
     } catch (err: any) {
       setLoading(false);
       setIsPostLoginSyncing(false);
@@ -223,7 +253,13 @@ export default function IndexScreen() {
   };
 
   if (!isLoaded || (isLoaded && isUserLoggedIn) || isPostLoginSyncing) {
-    return <SplashScreen syncMessage={isPostLoginSyncing ? syncMessage : 'Carregando...'} />;
+    return (
+      <SplashScreen
+        syncMessage={isPostLoginSyncing ? syncMessage : 'Carregando suas rotinas...'}
+        progress={isPostLoginSyncing ? syncProgress : undefined}
+        isReady={isPostLoginSyncing ? isSyncReady : undefined}
+      />
+    );
   }
 
   return (
