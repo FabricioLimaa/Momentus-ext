@@ -48,8 +48,7 @@ export default function SettingsScreen() {
     updateSettings,
     triggerHaptic,
     userProfile,
-    clearAllLocalData,
-    clearCloudDataAction,
+    resetAllDataAndLogout,
     syncAllHabitsToCalendarAction,
     syncCloudAction,
     exportBackupAction,
@@ -66,7 +65,7 @@ export default function SettingsScreen() {
   const [syncEnabled, setSyncEnabled] = useState(settings.googleCalendarSyncEnabled ?? true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isClearModalVisible, setIsClearModalVisible] = useState(false);
-  const [isClearingCloud, setIsClearingCloud] = useState(false);
+  const [isClearingAll, setIsClearingAll] = useState(false);
 
   // Mantém os estados locais atualizados caso as configurações mudem
   useEffect(() => {
@@ -215,30 +214,17 @@ export default function SettingsScreen() {
     setIsClearModalVisible(true);
   };
 
-  const handleExecuteClearLocal = () => {
-    clearAllLocalData();
-    setIsClearModalVisible(false);
-    Alert.alert(
-      'Dados Locais Redefinidos',
-      'Rotinas, templates e itens do dispositivo foram resetados. Seus dados na nuvem continuam seguros.'
-    );
-  };
-
-  const handleExecuteClearCloud = async () => {
-    setIsClearingCloud(true);
+  const handleExecuteResetAll = async () => {
+    setIsClearingAll(true);
     try {
-      clearAllLocalData();
-      await clearCloudDataAction().catch(() => false);
-      setIsClearingCloud(false);
+      await resetAllDataAndLogout();
+      setIsClearingAll(false);
       setIsClearModalVisible(false);
-      Alert.alert(
-        'Limpeza Completa Concluída',
-        'Todos os seus dados locais e da nuvem foram apagados definitivamente. Apenas a categoria padrão "Outros" foi preservada.'
-      );
+      router.replace('/');
     } catch {
-      setIsClearingCloud(false);
+      setIsClearingAll(false);
       setIsClearModalVisible(false);
-      Alert.alert('Erro', 'Ocorreu uma falha ao comunicar com a nuvem durante a limpeza.');
+      Alert.alert('Erro', 'Ocorreu uma falha ao apagar os dados da conta.');
     }
   };
 
@@ -499,7 +485,7 @@ export default function SettingsScreen() {
             onPress={handleConfirmClearData}
             activeOpacity={0.8}>
             <Ionicons name="trash-bin-outline" size={18} color={MomentusColors.errorRed} />
-            <Text style={styles.clearCloudBtnText}>Limpar Dados (Local / Nuvem)</Text>
+            <Text style={styles.clearCloudBtnText}>Apagar Todos os Dados</Text>
           </TouchableOpacity>
 
           {/* Links para Páginas Secundárias */}
@@ -542,13 +528,13 @@ export default function SettingsScreen() {
           <View style={{ height: 40 }} />
         </ScrollView>
 
-        {/* Modal Dedicado de Limpeza de Dados do Aplicativo */}
+        {/* Modal Dedicado de Confirmação: Apagar Todos os Dados */}
         <Modal
           visible={isClearModalVisible}
           transparent
           animationType="fade"
           onRequestClose={() => {
-            if (!isClearingCloud) setIsClearModalVisible(false);
+            if (!isClearingAll) setIsClearModalVisible(false);
           }}>
           <View style={styles.clearModalOverlay}>
             <View
@@ -565,80 +551,61 @@ export default function SettingsScreen() {
               </View>
 
               <Text style={[styles.clearModalTitle, { color: theme.textPrimary }]}>
-                Limpar Dados do Aplicativo
+                Apagar Todos os Dados?
               </Text>
 
               <Text style={[styles.clearModalSubtitle, { color: theme.textSecondary }]}>
-                Esta ação é irreversível e resetará suas informações. Selecione o nível de limpeza desejado:
+                Esta ação é definitiva, irreversível e limpará completamente sua conta.
               </Text>
 
-              {/* Opção 1: Apenas Local */}
-              <TouchableOpacity
+              {/* Card de Aviso Detalhado */}
+              <View
                 style={[
-                  styles.clearOptionCard,
-                  { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
-                ]}
-                onPress={handleExecuteClearLocal}
-                disabled={isClearingCloud}
-                activeOpacity={0.85}>
-                <View style={styles.clearOptionHeader}>
-                  <View style={[styles.clearOptionIconBox, { backgroundColor: 'rgba(56, 189, 248, 0.15)' }]}>
-                    <Ionicons name="phone-portrait-outline" size={20} color={MomentusColors.cyan} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.clearOptionTitle, { color: theme.textPrimary }]}>
-                      Limpeza Apenas Local
-                    </Text>
-                    <Text style={[styles.clearOptionDesc, { color: theme.textSecondary }]}>
-                      Remove rotinas, templates salvos, conquistas e inventário deste dispositivo. Seus dados na nuvem continuam seguros e podem ser sincronizados novamente.
-                    </Text>
-                  </View>
-                </View>
-                <View style={[styles.clearOptionActionBtn, { borderColor: theme.outline }]}>
-                  <Text style={[styles.clearOptionActionText, { color: theme.textPrimary }]}>
-                    Redefinir Apenas Local
+                  styles.warningBox,
+                  {
+                    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                    borderColor: 'rgba(239, 68, 68, 0.25)',
+                  },
+                ]}>
+                <View style={styles.warningItemRow}>
+                  <Ionicons name="trash-bin-outline" size={18} color={MomentusColors.errorRed} style={{ marginTop: 2 }} />
+                  <Text style={[styles.warningItemText, { color: theme.textPrimary }]}>
+                    <Text style={{ fontWeight: '800' }}>O que será excluído: </Text>
+                    Todas as suas rotinas, hábitos, categorias personalizadas, templates, conquistas e histórico (do aparelho e da nuvem).
                   </Text>
                 </View>
-              </TouchableOpacity>
 
-              {/* Opção 2: Local + Nuvem */}
+                <View style={[styles.warningDivider, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]} />
+
+                <View style={styles.warningItemRow}>
+                  <Ionicons name="log-out-outline" size={18} color={MomentusColors.errorRed} style={{ marginTop: 2 }} />
+                  <Text style={[styles.warningItemText, { color: theme.textPrimary }]}>
+                    <Text style={{ fontWeight: '800' }}>Encerramento de sessão: </Text>
+                    Para garantir que nenhum dado residual permaneça salvo, sua conta será desconectada e você voltará à tela inicial de login.
+                  </Text>
+                </View>
+              </View>
+
+              {/* Botão de Ação Destrutiva Principal */}
               <TouchableOpacity
                 style={[
-                  styles.clearOptionCard,
-                  styles.clearOptionCardDestructive,
-                  { backgroundColor: 'rgba(239, 68, 68, 0.06)', borderColor: 'rgba(239, 68, 68, 0.25)' },
+                  styles.confirmDeleteBtn,
+                  { backgroundColor: MomentusColors.errorRed, borderColor: MomentusColors.errorRed },
                 ]}
-                onPress={handleExecuteClearCloud}
-                disabled={isClearingCloud}
+                onPress={handleExecuteResetAll}
+                disabled={isClearingAll}
                 activeOpacity={0.85}>
-                <View style={styles.clearOptionHeader}>
-                  <View style={[styles.clearOptionIconBox, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
-                    <Ionicons name="cloud-offline-outline" size={20} color={MomentusColors.errorRed} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <View style={styles.clearOptionTitleRow}>
-                      <Text style={[styles.clearOptionTitle, { color: MomentusColors.errorRed }]}>
-                        Local + Nuvem (Apagar Tudo)
-                      </Text>
-                      <View style={styles.destructiveBadge}>
-                        <Text style={styles.destructiveBadgeText}>Definitivo</Text>
-                      </View>
-                    </View>
-                    <Text style={[styles.clearOptionDesc, { color: theme.textSecondary }]}>
-                      Exclui permanentemente rotinas, templates, itens do inventário e categorias da nuvem e do dispositivo. Apenas a categoria padrão <Text style={{ fontWeight: '800' }}>Outros</Text> é mantida.
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={[styles.clearOptionActionBtn, { backgroundColor: MomentusColors.errorRed, borderColor: MomentusColors.errorRed }]}>
-                  {isClearingCloud ? (
+                {isClearingAll ? (
+                  <View style={styles.loadingRow}>
                     <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Text style={[styles.clearOptionActionText, { color: '#FFFFFF' }]}>
-                      Apagar Tudo Definitivamente
-                    </Text>
-                  )}
-                </View>
+                    <Text style={styles.confirmDeleteBtnText}>Apagando dados e saindo...</Text>
+                  </View>
+                ) : (
+                  <View style={styles.loadingRow}>
+                    <Ionicons name="trash" size={18} color="#FFFFFF" />
+                    <Text style={styles.confirmDeleteBtnText}>Sim, Apagar Tudo e Sair</Text>
+                  </View>
+                )}
               </TouchableOpacity>
 
               {/* Botão Cancelar */}
@@ -648,7 +615,7 @@ export default function SettingsScreen() {
                   { borderColor: theme.outline, backgroundColor: theme.surfaceElevated },
                 ]}
                 onPress={() => setIsClearModalVisible(false)}
-                disabled={isClearingCloud}
+                disabled={isClearingAll}
                 activeOpacity={0.85}>
                 <Text style={[styles.clearCancelBtnText, { color: theme.textSecondary }]}>
                   Cancelar
@@ -1009,70 +976,48 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 6,
   },
-  clearOptionCard: {
+  warningBox: {
     width: '100%',
-    borderRadius: 18,
+    borderRadius: 16,
     borderWidth: 1,
     padding: 14,
-    gap: 12,
-    ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
+    gap: 10,
+    marginVertical: 4,
   },
-  clearOptionCardDestructive: {
-    borderWidth: 1.5,
-  },
-  clearOptionHeader: {
+  warningItemRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
+    gap: 10,
   },
-  clearOptionIconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
+  warningItemText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  warningDivider: {
+    height: 1,
+    width: '100%',
+  },
+  confirmDeleteBtn: {
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: 16,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 2,
+    marginTop: 6,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
   },
-  clearOptionTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  clearOptionTitle: {
+  confirmDeleteBtnText: {
+    color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '800',
-    marginBottom: 4,
   },
-  clearOptionDesc: {
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  destructiveBadge: {
-    backgroundColor: 'rgba(239, 68, 68, 0.18)',
-    borderColor: 'rgba(239, 68, 68, 0.4)',
-    borderWidth: 1,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 6,
-    marginBottom: 2,
-  },
-  destructiveBadgeText: {
-    color: MomentusColors.errorRed,
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  clearOptionActionBtn: {
-    width: '100%',
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
+  loadingRow: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  clearOptionActionText: {
-    fontSize: 13,
-    fontWeight: '800',
+    gap: 8,
   },
   clearCancelBtn: {
     width: '100%',

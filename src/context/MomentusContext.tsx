@@ -170,6 +170,7 @@ interface MomentusContextData {
   updateSettings: (newSettings: Partial<AppSettings>) => void;
   clearAllLocalData: () => void;
   clearCloudDataAction: () => Promise<boolean>;
+  resetAllDataAndLogout: () => Promise<boolean>;
   syncAllHabitsToCalendarAction: () => Promise<number>;
   syncGoogleCalendarToHabitsAction: (targetDate?: string) => Promise<number>;
   fetchGoogleEventsAction: (targetDate?: string) => Promise<GoogleCalendarEventItem[]>;
@@ -1509,6 +1510,26 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return ok;
   };
 
+  const resetAllDataAndLogout = async (): Promise<boolean> => {
+    try {
+      // 1. Cancela todas as notificações locais agendadas
+      await cancelAllNotifications().catch(() => {});
+
+      // 2. Apaga da nuvem se o usuário estiver autenticado
+      const currentUser = firebaseAuth.currentUser;
+      if (currentUser?.uid) {
+        await clearCloudData(currentUser.uid).catch(() => false);
+      }
+
+      // 3. Executa o logout e a limpeza completa local (SQLite, SecureStore, AsyncStorage, FirebaseAuth)
+      await logout();
+      return true;
+    } catch (err) {
+      MomentusLog.auth.error('Erro ao executar resetAllDataAndLogout:', err);
+      return false;
+    }
+  };
+
   const exportBackupAction = async (): Promise<boolean> => {
     const backupTimestamp = formatBackupTimestamp();
     const updatedSettings = { ...settings, lastBackupAt: backupTimestamp };
@@ -1904,6 +1925,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         updateSettings,
         clearAllLocalData,
         clearCloudDataAction,
+        resetAllDataAndLogout,
         syncAllHabitsToCalendarAction,
         syncGoogleCalendarToHabitsAction,
         fetchGoogleEventsAction,
