@@ -180,6 +180,8 @@ interface MomentusContextData {
   login: (email: string, name?: string, photoUrl?: string | null) => void;
   logout: () => Promise<void>;
   syncCloudAction: (targetUid?: string) => Promise<void>;
+  isPostLoginActive: boolean;
+  setIsPostLoginActive: (active: boolean) => void;
   // Legal Actions
   acceptTermsAction: () => Promise<void>;
   declineTermsAction: () => Promise<void>;
@@ -243,6 +245,9 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     habitId: string;
     habitTitle: string;
   } | null>(null);
+
+  // Estado de controle para impedir corte brusco da SplashScreen no pós-login
+  const [isPostLoginActive, setIsPostLoginActive] = useState<boolean>(false);
 
   // Registro das datas cujos pontos de dia completo já foram validados (Anti-Abuse)
   const [validatedDayDates, setValidatedDayDates] = useState<string[]>([]);
@@ -1960,6 +1965,8 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         login,
         logout,
         syncCloudAction,
+        isPostLoginActive,
+        setIsPostLoginActive,
         acceptTermsAction,
         declineTermsAction,
         isTermsAccepted,

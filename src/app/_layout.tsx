@@ -10,7 +10,7 @@ import { CURRENT_TERMS_VERSION } from '@/constants/legalContent';
 function TabsNavigator() {
   const router = useRouter();
   const pathname = usePathname();
-  const { theme, settings, userProfile, isLoaded } = useMomentus();
+  const { theme, settings, userProfile, isLoaded, isPostLoginActive } = useMomentus();
   const primaryColor = settings.primaryColorHex || MomentusColors.emeraldNeon;
 
   useEffect(() => {
@@ -35,8 +35,8 @@ function TabsNavigator() {
       return;
     }
 
-    // Se o usuário já estiver autenticado e tentar acessar / ou /login, direciona para /home
-    if (isUserLoggedIn && (pathname === '/' || pathname === '/login')) {
+    // Se o usuário já estiver autenticado e tentar acessar / ou /login, direciona para /home (a menos que a SplashScreen pós-login esteja ativa)
+    if (isUserLoggedIn && (pathname === '/' || pathname === '/login') && !isPostLoginActive) {
       router.replace('/home');
       return;
     }
@@ -49,6 +49,7 @@ function TabsNavigator() {
     settings.termsAccepted,
     settings.termsAcceptedVersion,
     userProfile.isLoggedIn,
+    isPostLoginActive,
     pathname,
     router,
   ]);

@@ -45,7 +45,16 @@ if (
 
 export default function IndexScreen() {
   const insets = useSafeAreaInsets();
-  const { login, settings, syncCloudAction, userProfile, isLoaded, theme } = useMomentus();
+  const {
+    login,
+    settings,
+    syncCloudAction,
+    userProfile,
+    isLoaded,
+    theme,
+    isPostLoginActive,
+    setIsPostLoginActive,
+  } = useMomentus();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -84,12 +93,12 @@ export default function IndexScreen() {
     loadSavedRememberMe();
   }, []);
 
-  // Se o usuário já estiver autenticado ao acessar a raiz /, redireciona imediatamente para /home
+  // Se o usuário já estiver autenticado ao acessar a raiz /, redireciona para /home (a menos que esteja na SplashScreen de pós-login)
   useEffect(() => {
-    if (isLoaded && isUserLoggedIn) {
+    if (isLoaded && isUserLoggedIn && !isPostLoginSyncing && !isPostLoginActive) {
       router.replace('/home');
     }
-  }, [isLoaded, isUserLoggedIn]);
+  }, [isLoaded, isUserLoggedIn, isPostLoginSyncing, isPostLoginActive]);
 
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const isPasswordValid = password.length >= 6;
@@ -118,7 +127,8 @@ export default function IndexScreen() {
 
   /**
    * Fluxo Orquestrado Pós-Login:
-   * Etapas dinâmicas transparentes, barra de progresso fluida, proteção contra timeout e delay agradável.
+   * Etapas dinâmicas com tempo perceptível de leitura, barra de progresso fluida,
+   * proteção contra conexões lentas e delay confortável de confirmação (100% com checkmark).
    */
   const executePostLoginFlow = async (user: {
     uid: string;
@@ -126,25 +136,25 @@ export default function IndexScreen() {
     displayName?: string | null;
     photoURL?: string | null;
   }) => {
+    setIsPostLoginActive(true);
     setIsPostLoginSyncing(true);
     setIsSyncReady(false);
-    setSyncProgress(15);
-    setSyncMessage('Autenticando sessão segura...');
 
-    // 1. Atualiza perfil no contexto local
+    // 1. Etapa: Autenticação Segura
+    setSyncProgress(18);
+    setSyncMessage('Autenticando sessão segura...');
     login(
       user.email || 'usuario@momentus.com',
       user.displayName || undefined,
       user.photoURL || undefined
     );
-
-    await new Promise((r) => setTimeout(r, 220));
+    await new Promise((r) => setTimeout(r, 650));
 
     // 2. Etapa: Buscando rotinas e categorias
-    setSyncProgress(45);
+    setSyncProgress(48);
     setSyncMessage('Buscando rotinas e categorias...');
 
-    // 3. Etapa: Sincronização com proteção contra timeout (Sugestão E)
+    // 3. Etapa: Sincronização em nuvem com proteção contra timeout (Sugestão E)
     try {
       const syncTimeoutPromise = new Promise<{ isTimeout: boolean }>((resolve) =>
         setTimeout(() => resolve({ isTimeout: true }), 4000)
@@ -155,28 +165,30 @@ export default function IndexScreen() {
 
       if (result.isTimeout) {
         setSyncMessage('Conexão lenta detectada. Carregando dados locais...');
-        await new Promise((r) => setTimeout(r, 600));
+        await new Promise((r) => setTimeout(r, 700));
       }
     } catch (syncErr) {
       console.warn('Erro ou timeout ao sincronizar nuvem pós login:', syncErr);
     }
+    await new Promise((r) => setTimeout(r, 600));
 
     // 4. Etapa: Sincronizando conquistas e progresso
-    setSyncProgress(80);
+    setSyncProgress(82);
     setSyncMessage('Sincronizando conquistas e progresso...');
-    await new Promise((r) => setTimeout(r, 250));
+    await new Promise((r) => setTimeout(r, 650));
 
-    // 5. Etapa: Tudo pronto! (100% com checkmark de sucesso)
+    // 5. Etapa: Tudo pronto! (100% com checkmark de sucesso e mensagem personalizada)
     const rawName = user.displayName?.trim() || user.email?.split('@')[0] || '';
     const firstName = rawName.split(' ')[0] ? `, ${rawName.split(' ')[0]}` : '';
     setSyncProgress(100);
     setIsSyncReady(true);
     setSyncMessage(`Tudo pronto! Bem-vindo(a)${firstName} ✨`);
 
-    // Delay confortável para percepção do sucesso e certeza de carregamento
-    await new Promise((r) => setTimeout(r, 850));
+    // Delay confortável para percepção do sucesso e certeza de dados carregados
+    await new Promise((r) => setTimeout(r, 1200));
 
     // 6. Transição final para a tela correspondente
+    setIsPostLoginActive(false);
     await navigatePostLogin(user.uid);
   };
 
@@ -188,6 +200,7 @@ export default function IndexScreen() {
       await executePostLoginFlow(user);
     } catch (err: any) {
       setLoading(false);
+      setIsPostLoginActive(false);
       setIsPostLoginSyncing(false);
       if (err.message !== 'SIGN_IN_CANCELLED' && err.code !== 'SIGN_IN_CANCELLED') {
         Alert.alert(
@@ -206,6 +219,7 @@ export default function IndexScreen() {
       await executePostLoginFlow(user);
     } catch (err: any) {
       setLoading(false);
+      setIsPostLoginActive(false);
       setIsPostLoginSyncing(false);
       if (err.code !== 'ERR_REQUEST_CANCELED') {
         Alert.alert('Erro ao entrar com Apple', getFriendlyAuthErrorMessage(err));
@@ -247,6 +261,7 @@ export default function IndexScreen() {
       await executePostLoginFlow(user);
     } catch (err: any) {
       setLoading(false);
+      setIsPostLoginActive(false);
       setIsPostLoginSyncing(false);
       Alert.alert('Erro no login', getFriendlyAuthErrorMessage(err));
     }
