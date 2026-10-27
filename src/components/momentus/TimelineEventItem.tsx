@@ -102,6 +102,11 @@ export const TimelineEventItem: React.FC<TimelineEventItemProps> = ({
       style={[
         styles.container,
         isSelected && { backgroundColor: `${theme.primary}20`, borderRadius: 12 },
+        isOngoing && !isChecked && !isSelected && {
+          backgroundColor: `${theme.primary}0D`,
+          borderRadius: 12,
+        },
+        Platform.OS === 'web' && ({ cursor: 'pointer' } as any),
       ]}>
       {/* 1. Horário de Início */}
       <View style={styles.timeColumn}>
@@ -170,6 +175,18 @@ export const TimelineEventItem: React.FC<TimelineEventItemProps> = ({
               {category?.name || 'Geral'}
             </Text>
           </View>
+
+          {/* Badge de Atividade em Andamento (Agora) */}
+          {isOngoing && !isChecked && (
+            <View
+              style={[
+                styles.ongoingBadge,
+                { backgroundColor: `${theme.primary}20`, borderColor: `${theme.primary}50` },
+              ]}>
+              <Ionicons name="radio-button-on" size={10} color={theme.primary} />
+              <Text style={[styles.ongoingBadgeText, { color: theme.primary }]}>Agora</Text>
+            </View>
+          )}
 
           {/* Indicador do Google Agenda */}
           {(item.isFromGoogleCalendar || item.saveToGoogle || !!item.googleCalendarEventId) && (
@@ -298,6 +315,21 @@ const styles = StyleSheet.create({
   categoryBadgeText: {
     fontSize: 10,
     fontWeight: '700',
+  },
+  ongoingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginLeft: 6,
+  },
+  ongoingBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
   },
   timeRangeText: {
     fontSize: 12,

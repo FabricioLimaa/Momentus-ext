@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { HabitItem, Category } from '@/types';
 import { MomentusColors } from '@/constants/theme';
@@ -14,6 +14,7 @@ interface EventDetailDialogProps {
   onDismiss: () => void;
   onEditClick: () => void;
   onDeleteClick: () => void;
+  onStartFocus?: () => void;
 }
 
 export const EventDetailDialog: React.FC<EventDetailDialogProps> = ({
@@ -23,6 +24,7 @@ export const EventDetailDialog: React.FC<EventDetailDialogProps> = ({
   onDismiss,
   onEditClick,
   onDeleteClick,
+  onStartFocus,
 }) => {
   const { theme, templates } = useMomentus();
   if (!event) return null;
@@ -130,6 +132,22 @@ export const EventDetailDialog: React.FC<EventDetailDialogProps> = ({
                 <Ionicons name="logo-google" size={14} color={theme.primary} />
                 <Text style={[styles.googleSyncText, { color: theme.primary }]}>Sincronizado com Google Agenda</Text>
               </View>
+            )}
+
+            {/* Ação Rápida: Iniciar Foco */}
+            {onStartFocus && (
+              <TouchableOpacity
+                style={[
+                  styles.startFocusBtn,
+                  { backgroundColor: `${theme.primary}18`, borderColor: `${theme.primary}50` },
+                ]}
+                onPress={onStartFocus}
+                activeOpacity={0.85}>
+                <Ionicons name="timer-outline" size={18} color={theme.primary} />
+                <Text style={[styles.startFocusBtnText, { color: theme.primary }]}>
+                  Iniciar Foco nesta Atividade
+                </Text>
+              </TouchableOpacity>
             )}
 
             {/* 6. Ações */}
@@ -287,6 +305,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: MomentusColors.emeraldNeon,
     fontWeight: '600',
+  },
+  startFocusBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 4,
+    marginBottom: 16,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
+  },
+  startFocusBtnText: {
+    fontSize: 14,
+    fontWeight: '800',
   },
   actionsRow: {
     flexDirection: 'row',

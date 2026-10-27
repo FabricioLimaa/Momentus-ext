@@ -327,3 +327,92 @@ export function getStreakColor(streakCount: number): string {
   return '#94A3B8';
 }
 
+/**
+ * Retorna a data formatada por extenso em português.
+ * Ex: '2026-10-27' -> 'Terça-feira, 27 de Outubro'
+ */
+export function formatFullDateDisplay(dateStr?: string | null): string {
+  if (!dateStr) return '';
+  try {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    const weekdays = [
+      'Domingo',
+      'Segunda-feira',
+      'Terça-feira',
+      'Quarta-feira',
+      'Quinta-feira',
+      'Sexta-feira',
+      'Sábado',
+    ];
+    const months = [
+      'Janeiro',
+      'Fevereiro',
+      'Março',
+      'Abril',
+      'Maio',
+      'Junho',
+      'Julho',
+      'Agosto',
+      'Setembro',
+      'Outubro',
+      'Novembro',
+      'Dezembro',
+    ];
+    return `${weekdays[date.getDay()]}, ${d} de ${months[m - 1]}`;
+  } catch {
+    return dateStr;
+  }
+}
+
+export interface DayStripItem {
+  dateStr: string;
+  dayNum: string;
+  weekDayName: string;
+  isToday: boolean;
+  hasHabits: boolean;
+  allCompleted: boolean;
+}
+
+/**
+ * Retorna uma fita de 7 dias centrada na data de referência (-3 dias até +3 dias).
+ */
+export function getWeekDaysStrip(
+  centerDateStr: string,
+  todayStr: string,
+  habitsByDateMap?: Map<string, { total: number; completed: number }>
+): DayStripItem[] {
+  try {
+    const [y, m, d] = centerDateStr.split('-').map(Number);
+    const centerDate = new Date(y, m - 1, d);
+    const weekdayShort = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
+
+    const items: DayStripItem[] = [];
+    for (let offset = -3; offset <= 3; offset++) {
+      const curDate = new Date(centerDate);
+      curDate.setDate(curDate.getDate() + offset);
+
+      const curY = curDate.getFullYear();
+      const curM = String(curDate.getMonth() + 1).padStart(2, '0');
+      const curD = String(curDate.getDate()).padStart(2, '0');
+      const dateKey = `${curY}-${curM}-${curD}`;
+
+      const habitInfo = habitsByDateMap?.get(dateKey);
+      const hasHabits = Boolean(habitInfo && habitInfo.total > 0);
+      const allCompleted = Boolean(hasHabits && habitInfo!.completed === habitInfo!.total);
+
+      items.push({
+        dateStr: dateKey,
+        dayNum: String(curDate.getDate()).padStart(2, '0'),
+        weekDayName: weekdayShort[curDate.getDay()],
+        isToday: dateKey === todayStr,
+        hasHabits,
+        allCompleted,
+      });
+    }
+    return items;
+  } catch {
+    return [];
+  }
+}
+
