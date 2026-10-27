@@ -959,6 +959,7 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     backgroundColor: MomentusColors.navyBackground,
+    ...(Platform.OS === 'web' ? { minHeight: '100vh' as any } : {}),
   },
   container: {
     flex: 1,
@@ -1179,6 +1180,7 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     backgroundColor: MomentusColors.navyBackground,
+    ...(Platform.OS === 'web' ? { minHeight: '100vh' as any, width: '100vw' as any } : {}),
   },
   formModalContainer: {
     flex: 1,

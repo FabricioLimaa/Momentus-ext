@@ -555,9 +555,9 @@ const styles = StyleSheet.create({
     borderRadius: 60,
   },
   logoBadge: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    width: 104,
+    height: 104,
+    borderRadius: 52,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: MomentusColors.emeraldNeon,
@@ -567,8 +567,8 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   logoImage: {
-    width: 58,
-    height: 58,
+    width: 72,
+    height: 44,
   },
   brandTitle: {
     ...TypographyTokens.heroTitle,

@@ -247,7 +247,7 @@ export const WeeklySummaryModal: React.FC<WeeklySummaryModalProps> = ({
                   >
                     <Image
                       source={require('@/../assets/images/brand/symbol-transparent.png')}
-                      style={{ width: 14, height: 14 }}
+                      style={{ width: 18, height: 11, marginRight: 2 }}
                       resizeMode="contain"
                     />
                     <Text style={[styles.brandText, { color: primaryColor }]}>

@@ -67,6 +67,9 @@ function TabsNavigator() {
       <Tabs
         screenOptions={{
           headerShown: false,
+          sceneStyle: {
+            backgroundColor: theme.background,
+          },
           tabBarStyle: isAuthScreen
             ? { display: 'none' }
             : {

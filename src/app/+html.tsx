@@ -18,6 +18,18 @@ export default function Root({ children }: PropsWithChildren) {
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
         <title>Momentus</title>
         <ScrollViewStyleReset />
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+              html, body, #root {
+                background-color: #0B1220;
+                min-height: 100%;
+                margin: 0;
+                padding: 0;
+              }
+            `,
+          }}
+        />
       </head>
       <body>{children}</body>
     </html>

@@ -409,9 +409,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   brandFooterLogo: {
-    width: 140,
-    height: 38,
-    opacity: 0.85,
+    width: 180,
+    height: 32,
+    opacity: 0.9,
   },
 });
 

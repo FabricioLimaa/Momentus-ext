@@ -46,8 +46,16 @@ export default function CategoriesScreen() {
   const [metaMinutes, setMetaMinutes] = useState('0');
 
   // Identifica categoria do sistema / protegida (Outros)
-  const isSystemCategory = (cat: Category) => {
-    return cat.id === 'cat-outros' || cat.name.trim().toLowerCase() === 'outros';
+  const isSystemCategory = (cat: Category | null | undefined) => {
+    if (!cat) return false;
+    const norm = (cat.name || '').trim().toLowerCase();
+    const id = (cat.id || '').toLowerCase();
+    return (
+      id === 'cat-outros' ||
+      id === 'outros' ||
+      norm === 'outros' ||
+      norm === 'outro'
+    );
   };
 
   // Filtra apenas stickers que o usuário realmente possui (isOwned === true)
@@ -90,8 +98,11 @@ export default function CategoriesScreen() {
       return;
     }
 
+    const isSystem = editingCategory ? isSystemCategory(editingCategory) : false;
+    const finalName = isSystem ? editingCategory!.name : trimmedName;
+
     // Valida duplicidade de nome (ignorando maiúsculas/minúsculas)
-    const isDuplicate = categories.some(
+    const isDuplicate = !isSystem && categories.some(
       (c) =>
         c.name.trim().toLowerCase() === trimmedName.toLowerCase() &&
         c.id !== editingCategory?.id
@@ -114,7 +125,7 @@ export default function CategoriesScreen() {
 
     upsertCategory(
       editingCategory ? editingCategory.id : null,
-      trimmedName,
+      finalName,
       formColor,
       formStickerId,
       calculatedMeta
@@ -322,15 +333,22 @@ export default function CategoriesScreen() {
                       backgroundColor: theme.surfaceElevated,
                       borderColor: theme.outline,
                       color: theme.textPrimary,
+                      opacity: editingCategory && isSystemCategory(editingCategory) ? 0.7 : 1,
                     },
                   ]}
                   value={formName}
                   onChangeText={setFormName}
                   placeholder="Ex: Trabalho, Estudos, Saúde..."
                   placeholderTextColor={MomentusColors.textMuted}
-                  autoFocus
+                  autoFocus={!editingCategory || !isSystemCategory(editingCategory)}
+                  editable={!editingCategory || !isSystemCategory(editingCategory)}
                   maxLength={40}
                 />
+                {editingCategory && isSystemCategory(editingCategory) && (
+                  <Text style={{ fontSize: 11, color: theme.textSecondary, marginTop: 4, marginBottom: 8 }}>
+                    O nome da categoria padrão &#34;Outros&#34; é protegido pelo sistema e não pode ser alterado.
+                  </Text>
+                )}
 
                 {/* Seção Informativa de Meta Semanal (Bloqueada com Badge "Em breve") */}
                 <View
@@ -543,6 +561,7 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     backgroundColor: MomentusColors.navyBackground,
+    ...(Platform.OS === 'web' ? { minHeight: '100vh' as any } : {}),
   },
   container: {
     flex: 1,

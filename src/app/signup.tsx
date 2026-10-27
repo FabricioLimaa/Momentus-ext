@@ -392,10 +392,10 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   logoCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    borderWidth: 1,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 12,
@@ -407,8 +407,8 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   logoSymbolImage: {
-    width: 44,
-    height: 44,
+    width: 58,
+    height: 34,
   },
   title: {
     fontSize: 24,
