@@ -260,6 +260,9 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const creditedAchievementIdsRef = useRef<Set<string>>(new Set());
   // Trava para evitar execuções concorrentes de sincronização com o Google Agenda
   const isSyncingGoogleCalendarRef = useRef<boolean>(false);
+  // Trava para evitar sincronizações ou ressuscitação de sessão durante logout/limpeza
+  const isLoggingOutRef = useRef<boolean>(false);
+  const unsubFirestoreRef = useRef<(() => void) | null>(null);
   const categoriesRef = useRef(categories);
   useEffect(() => {
     categoriesRef.current = categories;
@@ -507,20 +510,21 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     requestNotificationPermissions().catch(() => {});
 
     // Observa mudanças de autenticação do Firebase e sincroniza automaticamente
-    let unsubFirestore: (() => void) | null = null;
     const unsubAuth = onAuthStateChanged(firebaseAuth, async (user) => {
-      if (unsubFirestore) {
-        unsubFirestore();
-        unsubFirestore = null;
+      if (unsubFirestoreRef.current) {
+        unsubFirestoreRef.current();
+        unsubFirestoreRef.current = null;
+      }
+
+      if (isLoggingOutRef.current) {
+        setUserProfile(INITIAL_USER_PROFILE);
+        return;
       }
 
       if (!user) {
         const secureSession = await getSecureSession();
-        if (!secureSession) {
-          setUserProfile((prev) => ({
-            ...prev,
-            isLoggedIn: false,
-          }));
+        if (!secureSession || isLoggingOutRef.current) {
+          setUserProfile(INITIAL_USER_PROFILE);
         } else {
           MomentusLog.auth.debug('Firebase Auth reportou user nulo provisório, preservando sessão local.');
         }
@@ -577,7 +581,8 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       // Registra listener em tempo real para sincronizar mudanças feitas no nativo (eventos e conclusões)
       try {
-        unsubFirestore = listenToFirestoreSync(user.uid, () => {
+        unsubFirestoreRef.current = listenToFirestoreSync(user.uid, () => {
+          if (isLoggingOutRef.current) return;
           syncCloudActionRef.current(user.uid).catch(() => {});
         });
       } catch (err) {
@@ -587,6 +592,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     // Sincronização periódica a cada 60 segundos com a nuvem (equivalente ao SyncWorker.kt)
     const periodicSyncTimer = setInterval(() => {
+      if (isLoggingOutRef.current) return;
       const activeUid = firebaseAuth.currentUser?.uid;
       if (activeUid) {
         syncCloudActionRef.current(activeUid).catch(() => {});
@@ -598,8 +604,9 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     return () => {
       unsubAuth();
-      if (unsubFirestore) {
-        unsubFirestore();
+      if (unsubFirestoreRef.current) {
+        unsubFirestoreRef.current();
+        unsubFirestoreRef.current = null;
       }
       clearInterval(periodicSyncTimer);
       cleanupSilentRefresh();
@@ -608,7 +615,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Persistência contínua: grava no SQLite e mantém AsyncStorage sincronizado
   useEffect(() => {
-    if (!isLoaded) return;
+    if (!isLoaded || isLoggingOutRef.current) return;
     async function saveState() {
       try {
         // Grava no SQLite
@@ -1512,19 +1519,31 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const resetAllDataAndLogout = async (): Promise<boolean> => {
     try {
-      // 1. Cancela todas as notificações locais agendadas
+      isLoggingOutRef.current = true;
+
+      // 1. Desinscreve o listener em tempo real do Firestore imediatamente
+      // para não receber eventos de deleção e não disparar syncCloudAction
+      if (unsubFirestoreRef.current) {
+        unsubFirestoreRef.current();
+        unsubFirestoreRef.current = null;
+      }
+
+      // 2. Cancela todas as notificações locais agendadas
       await cancelAllNotifications().catch(() => {});
 
-      // 2. Apaga da nuvem se o usuário estiver autenticado
+      // 3. Apaga da nuvem se o usuário estiver autenticado
       const currentUser = firebaseAuth.currentUser;
       if (currentUser?.uid) {
         await clearCloudData(currentUser.uid).catch(() => false);
       }
 
-      // 3. Executa o logout e a limpeza completa local (SQLite, SecureStore, AsyncStorage, FirebaseAuth)
+      // 4. Executa o logout e a limpeza completa local (SQLite, SecureStore, AsyncStorage, FirebaseAuth)
       await logout();
+
+      isLoggingOutRef.current = false;
       return true;
     } catch (err) {
+      isLoggingOutRef.current = false;
       MomentusLog.auth.error('Erro ao executar resetAllDataAndLogout:', err);
       return false;
     }
@@ -1690,6 +1709,11 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const logout = async (): Promise<void> => {
+    isLoggingOutRef.current = true;
+    if (unsubFirestoreRef.current) {
+      unsubFirestoreRef.current();
+      unsubFirestoreRef.current = null;
+    }
     lastLoadedUid.current = null;
     setUserProfile(INITIAL_USER_PROFILE);
     await clearSecureSession().catch(() => {});
@@ -1702,6 +1726,8 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setAchievements(INITIAL_ACHIEVEMENTS);
     setMarketItems(INITIAL_MARKET_ITEMS);
     triggerHaptic('impact');
+    setUserProfile(INITIAL_USER_PROFILE);
+    isLoggingOutRef.current = false;
   };
 
   const acceptTermsAction = async (): Promise<void> => {

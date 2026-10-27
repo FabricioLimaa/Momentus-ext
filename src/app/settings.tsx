@@ -220,7 +220,9 @@ export default function SettingsScreen() {
       await resetAllDataAndLogout();
       setIsClearingAll(false);
       setIsClearModalVisible(false);
-      router.replace('/');
+      setTimeout(() => {
+        router.replace('/');
+      }, 50);
     } catch {
       setIsClearingAll(false);
       setIsClearModalVisible(false);
