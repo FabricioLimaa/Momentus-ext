@@ -9,7 +9,6 @@ import {
   getStreakColor,
   getTodayDateString,
   formatFullDateDisplay,
-  getWeekDaysStrip,
 } from "@/constants/initialData";
 import {
   MomentusColors,
@@ -61,9 +60,7 @@ export default function HomeScreen() {
   const [selectedHabitIds, setSelectedHabitIds] = useState<string[]>([]);
   const [avatarError, setAvatarError] = useState(false);
 
-  // Estados de data e filtros da Home
-  const todayStr = useMemo(() => getTodayDateString(), []);
-  const [selectedDateStr, setSelectedDateStr] = useState<string>(todayStr);
+  // Filtros rápidos da Home (Todas, Pendentes, Concluídas)
   const [filterStatus, setFilterStatus] = useState<"ALL" | "PENDING" | "COMPLETED">("ALL");
 
   const authUser = firebaseAuth.currentUser;
@@ -74,60 +71,43 @@ export default function HomeScreen() {
   const userName = resolvedName.split(" ")[0] || "Explorador";
   const displayPhoto = userProfile.photoUrl || authUser?.photoURL || null;
 
-  // Mapa de hábitos por data para os indicadores visuais na fita de dias
-  const habitsByDateMap = useMemo(() => {
-    const map = new Map<string, { total: number; completed: number }>();
-    habits.forEach((h) => {
-      if (!h.date) return;
-      const cur = map.get(h.date) || { total: 0, completed: 0 };
-      cur.total += 1;
-      if (h.completed) cur.completed += 1;
-      map.set(h.date, cur);
-    });
-    return map;
-  }, [habits]);
+  const todayStr = useMemo(() => getTodayDateString(), []);
 
-  // Fita de 7 dias centrada na data selecionada ou em hoje
-  const weekDaysStrip = useMemo(() => {
-    return getWeekDaysStrip(todayStr, todayStr, habitsByDateMap);
-  }, [todayStr, habitsByDateMap]);
-
-  // Hábitos do dia atualmente selecionado na Home
-  const dateHabits = useMemo(() => {
+  // Hábitos do dia de hoje ordenados por horário de início
+  const todayHabits = useMemo(() => {
     return habits
-      .filter((h) => h.date === selectedDateStr)
+      .filter((h) => h.date === todayStr)
       .sort((a, b) => a.timeStart.localeCompare(b.timeStart));
-  }, [habits, selectedDateStr]);
+  }, [habits, todayStr]);
 
-  const isViewingToday = selectedDateStr === todayStr;
-  const totalInDate = dateHabits.length;
-  const completionsInDate = dateHabits.filter((h) => h.completed).length;
-  const pendingInDate = totalInDate - completionsInDate;
-  const progress = totalInDate > 0 ? completionsInDate / totalInDate : 0;
+  const totalToday = todayHabits.length;
+  const completionsToday = todayHabits.filter((h) => h.completed).length;
+  const pendingToday = totalToday - completionsToday;
+  const progress = totalToday > 0 ? completionsToday / totalToday : 0;
 
   // Lista de hábitos filtrados pelo status (Todas, Pendentes ou Concluídas)
   const filteredHabits = useMemo(() => {
     if (filterStatus === "PENDING") {
-      return dateHabits.filter((h) => !h.completed);
+      return todayHabits.filter((h) => !h.completed);
     }
     if (filterStatus === "COMPLETED") {
-      return dateHabits.filter((h) => h.completed);
+      return todayHabits.filter((h) => h.completed);
     }
-    return dateHabits;
-  }, [dateHabits, filterStatus]);
+    return todayHabits;
+  }, [todayHabits, filterStatus]);
 
-  // Nível de XP dinâmico do usuário
+  // Nível de XP dinâmico do usuário e data de hoje formatada por extenso
   const userLevel = Math.floor((userProfile.totalPoints || 0) / 100) + 1;
-  const fullDateFormatted = useMemo(() => formatFullDateDisplay(selectedDateStr), [selectedDateStr]);
+  const fullDateFormatted = useMemo(() => formatFullDateDisplay(todayStr), [todayStr]);
 
   // Frase motivacional contextualizada
   const motivationalText = useMemo(() => {
-    if (totalInDate === 0) return "Dia livre! Que tal planejar algo novo? ✨";
-    if (completionsInDate === 0) return "Vamos começar? O primeiro passo! 🚀";
+    if (totalToday === 0) return "Dia livre! Que tal planejar algo novo? ✨";
+    if (completionsToday === 0) return "Vamos começar? O primeiro passo! 🚀";
     if (progress < 0.5) return "Ótimo começo! Continue focado. 💪";
     if (progress < 1.0) return "Mais da metade concluído! Você está quase lá. ⚡";
     return "Dia perfeito! Você conquistou todas as suas metas! 🏆";
-  }, [totalInDate, completionsInDate, progress]);
+  }, [totalToday, completionsToday, progress]);
 
   // Saudação por horário
   const greeting = useMemo(() => {
@@ -151,10 +131,10 @@ export default function HomeScreen() {
   };
 
   const handleSelectAll = () => {
-    if (selectedHabitIds.length === dateHabits.length) {
+    if (selectedHabitIds.length === todayHabits.length) {
       setSelectedHabitIds([]);
     } else {
-      setSelectedHabitIds(dateHabits.map((h) => h.id));
+      setSelectedHabitIds(todayHabits.map((h) => h.id));
     }
   };
 
@@ -245,8 +225,8 @@ export default function HomeScreen() {
               >
                 <Ionicons
                   name={
-                    selectedHabitIds.length === dateHabits.length &&
-                    dateHabits.length > 0
+                    selectedHabitIds.length === todayHabits.length &&
+                    todayHabits.length > 0
                       ? "checkbox"
                       : "checkbox-outline"
                   }
@@ -275,7 +255,7 @@ export default function HomeScreen() {
 
         <ScrollView
           style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: 110 }]}
           showsVerticalScrollIndicator={false}
         >
           {/* 1. Header de Saudação & Identidade Visual Oficial da Marca */}
@@ -362,7 +342,7 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {/* Subcabeçalho com Data por Extenso e Atalho "Hoje" */}
+          {/* Subcabeçalho com Data de Hoje por Extenso */}
           <View style={styles.dateSubHeader}>
             <View style={styles.dateInfoRow}>
               <Ionicons name="calendar-outline" size={15} color={theme.primary} />
@@ -370,102 +350,9 @@ export default function HomeScreen() {
                 {fullDateFormatted}
               </Text>
             </View>
-
-            {!isViewingToday && (
-              <TouchableOpacity
-                style={[
-                  styles.backTodayBtn,
-                  { backgroundColor: `${theme.primary}18`, borderColor: `${theme.primary}50` },
-                ]}
-                onPress={() => setSelectedDateStr(todayStr)}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="arrow-undo-outline" size={13} color={theme.primary} />
-                <Text style={[styles.backTodayBtnText, { color: theme.primary }]}>
-                  Voltar para Hoje
-                </Text>
-              </TouchableOpacity>
-            )}
           </View>
 
-          {/* 2. Mini Fita Horizontal de Dias (Date Strip de 7 Dias) */}
-          <View style={styles.dateStripContainer}>
-            {weekDaysStrip.map((item) => {
-              const isSelected = item.dateStr === selectedDateStr;
-
-              return (
-                <TouchableOpacity
-                  key={item.dateStr}
-                  style={[
-                    styles.dateStripItem,
-                    {
-                      backgroundColor: isSelected
-                        ? theme.primary
-                        : theme.surface,
-                      borderColor: isSelected
-                        ? theme.primary
-                        : item.isToday
-                          ? `${theme.primary}60`
-                          : theme.outline,
-                    },
-                  ]}
-                  onPress={() => setSelectedDateStr(item.dateStr)}
-                  activeOpacity={0.8}
-                >
-                  <Text
-                    style={[
-                      styles.dateStripDayName,
-                      {
-                        color: isSelected
-                          ? "#0F172A"
-                          : item.isToday
-                            ? theme.primary
-                            : theme.textSecondary,
-                        fontWeight: isSelected || item.isToday ? "800" : "600",
-                      },
-                    ]}
-                  >
-                    {item.weekDayName}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.dateStripDayNum,
-                      {
-                        color: isSelected
-                          ? "#0F172A"
-                          : theme.textPrimary,
-                        fontWeight: isSelected ? "900" : "700",
-                      },
-                    ]}
-                  >
-                    {item.dayNum}
-                  </Text>
-
-                  {/* Indicador de Rotinas do Dia */}
-                  <View style={styles.dateDotContainer}>
-                    {item.hasHabits ? (
-                      <View
-                        style={[
-                          styles.dateStripDot,
-                          {
-                            backgroundColor: isSelected
-                              ? "#0F172A"
-                              : item.allCompleted
-                                ? theme.primary
-                                : MomentusColors.cyan,
-                          },
-                        ]}
-                      />
-                    ) : (
-                      <View style={styles.dateStripDotEmpty} />
-                    )}
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {/* 3. Card de Streak & Progresso Circular (GlassCard Enriquecido) */}
+          {/* 2. Card de Streak & Progresso Circular (GlassCard Limpo e Enriquecido) */}
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={() => router.push("/achievements" as any)}
@@ -550,37 +437,22 @@ export default function HomeScreen() {
                   />
                 </View>
               </View>
-
-              {/* Banner Comemorativo de 100% Concluído */}
-              {progress === 1.0 && totalInDate > 0 && (
-                <View
-                  style={[
-                    styles.perfectDayBanner,
-                    { backgroundColor: `${theme.primary}20`, borderColor: `${theme.primary}60` },
-                  ]}
-                >
-                  <Ionicons name="star" size={16} color={theme.primary} />
-                  <Text style={[styles.perfectDayBannerText, { color: theme.primary }]}>
-                    Dia Perfeito Conquistado! 100% das metas cumpridas!
-                  </Text>
-                </View>
-              )}
             </GlassCard>
           </TouchableOpacity>
 
-          {/* 4. Seção "Seu dia" com Filtros Rápidos */}
+          {/* 3. Seção "Seu dia" com Filtros Rápidos (Todas, Pendentes, Concluídas) */}
           <View style={styles.sectionHeader}>
             <View>
               <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
-                {isViewingToday ? "Seu dia" : "Rotinas do dia"}
+                Seu dia
               </Text>
               <Text style={[styles.sectionCountText, { color: theme.textSecondary }]}>
-                {completionsInDate}/{totalInDate} concluída{totalInDate === 1 ? "" : "s"}
+                {completionsToday}/{totalToday} concluída{totalToday === 1 ? "" : "s"}
               </Text>
             </View>
 
-            {/* Chips de Filtro Rápido (Todas, Pendentes, Concluídas) */}
-            {totalInDate > 0 && (
+            {/* Chips de Filtro Rápido */}
+            {totalToday > 0 && (
               <View style={styles.filterChipsRow}>
                 <TouchableOpacity
                   style={[
@@ -598,7 +470,7 @@ export default function HomeScreen() {
                       { color: filterStatus === "ALL" ? "#0F172A" : theme.textSecondary },
                     ]}
                   >
-                    Todas ({totalInDate})
+                    Todas ({totalToday})
                   </Text>
                 </TouchableOpacity>
 
@@ -618,7 +490,7 @@ export default function HomeScreen() {
                       { color: filterStatus === "PENDING" ? "#0F172A" : theme.textSecondary },
                     ]}
                   >
-                    Pendentes ({pendingInDate})
+                    Pendentes ({pendingToday})
                   </Text>
                 </TouchableOpacity>
 
@@ -638,15 +510,15 @@ export default function HomeScreen() {
                       { color: filterStatus === "COMPLETED" ? "#0F172A" : theme.textSecondary },
                     ]}
                   >
-                    Concluídas ({completionsInDate})
+                    Concluídas ({completionsToday})
                   </Text>
                 </TouchableOpacity>
               </View>
             )}
           </View>
 
-          {/* 5. Lista de Rotinas na Timeline ou Empty State Proativo */}
-          {totalInDate === 0 ? (
+          {/* 4. Lista de Rotinas na Timeline ou Empty State Proativo */}
+          {totalToday === 0 ? (
             <View
               style={[
                 styles.emptyContainer,
@@ -659,7 +531,7 @@ export default function HomeScreen() {
                 color={theme.textSecondary}
               />
               <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
-                {isViewingToday ? "Nada agendado para hoje" : "Nenhuma rotina para este dia"}
+                Nada agendado para hoje
               </Text>
               <Text
                 style={[styles.emptySubtitle, { color: theme.textSecondary }]}
@@ -772,10 +644,10 @@ export default function HomeScreen() {
             </View>
           )}
 
-          <View style={{ height: 90 }} />
+          <View style={{ height: 20 }} />
         </ScrollView>
 
-        {/* Floating Action Button (+) */}
+        {/* Floating Action Button (+) Sempre Visível com Z-Index Elevado */}
         {!isSelectionMode && (
           <TouchableOpacity
             style={[
@@ -787,6 +659,8 @@ export default function HomeScreen() {
               setHabitToEdit(null);
               setIsAddModalVisible(true);
             }}
+            accessibilityRole="button"
+            accessibilityLabel="Criar nova rotina"
           >
             <Ionicons
               name="add"
@@ -796,7 +670,7 @@ export default function HomeScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Modal de Detalhes do Evento com Atalho de Iniciar Foco */}
+        {/* Modal de Detalhes do Evento com Atalho de Iniciar Foco com a Rotina Vinculada */}
         <EventDetailDialog
           visible={!!selectedDetailHabit}
           event={selectedDetailHabit}
@@ -818,8 +692,14 @@ export default function HomeScreen() {
             }
           }}
           onStartFocus={() => {
-            setSelectedDetailHabit(null);
-            router.push("/focus" as any);
+            if (selectedDetailHabit) {
+              const targetHabitId = selectedDetailHabit.id;
+              setSelectedDetailHabit(null);
+              router.push({
+                pathname: "/focus",
+                params: { habitId: targetHabitId },
+              } as any);
+            }
           }}
         />
 
@@ -827,7 +707,7 @@ export default function HomeScreen() {
         <NewHabitModal
           visible={isAddModalVisible}
           habitToEdit={habitToEdit}
-          initialDate={selectedDateStr}
+          initialDate={todayStr}
           onClose={() => {
             setIsAddModalVisible(false);
             setHabitToEdit(null);
@@ -851,6 +731,7 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: LayoutTokens.maxContentWidth,
     alignSelf: "center",
+    position: "relative",
   },
   selectionTopBar: {
     flexDirection: "row",
@@ -885,7 +766,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
     paddingTop: LayoutTokens.pagePaddingTop,
-    paddingBottom: LayoutTokens.pagePaddingBottom,
   },
   homeHeader: {
     flexDirection: "row",
@@ -960,11 +840,8 @@ const styles = StyleSheet.create({
   },
   dateSubHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 16,
-    flexWrap: "wrap",
-    gap: 8,
   },
   dateInfoRow: {
     flexDirection: "row",
@@ -974,56 +851,6 @@ const styles = StyleSheet.create({
   dateSubHeaderText: {
     fontSize: 13,
     fontWeight: "700",
-  },
-  backTodayBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
-    borderWidth: 1,
-    ...(Platform.OS === "web" ? { cursor: "pointer" as any } : {}),
-  },
-  backTodayBtnText: {
-    fontSize: 11,
-    fontWeight: "800",
-  },
-  dateStripContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 20,
-    gap: 6,
-  },
-  dateStripItem: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-    ...(Platform.OS === "web" ? { cursor: "pointer" as any } : {}),
-  },
-  dateStripDayName: {
-    fontSize: 11,
-    marginBottom: 2,
-  },
-  dateStripDayNum: {
-    fontSize: 15,
-  },
-  dateDotContainer: {
-    height: 6,
-    marginTop: 4,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  dateStripDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-  },
-  dateStripDotEmpty: {
-    width: 5,
-    height: 5,
   },
   streakCardContainer: {
     marginBottom: 24,
@@ -1083,21 +910,6 @@ const styles = StyleSheet.create({
     color: MomentusColors.emeraldNeon,
     marginTop: 4,
     lineHeight: 18,
-  },
-  perfectDayBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginTop: 12,
-  },
-  perfectDayBannerText: {
-    fontSize: 12,
-    fontWeight: "800",
-    flex: 1,
   },
   circularProgressContainer: {
     width: 80,
@@ -1230,7 +1042,7 @@ const styles = StyleSheet.create({
   fab: {
     position: "absolute",
     right: LayoutTokens.pagePaddingHorizontal,
-    bottom: 24,
+    bottom: Platform.OS === "ios" ? 28 : 22,
     width: ComponentHeightTokens.fab,
     height: ComponentHeightTokens.fab,
     borderRadius: ComponentHeightTokens.fab / 2,
@@ -1239,8 +1051,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.45,
     shadowRadius: 10,
-    elevation: 8,
+    elevation: 10,
+    zIndex: 9999,
     ...(Platform.OS === "web" ? { cursor: "pointer" as any } : {}),
   },
 });
-

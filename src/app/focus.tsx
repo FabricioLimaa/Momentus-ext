@@ -25,11 +25,13 @@ import {
   scheduleFocusNotification,
   cancelFocusNotification,
 } from '@/services/notificationService';
+import { useLocalSearchParams } from 'expo-router';
 
 type FocusMode = 'FOCUS' | 'SHORT_BREAK' | 'LONG_BREAK';
 type FocusSettingsTab = 'FOCUS' | 'SHORT_BREAK' | 'LONG_BREAK';
 
 export default function FocusScreen() {
+  const { habitId } = useLocalSearchParams<{ habitId?: string }>();
   const {
     habits,
     categories,
@@ -54,6 +56,13 @@ export default function FocusScreen() {
   // Vínculo com Hábito do Dia
   const [selectedHabitId, setSelectedHabitId] = useState<string | null>(null);
   const [showHabitPickerModal, setShowHabitPickerModal] = useState(false);
+
+  // Seleciona automaticamente o hábito caso venha por parâmetro de navegação (ex: da tela Home)
+  useEffect(() => {
+    if (habitId && typeof habitId === 'string') {
+      setSelectedHabitId(habitId);
+    }
+  }, [habitId]);
 
   // Som de foco suave / Tique-taque
   const [tickingEnabled, setTickingEnabled] = useState(false);
