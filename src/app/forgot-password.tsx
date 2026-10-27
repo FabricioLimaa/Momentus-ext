@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -26,13 +26,14 @@ import { sendPasswordReset, getFriendlyAuthErrorMessage } from '@/services/authS
 
 export default function ForgotPasswordScreen() {
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ email?: string }>();
   const { settings } = useMomentus();
 
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(params.email || '');
   const [loading, setLoading] = useState(false);
 
   const primaryColor = settings.primaryColorHex || MomentusColors.emeraldNeon;
-  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
   const handleSendResetLink = async () => {
     if (!isEmailValid) {
@@ -42,7 +43,7 @@ export default function ForgotPasswordScreen() {
 
     setLoading(true);
     try {
-      await sendPasswordReset(email);
+      await sendPasswordReset(email.trim());
       setLoading(false);
       Alert.alert(
         'E-mail Enviado! 📬',
@@ -69,7 +70,9 @@ export default function ForgotPasswordScreen() {
         <TouchableOpacity
           onPress={() => router.back()}
           style={styles.backButton}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          accessibilityRole="button"
+          accessibilityLabel="Voltar">
           <Ionicons name="arrow-back" size={24} color={MomentusColors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Recuperar Senha</Text>
@@ -94,17 +97,40 @@ export default function ForgotPasswordScreen() {
         </Text>
 
         <View style={styles.formContainer}>
-          <View style={styles.inputWrapper}>
-            <Ionicons name="mail-outline" size={20} color={primaryColor} style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="E-mail cadastrado"
-              placeholderTextColor={MomentusColors.textSecondary}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              value={email}
-              onChangeText={setEmail}
-            />
+          <View style={styles.inputBlock}>
+            <View style={styles.inputWrapper}>
+              <Ionicons name="mail-outline" size={20} color={primaryColor} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="E-mail cadastrado"
+                placeholderTextColor={MomentusColors.textSecondary}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+                textContentType="emailAddress"
+                returnKeyType="send"
+                onSubmitEditing={() => {
+                  if (isEmailValid && !loading) {
+                    handleSendResetLink();
+                  }
+                }}
+                value={email}
+                onChangeText={setEmail}
+              />
+              {email.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => setEmail('')}
+                  style={styles.clearIconButton}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Limpar e-mail">
+                  <Ionicons name="close-circle" size={18} color={`${MomentusColors.textSecondary}80`} />
+                </TouchableOpacity>
+              )}
+            </View>
+            {email.length > 0 && !isEmailValid && (
+              <Text style={styles.inputErrorHint}>Informe um formato de e-mail válido.</Text>
+            )}
           </View>
 
           <TouchableOpacity
@@ -116,7 +142,9 @@ export default function ForgotPasswordScreen() {
               {
                 backgroundColor: isEmailValid ? primaryColor : MomentusColors.navyOutline,
               },
-            ]}>
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Enviar link de recuperação">
             {loading ? (
               <ActivityIndicator color="#000000" />
             ) : (
@@ -138,6 +166,7 @@ export default function ForgotPasswordScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    width: '100%',
     backgroundColor: MomentusColors.navyBackground,
   },
   header: {
@@ -153,6 +182,7 @@ const styles = StyleSheet.create({
     borderRadius: ComponentHeightTokens.iconButton / 2,
     alignItems: 'center',
     justifyContent: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   headerTitle: {
     ...TypographyTokens.screenTitle,
@@ -196,7 +226,10 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     width: '100%',
-    gap: 20,
+    gap: 16,
+  },
+  inputBlock: {
+    width: '100%',
   },
   inputWrapper: {
     flexDirection: 'row',
@@ -216,12 +249,26 @@ const styles = StyleSheet.create({
     color: MomentusColors.textPrimary,
     fontSize: 15,
   },
+  clearIconButton: {
+    padding: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  },
+  inputErrorHint: {
+    color: MomentusColors.errorRed,
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 6,
+    fontWeight: '500',
+  },
   submitButton: {
     height: ComponentHeightTokens.buttonHero,
     borderRadius: BorderRadiusTokens.input,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 8,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   submitButtonText: {
     fontSize: 16,

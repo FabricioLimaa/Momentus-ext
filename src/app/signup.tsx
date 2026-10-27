@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -33,22 +33,29 @@ export default function SignUpScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isPostSignUpSyncing, setIsPostSignUpSyncing] = useState(false);
 
+  const emailInputRef = useRef<TextInput>(null);
+  const passwordInputRef = useRef<TextInput>(null);
+  const confirmPasswordInputRef = useRef<TextInput>(null);
+
   const primaryColor = settings.primaryColorHex || MomentusColors.emeraldNeon;
 
+  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const isPasswordStrong = password.length >= 6;
+  const passwordsMatch = !confirmPassword || password === confirmPassword;
+
   const isFormValid = useMemo(() => {
-    const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     return (
       name.trim().length > 0 &&
       isEmailValid &&
-      password.length >= 6 &&
+      isPasswordStrong &&
       password === confirmPassword
     );
-  }, [name, email, password, confirmPassword]);
-
-  const passwordsMatch = !confirmPassword || password === confirmPassword;
+  }, [name, isEmailValid, isPasswordStrong, password, confirmPassword]);
 
   const handleSignUp = async () => {
     if (!isFormValid) {
@@ -58,10 +65,10 @@ export default function SignUpScreen() {
 
     setLoading(true);
     try {
-      const user = await registerWithEmail(email, password, name.trim());
+      const user = await registerWithEmail(email.trim(), password, name.trim());
       setIsPostSignUpSyncing(true);
       login(
-        user.email || email,
+        user.email || email.trim(),
         user.displayName || name.trim(),
         user.photoURL || undefined
       );
@@ -85,6 +92,14 @@ export default function SignUpScreen() {
     }
   };
 
+  const handleNavigateToLogin = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/');
+    }
+  };
+
   if (isPostSignUpSyncing) {
     return <SplashScreen syncMessage="Preparando seu espaço..." />;
   }
@@ -96,9 +111,11 @@ export default function SignUpScreen() {
       {/* Top Header */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={handleNavigateToLogin}
           style={styles.backButton}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          accessibilityRole="button"
+          accessibilityLabel="Voltar">
           <Ionicons name="arrow-back" size={24} color={MomentusColors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Criar Conta</Text>
@@ -130,6 +147,11 @@ export default function SignUpScreen() {
                 style={styles.input}
                 placeholder="Seu nome"
                 placeholderTextColor={MomentusColors.textSecondary}
+                autoCapitalize="words"
+                autoComplete="name"
+                textContentType="name"
+                returnKeyType="next"
+                onSubmitEditing={() => emailInputRef.current?.focus()}
                 value={name}
                 onChangeText={setName}
               />
@@ -142,15 +164,33 @@ export default function SignUpScreen() {
             <View style={styles.inputWrapper}>
               <Ionicons name="mail-outline" size={20} color={primaryColor} style={styles.inputIcon} />
               <TextInput
+                ref={emailInputRef}
                 style={styles.input}
                 placeholder="seu.email@exemplo.com"
                 placeholderTextColor={MomentusColors.textSecondary}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                autoComplete="email"
+                textContentType="emailAddress"
+                returnKeyType="next"
+                onSubmitEditing={() => passwordInputRef.current?.focus()}
                 value={email}
                 onChangeText={setEmail}
               />
+              {email.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => setEmail('')}
+                  style={styles.fieldActionBtn}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Limpar e-mail">
+                  <Ionicons name="close-circle" size={18} color={`${MomentusColors.textSecondary}80`} />
+                </TouchableOpacity>
+              )}
             </View>
+            {email.length > 0 && !isEmailValid && (
+              <Text style={styles.errorText}>Informe um e-mail válido.</Text>
+            )}
           </View>
 
           {/* Senha */}
@@ -159,15 +199,46 @@ export default function SignUpScreen() {
             <View style={styles.inputWrapper}>
               <Ionicons name="lock-closed-outline" size={20} color={primaryColor} style={styles.inputIcon} />
               <TextInput
+                ref={passwordInputRef}
                 style={styles.input}
                 placeholder="Senha (mínimo 6 caracteres)"
                 placeholderTextColor={MomentusColors.textSecondary}
-                secureTextEntry
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoComplete="new-password"
+                textContentType="newPassword"
+                returnKeyType="next"
+                onSubmitEditing={() => confirmPasswordInputRef.current?.focus()}
                 value={password}
                 onChangeText={setPassword}
               />
+              <TouchableOpacity
+                onPress={() => setShowPassword((prev) => !prev)}
+                style={styles.fieldActionBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel={showPassword ? 'Ocultar senha' : 'Exibir senha'}>
+                <Ionicons
+                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                  size={20}
+                  color={MomentusColors.textSecondary}
+                />
+              </TouchableOpacity>
             </View>
-            <Text style={styles.helperText}>Mínimo de 6 caracteres.</Text>
+            {password.length > 0 ? (
+              isPasswordStrong ? (
+                <View style={styles.validationRow}>
+                  <Ionicons name="checkmark-circle" size={14} color={primaryColor} />
+                  <Text style={[styles.helperText, { color: primaryColor, marginLeft: 4 }]}>
+                    Senha com tamanho adequado.
+                  </Text>
+                </View>
+              ) : (
+                <Text style={styles.errorText}>Mínimo de 6 caracteres.</Text>
+              )
+            ) : (
+              <Text style={styles.helperText}>Mínimo de 6 caracteres.</Text>
+            )}
           </View>
 
           {/* Confirmar Senha */}
@@ -180,16 +251,47 @@ export default function SignUpScreen() {
               ]}>
               <Ionicons name="lock-closed-outline" size={20} color={primaryColor} style={styles.inputIcon} />
               <TextInput
+                ref={confirmPasswordInputRef}
                 style={styles.input}
                 placeholder="Confirme sua senha"
                 placeholderTextColor={MomentusColors.textSecondary}
-                secureTextEntry
+                secureTextEntry={!showConfirmPassword}
+                autoCapitalize="none"
+                autoComplete="new-password"
+                textContentType="newPassword"
+                returnKeyType="done"
+                onSubmitEditing={() => {
+                  if (isFormValid && !loading) {
+                    handleSignUp();
+                  }
+                }}
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
               />
+              <TouchableOpacity
+                onPress={() => setShowConfirmPassword((prev) => !prev)}
+                style={styles.fieldActionBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel={showConfirmPassword ? 'Ocultar senha' : 'Exibir senha'}>
+                <Ionicons
+                  name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'}
+                  size={20}
+                  color={MomentusColors.textSecondary}
+                />
+              </TouchableOpacity>
             </View>
-            {!passwordsMatch && (
-              <Text style={styles.errorText}>As senhas não coincidem.</Text>
+            {confirmPassword.length > 0 && (
+              passwordsMatch ? (
+                <View style={styles.validationRow}>
+                  <Ionicons name="checkmark-circle" size={14} color={primaryColor} />
+                  <Text style={[styles.helperText, { color: primaryColor, marginLeft: 4 }]}>
+                    As senhas coincidem.
+                  </Text>
+                </View>
+              ) : (
+                <Text style={styles.errorText}>As senhas não coincidem.</Text>
+              )
             )}
           </View>
 
@@ -203,7 +305,9 @@ export default function SignUpScreen() {
               {
                 backgroundColor: isFormValid ? primaryColor : MomentusColors.navyOutline,
               },
-            ]}>
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Criar Conta">
             {loading ? (
               <ActivityIndicator color="#000000" />
             ) : (
@@ -219,8 +323,10 @@ export default function SignUpScreen() {
 
           {/* Link Já tem conta */}
           <TouchableOpacity
-            onPress={() => router.push('/')}
-            style={styles.loginLinkButton}>
+            onPress={handleNavigateToLogin}
+            style={styles.loginLinkButton}
+            accessibilityRole="button"
+            accessibilityLabel="Já tem uma conta? Faça login">
             <Text style={styles.loginLinkText}>
               Já tem uma conta?{' '}
               <Text style={[styles.loginLinkHighlight, { color: primaryColor }]}>
@@ -237,6 +343,7 @@ export default function SignUpScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    width: '100%',
     backgroundColor: MomentusColors.navyBackground,
   },
   header: {
@@ -252,6 +359,7 @@ const styles = StyleSheet.create({
     borderRadius: ComponentHeightTokens.iconButton / 2,
     alignItems: 'center',
     justifyContent: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   headerTitle: {
     ...TypographyTokens.screenTitle,
@@ -324,6 +432,18 @@ const styles = StyleSheet.create({
     color: MomentusColors.textPrimary,
     fontSize: 15,
   },
+  fieldActionBtn: {
+    padding: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  },
+  validationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 6,
+    marginTop: 2,
+  },
   helperText: {
     fontSize: 12,
     color: MomentusColors.textSecondary,
@@ -343,6 +463,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 16,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   submitButtonText: {
     fontSize: 16,
@@ -352,6 +473,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 16,
     paddingVertical: 8,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   loginLinkText: {
     fontSize: 14,

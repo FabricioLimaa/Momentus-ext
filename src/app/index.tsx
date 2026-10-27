@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,11 +10,14 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  LayoutAnimation,
+  UIManager,
 } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Constants from 'expo-constants';
 import {
   MomentusColors,
   LayoutTokens,
@@ -30,6 +33,14 @@ import {
 import { hasAcceptedTermsCloud } from '@/services/firestoreSyncService';
 import { CURRENT_TERMS_VERSION } from '@/constants/legalContent';
 import { SplashScreen } from '@/components/momentus/SplashScreen';
+import { getAppKv, setAppKv } from '@/database/momentusDb';
+
+if (
+  Platform.OS === 'android' &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 export default function IndexScreen() {
   const insets = useSafeAreaInsets();
@@ -37,15 +48,38 @@ export default function IndexScreen() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [showEmailFields, setShowEmailFields] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isPostLoginSyncing, setIsPostLoginSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState('Sincronizando suas rotinas...');
 
+  const passwordInputRef = useRef<TextInput>(null);
+
   const primaryColor = settings.primaryColorHex || MomentusColors.emeraldNeon;
+  const appVersion = Constants.expoConfig?.version || '1.6.6';
 
   const isUserLoggedIn = !!userProfile.isLoggedIn;
+
+  // Carrega e-mail e preferência de Lembrar-me salvos localmente
+  useEffect(() => {
+    async function loadSavedRememberMe() {
+      try {
+        const prefs = await getAppKv<{ email: string; rememberMe: boolean }>(
+          'auth_remember_me_prefs'
+        );
+        if (prefs?.rememberMe && prefs.email) {
+          setEmail(prefs.email);
+          setRememberMe(true);
+          setShowEmailFields(true);
+        }
+      } catch (err) {
+        console.warn('Erro ao carregar credenciais salvas:', err);
+      }
+    }
+    loadSavedRememberMe();
+  }, []);
 
   // Se o usuário já estiver autenticado ao acessar a raiz /, redireciona imediatamente para /home
   useEffect(() => {
@@ -54,8 +88,15 @@ export default function IndexScreen() {
     }
   }, [isLoaded, isUserLoggedIn]);
 
-  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const isPasswordValid = password.length >= 6;
+
+  const toggleEmailFields = () => {
+    if (Platform.OS !== 'web') {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    }
+    setShowEmailFields((prev) => !prev);
+  };
 
   const navigatePostLogin = async (uid: string) => {
     try {
@@ -141,11 +182,28 @@ export default function IndexScreen() {
 
     setLoading(true);
     try {
-      const user = await loginWithEmail(email, password);
+      // Persiste preferência de Lembrar-me
+      try {
+        if (rememberMe) {
+          await setAppKv('auth_remember_me_prefs', {
+            email: email.trim(),
+            rememberMe: true,
+          });
+        } else {
+          await setAppKv('auth_remember_me_prefs', {
+            email: '',
+            rememberMe: false,
+          });
+        }
+      } catch (prefErr) {
+        console.warn('Erro ao salvar preferência de lembrar-me:', prefErr);
+      }
+
+      const user = await loginWithEmail(email.trim(), password);
       setIsPostLoginSyncing(true);
       setSyncMessage('Carregando suas rotinas...');
       login(
-        user.email || email,
+        user.email || email.trim(),
         user.displayName || undefined,
         user.photoURL || undefined
       );
@@ -198,7 +256,9 @@ export default function IndexScreen() {
             activeOpacity={0.85}
             onPress={handleGoogleSignIn}
             disabled={loading}
-            style={styles.googleButtonWrapper}>
+            style={styles.googleButtonWrapper}
+            accessibilityRole="button"
+            accessibilityLabel="Entrar com o Google">
             <LinearGradient
               colors={[primaryColor, '#10B981']}
               start={{ x: 0, y: 0 }}
@@ -221,7 +281,9 @@ export default function IndexScreen() {
               activeOpacity={0.85}
               onPress={handleAppleSignIn}
               disabled={loading}
-              style={[styles.emailOutlineButton, { backgroundColor: '#000000', borderColor: '#334155', marginBottom: 12 }]}>
+              style={[styles.emailOutlineButton, { backgroundColor: '#000000', borderColor: '#334155', marginBottom: 12 }]}
+              accessibilityRole="button"
+              accessibilityLabel="Continuar com a Apple">
               <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
               <Text style={[styles.emailOutlineButtonText, { color: '#FFFFFF' }]}>Continuar com Apple</Text>
             </TouchableOpacity>
@@ -241,8 +303,11 @@ export default function IndexScreen() {
           {/* Botão Alternar E-mail */}
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={() => setShowEmailFields((prev) => !prev)}
-            style={styles.emailOutlineButton}>
+            onPress={toggleEmailFields}
+            disabled={loading}
+            style={styles.emailOutlineButton}
+            accessibilityRole="button"
+            accessibilityLabel="Entrar com e-mail">
             <Ionicons name="mail-outline" size={20} color={MomentusColors.textPrimary} />
             <Text style={styles.emailOutlineButtonText}>Entrar com E-mail</Text>
           </TouchableOpacity>
@@ -250,34 +315,80 @@ export default function IndexScreen() {
           {/* Campos de Login por E-mail (Acordeão) */}
           {showEmailFields && (
             <View style={styles.emailFieldsBox}>
-              <View style={styles.inputWrapper}>
-                <Ionicons name="mail" size={20} color={primaryColor} style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="E-mail"
-                  placeholderTextColor={MomentusColors.textSecondary}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  value={email}
-                  onChangeText={setEmail}
-                />
+              <View style={styles.inputBlock}>
+                <View style={styles.inputWrapper}>
+                  <Ionicons name="mail" size={20} color={primaryColor} style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="E-mail"
+                    placeholderTextColor={MomentusColors.textSecondary}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoComplete="email"
+                    textContentType="emailAddress"
+                    returnKeyType="next"
+                    onSubmitEditing={() => passwordInputRef.current?.focus()}
+                    value={email}
+                    onChangeText={setEmail}
+                  />
+                  {email.length > 0 && (
+                    <TouchableOpacity
+                      onPress={() => setEmail('')}
+                      style={styles.fieldActionBtn}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Limpar e-mail">
+                      <Ionicons name="close-circle" size={18} color={`${MomentusColors.textSecondary}80`} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+                {email.length > 0 && !isEmailValid && (
+                  <Text style={styles.inputErrorHint}>Informe um formato de e-mail válido.</Text>
+                )}
               </View>
 
-              <View style={styles.inputWrapper}>
-                <Ionicons
-                  name="lock-closed"
-                  size={20}
-                  color={primaryColor}
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Senha"
-                  placeholderTextColor={MomentusColors.textSecondary}
-                  secureTextEntry
-                  value={password}
-                  onChangeText={setPassword}
-                />
+              <View style={styles.inputBlock}>
+                <View style={styles.inputWrapper}>
+                  <Ionicons
+                    name="lock-closed"
+                    size={20}
+                    color={primaryColor}
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    ref={passwordInputRef}
+                    style={styles.input}
+                    placeholder="Senha"
+                    placeholderTextColor={MomentusColors.textSecondary}
+                    secureTextEntry={!showPassword}
+                    autoCapitalize="none"
+                    autoComplete="current-password"
+                    textContentType="password"
+                    returnKeyType="go"
+                    onSubmitEditing={() => {
+                      if (isEmailValid && isPasswordValid && !loading) {
+                        handleEmailSignIn();
+                      }
+                    }}
+                    value={password}
+                    onChangeText={setPassword}
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowPassword((prev) => !prev)}
+                    style={styles.fieldActionBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={showPassword ? 'Ocultar senha' : 'Exibir senha'}>
+                    <Ionicons
+                      name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                      size={20}
+                      color={MomentusColors.textSecondary}
+                    />
+                  </TouchableOpacity>
+                </View>
+                {password.length > 0 && !isPasswordValid && (
+                  <Text style={styles.inputErrorHint}>A senha deve ter pelo menos 6 caracteres.</Text>
+                )}
               </View>
 
               {/* Opções: Lembrar-me e Esqueceu a Senha */}
@@ -285,7 +396,9 @@ export default function IndexScreen() {
                 <TouchableOpacity
                   style={styles.checkboxRow}
                   activeOpacity={0.8}
-                  onPress={() => setRememberMe((prev) => !prev)}>
+                  onPress={() => setRememberMe((prev) => !prev)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: rememberMe }}>
                   <Ionicons
                     name={rememberMe ? 'checkbox' : 'square-outline'}
                     size={22}
@@ -295,8 +408,16 @@ export default function IndexScreen() {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  onPress={() => router.push('/forgot-password')}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  onPress={() =>
+                    router.push({
+                      pathname: '/forgot-password',
+                      params: email.trim() ? { email: email.trim() } : {},
+                    } as any)
+                  }
+                  style={styles.forgotPasswordBtn}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Esqueceu a senha?">
                   <Text style={[styles.forgotPasswordText, { color: primaryColor }]}>
                     Esqueceu a senha?
                   </Text>
@@ -314,7 +435,9 @@ export default function IndexScreen() {
                     backgroundColor:
                       isEmailValid && isPasswordValid ? primaryColor : MomentusColors.navyOutline,
                   },
-                ]}>
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Entrar">
                 {loading ? (
                   <ActivityIndicator color="#000000" />
                 ) : (
@@ -351,13 +474,17 @@ export default function IndexScreen() {
         {/* Link Criar Conta */}
         <View style={styles.signUpRow}>
           <Text style={styles.signUpQuestion}>Não tem uma conta?</Text>
-          <TouchableOpacity onPress={() => router.push('/signup')}>
+          <TouchableOpacity
+            onPress={() => router.push('/signup')}
+            style={styles.signUpLinkBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Criar uma conta">
             <Text style={[styles.signUpLink, { color: primaryColor }]}> Crie uma aqui</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Versão */}
-        <Text style={styles.versionText}>Versão: 2.1.0</Text>
+        {/* Versão Dinâmica */}
+        <Text style={styles.versionText}>Versão: {appVersion}</Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -366,6 +493,7 @@ export default function IndexScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    width: '100%',
     backgroundColor: MomentusColors.navyBackground,
   },
   scrollContent: {
@@ -427,6 +555,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 10,
     elevation: 6,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   googleGradient: {
     flexDirection: 'row',
@@ -450,6 +579,7 @@ const styles = StyleSheet.create({
     borderColor: MomentusColors.navyOutline,
     backgroundColor: MomentusColors.navySurface,
     gap: 12,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   emailOutlineButtonText: {
     fontSize: 16,
@@ -480,6 +610,9 @@ const styles = StyleSheet.create({
     marginTop: 10,
     gap: 14,
   },
+  inputBlock: {
+    width: '100%',
+  },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -498,6 +631,19 @@ const styles = StyleSheet.create({
     color: MomentusColors.textPrimary,
     fontSize: 15,
   },
+  fieldActionBtn: {
+    padding: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  },
+  inputErrorHint: {
+    color: MomentusColors.errorRed,
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 6,
+    fontWeight: '500',
+  },
   optionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -509,11 +655,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   rememberMeText: {
     fontSize: 14,
     color: MomentusColors.textSecondary,
     fontWeight: '500',
+  },
+  forgotPasswordBtn: {
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   forgotPasswordText: {
     fontSize: 14,
@@ -525,6 +675,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 6,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   submitButtonText: {
     fontSize: 16,
@@ -559,6 +710,9 @@ const styles = StyleSheet.create({
   signUpQuestion: {
     fontSize: 14,
     color: MomentusColors.textSecondary,
+  },
+  signUpLinkBtn: {
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   signUpLink: {
     fontSize: 14,
