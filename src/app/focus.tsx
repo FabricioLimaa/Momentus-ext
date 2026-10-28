@@ -20,7 +20,11 @@ import { MomentusColors, getContrastTextColor } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import { getTodayDateString } from '@/constants/initialData';
 import { getAppKv, setAppKv } from '@/database/momentusDb';
-import { soundManager } from '@/util/soundManager';
+import {
+  soundManager,
+  SoundscapeType,
+  SOUNDSCAPE_OPTIONS,
+} from '@/util/soundManager';
 import {
   scheduleFocusNotification,
   cancelFocusNotification,
@@ -66,6 +70,15 @@ export default function FocusScreen() {
 
   // Som de foco suave / Tique-taque
   const [tickingEnabled, setTickingEnabled] = useState(false);
+
+  // Paisagens Sonoras / Sons de Ambiente (Soundscapes)
+  const [soundscape, setSoundscape] = useState<SoundscapeType>('none');
+  const [soundscapeVolume, setSoundscapeVolume] = useState<number>(0.6);
+  const [showSoundscapeModal, setShowSoundscapeModal] = useState(false);
+
+  // Modo Imersivo / Deep Focus (Tela Cheia / Relógio de Mesa)
+  const [isDeepFocus, setIsDeepFocus] = useState(false);
+  const [deepControlsVisible, setDeepControlsVisible] = useState(true);
 
   // Tempo restante em segundos
   const [timeLeft, setTimeLeft] = useState(25 * 60);
@@ -136,6 +149,20 @@ export default function FocusScreen() {
       }
     });
 
+    getAppKv<SoundscapeType>('focus_soundscape').then((saved) => {
+      if (saved) {
+        setSoundscape(saved);
+        soundManager.setSoundscape(saved, false);
+      }
+    });
+
+    getAppKv<number>('focus_soundscape_volume').then((savedVol) => {
+      if (typeof savedVol === 'number') {
+        setSoundscapeVolume(savedVol);
+        soundManager.setSoundscapeVolume(savedVol);
+      }
+    });
+
     // Restaura sessão de foco ativa caso o usuário tenha trocado de aba ou recarregado
     getAppKv<{
       endTime: number;
@@ -159,6 +186,10 @@ export default function FocusScreen() {
         }
       }
     });
+
+    return () => {
+      soundManager.pauseSoundscape();
+    };
   }, []);
 
   // Diálogo de configurações no estilo TimePickerModal
@@ -217,6 +248,7 @@ export default function FocusScreen() {
       if (timerRef.current) clearInterval(timerRef.current);
       endTimeRef.current = null;
       setIsRunning(false);
+      soundManager.pauseSoundscape();
       cancelFocusNotification(notificationIdRef.current);
       notificationIdRef.current = null;
       setAppKv('active_focus_timer', null).catch(() => {});
@@ -232,6 +264,7 @@ export default function FocusScreen() {
   const onTimerFinished = useCallback(() => {
     triggerHaptic('success');
     soundManager.playAchievementSound();
+    soundManager.pauseSoundscape();
     cancelFocusNotification(notificationIdRef.current);
     notificationIdRef.current = null;
     setAppKv('active_focus_timer', null).catch(() => {});
@@ -383,6 +416,11 @@ export default function FocusScreen() {
       setIsRunning(true);
       soundManager.playSuccessSound();
 
+      // Inicia som de ambiente se estiver no modo foco
+      if (mode === 'FOCUS' && soundscape !== 'none') {
+        soundManager.resumeSoundscape();
+      }
+
       // Agenda notificação local de término no dispositivo
       const linkedHabit = habits.find((h) => h.id === selectedHabitId);
       scheduleFocusNotification(timeLeft, mode, linkedHabit?.title).then((id) => {
@@ -400,6 +438,7 @@ export default function FocusScreen() {
       // Pausa a contagem preservando o timeLeft atual
       endTimeRef.current = null;
       setIsRunning(false);
+      soundManager.pauseSoundscape();
       cancelFocusNotification(notificationIdRef.current);
       notificationIdRef.current = null;
       setAppKv('active_focus_timer', null).catch(() => {});
@@ -413,6 +452,7 @@ export default function FocusScreen() {
     }
     endTimeRef.current = null;
     setIsRunning(false);
+    soundManager.pauseSoundscape();
     cancelFocusNotification(notificationIdRef.current);
     notificationIdRef.current = null;
     setAppKv('active_focus_timer', null).catch(() => {});
@@ -480,6 +520,7 @@ export default function FocusScreen() {
     }
     endTimeRef.current = null;
     setIsRunning(false);
+    soundManager.pauseSoundscape();
     cancelFocusNotification(notificationIdRef.current);
     notificationIdRef.current = null;
     setAppKv('active_focus_timer', null).catch(() => {});
@@ -495,6 +536,24 @@ export default function FocusScreen() {
     } else {
       switchMode('FOCUS');
     }
+    triggerHaptic('impact');
+  };
+
+  const selectSoundscape = (type: SoundscapeType) => {
+    setSoundscape(type);
+    setAppKv('focus_soundscape', type).catch(() => {});
+    triggerHaptic('selection');
+    if (isRunning && mode === 'FOCUS') {
+      soundManager.setSoundscape(type, true);
+    } else {
+      soundManager.setSoundscape(type, false);
+    }
+  };
+
+  const changeSoundscapeVolume = (vol: number) => {
+    setSoundscapeVolume(vol);
+    soundManager.setSoundscapeVolume(vol);
+    setAppKv('focus_soundscape_volume', vol).catch(() => {});
     triggerHaptic('impact');
   };
 
@@ -519,6 +578,39 @@ export default function FocusScreen() {
               </Text>
             </View>
             <View style={styles.headerRightActions}>
+              {/* Botão de Paisagem Sonora (Soundscape) */}
+              <TouchableOpacity
+                style={[
+                  styles.headerIconBtn,
+                  {
+                    backgroundColor: soundscape !== 'none' ? `${activeColor}20` : theme.surface,
+                    borderColor: soundscape !== 'none' ? activeColor : theme.outline,
+                  },
+                ]}
+                onPress={() => {
+                  setShowSoundscapeModal(true);
+                  triggerHaptic('impact');
+                }}
+                activeOpacity={0.7}
+                accessibilityLabel="Paisagens Sonoras e ruído ambiente">
+                <Ionicons
+                  name={
+                    soundscape === 'rain'
+                      ? 'rainy-outline'
+                      : soundscape === 'waves'
+                      ? 'water-outline'
+                      : soundscape === 'brown_noise'
+                      ? 'disc-outline'
+                      : soundscape === 'white_noise'
+                      ? 'radio-outline'
+                      : 'musical-notes-outline'
+                  }
+                  size={18}
+                  color={soundscape !== 'none' ? activeColor : theme.textSecondary}
+                />
+              </TouchableOpacity>
+
+              {/* Botão de Tique-taque */}
               <TouchableOpacity
                 style={[
                   styles.headerIconBtn,
@@ -537,6 +629,26 @@ export default function FocusScreen() {
                 />
               </TouchableOpacity>
 
+              {/* Botão de Modo Imersivo / Deep Focus (Tela Cheia) */}
+              <TouchableOpacity
+                style={[
+                  styles.headerIconBtn,
+                  {
+                    backgroundColor: theme.surface,
+                    borderColor: theme.outline,
+                  },
+                ]}
+                onPress={() => {
+                  setIsDeepFocus(true);
+                  setDeepControlsVisible(true);
+                  triggerHaptic('impact');
+                }}
+                activeOpacity={0.7}
+                accessibilityLabel="Entrar no Modo Imersivo Tela Cheia">
+                <Ionicons name="expand-outline" size={18} color={theme.textSecondary} />
+              </TouchableOpacity>
+
+              {/* Botão de Ajustes de Ciclo Pomodoro */}
               <TouchableOpacity
                 style={[styles.headerIconBtn, { backgroundColor: theme.surface, borderColor: theme.outline }]}
                 onPress={openCycleSettings}
@@ -1316,6 +1428,368 @@ export default function FocusScreen() {
             </View>
           </View>
         </Modal>
+
+        {/* Modal de Paisagens Sonoras / Som Ambiente (Pilar 2) */}
+        <Modal
+          visible={showSoundscapeModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowSoundscapeModal(false)}>
+          <View style={styles.pickerOverlay}>
+            <View
+              style={[
+                styles.pickerDialogContainer,
+                { backgroundColor: theme.surface, borderColor: theme.outline },
+              ]}>
+              {/* Cabeçalho */}
+              <View style={styles.pickerHeader}>
+                <View style={styles.pickerHeaderLeft}>
+                  <View style={[styles.pickerHeaderIconBg, { backgroundColor: `${activeColor}20` }]}>
+                    <Ionicons name="musical-notes" size={18} color={activeColor} />
+                  </View>
+                  <View>
+                    <Text style={[styles.pickerTitle, { color: theme.textPrimary }]}>
+                      Paisagens Sonoras
+                    </Text>
+                    <Text style={[styles.pickerSubtitle, { color: theme.textSecondary }]}>
+                      Áudio contínuo para isolamento acústico e foco
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setShowSoundscapeModal(false)}
+                  style={[styles.pickerCloseBtn, { backgroundColor: theme.surfaceElevated }]}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons name="close" size={18} color={theme.textSecondary} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Lista de Opções de Som */}
+              <View style={{ gap: 8, marginTop: 4 }}>
+                {SOUNDSCAPE_OPTIONS.map((opt) => {
+                  const isSelected = soundscape === opt.id;
+                  return (
+                    <TouchableOpacity
+                      key={opt.id}
+                      style={[
+                        styles.soundscapeOptionItem,
+                        {
+                          backgroundColor: isSelected ? `${activeColor}15` : theme.surfaceElevated,
+                          borderColor: isSelected ? activeColor : theme.outline,
+                        },
+                      ]}
+                      onPress={() => selectSoundscape(opt.id)}
+                      activeOpacity={0.75}>
+                      <View style={styles.soundscapeOptionLeft}>
+                        <View
+                          style={[
+                            styles.soundscapeIconBg,
+                            {
+                              backgroundColor: isSelected ? `${activeColor}30` : `${theme.textSecondary}15`,
+                            },
+                          ]}>
+                          <Ionicons
+                            name={opt.icon as any}
+                            size={18}
+                            color={isSelected ? activeColor : theme.textSecondary}
+                          />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text
+                            style={[
+                              styles.soundscapeOptionTitle,
+                              { color: isSelected ? activeColor : theme.textPrimary },
+                            ]}>
+                            {opt.label}
+                          </Text>
+                          <Text
+                            style={[styles.soundscapeOptionSubtitle, { color: theme.textSecondary }]}>
+                            {opt.sublabel}
+                          </Text>
+                        </View>
+                      </View>
+                      {isSelected && (
+                        <Ionicons name="checkmark-circle" size={20} color={activeColor} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Seletor de Volume (visível se tiver som selecionado) */}
+              {soundscape !== 'none' && (
+                <View style={[styles.soundscapeVolumeCard, { backgroundColor: theme.surfaceElevated }]}>
+                  <View style={styles.soundscapeVolumeHeader}>
+                    <Ionicons name="volume-medium-outline" size={16} color={theme.textSecondary} />
+                    <Text style={[styles.soundscapeVolumeTitle, { color: theme.textSecondary }]}>
+                      Volume do Ambiente: {Math.round(soundscapeVolume * 100)}%
+                    </Text>
+                  </View>
+                  <View style={styles.volumePresetsRow}>
+                    {[0.25, 0.5, 0.75, 1.0].map((v) => {
+                      const isActive = Math.abs(soundscapeVolume - v) < 0.05;
+                      return (
+                        <TouchableOpacity
+                          key={v}
+                          style={[
+                            styles.volumePresetBtn,
+                            {
+                              backgroundColor: isActive ? activeColor : theme.surface,
+                              borderColor: isActive ? activeColor : theme.outline,
+                            },
+                          ]}
+                          onPress={() => changeSoundscapeVolume(v)}
+                          activeOpacity={0.7}>
+                          <Text
+                            style={[
+                              styles.volumePresetText,
+                              {
+                                color: isActive
+                                  ? getContrastTextColor(activeColor)
+                                  : theme.textSecondary,
+                                fontWeight: isActive ? '800' : '600',
+                              },
+                            ]}>
+                            {Math.round(v * 100)}%
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+
+              {/* Botão de Fechar */}
+              <View style={[styles.pickerActionsRow, { marginTop: 14 }]}>
+                <TouchableOpacity
+                  style={[styles.pickerSaveBtn, { backgroundColor: activeColor, flex: 1 }]}
+                  onPress={() => setShowSoundscapeModal(false)}
+                  activeOpacity={0.85}>
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={18}
+                    color={getContrastTextColor(activeColor)}
+                  />
+                  <Text
+                    style={[
+                      styles.pickerSaveBtnText,
+                      { color: getContrastTextColor(activeColor) },
+                    ]}>
+                    Concluir
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Modal Imersivo: Deep Focus / Relógio de Mesa Fullscreen (Pilar 3) */}
+        <Modal
+          visible={isDeepFocus}
+          animationType="fade"
+          statusBarTranslucent
+          onRequestClose={() => setIsDeepFocus(false)}>
+          <View style={[styles.deepFocusContainer, { backgroundColor: theme.isDark ? '#040711' : '#0B1120' }]}>
+            <StatusBar hidden />
+            <TouchableOpacity
+              activeOpacity={1}
+              style={styles.deepFocusBackdrop}
+              onPress={() => {
+                setDeepControlsVisible((prev) => !prev);
+              }}>
+              {/* Header do Deep Focus (Animado / Fade) */}
+              <View
+                style={[
+                  styles.deepHeader,
+                  { opacity: deepControlsVisible ? 1 : 0 },
+                ]}>
+                <View style={styles.deepHeaderLeft}>
+                  <View
+                    style={[
+                      styles.contextPillDot,
+                      { backgroundColor: selectedCategory?.color || activeColor },
+                    ]}
+                  />
+                  <Text style={[styles.deepHabitTitle, { color: '#FFFFFF' }]} numberOfLines={1}>
+                    {selectedHabit ? selectedHabit.title : 'Foco Profundo'}
+                  </Text>
+                </View>
+
+                {/* Ciclos Pomodoro */}
+                <View style={styles.deepCyclesRow}>
+                  {[1, 2, 3, 4].map((cycleNum) => {
+                    const isDone = (completedSessions % 4) >= cycleNum;
+                    const isCurrent = (completedSessions % 4) + 1 === cycleNum && mode === 'FOCUS';
+                    return (
+                      <View
+                        key={cycleNum}
+                        style={[
+                          styles.miniCycleDot,
+                          {
+                            backgroundColor: isDone
+                              ? activeColor
+                              : isCurrent
+                              ? `${activeColor}99`
+                              : 'rgba(255, 255, 255, 0.2)',
+                            transform: [{ scale: isCurrent ? 1.3 : 1 }],
+                          },
+                        ]}
+                      />
+                    );
+                  })}
+                </View>
+
+                {/* Ações do Topo */}
+                <View style={styles.deepHeaderActions}>
+                  <TouchableOpacity
+                    style={[
+                      styles.deepIconBtn,
+                      {
+                        backgroundColor: soundscape !== 'none' ? `${activeColor}30` : 'rgba(255, 255, 255, 0.1)',
+                        borderColor: soundscape !== 'none' ? activeColor : 'rgba(255, 255, 255, 0.2)',
+                      },
+                    ]}
+                    onPress={() => {
+                      setShowSoundscapeModal(true);
+                      triggerHaptic('impact');
+                    }}>
+                    <Ionicons
+                      name={
+                        soundscape === 'rain'
+                          ? 'rainy-outline'
+                          : soundscape === 'waves'
+                          ? 'water-outline'
+                          : soundscape === 'brown_noise'
+                          ? 'disc-outline'
+                          : soundscape === 'white_noise'
+                          ? 'radio-outline'
+                          : 'musical-notes-outline'
+                      }
+                      size={18}
+                      color={soundscape !== 'none' ? activeColor : '#FFFFFF'}
+                    />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.deepIconBtn, { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderColor: 'rgba(255, 255, 255, 0.2)' }]}
+                    onPress={() => {
+                      setIsDeepFocus(false);
+                      triggerHaptic('impact');
+                    }}
+                    accessibilityLabel="Sair da tela cheia">
+                    <Ionicons name="contract-outline" size={20} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Centro: Timer Circular Grande */}
+              <View style={styles.deepTimerCenter}>
+                <Animated.View
+                  style={[
+                    styles.deepHaloCircle,
+                    {
+                      borderColor: activeColor,
+                      transform: [{ scale: breathingAnim }],
+                      opacity: isRunning ? 0.35 : 0.12,
+                    },
+                  ]}
+                />
+
+                <View style={styles.deepOuterCircle}>
+                  <Svg width={300} height={300} style={StyleSheet.absoluteFill}>
+                    <G transform="rotate(-90 150 150)">
+                      <Circle
+                        cx={150}
+                        cy={150}
+                        r={140}
+                        stroke="rgba(255, 255, 255, 0.08)"
+                        strokeWidth={12}
+                        fill="transparent"
+                      />
+                      {progressFraction > 0 && (
+                        <Circle
+                          cx={150}
+                          cy={150}
+                          r={140}
+                          stroke={activeColor}
+                          strokeWidth={12}
+                          strokeDasharray={`${2 * Math.PI * 140} ${2 * Math.PI * 140}`}
+                          strokeDashoffset={2 * Math.PI * 140 * (1 - progressFraction)}
+                          strokeLinecap="round"
+                          fill="transparent"
+                        />
+                      )}
+                    </G>
+                  </Svg>
+
+                  <View style={styles.deepInnerCircle}>
+                    <Text style={[styles.deepModeLabel, { color: activeColor }]}>
+                      {mode === 'FOCUS' ? 'FOCO PROFUNDO' : mode === 'SHORT_BREAK' ? 'PAUSA CURTA' : 'PAUSA LONGA'}
+                    </Text>
+                    <Text style={styles.deepTimerText}>{timeFormatted}</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Controles Inferiores (Animados / Fade) */}
+              <View
+                style={[
+                  styles.deepFooter,
+                  { opacity: deepControlsVisible ? 1 : 0 },
+                ]}>
+                <View style={styles.controlsRow}>
+                  <TouchableOpacity
+                    onPress={resetTimer}
+                    style={[
+                      styles.controlIconBtn,
+                      { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderColor: 'rgba(255, 255, 255, 0.2)' },
+                    ]}
+                    activeOpacity={0.7}
+                    accessibilityLabel="Reiniciar cronômetro">
+                    <Ionicons name="refresh" size={22} color="#FFFFFF" />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={toggleTimer}
+                    style={[
+                      styles.playBtn,
+                      { backgroundColor: isRunning ? MomentusColors.dangerRed : activeColor, minWidth: 160 },
+                    ]}
+                    activeOpacity={0.85}
+                    accessibilityLabel={isRunning ? 'Pausar foco' : 'Iniciar foco'}>
+                    <Ionicons
+                      name={isRunning ? 'pause' : 'play'}
+                      size={28}
+                      color={isRunning ? '#FFFFFF' : getContrastTextColor(activeColor)}
+                    />
+                    <Text
+                      style={[
+                        styles.playBtnText,
+                        { color: isRunning ? '#FFFFFF' : getContrastTextColor(activeColor) },
+                      ]}>
+                      {isRunning ? 'PAUSAR' : 'INICIAR'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={skipCycle}
+                    style={[
+                      styles.controlIconBtn,
+                      { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderColor: 'rgba(255, 255, 255, 0.2)' },
+                    ]}
+                    activeOpacity={0.7}
+                    accessibilityLabel="Avançar próximo ciclo">
+                    <Ionicons name="play-skip-forward-outline" size={22} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={styles.deepHintText}>
+                  Toque na tela para ocultar/exibir os controles
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </Modal>
       </ScrollView>
     </SafeAreaView>
   );
@@ -1804,5 +2278,167 @@ const styles = StyleSheet.create({
   pickerSaveBtnText: {
     fontSize: 14,
     fontWeight: '800',
+  },
+
+  // Estilos de Paisagens Sonoras (Pilar 2)
+  soundscapeOptionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: 1.5,
+  },
+  soundscapeOptionLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  soundscapeIconBg: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  soundscapeOptionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  soundscapeOptionSubtitle: {
+    fontSize: 11,
+    marginTop: 1,
+  },
+  soundscapeVolumeCard: {
+    borderRadius: 16,
+    padding: 12,
+    marginTop: 8,
+    gap: 8,
+  },
+  soundscapeVolumeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  soundscapeVolumeTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  volumePresetsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  volumePresetBtn: {
+    flex: 1,
+    paddingVertical: 7,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  volumePresetText: {
+    fontSize: 11,
+  },
+
+  // Estilos do Modo Imersivo / Deep Focus (Pilar 3)
+  deepFocusContainer: {
+    flex: 1,
+  },
+  deepFocusBackdrop: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 12 : 36,
+    paddingBottom: 40,
+    justifyContent: 'space-between',
+  },
+  deepHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 44,
+  },
+  deepHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    maxWidth: 160,
+  },
+  deepHabitTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  deepCyclesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  deepHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  deepIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deepTimerCenter: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    marginVertical: 'auto',
+  },
+  deepHaloCircle: {
+    position: 'absolute',
+    width: 330,
+    height: 330,
+    borderRadius: 165,
+    borderWidth: 2,
+  },
+  deepOuterCircle: {
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+  },
+  deepInnerCircle: {
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  deepModeLabel: {
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 3,
+    marginBottom: 6,
+  },
+  deepTimerText: {
+    fontSize: 56,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: -1,
+    fontVariant: ['tabular-nums'],
+  },
+  deepFooter: {
+    alignItems: 'center',
+    gap: 16,
+  },
+  deepHintText: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.45)',
+    fontWeight: '500',
+    textAlign: 'center',
   },
 });

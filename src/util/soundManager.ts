@@ -3,9 +3,62 @@ import type { AudioPlayer } from 'expo-audio';
 
 type ExpoAudioModule = typeof import('expo-audio');
 
+export type SoundscapeType = 'none' | 'brown_noise' | 'rain' | 'waves' | 'white_noise';
+
+export interface SoundscapeOption {
+  id: SoundscapeType;
+  label: string;
+  sublabel: string;
+  icon: string;
+}
+
+export const SOUNDSCAPE_OPTIONS: SoundscapeOption[] = [
+  {
+    id: 'none',
+    label: 'Sem som de fundo',
+    sublabel: 'Apenas silêncio ou tique-taque',
+    icon: 'volume-mute-outline',
+  },
+  {
+    id: 'brown_noise',
+    label: 'Ruído Marrom',
+    sublabel: 'Grave suave para foco profundo',
+    icon: 'disc-outline',
+  },
+  {
+    id: 'rain',
+    label: 'Chuva Suave',
+    sublabel: 'Pingos relaxantes de chuva contínua',
+    icon: 'rainy-outline',
+  },
+  {
+    id: 'waves',
+    label: 'Ondas do Mar',
+    sublabel: 'Fluxo e refluxo ritmado da praia',
+    icon: 'water-outline',
+  },
+  {
+    id: 'white_noise',
+    label: 'Ruído Branco',
+    sublabel: 'Isolamento acústico contra distrações',
+    icon: 'radio-outline',
+  },
+];
+
+const SOUNDSCAPE_ASSETS: Record<Exclude<SoundscapeType, 'none'>, any> = {
+  brown_noise: require('@/assets/sounds/brown_noise.wav'),
+  rain: require('@/assets/sounds/rain.wav'),
+  waves: require('@/assets/sounds/waves.wav'),
+  white_noise: require('@/assets/sounds/white_noise.wav'),
+};
+
 class SoundManager {
   private successPlayer: AudioPlayer | null = null;
   private achievementPlayer: AudioPlayer | null = null;
+  private soundscapePlayer: AudioPlayer | null = null;
+  private soundscapeWebAudio: any = null;
+  private currentSoundscape: SoundscapeType = 'none';
+  private soundscapeVolume: number = 0.5;
   private enabled: boolean = true;
   private audioModule: ExpoAudioModule | null | undefined = undefined;
   private modeConfigured: boolean = false;
@@ -141,6 +194,112 @@ class SoundManager {
         osc.stop(ctx.currentTime + 0.025);
       }
     } catch {}
+  }
+
+  /**
+   * Define o som de ambiente (soundscape) para concentração contínua.
+   */
+  public async setSoundscape(type: SoundscapeType, shouldPlay: boolean = true) {
+    this.currentSoundscape = type;
+
+    // Para o som de ambiente atual
+    if (this.soundscapeWebAudio) {
+      try {
+        this.soundscapeWebAudio.pause();
+      } catch {}
+      this.soundscapeWebAudio = null;
+    }
+    if (this.soundscapePlayer) {
+      try {
+        this.soundscapePlayer.pause();
+      } catch {}
+      this.soundscapePlayer = null;
+    }
+
+    if (type === 'none' || !this.enabled) {
+      return;
+    }
+
+    try {
+      const asset = SOUNDSCAPE_ASSETS[type];
+      if (!asset) return;
+
+      // Execução Web
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && (window as any).Audio) {
+        try {
+          const audioUrl = typeof asset === 'string' ? asset : asset?.default || asset;
+          const htmlAudio = new (window as any).Audio(audioUrl);
+          htmlAudio.loop = true;
+          htmlAudio.volume = this.soundscapeVolume;
+          this.soundscapeWebAudio = htmlAudio;
+          if (shouldPlay) {
+            htmlAudio.play().catch(() => {});
+          }
+          return;
+        } catch {}
+      }
+
+      // Execução Mobile (Expo Audio)
+      const Audio = this.getAudioModule();
+      if (!Audio?.createAudioPlayer) return;
+
+      this.soundscapePlayer = Audio.createAudioPlayer(asset);
+      this.soundscapePlayer.loop = true;
+      this.soundscapePlayer.volume = this.soundscapeVolume;
+      if (shouldPlay) {
+        this.soundscapePlayer.play();
+      }
+    } catch {}
+  }
+
+  public pauseSoundscape() {
+    try {
+      if (this.soundscapeWebAudio) {
+        this.soundscapeWebAudio.pause();
+      }
+      if (this.soundscapePlayer) {
+        this.soundscapePlayer.pause();
+      }
+    } catch {}
+  }
+
+  public resumeSoundscape() {
+    if (this.currentSoundscape === 'none' || !this.enabled) return;
+    try {
+      if (this.soundscapeWebAudio) {
+        this.soundscapeWebAudio.play().catch(() => {});
+      } else if (this.soundscapePlayer) {
+        this.soundscapePlayer.play();
+      } else {
+        this.setSoundscape(this.currentSoundscape, true);
+      }
+    } catch {}
+  }
+
+  public stopSoundscape() {
+    this.pauseSoundscape();
+    this.currentSoundscape = 'none';
+  }
+
+  public setSoundscapeVolume(vol: number) {
+    const clamped = Math.max(0, Math.min(1, vol));
+    this.soundscapeVolume = clamped;
+    try {
+      if (this.soundscapeWebAudio) {
+        this.soundscapeWebAudio.volume = clamped;
+      }
+      if (this.soundscapePlayer) {
+        this.soundscapePlayer.volume = clamped;
+      }
+    } catch {}
+  }
+
+  public getSoundscapeVolume(): number {
+    return this.soundscapeVolume;
+  }
+
+  public getCurrentSoundscape(): SoundscapeType {
+    return this.currentSoundscape;
   }
 }
 
