@@ -141,20 +141,19 @@ export default function IndexScreen() {
     setIsSyncReady(false);
 
     // 1. Etapa: Autenticação Segura
-    setSyncProgress(18);
+    setSyncProgress(30);
     setSyncMessage('Autenticando sessão segura...');
     login(
       user.email || 'usuario@momentus.com',
       user.displayName || undefined,
       user.photoURL || undefined
     );
-    await new Promise((r) => setTimeout(r, 650));
+    await new Promise((r) => setTimeout(r, 300));
 
-    // 2. Etapa: Buscando rotinas e categorias
-    setSyncProgress(48);
-    setSyncMessage('Buscando rotinas e categorias...');
+    // 2. Etapa: Sincronização paralela com a nuvem (agora otimizada com Promise.all)
+    setSyncProgress(65);
+    setSyncMessage('Sincronizando rotinas e categorias...');
 
-    // 3. Etapa: Sincronização em nuvem com proteção contra timeout (Sugestão E)
     try {
       const syncTimeoutPromise = new Promise<{ isTimeout: boolean }>((resolve) =>
         setTimeout(() => resolve({ isTimeout: true }), 4000)
@@ -164,36 +163,40 @@ export default function IndexScreen() {
       const result = await Promise.race([syncPromise, syncTimeoutPromise]);
 
       if (result.isTimeout) {
-        setSyncMessage('Conexão lenta detectada. Carregando dados locais...');
-        await new Promise((r) => setTimeout(r, 700));
+        setSyncMessage('Conexão lenta detectada. Carregando dados...');
+        await new Promise((r) => setTimeout(r, 400));
       }
     } catch (syncErr) {
       console.warn('Erro ou timeout ao sincronizar nuvem pós login:', syncErr);
     }
-    await new Promise((r) => setTimeout(r, 600));
 
-    // 4. Etapa: Sincronizando conquistas e progresso
-    setSyncProgress(82);
-    setSyncMessage('Sincronizando conquistas e progresso...');
-    await new Promise((r) => setTimeout(r, 650));
+    // 3. Etapa: Sincronizando conquistas e preferências
+    setSyncProgress(88);
+    setSyncMessage('Atualizando conquistas e preferências...');
+    await new Promise((r) => setTimeout(r, 350));
 
-    // 5. Etapa: Tudo pronto! (100% com checkmark de sucesso e mensagem personalizada)
+    // 4. Etapa: Tudo pronto! (100% com checkmark de sucesso e mensagem personalizada)
     const rawName = user.displayName?.trim() || user.email?.split('@')[0] || '';
     const firstName = rawName.split(' ')[0] ? `, ${rawName.split(' ')[0]}` : '';
     setSyncProgress(100);
     setIsSyncReady(true);
     setSyncMessage(`Tudo pronto! Bem-vindo(a)${firstName} ✨`);
 
-    // Delay confortável para percepção do sucesso e certeza de dados carregados
-    await new Promise((r) => setTimeout(r, 1200));
+    // Delay confortável para o usuário ver a confirmação de 100% com o checkmark
+    await new Promise((r) => setTimeout(r, 900));
 
-    // 6. Transição final para a tela correspondente
+    // 5. Transição final para a tela correspondente
     setIsPostLoginActive(false);
     await navigatePostLogin(user.uid);
   };
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
+    // Ativa antes da autenticação para o _layout.tsx não redirecionar prematuramente
+    setIsPostLoginActive(true);
+    setIsPostLoginSyncing(true);
+    setSyncProgress(15);
+    setSyncMessage('Iniciando autenticação Google...');
     try {
       const user = await loginWithGoogle();
       setLoading(false);
@@ -213,6 +216,11 @@ export default function IndexScreen() {
 
   const handleAppleSignIn = async () => {
     setLoading(true);
+    // Ativa antes da autenticação para o _layout.tsx não redirecionar prematuramente
+    setIsPostLoginActive(true);
+    setIsPostLoginSyncing(true);
+    setSyncProgress(15);
+    setSyncMessage('Iniciando autenticação Apple...');
     try {
       const user = await loginWithApple();
       setLoading(false);
@@ -238,6 +246,12 @@ export default function IndexScreen() {
     }
 
     setLoading(true);
+    // Ativa antes de loginWithEmail para que o onAuthStateChanged não acione router.replace('/home') prematuramente
+    setIsPostLoginActive(true);
+    setIsPostLoginSyncing(true);
+    setSyncProgress(15);
+    setSyncMessage('Validando credenciais...');
+
     try {
       // Persiste preferência de Lembrar-me
       try {

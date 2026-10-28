@@ -258,6 +258,8 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Ref para permitir chamada segura de syncCloudAction a partir de callbacks externos
   const syncCloudActionRef = useRef<(targetUid?: string) => Promise<void>>(async () => {});
+  // Trava para evitar execuções duplicadas e concorrentes de sincronização com o Firestore
+  const inFlightSyncPromiseRef = useRef<Promise<void> | null>(null);
   const lastLoadedUid = useRef<string | null>(null);
   // Rastreador de hábitos deletados na sessão para prevenir ressuscitação em corridas de sincronização
   const deletedHabitIdsRef = useRef<Set<string>>(new Set());
@@ -1776,120 +1778,136 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const syncCloudAction = async (targetUid?: string): Promise<void> => {
-    const authUser = firebaseAuth.currentUser;
-    const uid = targetUid || authUser?.uid;
-    if (!uid) {
-      if (userProfile.isLoggedIn) {
-        const backupTimestamp = formatBackupTimestamp();
-        const updatedSettings: AppSettings = {
-          ...settings,
-          lastBackupAt: backupTimestamp,
-        };
-        setSettings(updatedSettings);
-        await setAppKv('app_settings', updatedSettings);
-        return;
-      }
-      throw new Error('Faça login com sua conta Momentus para sincronizar os dados na nuvem.');
+    if (inFlightSyncPromiseRef.current) {
+      MomentusLog.sync.debug('Sincronização com o Firestore já em andamento. Aguardando promessa ativa...');
+      return inFlightSyncPromiseRef.current;
     }
 
-    const currentProfileWithAuth: UserProfile = {
-      ...userProfile,
-      name:
-        authUser?.displayName?.trim() ||
-        (userProfile.name !== 'Usuário' ? userProfile.name : (authUser?.email ? authUser.email.split('@')[0] : 'Usuário')),
-      email: authUser?.email || userProfile.email,
-      photoUrl: authUser?.photoURL ?? userProfile.photoUrl,
-      isLoggedIn: true,
-    };
-
-    const activeHabitsToSync = habits.filter(
-      (h) => !deletedHabitIdsRef.current.has(h.id)
-    );
-
-    const {
-      mergedHabits,
-      mergedCategories,
-      mergedTemplates,
-      mergedAchievements,
-      mergedMarketItems,
-      mergedUserProfile,
-      cloudTermsAccepted,
-      cloudTermsVersion,
-    } = await syncWithFirestore(
-      uid,
-      activeHabitsToSync,
-      categories,
-      templates,
-      achievements,
-      marketItems,
-      currentProfileWithAuth
-    );
-
-    const finalMergedHabits = mergedHabits.filter(
-      (h) => !deletedHabitIdsRef.current.has(h.id)
-    );
-    const { cleanHabits: cleanMergedHabits, removedIds: cloudRemovedIds } = deduplicateHabits(finalMergedHabits);
-    if (cloudRemovedIds.length > 0) {
-      cloudRemovedIds.forEach((rid) => {
-        deleteHabitDb(rid).catch(() => {});
-        if (uid) deleteHabitFromFirestore(uid, rid).catch(() => {});
-      });
-    }
-
-    const backupTimestamp = formatBackupTimestamp();
-    const termsAcceptedCombined = settings.termsAccepted || cloudTermsAccepted;
-    const termsVersionCombined = Math.max(
-      settings.termsAcceptedVersion ?? 0,
-      cloudTermsVersion ?? 0
-    );
-
-    const updatedSettings: AppSettings = {
-      ...settings,
-      lastBackupAt: backupTimestamp,
-      termsAccepted: termsAcceptedCombined,
-      termsAcceptedVersion: termsVersionCombined,
-    };
-
-    let effectiveProfile = mergedUserProfile || currentProfileWithAuth;
-
-    // Garante crédito de XP para cada conquista desbloqueada que ainda não foi contabilizada no saldo
-    const unlockedAchievements = mergedAchievements.filter((a) => a.unlocked);
-    const creditedSet = creditedAchievementIdsRef.current;
-    let missingAchievementPoints = 0;
-
-    unlockedAchievements.forEach((ach) => {
-      if (!creditedSet.has(ach.id)) {
-        missingAchievementPoints += (ach.xpReward || 0);
-        creditedSet.add(ach.id);
+    const syncTask = (async () => {
+      const authUser = firebaseAuth.currentUser;
+      const uid = targetUid || authUser?.uid;
+      if (!uid) {
+        if (userProfile.isLoggedIn) {
+          const backupTimestamp = formatBackupTimestamp();
+          const updatedSettings: AppSettings = {
+            ...settings,
+            lastBackupAt: backupTimestamp,
+          };
+          setSettings(updatedSettings);
+          await setAppKv('app_settings', updatedSettings);
+          return;
+        }
+        throw new Error('Faça login com sua conta Momentus para sincronizar os dados na nuvem.');
       }
-    });
 
-    if (missingAchievementPoints > 0) {
-      effectiveProfile = {
-        ...effectiveProfile,
-        totalPoints: effectiveProfile.totalPoints + missingAchievementPoints,
+      const currentProfileWithAuth: UserProfile = {
+        ...userProfile,
+        name:
+          authUser?.displayName?.trim() ||
+          (userProfile.name !== 'Usuário' ? userProfile.name : (authUser?.email ? authUser.email.split('@')[0] : 'Usuário')),
+        email: authUser?.email || userProfile.email,
+        photoUrl: authUser?.photoURL ?? userProfile.photoUrl,
+        isLoggedIn: true,
       };
-      saveUserProfileToFirestore(uid, {
-        totalPoints: effectiveProfile.totalPoints,
-      } as any).catch(() => {});
-      await setAppKv('credited_achievement_ids', Array.from(creditedSet)).catch(() => {});
+
+      const activeHabitsToSync = habits.filter(
+        (h) => !deletedHabitIdsRef.current.has(h.id)
+      );
+
+      const {
+        mergedHabits,
+        mergedCategories,
+        mergedTemplates,
+        mergedAchievements,
+        mergedMarketItems,
+        mergedUserProfile,
+        cloudTermsAccepted,
+        cloudTermsVersion,
+      } = await syncWithFirestore(
+        uid,
+        activeHabitsToSync,
+        categories,
+        templates,
+        achievements,
+        marketItems,
+        currentProfileWithAuth
+      );
+
+      const finalMergedHabits = mergedHabits.filter(
+        (h) => !deletedHabitIdsRef.current.has(h.id)
+      );
+      const { cleanHabits: cleanMergedHabits, removedIds: cloudRemovedIds } = deduplicateHabits(finalMergedHabits);
+      if (cloudRemovedIds.length > 0) {
+        cloudRemovedIds.forEach((rid) => {
+          deleteHabitDb(rid).catch(() => {});
+          if (uid) deleteHabitFromFirestore(uid, rid).catch(() => {});
+        });
+      }
+
+      const backupTimestamp = formatBackupTimestamp();
+      const termsAcceptedCombined = settings.termsAccepted || cloudTermsAccepted;
+      const termsVersionCombined = Math.max(
+        settings.termsAcceptedVersion ?? 0,
+        cloudTermsVersion ?? 0
+      );
+
+      const updatedSettings: AppSettings = {
+        ...settings,
+        lastBackupAt: backupTimestamp,
+        termsAccepted: termsAcceptedCombined,
+        termsAcceptedVersion: termsVersionCombined,
+      };
+
+      let effectiveProfile = mergedUserProfile || currentProfileWithAuth;
+
+      // Garante crédito de XP para cada conquista desbloqueada que ainda não foi contabilizada no saldo
+      const unlockedAchievements = mergedAchievements.filter((a) => a.unlocked);
+      const creditedSet = creditedAchievementIdsRef.current;
+      let missingAchievementPoints = 0;
+
+      unlockedAchievements.forEach((ach) => {
+        if (!creditedSet.has(ach.id)) {
+          missingAchievementPoints += (ach.xpReward || 0);
+          creditedSet.add(ach.id);
+        }
+      });
+
+      if (missingAchievementPoints > 0) {
+        effectiveProfile = {
+          ...effectiveProfile,
+          totalPoints: effectiveProfile.totalPoints + missingAchievementPoints,
+        };
+        saveUserProfileToFirestore(uid, {
+          totalPoints: effectiveProfile.totalPoints,
+        } as any).catch(() => {});
+        await setAppKv('credited_achievement_ids', Array.from(creditedSet)).catch(() => {});
+      }
+
+      setHabits(cleanMergedHabits);
+      setCategories(mergedCategories);
+      setTemplates(mergedTemplates);
+      setAchievements(mergedAchievements);
+      setMarketItems(mergedMarketItems);
+      setUserProfile(effectiveProfile);
+      setSettings(updatedSettings);
+
+      await Promise.all([
+        setAllHabitsDb(cleanMergedHabits),
+        setAllCategoriesDb(mergedCategories),
+        setAllTemplatesDb(mergedTemplates),
+        setAllAchievementsDb(mergedAchievements),
+        setAllMarketItemsDb(mergedMarketItems),
+        setAppKv('user_profile', effectiveProfile),
+        setAppKv('app_settings', updatedSettings),
+      ]).catch(() => {});
+    })();
+
+    inFlightSyncPromiseRef.current = syncTask;
+    try {
+      await syncTask;
+    } finally {
+      inFlightSyncPromiseRef.current = null;
     }
-
-    setHabits(cleanMergedHabits);
-    setCategories(mergedCategories);
-    setTemplates(mergedTemplates);
-    setAchievements(mergedAchievements);
-    setMarketItems(mergedMarketItems);
-    setUserProfile(effectiveProfile);
-    setSettings(updatedSettings);
-
-    await setAllHabitsDb(cleanMergedHabits);
-    await setAllCategoriesDb(mergedCategories);
-    await setAllTemplatesDb(mergedTemplates);
-    await setAllAchievementsDb(mergedAchievements);
-    await setAllMarketItemsDb(mergedMarketItems);
-    await setAppKv('user_profile', effectiveProfile);
-    await setAppKv('app_settings', updatedSettings);
   };
 
   const toggleHabitRef = useRef(toggleHabit);

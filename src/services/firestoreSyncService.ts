@@ -179,6 +179,53 @@ export async function syncWithFirestore(
   const metasColRef = collection(userDocRef, "metas");
 
   // ========================================================
+  // 0. Busca Paralela Otimizada (Single Multiplexed Network Phase)
+  // ========================================================
+  const [
+    categoriesSnapshot,
+    metasSnapshot,
+    completedHabitsSnapshot,
+    eventsSnapshot,
+    templatesSnapshot,
+    achSnapshot,
+    inventorySnapshot,
+    userDocSnap,
+  ] = await Promise.all([
+    getDocs(categoriesColRef).catch((e) => {
+      MomentusLog.sync.warn('Erro ao buscar categorias:', e);
+      return { forEach: () => {} } as any;
+    }),
+    getDocs(metasColRef).catch((e) => {
+      MomentusLog.sync.warn('Erro ao buscar metas:', e);
+      return { forEach: () => {} } as any;
+    }),
+    getDocs(completedHabitsColRef).catch((e) => {
+      MomentusLog.sync.warn('Erro ao buscar habitos concluidos:', e);
+      return { forEach: () => {} } as any;
+    }),
+    getDocs(eventsColRef).catch((e) => {
+      MomentusLog.sync.warn('Erro ao buscar eventos:', e);
+      return { forEach: () => {} } as any;
+    }),
+    getDocs(templatesColRef).catch((e) => {
+      MomentusLog.sync.warn('Erro ao buscar templates:', e);
+      return { forEach: () => {} } as any;
+    }),
+    getDocs(achievementsColRef).catch((e) => {
+      MomentusLog.sync.warn('Erro ao buscar conquistas:', e);
+      return { forEach: () => {} } as any;
+    }),
+    getDocs(inventoryColRef).catch((e) => {
+      MomentusLog.sync.warn('Erro ao buscar inventario:', e);
+      return { forEach: () => {} } as any;
+    }),
+    getDoc(userDocRef).catch((e) => {
+      MomentusLog.sync.warn('Erro ao buscar documento do usuario:', e);
+      return { exists: () => false, data: () => ({}) } as any;
+    }),
+  ]);
+
+  // ========================================================
   // 1. Sincronização de Categorias (Category.kt) e Metas (Meta.kt)
   // ========================================================
   const LEGACY_MOCK_CAT_IDS = new Set([
@@ -189,13 +236,11 @@ export async function syncWithFirestore(
     "cat-pessoal",
   ]);
 
-  const categoriesSnapshot = await getDocs(categoriesColRef);
   const cloudCategoriesMap = new Map<string, any>();
-  categoriesSnapshot.forEach((d) => cloudCategoriesMap.set(d.id, d.data()));
+  categoriesSnapshot.forEach((d: any) => cloudCategoriesMap.set(d.id, d.data()));
 
-  const metasSnapshot = await getDocs(metasColRef);
   const cloudMetasMap = new Map<string, any>();
-  metasSnapshot.forEach((d) => cloudMetasMap.set(d.id, d.data()));
+  metasSnapshot.forEach((d: any) => cloudMetasMap.set(d.id, d.data()));
 
   // Procura se já existe uma categoria "Outros" na nuvem (inclusive vinda do nativo com UUID)
   let cloudOutrosId: string | null = null;
@@ -341,7 +386,6 @@ export async function syncWithFirestore(
   // ========================================================
   // 2. Sincronização de Hábitos Concluídos (HabitoConcluido.kt)
   // ========================================================
-  const completedHabitsSnapshot = await getDocs(completedHabitsColRef);
   const cloudCompletedHabitsSet = new Set<string>();
   const localHabitsMapById = new Map<string, HabitItem>(
     cleanLocalHabits.map((h) => [h.id, h])
@@ -349,7 +393,7 @@ export async function syncWithFirestore(
   const completedBatch = writeBatch(firestore);
   let completedChanges = 0;
 
-  completedHabitsSnapshot.forEach((d) => {
+  completedHabitsSnapshot.forEach((d: any) => {
     const data = d.data();
     const rawId = data.itemCronogramaId || d.id;
     const localHabit = localHabitsMapById.get(rawId) || localHabitsMapById.get(d.id);
@@ -399,9 +443,8 @@ export async function syncWithFirestore(
   // ========================================================
   // 3. Sincronização de Eventos (ItemCronograma.kt)
   // ========================================================
-  const eventsSnapshot = await getDocs(eventsColRef);
   const cloudEventsMap = new Map<string, any>();
-  eventsSnapshot.forEach((d) => cloudEventsMap.set(d.id, d.data()));
+  eventsSnapshot.forEach((d: any) => cloudEventsMap.set(d.id, d.data()));
 
   const localEventsMap = new Map<string, HabitItem>(
     cleanLocalHabits.map((h) => [h.id, h]),
@@ -528,9 +571,8 @@ export async function syncWithFirestore(
   // ========================================================
   const mergedTemplates: RoutineTemplate[] = [...localTemplates];
   try {
-    const templatesSnapshot = await getDocs(templatesColRef);
     const cloudTemplatesMap = new Map<string, any>();
-    templatesSnapshot.forEach((d) => cloudTemplatesMap.set(d.id, d.data()));
+    templatesSnapshot.forEach((d: any) => cloudTemplatesMap.set(d.id, d.data()));
 
     const localTemplatesMap = new Map<string, RoutineTemplate>(
       localTemplates.map((t) => [t.id, t]),
@@ -618,9 +660,8 @@ export async function syncWithFirestore(
   // ========================================================
   let mergedAchievements: Achievement[] = [...localAchievements];
   try {
-    const achSnapshot = await getDocs(achievementsColRef);
     const cloudUnlockedSet = new Map<string, any>();
-    achSnapshot.forEach((d) => {
+    achSnapshot.forEach((d: any) => {
       const data = d.data();
       const achId = data.achievementId || d.id;
       cloudUnlockedSet.set(achId, data);
@@ -660,9 +701,8 @@ export async function syncWithFirestore(
   // ========================================================
   let mergedMarketItems: MarketItem[] = [...localMarketItems];
   try {
-    const inventorySnapshot = await getDocs(inventoryColRef);
     const cloudInventorySet = new Set<string>();
-    inventorySnapshot.forEach((d) => cloudInventorySet.add(d.id));
+    inventorySnapshot.forEach((d: any) => cloudInventorySet.add(d.id));
 
     const inventoryBatch = writeBatch(firestore);
     let newItems = 0;
@@ -698,7 +738,6 @@ export async function syncWithFirestore(
   let cloudTermsVersion = 0;
 
   try {
-    const userDocSnap = await getDoc(userDocRef);
     const cloudUserData = userDocSnap.exists() ? userDocSnap.data() : {};
     cloudTermsAccepted = cloudUserData?.terms_accepted === true;
     cloudTermsVersion =
