@@ -14,6 +14,7 @@ import {
   MomentusColors,
   getContrastTextColor,
   LayoutTokens,
+  SpacingTokens,
   BorderRadiusTokens,
   ComponentHeightTokens,
   TypographyTokens,
@@ -919,8 +920,8 @@ const styles = StyleSheet.create({
   },
   sectionHeader: {
     flexDirection: "column",
-    gap: 12,
-    marginBottom: 16,
+    gap: SpacingTokens.md,
+    marginBottom: SpacingTokens.lg,
   },
   sectionTitle: {
     ...TypographyTokens.sectionHeader,
@@ -934,13 +935,13 @@ const styles = StyleSheet.create({
   filterChipsRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: SpacingTokens.sm,
     flexWrap: "wrap",
   },
   filterChip: {
-    paddingHorizontal: 12,
+    paddingHorizontal: SpacingTokens.md,
     paddingVertical: 6,
-    borderRadius: 10,
+    borderRadius: BorderRadiusTokens.sm,
     borderWidth: 1,
     ...(Platform.OS === "web" ? { cursor: "pointer" as any } : {}),
   },
@@ -1037,7 +1038,7 @@ const styles = StyleSheet.create({
   timelineList: {
     borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
-    paddingVertical: 12,
+    paddingVertical: SpacingTokens.md,
   },
   fab: {
     position: 'absolute',

@@ -19,6 +19,7 @@ import {
   MomentusColors,
   getContrastTextColor,
   LayoutTokens,
+  SpacingTokens,
   BorderRadiusTokens,
   ComponentHeightTokens,
   TypographyTokens,
@@ -1807,14 +1808,14 @@ const styles = StyleSheet.create({
   filterChipsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: SpacingTokens.sm,
     paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
-    marginBottom: 16,
+    marginBottom: SpacingTokens.lg,
   },
   filterChip: {
-    paddingHorizontal: 12,
+    paddingHorizontal: SpacingTokens.md,
     paddingVertical: 6,
-    borderRadius: 10,
+    borderRadius: BorderRadiusTokens.sm,
     borderWidth: 1,
     ...Platform.select({
       web: { cursor: 'pointer' },
@@ -1944,7 +1945,7 @@ const styles = StyleSheet.create({
   timelineList: {
     borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
-    paddingVertical: 12,
+    paddingVertical: SpacingTokens.md,
   },
   fab: {
     position: 'absolute',
