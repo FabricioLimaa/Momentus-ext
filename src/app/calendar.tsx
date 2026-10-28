@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,8 +9,11 @@ import {
   StatusBar,
   Alert,
   TextInput,
+  PanResponder,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import {
   MomentusColors,
@@ -65,16 +68,36 @@ function formatHumanCalendarDate(dateStr: string, isToday: boolean) {
   return `${dayOfWeek}, ${d} de ${monthName}`;
 }
 
+function getPreviousDateString(dateStr: string): string {
+  if (!dateStr) return '';
+  const [y, m, d] = dateStr.split('-').map(Number);
+  if (!y || !m || !d) return '';
+  const date = new Date(y, m - 1, d);
+  date.setDate(date.getDate() - 1);
+  const prevY = date.getFullYear();
+  const prevM = String(date.getMonth() + 1).padStart(2, '0');
+  const prevD = String(date.getDate()).padStart(2, '0');
+  return `${prevY}-${prevM}-${prevD}`;
+}
+
 interface EventPinsProps {
   pins: string[];
   hasMore: boolean;
   isSelected: boolean;
   primaryColor: string;
+  isAllCompleted?: boolean;
 }
 
-function EventPins({ pins, hasMore, isSelected, primaryColor }: EventPinsProps) {
+function EventPins({
+  pins,
+  hasMore,
+  isSelected,
+  primaryColor,
+  isAllCompleted = false,
+}: EventPinsProps) {
   if (pins.length === 0) return null;
   const pinContrastColor = isSelected ? getContrastTextColor(primaryColor) : undefined;
+
   return (
     <View style={styles.pinsRow}>
       {pins.map((color, idx) => (
@@ -95,11 +118,20 @@ function EventPins({ pins, hasMore, isSelected, primaryColor }: EventPinsProps) 
           +
         </Text>
       )}
+      {isAllCompleted && !hasMore && (
+        <View
+          style={[
+            styles.pinCheckDot,
+            { backgroundColor: isSelected ? pinContrastColor : MomentusColors.emeraldGreen },
+          ]}
+        />
+      )}
     </View>
   );
 }
 
 export default function CalendarScreen() {
+  const router = useRouter();
   const {
     habits,
     categories,
@@ -107,9 +139,12 @@ export default function CalendarScreen() {
     setSelectedDate,
     toggleHabit,
     deleteHabit,
+    deleteMultipleHabits,
+    addHabit,
     theme,
     settings,
     syncGoogleCalendarToHabitsAction,
+    triggerHaptic,
   } = useMomentus();
 
   const primaryColor = settings.primaryColorHex || theme.primary;
@@ -122,8 +157,17 @@ export default function CalendarScreen() {
   const [habitToEdit, setHabitToEdit] = useState<HabitItem | null>(null);
   const [selectedDetailHabit, setSelectedDetailHabit] = useState<HabitItem | null>(null);
 
+  // Filtros rápidos da Agenda (Todas, Pendentes, Concluídas)
+  const [filterStatus, setFilterStatus] = useState<'ALL' | 'PENDING' | 'COMPLETED'>('ALL');
+
+  // Estados de seleção múltipla (Paridade total com a Home)
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedHabitIds, setSelectedHabitIds] = useState<string[]>([]);
+
+  // Estado de pull-to-refresh
+  const [refreshing, setRefreshing] = useState(false);
+
   // Sincroniza silenciosamente os eventos da Google Agenda em background apenas se ativado
-  // e apenas uma vez por data selecionada, evitando loops e desmarcações involuntárias
   const lastSyncedDateRef = useRef<string>('');
   useEffect(() => {
     if (!settings.googleCalendarSyncEnabled) return;
@@ -153,7 +197,7 @@ export default function CalendarScreen() {
     return map;
   }, [categories]);
 
-  // Função para obter até 3 pins de categoria e indicar se há mais
+  // Função para obter até 3 pins de categoria, total e status de conclusão
   const getDayPinsInfo = (dateStr: string) => {
     const dayHabits = habits
       .filter((h) => h.date === dateStr)
@@ -162,7 +206,8 @@ export default function CalendarScreen() {
       .slice(0, 3)
       .map((h) => categoriesMap.get(h.categoryId) || primaryColor);
     const hasMore = dayHabits.length > 3;
-    return { pins, hasMore };
+    const isAllCompleted = dayHabits.length > 0 && dayHabits.every((h) => h.completed);
+    return { pins, hasMore, totalCount: dayHabits.length, isAllCompleted };
   };
 
   // Rotinas do dia selecionado ordenadas por horário de início
@@ -172,7 +217,16 @@ export default function CalendarScreen() {
       .sort((a, b) => a.timeStart.localeCompare(b.timeStart));
   }, [habits, selectedDate]);
 
-  const completedCount = habitsForDate.filter((h) => h.completed).length;
+  const totalForDate = habitsForDate.length;
+  const completedForDate = habitsForDate.filter((h) => h.completed).length;
+  const pendingForDate = totalForDate - completedForDate;
+
+  // Rotinas de ontem (para Empty State Proativo "Copiar rotinas de ontem")
+  const yesterdayDateStr = useMemo(() => getPreviousDateString(selectedDate), [selectedDate]);
+  const yesterdayHabits = useMemo(
+    () => habits.filter((h) => h.date === yesterdayDateStr),
+    [habits, yesterdayDateStr]
+  );
 
   // Cálculo da Semana (estritamente de Domingo a Sábado)
   const currentWeekDays = useMemo(() => {
@@ -200,7 +254,7 @@ export default function CalendarScreen() {
     return days;
   }, [weekAnchorDate]);
 
-  // Título amigável da semana com o intervalo de dias e mês (ex: "18 a 24 de Outubro 2026")
+  // Título amigável da semana
   const weekTitle = useMemo(() => {
     if (currentWeekDays.length === 0) return '';
     const first = currentWeekDays[0];
@@ -219,8 +273,7 @@ export default function CalendarScreen() {
     return `${first.dayNumber} ${MONTH_NAMES[firstMonth].slice(0, 3)} - ${last.dayNumber} ${MONTH_NAMES[lastMonth].slice(0, 3)} ${lastYear}`;
   }, [currentWeekDays]);
 
-  // Navega para a semana anterior mantendo a seleção coerente e sem travas
-  const prevWeek = () => {
+  const prevWeek = useCallback(() => {
     setWeekAnchorDate((prev) => {
       const next = new Date(prev);
       next.setDate(prev.getDate() - 7);
@@ -231,10 +284,9 @@ export default function CalendarScreen() {
       setCurrentYearMonth({ year: next.getFullYear(), month: next.getMonth() });
       return next;
     });
-  };
+  }, [setSelectedDate]);
 
-  // Navega para a próxima semana mantendo a seleção coerente e sem travas
-  const nextWeek = () => {
+  const nextWeek = useCallback(() => {
     setWeekAnchorDate((prev) => {
       const next = new Date(prev);
       next.setDate(prev.getDate() + 7);
@@ -245,44 +297,187 @@ export default function CalendarScreen() {
       setCurrentYearMonth({ year: next.getFullYear(), month: next.getMonth() });
       return next;
     });
-  };
+  }, [setSelectedDate]);
 
   const goToToday = () => {
+    triggerHaptic?.('selection');
     const now = new Date();
     setWeekAnchorDate(now);
     setCurrentYearMonth({ year: now.getFullYear(), month: now.getMonth() });
     setSelectedDate(todayStr);
   };
 
-  // Cálculo do Grid Mensal (com células compactas e sem aspectRatio excessivo)
+  // Cálculo do Grid Mensal com dias do mês anterior e próximo (dias fantasma)
   const { year, month } = currentYearMonth;
   const firstDayOfWeekMonth = new Date(year, month, 1).getDay(); // 0 = Domingo
   const totalDaysMonth = new Date(year, month + 1, 0).getDate();
+  const prevMonthLastDay = new Date(year, month, 0).getDate();
 
   const calendarDays = useMemo(() => {
-    const days = [];
-    for (let i = 0; i < firstDayOfWeekMonth; i++) {
-      days.push(null);
+    const days: Array<{
+      dayNumber: number;
+      dateStr: string;
+      isCurrentMonth: boolean;
+      year: number;
+      month: number;
+    }> = [];
+
+    // Dias do mês anterior
+    const prevYear = month === 0 ? year - 1 : year;
+    const prevMonthIdx = month === 0 ? 11 : month - 1;
+    for (let i = firstDayOfWeekMonth - 1; i >= 0; i--) {
+      const d = prevMonthLastDay - i;
+      const dateStr = `${prevYear}-${String(prevMonthIdx + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      days.push({
+        dayNumber: d,
+        dateStr,
+        isCurrentMonth: false,
+        year: prevYear,
+        month: prevMonthIdx,
+      });
     }
+
+    // Dias do mês atual
     for (let d = 1; d <= totalDaysMonth; d++) {
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      days.push({ dayNumber: d, dateStr });
+      days.push({
+        dayNumber: d,
+        dateStr,
+        isCurrentMonth: true,
+        year,
+        month,
+      });
     }
-    return days;
-  }, [year, month, firstDayOfWeekMonth, totalDaysMonth]);
 
-  const prevMonth = () => {
+    // Dias do próximo mês para completar a grade em múltiplos de 7
+    const nextYear = month === 11 ? year + 1 : year;
+    const nextMonthIdx = month === 11 ? 0 : month + 1;
+    const remaining = (7 - (days.length % 7)) % 7;
+    for (let d = 1; d <= remaining; d++) {
+      const dateStr = `${nextYear}-${String(nextMonthIdx + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      days.push({
+        dayNumber: d,
+        dateStr,
+        isCurrentMonth: false,
+        year: nextYear,
+        month: nextMonthIdx,
+      });
+    }
+
+    return days;
+  }, [year, month, firstDayOfWeekMonth, totalDaysMonth, prevMonthLastDay]);
+
+  const prevMonth = useCallback(() => {
     setCurrentYearMonth((prev) => {
       if (prev.month === 0) return { year: prev.year - 1, month: 11 };
       return { year: prev.year, month: prev.month - 1 };
     });
-  };
+  }, []);
 
-  const nextMonth = () => {
+  const nextMonth = useCallback(() => {
     setCurrentYearMonth((prev) => {
       if (prev.month === 11) return { year: prev.year + 1, month: 0 };
       return { year: prev.year, month: prev.month + 1 };
     });
+  }, []);
+
+  // Gesto de Swipe Horizontal para mudar semana ou mês
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gestureState) => {
+          return (
+            Math.abs(gestureState.dx) > 30 &&
+            Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.8
+          );
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          if (gestureState.dx < -45) {
+            triggerHaptic?.('selection');
+            if (isMonthView) {
+              nextMonth();
+            } else {
+              nextWeek();
+            }
+          } else if (gestureState.dx > 45) {
+            triggerHaptic?.('selection');
+            if (isMonthView) {
+              prevMonth();
+            } else {
+              prevWeek();
+            }
+          }
+        },
+      }),
+    [isMonthView, triggerHaptic, nextMonth, nextWeek, prevMonth, prevWeek]
+  );
+
+  // Pull-to-refresh
+  const onRefresh = async () => {
+    setRefreshing(true);
+    triggerHaptic?.('impact');
+    try {
+      if (settings.googleCalendarSyncEnabled) {
+        await syncGoogleCalendarToHabitsAction(selectedDate);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // Funções de Seleção Múltipla
+  const handleToggleSelectHabit = (id: string) => {
+    triggerHaptic?.('selection');
+    setSelectedHabitIds((prev) => {
+      const next = prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id];
+      if (next.length === 0) {
+        setIsSelectionMode(false);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    triggerHaptic?.('selection');
+    if (selectedHabitIds.length === habitsForDate.length) {
+      setSelectedHabitIds([]);
+    } else {
+      setSelectedHabitIds(habitsForDate.map((h) => h.id));
+    }
+  };
+
+  const handleClearSelection = () => {
+    setIsSelectionMode(false);
+    setSelectedHabitIds([]);
+  };
+
+  const handleConfirmDeleteSelected = () => {
+    if (selectedHabitIds.length === 0) return;
+    Alert.alert(
+      'Excluir Selecionadas',
+      `Tem certeza que deseja excluir as ${selectedHabitIds.length} rotinas selecionadas?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir Todas',
+          style: 'destructive',
+          onPress: () => {
+            deleteMultipleHabits(selectedHabitIds);
+            handleClearSelection();
+            triggerHaptic?.('impact');
+          },
+        },
+      ]
+    );
+  };
+
+  const handleToggleCompleteSelected = () => {
+    if (selectedHabitIds.length === 0) return;
+    selectedHabitIds.forEach((id) => toggleHabit(id));
+    triggerHaptic?.('success');
+    handleClearSelection();
   };
 
   const handleDeleteSingle = (habit: HabitItem) => {
@@ -297,13 +492,46 @@ export default function CalendarScreen() {
           onPress: () => {
             deleteHabit(habit.id);
             setSelectedDetailHabit(null);
+            triggerHaptic?.('impact');
           },
         },
       ]
     );
   };
 
-  // Termo de busca normalizado (sem acentos e minúsculas) para busca instantânea em memória
+  // Copiar rotinas de ontem para o dia selecionado
+  const handleCopyYesterdayHabits = () => {
+    if (yesterdayHabits.length === 0) return;
+    Alert.alert(
+      'Copiar Rotinas de Ontem',
+      `Deseja copiar as ${yesterdayHabits.length} rotinas de ontem para ${formatHumanCalendarDate(
+        selectedDate,
+        selectedDate === todayStr
+      )}?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Copiar Todas',
+          onPress: () => {
+            yesterdayHabits.forEach((h) => {
+              addHabit({
+                title: h.title,
+                description: h.description,
+                categoryId: h.categoryId,
+                timeStart: h.timeStart,
+                timeEnd: h.timeEnd,
+                date: selectedDate,
+                saveToGoogle: h.saveToGoogle,
+              });
+            });
+            triggerHaptic?.('success');
+          },
+        },
+      ]
+    );
+  };
+
+  // Termo de busca normalizado
   const normalizedSearchTerm = useMemo(() => {
     return searchQuery
       .trim()
@@ -312,7 +540,7 @@ export default function CalendarScreen() {
       .replace(/[\u0300-\u036f]/g, '');
   }, [searchQuery]);
 
-  // Hábitos que correspondem ao termo de busca (no título, observação ou nome da categoria)
+  // Hábitos que correspondem ao termo de busca
   const matchingHabits = useMemo(() => {
     if (!normalizedSearchTerm) return [];
     return habits.filter((h) => {
@@ -337,12 +565,11 @@ export default function CalendarScreen() {
     });
   }, [habits, categories, normalizedSearchTerm]);
 
-  // Conjunto de datas com ocorrências do termo pesquisado
+  // Conjunto de datas com ocorrências
   const matchingDatesSet = useMemo(() => {
     return new Set(matchingHabits.map((h) => h.date));
   }, [matchingHabits]);
 
-  // Contagem de dias com ocorrências no mês atualmente visualizado
   const monthMatchingDaysCount = useMemo(() => {
     if (!normalizedSearchTerm) return 0;
     const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
@@ -355,16 +582,27 @@ export default function CalendarScreen() {
     return count;
   }, [normalizedSearchTerm, matchingDatesSet, year, month]);
 
-  // Contagem de dias com ocorrências na semana atualmente visualizada
   const weekMatchingDaysCount = useMemo(() => {
     if (!normalizedSearchTerm) return 0;
     return currentWeekDays.filter((d) => matchingDatesSet.has(d.dateStr)).length;
   }, [normalizedSearchTerm, currentWeekDays, matchingDatesSet]);
 
-  // Rotinas filtradas para a timeline do dia selecionado
+  // Rotinas exibidas na timeline (com busca + filtro de status)
   const displayHabits = useMemo(() => {
-    if (!normalizedSearchTerm) return habitsForDate;
-    return habitsForDate.filter((h) => {
+    let list = habitsForDate;
+
+    // Aplica filtro de status se não estiver buscando
+    if (!normalizedSearchTerm) {
+      if (filterStatus === 'PENDING') {
+        list = list.filter((h) => !h.completed);
+      } else if (filterStatus === 'COMPLETED') {
+        list = list.filter((h) => h.completed);
+      }
+      return list;
+    }
+
+    // Busca textual
+    return list.filter((h) => {
       const titleNorm = (h.title || '')
         .toLowerCase()
         .normalize('NFD')
@@ -384,7 +622,7 @@ export default function CalendarScreen() {
         catNorm.includes(normalizedSearchTerm)
       );
     });
-  }, [habitsForDate, normalizedSearchTerm, categories]);
+  }, [habitsForDate, filterStatus, normalizedSearchTerm, categories]);
 
   const isCurrentWeekShowingToday = currentWeekDays.some((d) => d.dateStr === todayStr);
 
@@ -395,61 +633,112 @@ export default function CalendarScreen() {
         backgroundColor={theme.background}
       />
       <View style={[styles.container, { backgroundColor: theme.background }]}>
-        {/* Header Principal */}
-        <View style={styles.header}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.title, { color: theme.textPrimary }]}>Agenda & Rotinas</Text>
-            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-              Sincronizado com seus blocos e metas
+        {/* TopBar no Modo de Seleção Múltipla */}
+        {isSelectionMode ? (
+          <View
+            style={[
+              styles.selectionTopBar,
+              {
+                backgroundColor: theme.surface,
+                borderBottomColor: theme.outline,
+              },
+            ]}>
+            <TouchableOpacity onPress={handleClearSelection} style={styles.iconButton}>
+              <Ionicons name="close" size={24} color={theme.textPrimary} />
+            </TouchableOpacity>
+
+            <Text style={[styles.selectionCountText, { color: theme.textPrimary }]}>
+              {selectedHabitIds.length} selecionada{selectedHabitIds.length === 1 ? '' : 's'}
             </Text>
+
+            <View style={styles.selectionActions}>
+              <TouchableOpacity
+                onPress={handleToggleCompleteSelected}
+                disabled={selectedHabitIds.length === 0}
+                style={[styles.iconButton, selectedHabitIds.length === 0 && { opacity: 0.4 }]}>
+                <Ionicons name="checkmark-circle-outline" size={22} color={MomentusColors.emeraldGreen} />
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={handleSelectAll} style={styles.iconButton}>
+                <Ionicons
+                  name={
+                    selectedHabitIds.length === habitsForDate.length && habitsForDate.length > 0
+                      ? 'checkbox'
+                      : 'checkbox-outline'
+                  }
+                  size={22}
+                  color={primaryColor}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleConfirmDeleteSelected}
+                disabled={selectedHabitIds.length === 0}
+                style={[styles.iconButton, selectedHabitIds.length === 0 && { opacity: 0.4 }]}>
+                <Ionicons name="trash-outline" size={22} color={MomentusColors.errorRed} />
+              </TouchableOpacity>
+            </View>
           </View>
-
-          <View style={styles.headerActions}>
-            <TouchableOpacity
-              style={[
-                styles.searchToggleBtn,
-                {
-                  backgroundColor: isSearchOpen ? `${primaryColor}20` : theme.surface,
-                  borderColor: isSearchOpen ? primaryColor : theme.outline,
-                },
-              ]}
-              onPress={() => {
-                const nextState = !isSearchOpen;
-                setIsSearchOpen(nextState);
-                if (!nextState) {
-                  setSearchQuery('');
-                }
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={isSearchOpen ? 'Fechar busca' : 'Buscar rotinas'}
-              activeOpacity={0.7}>
-              <Ionicons
-                name={isSearchOpen ? 'close' : 'search'}
-                size={18}
-                color={isSearchOpen ? primaryColor : theme.textPrimary}
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.toggleViewBtn,
-                { backgroundColor: theme.surface, borderColor: theme.outline },
-              ]}
-              onPress={() => setIsMonthView(!isMonthView)}
-              accessibilityRole="button"
-              accessibilityLabel={`Mudar visualização para ${isMonthView ? 'Semana' : 'Mês'}`}
-              activeOpacity={0.7}>
-              <Ionicons
-                name={isMonthView ? 'calendar-outline' : 'grid-outline'}
-                size={16}
-                color={primaryColor}
-              />
-              <Text style={[styles.toggleViewText, { color: primaryColor }]}>
-                {isMonthView ? 'Semana' : 'Mês'}
+        ) : (
+          /* Header Principal Normal */
+          <View style={styles.header}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.title, { color: theme.textPrimary }]}>Agenda & Rotinas</Text>
+              <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+                Sincronizado com seus blocos e metas
               </Text>
-            </TouchableOpacity>
+            </View>
+
+            <View style={styles.headerActions}>
+              <TouchableOpacity
+                style={[
+                  styles.searchToggleBtn,
+                  {
+                    backgroundColor: isSearchOpen ? `${primaryColor}20` : theme.surface,
+                    borderColor: isSearchOpen ? primaryColor : theme.outline,
+                  },
+                ]}
+                onPress={() => {
+                  const nextState = !isSearchOpen;
+                  setIsSearchOpen(nextState);
+                  if (!nextState) {
+                    setSearchQuery('');
+                  }
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={isSearchOpen ? 'Fechar busca' : 'Buscar rotinas'}
+                activeOpacity={0.7}>
+                <Ionicons
+                  name={isSearchOpen ? 'close' : 'search'}
+                  size={18}
+                  color={isSearchOpen ? primaryColor : theme.textPrimary}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.toggleViewBtn,
+                  { backgroundColor: theme.surface, borderColor: theme.outline },
+                ]}
+                onPress={() => {
+                  triggerHaptic?.('selection');
+                  setIsMonthView(!isMonthView);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`Mudar visualização para ${isMonthView ? 'Semana' : 'Mês'}`}
+                activeOpacity={0.7}>
+                <Ionicons
+                  name={isMonthView ? 'calendar-outline' : 'grid-outline'}
+                  size={16}
+                  color={primaryColor}
+                />
+                <Text style={[styles.toggleViewText, { color: primaryColor }]}>
+                  {isMonthView ? 'Semana' : 'Mês'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Barra de Busca Retrátil */}
         {isSearchOpen && (
@@ -520,16 +809,23 @@ export default function CalendarScreen() {
           </View>
         )}
 
-        {/* Visualização de Mês ou Semana */}
+        {/* Visualização de Mês ou Semana com Suporte a Swipe */}
         {isMonthView ? (
           <View
+            {...panResponder.panHandlers}
             style={[
               styles.monthCard,
               { backgroundColor: theme.surface, borderColor: theme.outline },
             ]}>
             {/* Barra de Navegação do Mês */}
             <View style={styles.calendarNavRow}>
-              <TouchableOpacity onPress={prevMonth} style={styles.navBtn} activeOpacity={0.7}>
+              <TouchableOpacity
+                onPress={() => {
+                  triggerHaptic?.('selection');
+                  prevMonth();
+                }}
+                style={styles.navBtn}
+                activeOpacity={0.7}>
                 <Ionicons name="chevron-back" size={18} color={theme.textPrimary} />
               </TouchableOpacity>
               <Text style={[styles.navTitle, { color: theme.textPrimary }]}>
@@ -542,7 +838,13 @@ export default function CalendarScreen() {
                   activeOpacity={0.7}>
                   <Text style={[styles.todayBadgeText, { color: primaryColor }]}>Hoje</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={nextMonth} style={styles.navBtn} activeOpacity={0.7}>
+                <TouchableOpacity
+                  onPress={() => {
+                    triggerHaptic?.('selection');
+                    nextMonth();
+                  }}
+                  style={styles.navBtn}
+                  activeOpacity={0.7}>
                   <Ionicons name="chevron-forward" size={18} color={theme.textPrimary} />
                 </TouchableOpacity>
               </View>
@@ -562,25 +864,31 @@ export default function CalendarScreen() {
               ))}
             </View>
 
-            {/* Grid dos Dias do Mês */}
+            {/* Grid dos Dias do Mês com Dias Fantasmas */}
             <View style={styles.daysGrid}>
-              {calendarDays.map((item, index) => {
-                if (!item) {
-                  return <View key={`blank-${index}`} style={styles.dayGridCellBlank} />;
-                }
+              {calendarDays.map((item) => {
                 const isSelected = selectedDate === item.dateStr;
                 const isToday = todayStr === item.dateStr;
                 const hasMatch = matchingDatesSet.has(item.dateStr);
                 const isSearchActive = Boolean(normalizedSearchTerm);
-                const { pins, hasMore } = getDayPinsInfo(item.dateStr);
+                const { pins, hasMore, isAllCompleted } = getDayPinsInfo(item.dateStr);
                 const contrastSelected = getContrastTextColor(primaryColor);
 
                 return (
                   <TouchableOpacity
                     key={item.dateStr}
-                    onPress={() => setSelectedDate(item.dateStr)}
+                    onPress={() => {
+                      triggerHaptic?.('selection');
+                      setSelectedDate(item.dateStr);
+                      if (!item.isCurrentMonth) {
+                        setCurrentYearMonth({ year: item.year, month: item.month });
+                        const [y, m, d] = item.dateStr.split('-').map(Number);
+                        setWeekAnchorDate(new Date(y, m - 1, d));
+                      }
+                    }}
                     style={[
                       styles.dayGridCell,
+                      !item.isCurrentMonth && { opacity: 0.35 },
                       isSelected && { backgroundColor: primaryColor },
                       isToday && !isSelected && { borderColor: primaryColor, borderWidth: 1.5 },
                       isSearchActive && hasMatch && !isSelected && {
@@ -589,14 +897,20 @@ export default function CalendarScreen() {
                         borderWidth: 1.5,
                       },
                       isSearchActive && !hasMatch && !isSelected && {
-                        opacity: 0.3,
+                        opacity: 0.2,
                       },
                     ]}
                     activeOpacity={0.7}>
                     <Text
                       style={[
                         styles.dayGridText,
-                        { color: isSelected ? contrastSelected : theme.textPrimary },
+                        {
+                          color: isSelected
+                            ? contrastSelected
+                            : item.isCurrentMonth
+                            ? theme.textPrimary
+                            : theme.textSecondary,
+                        },
                         isSelected && { fontWeight: '800' },
                         isToday && !isSelected && { color: primaryColor, fontWeight: '700' },
                         isSearchActive && hasMatch && !isSelected && {
@@ -613,6 +927,7 @@ export default function CalendarScreen() {
                       hasMore={hasMore}
                       isSelected={isSelected}
                       primaryColor={primaryColor}
+                      isAllCompleted={isAllCompleted}
                     />
                   </TouchableOpacity>
                 );
@@ -621,6 +936,7 @@ export default function CalendarScreen() {
           </View>
         ) : (
           <View
+            {...panResponder.panHandlers}
             style={[
               styles.weekCard,
               { backgroundColor: theme.surface, borderColor: theme.outline },
@@ -628,7 +944,10 @@ export default function CalendarScreen() {
             {/* Barra de Navegação da Semana */}
             <View style={styles.calendarNavRow}>
               <TouchableOpacity
-                onPress={prevWeek}
+                onPress={() => {
+                  triggerHaptic?.('selection');
+                  prevWeek();
+                }}
                 style={styles.navBtn}
                 activeOpacity={0.7}
                 hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
@@ -651,7 +970,10 @@ export default function CalendarScreen() {
                   </TouchableOpacity>
                 )}
                 <TouchableOpacity
-                  onPress={nextWeek}
+                  onPress={() => {
+                    triggerHaptic?.('selection');
+                    nextWeek();
+                  }}
                   style={styles.navBtn}
                   activeOpacity={0.7}
                   hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
@@ -667,13 +989,16 @@ export default function CalendarScreen() {
                 const isToday = todayStr === item.dateStr;
                 const hasMatch = matchingDatesSet.has(item.dateStr);
                 const isSearchActive = Boolean(normalizedSearchTerm);
-                const { pins, hasMore } = getDayPinsInfo(item.dateStr);
+                const { pins, hasMore, isAllCompleted } = getDayPinsInfo(item.dateStr);
                 const contrastSelected = getContrastTextColor(primaryColor);
 
                 return (
                   <TouchableOpacity
                     key={item.dateStr}
-                    onPress={() => setSelectedDate(item.dateStr)}
+                    onPress={() => {
+                      triggerHaptic?.('selection');
+                      setSelectedDate(item.dateStr);
+                    }}
                     style={[
                       styles.weekDayBox,
                       { borderColor: theme.outline },
@@ -728,6 +1053,7 @@ export default function CalendarScreen() {
                       hasMore={hasMore}
                       isSelected={isSelected}
                       primaryColor={primaryColor}
+                      isAllCompleted={isAllCompleted}
                     />
                   </TouchableOpacity>
                 );
@@ -769,7 +1095,7 @@ export default function CalendarScreen() {
                             } (${displayCompleted} concluída${displayCompleted === 1 ? '' : 's'})`
                         : habitsForDate.length === 0
                         ? 'Nenhuma atividade agendada'
-                        : `${completedCount} de ${habitsForDate.length} concluídas`}
+                        : `${completedForDate} de ${totalForDate} concluídas`}
                     </Text>
                   </View>
                 </View>
@@ -822,30 +1148,185 @@ export default function CalendarScreen() {
           );
         })()}
 
-        {/* Timeline Vertical das Rotinas do Dia */}
+        {/* Chips de Filtro Rápido (Todas, Pendentes, Concluídas) - Idêntico à Home */}
+        {totalForDate > 0 && !normalizedSearchTerm && (
+          <View style={styles.filterChipsRow}>
+            <TouchableOpacity
+              style={[
+                styles.filterChip,
+                filterStatus === 'ALL'
+                  ? { backgroundColor: primaryColor, borderColor: primaryColor }
+                  : { backgroundColor: theme.surface, borderColor: theme.outline },
+              ]}
+              onPress={() => {
+                triggerHaptic?.('selection');
+                setFilterStatus('ALL');
+              }}
+              activeOpacity={0.8}>
+              <Text
+                style={[
+                  styles.filterChipText,
+                  {
+                    color:
+                      filterStatus === 'ALL'
+                        ? getContrastTextColor(primaryColor)
+                        : theme.textSecondary,
+                  },
+                ]}>
+                Todas ({totalForDate})
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.filterChip,
+                filterStatus === 'PENDING'
+                  ? { backgroundColor: primaryColor, borderColor: primaryColor }
+                  : { backgroundColor: theme.surface, borderColor: theme.outline },
+              ]}
+              onPress={() => {
+                triggerHaptic?.('selection');
+                setFilterStatus('PENDING');
+              }}
+              activeOpacity={0.8}>
+              <Text
+                style={[
+                  styles.filterChipText,
+                  {
+                    color:
+                      filterStatus === 'PENDING'
+                        ? getContrastTextColor(primaryColor)
+                        : theme.textSecondary,
+                  },
+                ]}>
+                Pendentes ({pendingForDate})
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.filterChip,
+                filterStatus === 'COMPLETED'
+                  ? { backgroundColor: primaryColor, borderColor: primaryColor }
+                  : { backgroundColor: theme.surface, borderColor: theme.outline },
+              ]}
+              onPress={() => {
+                triggerHaptic?.('selection');
+                setFilterStatus('COMPLETED');
+              }}
+              activeOpacity={0.8}>
+              <Text
+                style={[
+                  styles.filterChipText,
+                  {
+                    color:
+                      filterStatus === 'COMPLETED'
+                        ? getContrastTextColor(primaryColor)
+                        : theme.textSecondary,
+                  },
+                ]}>
+                Concluídas ({completedForDate})
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Timeline Vertical das Rotinas do Dia com Pull-to-Refresh */}
         <ScrollView
           style={styles.habitsScroll}
           contentContainerStyle={styles.habitsContent}
-          showsVerticalScrollIndicator={false}>
-          {displayHabits.length === 0 ? (
-            <View style={styles.emptyView}>
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={primaryColor}
+              colors={[primaryColor]}
+            />
+          }>
+          {totalForDate === 0 && !normalizedSearchTerm ? (
+            /* Empty State Proativo do Dia */
+            <View
+              style={[
+                styles.emptyContainer,
+                { backgroundColor: theme.surface, borderColor: theme.outline },
+              ]}>
               <Ionicons
-                name={normalizedSearchTerm ? 'search-outline' : 'sparkles-outline'}
+                name="calendar-outline"
                 size={42}
-                color={MomentusColors.textSecondary}
+                color={theme.textSecondary}
               />
               <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
-                {normalizedSearchTerm ? 'Nenhuma rotina encontrada' : 'Nenhum evento neste dia'}
+                Nenhum evento neste dia
               </Text>
               <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-                {normalizedSearchTerm
-                  ? `Não há rotinas com "${searchQuery}" em ${formatHumanCalendarDate(
-                      selectedDate,
-                      selectedDate === todayStr
-                    )}.`
-                  : 'Aproveite o tempo livre ou planeje uma nova rotina.'}
+                Aproveite o tempo livre, crie novas metas ou replique rotinas habituais.
               </Text>
-              {normalizedSearchTerm ? (
+
+              {/* Botões de Ação Rápida */}
+              <View style={styles.emptyActionsRow}>
+                <TouchableOpacity
+                  style={[styles.emptyActionBtnPrimary, { backgroundColor: primaryColor }]}
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    setHabitToEdit(null);
+                    setModalVisible(true);
+                  }}>
+                  <Ionicons name="add" size={18} color={getContrastTextColor(primaryColor)} />
+                  <Text
+                    style={[
+                      styles.emptyActionBtnPrimaryText,
+                      { color: getContrastTextColor(primaryColor) },
+                    ]}>
+                    Nova Rotina
+                  </Text>
+                </TouchableOpacity>
+
+                {yesterdayHabits.length > 0 && (
+                  <TouchableOpacity
+                    style={[
+                      styles.emptyActionBtnSecondary,
+                      { borderColor: theme.outline, backgroundColor: theme.surfaceElevated },
+                    ]}
+                    activeOpacity={0.85}
+                    onPress={handleCopyYesterdayHabits}>
+                    <Ionicons name="copy-outline" size={16} color={theme.textPrimary} />
+                    <Text style={[styles.emptyActionBtnSecondaryText, { color: theme.textPrimary }]}>
+                      Copiar de Ontem ({yesterdayHabits.length})
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                  style={[
+                    styles.emptyActionBtnSecondary,
+                    { borderColor: theme.outline, backgroundColor: theme.surfaceElevated },
+                  ]}
+                  activeOpacity={0.85}
+                  onPress={() => router.push('/templates' as any)}>
+                  <Ionicons name="layers-outline" size={16} color={theme.textPrimary} />
+                  <Text style={[styles.emptyActionBtnSecondaryText, { color: theme.textPrimary }]}>
+                    Usar Template
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : displayHabits.length === 0 ? (
+            /* Empty State de Busca ou de Filtro */
+            normalizedSearchTerm ? (
+              <View style={styles.emptyView}>
+                <Ionicons
+                  name="search-outline"
+                  size={42}
+                  color={MomentusColors.textSecondary}
+                />
+                <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
+                  Nenhuma rotina encontrada
+                </Text>
+                <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
+                  Não há rotinas com &quot;{searchQuery}&quot; em{' '}
+                  {formatHumanCalendarDate(selectedDate, selectedDate === todayStr)}.
+                </Text>
                 <TouchableOpacity
                   onPress={() => setSearchQuery('')}
                   style={[styles.emptyActionBtn, { borderColor: primaryColor }]}
@@ -857,21 +1338,44 @@ export default function CalendarScreen() {
                     Limpar filtro de busca
                   </Text>
                 </TouchableOpacity>
-              ) : (
+              </View>
+            ) : (
+              <View
+                style={[
+                  styles.emptyFilterContainer,
+                  { backgroundColor: theme.surface, borderColor: theme.outline },
+                ]}>
+                <Ionicons
+                  name={
+                    filterStatus === 'PENDING'
+                      ? 'checkmark-done-circle-outline'
+                      : 'hourglass-outline'
+                  }
+                  size={40}
+                  color={
+                    filterStatus === 'PENDING'
+                      ? MomentusColors.emeraldGreen
+                      : theme.textSecondary
+                  }
+                />
+                <Text style={[styles.emptyFilterTitle, { color: theme.textPrimary }]}>
+                  {filterStatus === 'PENDING'
+                    ? 'Tudo concluído por aqui! 🎉'
+                    : 'Nenhuma rotina concluída ainda'}
+                </Text>
                 <TouchableOpacity
+                  style={[styles.resetFilterBtn, { borderColor: primaryColor }]}
                   onPress={() => {
-                    setHabitToEdit(null);
-                    setModalVisible(true);
+                    triggerHaptic?.('selection');
+                    setFilterStatus('ALL');
                   }}
-                  style={[styles.emptyActionBtn, { borderColor: primaryColor }]}
                   activeOpacity={0.8}>
-                  <Ionicons name="add-circle" size={18} color={primaryColor} />
-                  <Text style={[styles.emptyActionText, { color: primaryColor }]}>
-                    Criar para esta data
+                  <Text style={[styles.resetFilterBtnText, { color: primaryColor }]}>
+                    Ver todas as rotinas
                   </Text>
                 </TouchableOpacity>
-              )}
-            </View>
+              </View>
+            )
           ) : (
             <View
               style={[
@@ -896,9 +1400,26 @@ export default function CalendarScreen() {
                     isChecked={habit.completed}
                     isFirst={index === 0}
                     isLast={index === displayHabits.length - 1}
-                    onCheckedChange={() => toggleHabit(habit.id)}
-                    onClick={() => setSelectedDetailHabit(habit)}
-                    onLongClick={() => {}}
+                    isSelectionMode={isSelectionMode}
+                    isSelected={selectedHabitIds.includes(habit.id)}
+                    onCheckedChange={() => {
+                      triggerHaptic?.('selection');
+                      toggleHabit(habit.id);
+                    }}
+                    onClick={() => {
+                      if (isSelectionMode) {
+                        handleToggleSelectHabit(habit.id);
+                      } else {
+                        setSelectedDetailHabit(habit);
+                      }
+                    }}
+                    onLongClick={() => {
+                      if (!isSelectionMode) {
+                        triggerHaptic?.('impact');
+                        setIsSelectionMode(true);
+                        setSelectedHabitIds([habit.id]);
+                      }
+                    }}
                   />
                 );
               })}
@@ -908,16 +1429,18 @@ export default function CalendarScreen() {
           <View style={{ height: 90 }} />
         </ScrollView>
 
-        {/* Floating Action Button (+) */}
-        <TouchableOpacity
-          style={[styles.fab, { backgroundColor: primaryColor }]}
-          activeOpacity={0.85}
-          onPress={() => {
-            setHabitToEdit(null);
-            setModalVisible(true);
-          }}>
-          <Ionicons name="add" size={30} color={getContrastTextColor(primaryColor)} />
-        </TouchableOpacity>
+        {/* Floating Action Button (+) - Oculto durante modo de seleção */}
+        {!isSelectionMode && (
+          <TouchableOpacity
+            style={[styles.fab, { backgroundColor: primaryColor }]}
+            activeOpacity={0.85}
+            onPress={() => {
+              setHabitToEdit(null);
+              setModalVisible(true);
+            }}>
+            <Ionicons name="add" size={30} color={getContrastTextColor(primaryColor)} />
+          </TouchableOpacity>
+        )}
 
         {/* Diálogo de Detalhes da Rotina */}
         <EventDetailDialog
@@ -991,6 +1514,33 @@ const styles = StyleSheet.create({
     ...TypographyTokens.screenSubtitle,
     color: MomentusColors.textSecondary,
     marginTop: 2,
+  },
+  selectionTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    marginBottom: 12,
+  },
+  selectionCountText: {
+    fontSize: 16,
+    fontWeight: '700',
+    flex: 1,
+    marginLeft: 12,
+  },
+  selectionActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  iconButton: {
+    padding: 6,
+    borderRadius: 8,
+    ...Platform.select({
+      web: { cursor: 'pointer' },
+    }),
   },
   searchToggleBtn: {
     width: 36,
@@ -1132,10 +1682,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
-  dayGridCellBlank: {
-    width: `${100 / 7}%`,
-    height: 44,
-  },
   dayGridCell: {
     width: `${100 / 7}%`,
     height: 44,
@@ -1185,6 +1731,11 @@ const styles = StyleSheet.create({
     height: 5,
     borderRadius: 2.5,
   },
+  pinCheckDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+  },
   pinPlusText: {
     fontSize: 9,
     fontWeight: '900',
@@ -1193,7 +1744,7 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     marginHorizontal: LayoutTokens.pagePaddingHorizontal,
-    marginBottom: 14,
+    marginBottom: 10,
     borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
     padding: 14,
@@ -1253,6 +1804,25 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 3,
   },
+  filterChipsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
+    marginBottom: 12,
+  },
+  filterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: BorderRadiusTokens.control,
+    borderWidth: 1,
+    ...Platform.select({
+      web: { cursor: 'pointer' },
+    }),
+  },
+  filterChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
   habitsScroll: {
     flex: 1,
     paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
@@ -1261,12 +1831,14 @@ const styles = StyleSheet.create({
     paddingBottom: LayoutTokens.pagePaddingBottom,
     width: '100%',
   },
-  emptyView: {
+  emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 48,
-    paddingHorizontal: 24,
+    paddingVertical: 36,
+    paddingHorizontal: 20,
     borderRadius: BorderRadiusTokens.card,
+    borderWidth: 1,
+    marginTop: 4,
   },
   emptyTitle: {
     ...TypographyTokens.cardTitle,
@@ -1280,6 +1852,52 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     lineHeight: 18,
   },
+  emptyActionsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+  },
+  emptyActionBtnPrimary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: BorderRadiusTokens.control,
+    ...Platform.select({
+      web: { cursor: 'pointer' },
+    }),
+  },
+  emptyActionBtnPrimaryText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  emptyActionBtnSecondary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: BorderRadiusTokens.control,
+    borderWidth: 1,
+    ...Platform.select({
+      web: { cursor: 'pointer' },
+    }),
+  },
+  emptyActionBtnSecondaryText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  emptyView: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 48,
+    paddingHorizontal: 24,
+    borderRadius: BorderRadiusTokens.card,
+  },
   emptyActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1292,6 +1910,35 @@ const styles = StyleSheet.create({
   emptyActionText: {
     fontSize: 13,
     fontWeight: '700',
+  },
+  emptyFilterContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 36,
+    paddingHorizontal: 20,
+    borderRadius: BorderRadiusTokens.card,
+    borderWidth: 1,
+    marginTop: 8,
+  },
+  emptyFilterTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginTop: 10,
+    textAlign: 'center',
+  },
+  resetFilterBtn: {
+    marginTop: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    ...Platform.select({
+      web: { cursor: 'pointer' },
+    }),
+  },
+  resetFilterBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
   },
   timelineList: {
     borderRadius: BorderRadiusTokens.card,
@@ -1319,5 +1966,8 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
     zIndex: 99,
+    ...Platform.select({
+      web: { cursor: 'pointer' },
+    }),
   },
 });
