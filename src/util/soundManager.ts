@@ -60,6 +60,8 @@ class SoundManager {
   private currentSoundscape: SoundscapeType = 'none';
   private soundscapeVolume: number = 0.5;
   private enabled: boolean = true;
+  // Recurso temporariamente em desenvolvimento / calibração de áudio
+  private soundscapesFeatureEnabled: boolean = false;
   private audioModule: ExpoAudioModule | null | undefined = undefined;
   private modeConfigured: boolean = false;
 
@@ -216,7 +218,7 @@ class SoundManager {
       this.soundscapePlayer = null;
     }
 
-    if (type === 'none' || !this.enabled) {
+    if (!this.soundscapesFeatureEnabled || type === 'none' || !this.enabled) {
       return;
     }
 
@@ -264,7 +266,7 @@ class SoundManager {
   }
 
   public resumeSoundscape() {
-    if (this.currentSoundscape === 'none' || !this.enabled) return;
+    if (!this.soundscapesFeatureEnabled || this.currentSoundscape === 'none' || !this.enabled) return;
     try {
       if (this.soundscapeWebAudio) {
         this.soundscapeWebAudio.play().catch(() => {});
