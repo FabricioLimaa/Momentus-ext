@@ -1827,11 +1827,10 @@ const styles = StyleSheet.create({
   },
   habitsScroll: {
     flex: 1,
-    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
   },
   habitsContent: {
+    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
     paddingBottom: LayoutTokens.pagePaddingBottom,
-    width: '100%',
   },
   emptyContainer: {
     alignItems: 'center',
