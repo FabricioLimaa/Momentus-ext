@@ -46,10 +46,10 @@ export const SOUNDSCAPE_OPTIONS: SoundscapeOption[] = [
 ];
 
 const SOUNDSCAPE_ASSETS: Record<Exclude<SoundscapeType, 'none'>, any> = {
-  brown_noise: require('@/assets/sounds/brown_noise.wav'),
-  rain: require('@/assets/sounds/rain.wav'),
-  waves: require('@/assets/sounds/waves.wav'),
-  white_noise: require('@/assets/sounds/white_noise.wav'),
+  brown_noise: require('@/assets/sounds/brown_noise.mp3'),
+  rain: require('@/assets/sounds/rain.mp3'),
+  waves: require('@/assets/sounds/waves.mp3'),
+  white_noise: require('@/assets/sounds/white_noise.mp3'),
 };
 
 class SoundManager {
