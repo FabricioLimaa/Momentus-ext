@@ -1806,14 +1806,15 @@ const styles = StyleSheet.create({
   },
   filterChipsRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
     paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   filterChip: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: BorderRadiusTokens.control,
+    borderRadius: 10,
     borderWidth: 1,
     ...Platform.select({
       web: { cursor: 'pointer' },
@@ -1943,13 +1944,7 @@ const styles = StyleSheet.create({
   timelineList: {
     borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 3,
+    paddingVertical: 12,
   },
   fab: {
     position: 'absolute',
