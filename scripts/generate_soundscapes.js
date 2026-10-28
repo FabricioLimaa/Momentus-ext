@@ -151,3 +151,4 @@ for (const f of files) {
   fs.writeFileSync(filePath, buf);
   console.log(`Gerado: ${f.name} (${(buf.length / 1024).toFixed(1)} KB)`);
 }
+
