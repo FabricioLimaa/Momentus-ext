@@ -1005,7 +1005,7 @@ export default function FocusScreen() {
                 onPress={openCycleSettings}
                 activeOpacity={0.7}
                 accessibilityLabel="Ajustes de ciclo Pomodoro">
-                <Ionicons name="options-outline" size={18} color={theme.textSecondary} />
+                <Ionicons name="settings-outline" size={18} color={theme.textSecondary} />
               </TouchableOpacity>
             </View>
           </View>
@@ -1191,21 +1191,6 @@ export default function FocusScreen() {
           {/* Pilar 1: Presets Rápidos de Duração em 1 Toque (Visíveis quando pausado) */}
           {!isRunning && (
             <View style={styles.presetsRowContainer}>
-              <View style={styles.presetsHeaderRow}>
-                <View style={styles.presetsHeaderLeft}>
-                  <Ionicons name="flash-outline" size={13} color={activeColor} />
-                  <Text style={[styles.presetsTitle, { color: theme.textSecondary }]}>
-                    Duração Rápida ({mode === 'FOCUS' ? 'Foco' : mode === 'SHORT_BREAK' ? 'Pausa' : 'Descanso'}):
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  onPress={openCycleSettings}
-                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                  <Text style={[styles.presetsCustomBtn, { color: activeColor }]}>
-                    Ajustar
-                  </Text>
-                </TouchableOpacity>
-              </View>
               <View style={styles.presetsChipsRow}>
                 {PRESET_DURATIONS[mode].map((dur) => {
                   const isSelected = currentDurationMin === dur;
@@ -3057,26 +3042,6 @@ const styles = StyleSheet.create({
   /* Pilar 1: Presets Rápidos de Duração */
   presetsRowContainer: {
     marginTop: 8,
-    gap: 6,
-  },
-  presetsHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 2,
-  },
-  presetsHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  presetsTitle: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  presetsCustomBtn: {
-    fontSize: 11,
-    fontWeight: '800',
   },
   presetsChipsRow: {
     flexDirection: 'row',
