@@ -122,6 +122,7 @@ interface MomentusContextData {
   userLevel: UserLevelInfo;
   settings: AppSettings;
   theme: AppTheme;
+  focusHistoryMap: Record<string, number>;
   isLoaded: boolean;
   selectedDate: string;
   setSelectedDate: (date: string) => void;
@@ -201,6 +202,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [marketItems, setMarketItems] = useState<MarketItem[]>(INITIAL_MARKET_ITEMS);
   const [userProfile, setUserProfile] = useState<UserProfile>(INITIAL_USER_PROFILE);
   const [settings, setSettings] = useState<AppSettings>(INITIAL_SETTINGS);
+  const [focusHistoryMap, setFocusHistoryMap] = useState<Record<string, number>>({});
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Dynamic Theme (Light, Dark, System)
@@ -351,6 +353,15 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           initialFocusMinutes = 0;
           await setAppKv('last_focus_date', todayDateStr).catch(() => {});
         }
+
+        // Carrega o histórico diário acumulado de foco do SQLite
+        const savedFocusHistory = await getAppKv<Record<string, number>>('focus_history_map');
+        const initialFocusHistory: Record<string, number> = savedFocusHistory || {};
+        if (initialFocusMinutes > 0 && !initialFocusHistory[todayDateStr]) {
+          initialFocusHistory[todayDateStr] = initialFocusMinutes;
+          await setAppKv('focus_history_map', initialFocusHistory).catch(() => {});
+        }
+        setFocusHistoryMap(initialFocusHistory);
 
         const enrichedProfile: UserProfile = {
           ...effectiveProfile,
@@ -1426,6 +1437,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     let updatedPoints = 0;
     let updatedFocusMinutes = 0;
+    const todayDateStr = getTodayDateString();
 
     setUserProfile((prev) => {
       updatedPoints = prev.totalPoints + totalGained;
@@ -1438,8 +1450,18 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setAppKv('user_profile', updated).catch((err) =>
         MomentusLog.db.warn('Erro ao salvar user_profile após foco no SQLite:', err)
       );
-      setAppKv('last_focus_date', getTodayDateString()).catch(() => {});
+      setAppKv('last_focus_date', todayDateStr).catch(() => {});
       return updated;
+    });
+
+    // Registra no histórico diário permanente para consolidação nas Estatísticas
+    setFocusHistoryMap((prev) => {
+      const nextTotal = (prev[todayDateStr] || 0) + minutes;
+      const nextMap = { ...prev, [todayDateStr]: nextTotal };
+      setAppKv('focus_history_map', nextMap).catch((err) =>
+        MomentusLog.db.warn('Erro ao salvar focus_history_map no SQLite:', err)
+      );
+      return nextMap;
     });
 
     const uid = firebaseAuth.currentUser?.uid;
@@ -1500,6 +1522,8 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       focusMinutesToday: 0,
     }));
     setSettings(INITIAL_SETTINGS);
+    setFocusHistoryMap({});
+    setAppKv('focus_history_map', {}).catch(() => {});
     AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
     clearEntireDatabase().catch(() => {});
     // 8. Grava a base inicial limpa no banco local SQLite
@@ -1950,6 +1974,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         userLevel,
         settings,
         theme,
+        focusHistoryMap,
         isLoaded,
         selectedDate,
         setSelectedDate,
