@@ -1,0 +1,1390 @@
+import { firestore, auth } from "@/config/firebase";
+import { MomentusLog } from "@/util/logger";
+import { getTodayDateString } from "@/constants/initialData";
+import {
+  Achievement,
+  Category,
+  HabitItem,
+  MarketItem,
+  RoutineTemplate,
+  TemplateItem,
+  UserProfile,
+} from "@/types";
+import {
+  collection,
+  deleteDoc,
+  deleteField,
+  doc,
+  getDoc,
+  getDocs,
+  increment,
+  onSnapshot,
+  query,
+  setDoc,
+  Unsubscribe,
+  where,
+  writeBatch,
+} from "firebase/firestore";
+
+const EVENTS_COLLECTION = "eventos";
+const CATEGORIES_COLLECTION = "categories";
+export const LEGACY_MOCK_HABIT_IDS = new Set(["h-1", "h-2", "h-3", "h-4"]);
+export const LEGACY_MOCK_HABIT_TITLES = new Set([
+  "beber 2l de água",
+  "beber 2l de agua",
+  "leitura 20 minutos",
+  "treino ou caminhada",
+  "meditação mindfulness",
+  "meditacao mindfulness",
+]);
+
+export function isMockHabit(id: string, title?: string | null): boolean {
+  if (LEGACY_MOCK_HABIT_IDS.has(id)) return true;
+  if (title && LEGACY_MOCK_HABIT_TITLES.has(title.trim().toLowerCase())) return true;
+  return false;
+}
+
+const TEMPLATES_COLLECTION = "templates";
+const UNLOCKED_ACHIEVEMENTS_COLLECTION = "unlocked_achievements";
+const COMPLETED_HABITS_COLLECTION = "completed_habits";
+const INVENTORY_COLLECTION = "inventory";
+
+export interface SyncResult {
+  uploadedEvents: number;
+  downloadedEvents: number;
+  uploadedCategories: number;
+  downloadedCategories: number;
+  uploadedTemplates: number;
+  downloadedTemplates: number;
+  syncedAchievements: number;
+}
+
+/**
+ * Converte data em formato 'YYYY-MM-DD' para epoch timestamp em milissegundos UTC (Long no Kotlin).
+ * Espelha rigorosamente: date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+ */
+function dateToMillis(dateStr?: string | null): number | null {
+  if (!dateStr) return null;
+  if (typeof dateStr === "number") return dateStr;
+  const parts = String(dateStr).split("-");
+  if (parts.length === 3) {
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    return Date.UTC(year, month, day, 0, 0, 0);
+  }
+  const parsed = new Date(dateStr).getTime();
+  return isNaN(parsed) ? null : parsed;
+}
+
+/**
+ * Converte epoch timestamp ou Timestamp do Firestore de volta para string 'YYYY-MM-DD' usando UTC.
+ * Evita o deslocamento de data em fusos negativos (ex: UTC-3 Brasil).
+ */
+function millisToDateString(val?: any): string {
+  if (!val) return getTodayDateString();
+  if (typeof val === "string" && val.includes("-") && val.length === 10) {
+    return val;
+  }
+  if (typeof val === "number") {
+    const d = new Date(val);
+    const yyyy = d.getUTCFullYear();
+    const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const dd = String(d.getUTCDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  if (val && typeof val.toDate === "function") {
+    const d = val.toDate();
+    const yyyy = d.getUTCFullYear();
+    const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const dd = String(d.getUTCDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  return getTodayDateString();
+}
+
+/**
+ * Formata o horário no padrão ISO_LOCAL_TIME esperado pelo Kotlin ('HH:mm:ss').
+ */
+function formatTimeToIsoLocal(timeStr?: string, fallback = "08:00:00"): string {
+  if (!timeStr) return fallback;
+  if (timeStr.length === 5) return `${timeStr}:00`;
+  if (timeStr.length === 8) return timeStr;
+  return fallback;
+}
+
+/**
+ * Extrai 'HH:mm' a partir de strings como '08:00:00' ou '08:00'.
+ */
+function parseTimeString(val?: any, fallback = "08:00"): string {
+  if (!val || typeof val !== "string") return fallback;
+  if (val.length >= 5) {
+    return val.slice(0, 5);
+  }
+  return fallback;
+}
+
+/**
+ * Executa a sincronização bidirecional do Firestore respeitando ESTRITAMENTE o schema do app nativo:
+ * - users/{userId}: UserData.kt (display_name, email, points, streak, terms_accepted, terms_accepted_version)
+ * - eventos: ItemCronograma.kt (data como Long, horarioInicioString/horarioTerminoString como ISO_LOCAL_TIME)
+ * - completed_habits: HabitoConcluido.kt (itemCronogramaId, dataConclusao)
+ * - inventory: MarketRepository.kt (subcoleção com documentos por itemId)
+ * - unlocked_achievements: UnlockedAchievement.kt (achievementId, dateUnlocked)
+ * - categories: Category.kt (nome, cor, stickerId, duracaoPadraoMinutos)
+ * - templates: Template.kt (nome, descricao)
+ */
+export async function syncWithFirestore(
+  userId: string,
+  localHabits: HabitItem[],
+  localCategories: Category[],
+  localTemplates: RoutineTemplate[] = [],
+  localAchievements: Achievement[] = [],
+  localMarketItems: MarketItem[] = [],
+  localUserProfile?: UserProfile,
+): Promise<{
+  mergedHabits: HabitItem[];
+  mergedCategories: Category[];
+  mergedTemplates: RoutineTemplate[];
+  mergedAchievements: Achievement[];
+  mergedMarketItems: MarketItem[];
+  mergedUserProfile?: UserProfile;
+  cloudTermsAccepted?: boolean;
+  cloudTermsVersion?: number;
+  result: SyncResult;
+}> {
+  const result: SyncResult = {
+    uploadedEvents: 0,
+    downloadedEvents: 0,
+    uploadedCategories: 0,
+    downloadedCategories: 0,
+    uploadedTemplates: 0,
+    downloadedTemplates: 0,
+    syncedAchievements: 0,
+  };
+
+  const userDocRef = doc(firestore, "users", userId);
+  const eventsColRef = collection(userDocRef, EVENTS_COLLECTION);
+  const categoriesColRef = collection(userDocRef, CATEGORIES_COLLECTION);
+  const templatesColRef = collection(userDocRef, TEMPLATES_COLLECTION);
+  const achievementsColRef = collection(
+    userDocRef,
+    UNLOCKED_ACHIEVEMENTS_COLLECTION,
+  );
+  const completedHabitsColRef = collection(
+    userDocRef,
+    COMPLETED_HABITS_COLLECTION,
+  );
+  const inventoryColRef = collection(userDocRef, INVENTORY_COLLECTION);
+  const metasColRef = collection(userDocRef, "metas");
+
+  // ========================================================
+  // 0. Busca Paralela Otimizada (Single Multiplexed Network Phase)
+  // ========================================================
+  const [
+    categoriesSnapshot,
+    metasSnapshot,
+    completedHabitsSnapshot,
+    eventsSnapshot,
+    templatesSnapshot,
+    achSnapshot,
+    inventorySnapshot,
+    userDocSnap,
+  ] = await Promise.all([
+    getDocs(categoriesColRef).catch((e) => {
+      MomentusLog.sync.warn('Erro ao buscar categorias:', e);
+      return { forEach: () => {} } as any;
+    }),
+    getDocs(metasColRef).catch((e) => {
+      MomentusLog.sync.warn('Erro ao buscar metas:', e);
+      return { forEach: () => {} } as any;
+    }),
+    getDocs(completedHabitsColRef).catch((e) => {
+      MomentusLog.sync.warn('Erro ao buscar habitos concluidos:', e);
+      return { forEach: () => {} } as any;
+    }),
+    getDocs(eventsColRef).catch((e) => {
+      MomentusLog.sync.warn('Erro ao buscar eventos:', e);
+      return { forEach: () => {} } as any;
+    }),
+    getDocs(templatesColRef).catch((e) => {
+      MomentusLog.sync.warn('Erro ao buscar templates:', e);
+      return { forEach: () => {} } as any;
+    }),
+    getDocs(achievementsColRef).catch((e) => {
+      MomentusLog.sync.warn('Erro ao buscar conquistas:', e);
+      return { forEach: () => {} } as any;
+    }),
+    getDocs(inventoryColRef).catch((e) => {
+      MomentusLog.sync.warn('Erro ao buscar inventario:', e);
+      return { forEach: () => {} } as any;
+    }),
+    getDoc(userDocRef).catch((e) => {
+      MomentusLog.sync.warn('Erro ao buscar documento do usuario:', e);
+      return { exists: () => false, data: () => ({}) } as any;
+    }),
+  ]);
+
+  // ========================================================
+  // 1. Sincronização de Categorias (Category.kt) e Metas (Meta.kt)
+  // ========================================================
+  const LEGACY_MOCK_CAT_IDS = new Set([
+    "cat-saude",
+    "cat-trabalho",
+    "cat-estudos",
+    "cat-fitness",
+    "cat-pessoal",
+  ]);
+
+  const cloudCategoriesMap = new Map<string, any>();
+  categoriesSnapshot.forEach((d: any) => cloudCategoriesMap.set(d.id, d.data()));
+
+  const cloudMetasMap = new Map<string, any>();
+  metasSnapshot.forEach((d: any) => cloudMetasMap.set(d.id, d.data()));
+
+  // Procura se já existe uma categoria "Outros" na nuvem (inclusive vinda do nativo com UUID)
+  let cloudOutrosId: string | null = null;
+  cloudCategoriesMap.forEach((cloudCat, id) => {
+    const name = (cloudCat.nome || cloudCat.name || "").trim().toLowerCase();
+    if (name === "outros") {
+      // Prioriza ID com formato UUID ou diferente de 'cat-outros' se existir
+      if (!cloudOutrosId || cloudOutrosId === "cat-outros") {
+        cloudOutrosId = id;
+      }
+    }
+  });
+
+  // Procura se existe categoria "Outros" local
+  let localOutrosId: string | null = null;
+  localCategories.forEach((cat) => {
+    if (cat.name.trim().toLowerCase() === "outros") {
+      if (!localOutrosId || localOutrosId === "cat-outros") {
+        localOutrosId = cat.id;
+      }
+    }
+  });
+
+  const canonicalOutrosId = cloudOutrosId || localOutrosId || "cat-outros";
+  const duplicateOutrosIds = new Set<string>();
+
+  cloudCategoriesMap.forEach((cloudCat, id) => {
+    const name = (cloudCat.nome || cloudCat.name || "").trim().toLowerCase();
+    if (name === "outros" && id !== canonicalOutrosId) {
+      duplicateOutrosIds.add(id);
+    }
+  });
+  localCategories.forEach((cat) => {
+    if (cat.name.trim().toLowerCase() === "outros" && cat.id !== canonicalOutrosId) {
+      duplicateOutrosIds.add(cat.id);
+    }
+  });
+
+  // Filtra categorias locais ignorando mocks legados de teste e duplicatas de "Outros"
+  const cleanLocalCategories = localCategories.filter(
+    (c) => !LEGACY_MOCK_CAT_IDS.has(c.id) && !duplicateOutrosIds.has(c.id),
+  );
+
+  const localCategoriesMap = new Map<string, Category>(
+    cleanLocalCategories.map((c) => [c.id, c]),
+  );
+  const categoriesBatch = writeBatch(firestore);
+
+  // Exclui duplicatas de Outros da nuvem
+  duplicateOutrosIds.forEach((dupId) => {
+    if (cloudCategoriesMap.has(dupId)) {
+      categoriesBatch.delete(doc(categoriesColRef, dupId));
+      categoriesBatch.delete(doc(metasColRef, dupId));
+    }
+  });
+
+  cleanLocalCategories.forEach((cat) => {
+    // Se for 'cat-outros' local mas a nuvem já possui o Outros oficial do nativo, não faz upload duplicado
+    if (cat.id === "cat-outros" && canonicalOutrosId !== "cat-outros") {
+      return;
+    }
+
+    if (!cloudCategoriesMap.has(cat.id)) {
+      const docRef = doc(categoriesColRef, cat.id);
+      categoriesBatch.set(docRef, {
+        id: cat.id,
+        nome: cat.name,
+        descricao: null,
+        duracaoPadraoMinutos: 60,
+        cor: cat.color || "#616161",
+        tag: null,
+        stickerId: cat.stickerId || null,
+        lastUpdated: new Date(),
+      });
+      result.uploadedCategories++;
+    }
+
+    // Sincroniza meta na subcoleção 'metas' do Firestore conforme Meta.kt
+    const metaDocRef = doc(metasColRef, cat.id);
+    if (cat.metaMinutosSemanal != null && cat.metaMinutosSemanal > 0) {
+      categoriesBatch.set(metaDocRef, {
+        categoryId: cat.id,
+        metaMinutosSemanal: cat.metaMinutosSemanal,
+      });
+    } else if (cloudMetasMap.has(cat.id)) {
+      categoriesBatch.delete(metaDocRef);
+    }
+  });
+  await categoriesBatch.commit();
+
+  let mergedCategories: Category[] = [...cleanLocalCategories];
+  cloudCategoriesMap.forEach((cloudCat, id) => {
+    if (duplicateOutrosIds.has(id) || LEGACY_MOCK_CAT_IDS.has(id)) {
+      return;
+    }
+    if (!localCategoriesMap.has(id)) {
+      const metaVal =
+        cloudMetasMap.get(id)?.metaMinutosSemanal ??
+        cloudCat.metaMinutosSemanal ??
+        null;
+      mergedCategories.push({
+        id,
+        name: cloudCat.nome || cloudCat.name || "Outros",
+        color: cloudCat.cor || cloudCat.color || "#616161",
+        icon: cloudCat.icon || undefined,
+        stickerId: cloudCat.stickerId || null,
+        metaMinutosSemanal: metaVal,
+      });
+      result.downloadedCategories++;
+    }
+  });
+
+  // Se o usuário não tiver nenhuma categoria na nuvem nem localmente, garante a categoria padrão "Outros"
+  if (mergedCategories.length === 0) {
+    const defaultOutros: Category = {
+      id: "cat-outros",
+      name: "Outros",
+      color: "#616161",
+      stickerId: null,
+      metaMinutosSemanal: null,
+    };
+    mergedCategories.push(defaultOutros);
+    try {
+      const defaultDocRef = doc(categoriesColRef, defaultOutros.id);
+      await setDoc(defaultDocRef, {
+        id: defaultOutros.id,
+        nome: defaultOutros.name,
+        descricao: null,
+        duracaoPadraoMinutos: 60,
+        cor: defaultOutros.color,
+        tag: null,
+        stickerId: null,
+        lastUpdated: new Date(),
+      });
+    } catch {}
+  }
+
+  // 1. Filtra hábitos locais removendo mocks de teste e ajustando categorias duplicadas
+  const cleanLocalHabits = localHabits
+    .filter((h) => !isMockHabit(h.id, h.title))
+    .map((h) => (duplicateOutrosIds.has(h.categoryId) ? { ...h, categoryId: canonicalOutrosId } : h));
+
+  // ========================================================
+  // 2. Sincronização de Hábitos Concluídos (HabitoConcluido.kt)
+  // ========================================================
+  const cloudCompletedHabitsSet = new Set<string>();
+  const localHabitsMapById = new Map<string, HabitItem>(
+    cleanLocalHabits.map((h) => [h.id, h])
+  );
+  const completedBatch = writeBatch(firestore);
+  let completedChanges = 0;
+
+  completedHabitsSnapshot.forEach((d: any) => {
+    const data = d.data();
+    const rawId = data.itemCronogramaId || d.id;
+    const localHabit = localHabitsMapById.get(rawId) || localHabitsMapById.get(d.id);
+
+    // Se o hábito existe localmente e está desmarcado pelo usuário, remove da nuvem imediatamente
+    if (localHabit && !localHabit.completed) {
+      completedBatch.delete(d.ref);
+      completedChanges++;
+      return;
+    }
+
+    cloudCompletedHabitsSet.add(rawId);
+    cloudCompletedHabitsSet.add(d.id);
+    if (!rawId.startsWith('applied_') && /_[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(rawId)) {
+      cloudCompletedHabitsSet.add(rawId.replace(/_[0-9]{4}-[0-9]{2}-[0-9]{2}$/, ''));
+    }
+  });
+
+  // Atualiza estritamente os hábitos locais e garante integridade bidirecional
+  cleanLocalHabits.forEach((habit) => {
+    if (cloudCompletedHabitsSet.has(habit.id)) {
+      habit.completed = true;
+    }
+    const compRef = doc(completedHabitsColRef, habit.id);
+    if (habit.completed && !cloudCompletedHabitsSet.has(habit.id)) {
+      completedBatch.set(compRef, {
+        itemCronogramaId: habit.id,
+        dataConclusao: dateToMillis(habit.date) || Date.now(),
+      });
+      cloudCompletedHabitsSet.add(habit.id);
+      completedChanges++;
+    } else if (!habit.completed && cloudCompletedHabitsSet.has(habit.id)) {
+      completedBatch.delete(compRef);
+      cloudCompletedHabitsSet.delete(habit.id);
+      completedChanges++;
+    }
+  });
+
+  try {
+    if (completedChanges > 0) {
+      await completedBatch.commit();
+    }
+  } catch (err) {
+    MomentusLog.sync.warn("Aviso ao sincronizar completed_habits no Firestore:", err);
+  }
+
+  // ========================================================
+  // 3. Sincronização de Eventos (ItemCronograma.kt)
+  // ========================================================
+  const cloudEventsMap = new Map<string, any>();
+  eventsSnapshot.forEach((d: any) => cloudEventsMap.set(d.id, d.data()));
+
+  const localEventsMap = new Map<string, HabitItem>(
+    cleanLocalHabits.map((h) => [h.id, h]),
+  );
+  const eventsBatch = writeBatch(firestore);
+
+  // Remove hábitos mockados da nuvem se existirem
+  cloudEventsMap.forEach((cloudItem, id) => {
+    if (isMockHabit(id, cloudItem.titulo || cloudItem.title)) {
+      eventsBatch.delete(doc(eventsColRef, id));
+    }
+  });
+
+  // Identifica eventos deletados na nuvem para não ressuscitar
+  const deletedCloudIds = new Set<string>();
+  cloudEventsMap.forEach((cloudItem, id) => {
+    if (cloudItem.isDeleted === true) {
+      deletedCloudIds.add(id);
+    }
+  });
+
+  cleanLocalHabits.forEach((habit) => {
+    // Se o hábito já foi marcado como deletado na nuvem, não faz upload
+    if (deletedCloudIds.has(habit.id)) {
+      return;
+    }
+
+    const cloudItem = cloudEventsMap.get(habit.id);
+    if (!cloudItem) {
+      const docRef = doc(eventsColRef, habit.id);
+      // Salva ESTRITAMENTE os campos esperados pelo ItemCronograma nativo
+      eventsBatch.set(docRef, {
+        id: habit.id,
+        titulo: habit.title,
+        descricao: habit.description || null,
+        data: dateToMillis(habit.date),
+        diaDaSemana: null,
+        horarioInicioString: formatTimeToIsoLocal(habit.timeStart),
+        horarioTerminoString: formatTimeToIsoLocal(habit.timeEnd || habit.timeStart),
+        ordem: 0,
+        categoryId: habit.categoryId,
+        templateId: habit.templateSourceId || null,
+        templateSourceId: habit.templateSourceId || null,
+        googleCalendarEventId: habit.googleCalendarEventId || null,
+        isDeleted: false,
+        lastUpdated: new Date(),
+      });
+      result.uploadedEvents++;
+    }
+  });
+  await eventsBatch.commit();
+
+  // Mapeia eventos que pertencem a templates (templateId != null ou data == null)
+  const templateEventsMap = new Map<string, TemplateItem[]>();
+
+  const mergedHabits: HabitItem[] = cleanLocalHabits.filter((h) => !deletedCloudIds.has(h.id));
+
+  cloudEventsMap.forEach((cloudItem, id) => {
+    // Se o evento foi deletado ou é mock de desenvolvimento, ignora
+    if (cloudItem.isDeleted === true || isMockHabit(id, cloudItem.titulo || cloudItem.title)) {
+      return;
+    }
+
+    const rawCatId = cloudItem.categoryId || canonicalOutrosId;
+    const resolvedCatId = duplicateOutrosIds.has(rawCatId) ? canonicalOutrosId : rawCatId;
+
+    // Se o evento pertencer a um template, agrupa no mapa de eventos de template
+    if (cloudItem.templateId) {
+      const tmplId = String(cloudItem.templateId);
+      if (!templateEventsMap.has(tmplId)) {
+        templateEventsMap.set(tmplId, []);
+      }
+      templateEventsMap.get(tmplId)!.push({
+        id,
+        title: cloudItem.titulo || cloudItem.title || "Atividade",
+        description: cloudItem.descricao || cloudItem.description || null,
+        timeStart: parseTimeString(
+          cloudItem.horarioInicioString || cloudItem.horarioInicio,
+          "08:00",
+        ),
+        timeEnd: parseTimeString(
+          cloudItem.horarioTerminoString || cloudItem.horarioTermino,
+          "08:30",
+        ),
+        categoryId: resolvedCatId,
+        templateId: tmplId,
+        order: cloudItem.ordem ?? 0,
+      });
+      return;
+    }
+
+    // Se não for evento de template, é um hábito diário
+    if (!localEventsMap.has(id)) {
+      const isCompleted = cloudCompletedHabitsSet.has(id);
+      mergedHabits.push({
+        id,
+        title: cloudItem.titulo || cloudItem.title || "Rotina",
+        description: cloudItem.descricao || cloudItem.description || undefined,
+        date: millisToDateString(cloudItem.data || cloudItem.date),
+        timeStart: parseTimeString(
+          cloudItem.horarioInicioString || cloudItem.horarioInicio,
+          "08:00",
+        ),
+        timeEnd: parseTimeString(
+          cloudItem.horarioTerminoString || cloudItem.horarioTermino,
+          "09:00",
+        ),
+        categoryId: resolvedCatId,
+        completed: isCompleted,
+        streak: 0,
+        googleCalendarEventId: cloudItem.googleCalendarEventId || null,
+        saveToGoogle: false,
+        templateSourceId:
+          cloudItem.templateSourceId ||
+          cloudItem.templateId ||
+          (id.startsWith('applied_') ? id.split('_')[1] : null),
+      });
+      result.downloadedEvents++;
+    }
+  });
+
+  // ========================================================
+  // 4. Sincronização de Templates (Template.kt e ItemCronograma.kt)
+  // ========================================================
+  const mergedTemplates: RoutineTemplate[] = [...localTemplates];
+  try {
+    const cloudTemplatesMap = new Map<string, any>();
+    templatesSnapshot.forEach((d: any) => cloudTemplatesMap.set(d.id, d.data()));
+
+    const localTemplatesMap = new Map<string, RoutineTemplate>(
+      localTemplates.map((t) => [t.id, t]),
+    );
+    const templatesBatch = writeBatch(firestore);
+
+    localTemplates.forEach((tmpl) => {
+      const docRef = doc(templatesColRef, tmpl.id);
+      templatesBatch.set(docRef, {
+        id: tmpl.id,
+        nome: tmpl.title,
+        descricao: tmpl.description || null,
+        lastUpdated: new Date(),
+      });
+      if (!cloudTemplatesMap.has(tmpl.id)) {
+        result.uploadedTemplates++;
+      }
+    });
+    await templatesBatch.commit();
+
+    // Sincroniza templates da nuvem para o estado local
+    cloudTemplatesMap.forEach((cloudTmpl, id) => {
+      const itemsForTemplate = templateEventsMap.get(id) || [];
+      if (!localTemplatesMap.has(id)) {
+        mergedTemplates.push({
+          id,
+          title: cloudTmpl.nome || cloudTmpl.title || "Modelo de Rotina",
+          description:
+            cloudTmpl.descricao ||
+            cloudTmpl.description ||
+            null,
+          icon: "sparkles",
+          color: "#34D399",
+          lastUpdated: cloudTmpl.lastUpdated ? String(cloudTmpl.lastUpdated) : null,
+          items: itemsForTemplate,
+        });
+        result.downloadedTemplates++;
+      } else {
+        // Se já existia localmente mas estava sem itens e na nuvem temos os eventos
+        const localIdx = mergedTemplates.findIndex((t) => t.id === id);
+        if (localIdx >= 0 && mergedTemplates[localIdx].items.length === 0 && itemsForTemplate.length > 0) {
+          mergedTemplates[localIdx] = {
+            ...mergedTemplates[localIdx],
+            items: itemsForTemplate,
+          };
+        }
+      }
+    });
+
+    // Envia os itens dos templates locais para a coleção 'eventos' no Firestore se ainda não existirem lá
+    const templateItemsBatch = writeBatch(firestore);
+    let itemsToUploadCount = 0;
+    localTemplates.forEach((tmpl) => {
+      tmpl.items.forEach((item, idx) => {
+        if (!cloudEventsMap.has(item.id)) {
+          const itemDocRef = doc(eventsColRef, item.id);
+          templateItemsBatch.set(itemDocRef, {
+            id: item.id,
+            titulo: item.title,
+            descricao: item.description || null,
+            data: null,
+            diaDaSemana: null,
+            horarioInicioString: formatTimeToIsoLocal(item.timeStart),
+            horarioTerminoString: formatTimeToIsoLocal(item.timeEnd || item.timeStart),
+            ordem: item.order ?? idx,
+            categoryId: item.categoryId || "cat-outros",
+            templateId: tmpl.id,
+            googleCalendarEventId: null,
+            isDeleted: false,
+            lastUpdated: new Date(),
+          });
+          itemsToUploadCount++;
+        }
+      });
+    });
+    if (itemsToUploadCount > 0) {
+      await templateItemsBatch.commit();
+    }
+  } catch (err) {
+    MomentusLog.sync.warn("Aviso ao sincronizar templates no Firestore:", err);
+  }
+
+  // ========================================================
+  // 5. Sincronização de Conquistas (UnlockedAchievement.kt)
+  // ========================================================
+  let mergedAchievements: Achievement[] = [...localAchievements];
+  try {
+    const cloudUnlockedSet = new Map<string, any>();
+    achSnapshot.forEach((d: any) => {
+      const data = d.data();
+      const achId = data.achievementId || d.id;
+      cloudUnlockedSet.set(achId, data);
+    });
+
+    const achBatch = writeBatch(firestore);
+    localAchievements.forEach((ach) => {
+      if (ach.unlocked && !cloudUnlockedSet.has(ach.id)) {
+        const achDocRef = doc(achievementsColRef, ach.id);
+        achBatch.set(achDocRef, {
+          achievementId: ach.id,
+          dateUnlocked: new Date(),
+        });
+        result.syncedAchievements++;
+      }
+    });
+    await achBatch.commit();
+
+    mergedAchievements = localAchievements.map((ach) => {
+      if (!ach.unlocked && cloudUnlockedSet.has(ach.id)) {
+        result.syncedAchievements++;
+        return {
+          ...ach,
+          unlocked: true,
+          progress: ach.maxProgress,
+          unlockedAt: getTodayDateString(),
+        };
+      }
+      return ach;
+    });
+  } catch (err) {
+    MomentusLog.sync.warn("Aviso ao sincronizar conquistas no Firestore:", err);
+  }
+
+  // ========================================================
+  // 6. Sincronização do Inventário de Mercado (MarketRepository.kt)
+  // ========================================================
+  let mergedMarketItems: MarketItem[] = [...localMarketItems];
+  try {
+    const cloudInventorySet = new Set<string>();
+    inventorySnapshot.forEach((d: any) => cloudInventorySet.add(d.id));
+
+    const inventoryBatch = writeBatch(firestore);
+    let newItems = 0;
+    localMarketItems.forEach((item) => {
+      if (item.isOwned && !cloudInventorySet.has(item.id)) {
+        const itemDocRef = doc(inventoryColRef, item.id);
+        inventoryBatch.set(itemDocRef, {
+          purchasedAt: Date.now(),
+        });
+        cloudInventorySet.add(item.id);
+        newItems++;
+      }
+    });
+    if (newItems > 0) {
+      await inventoryBatch.commit();
+    }
+
+    mergedMarketItems = localMarketItems.map((item) => ({
+      ...item,
+      isOwned: item.isOwned || cloudInventorySet.has(item.id),
+    }));
+  } catch (err) {
+    MomentusLog.sync.warn("Aviso ao sincronizar inventário no Firestore:", err);
+  }
+
+  // ========================================================
+  // 7. Sincronização do Documento Raiz do Usuário (UserData.kt)
+  // ========================================================
+  let mergedUserProfile: UserProfile | undefined = localUserProfile
+    ? { ...localUserProfile }
+    : undefined;
+  let cloudTermsAccepted = false;
+  let cloudTermsVersion = 0;
+
+  try {
+    const cloudUserData = userDocSnap.exists() ? userDocSnap.data() : {};
+    cloudTermsAccepted = cloudUserData?.terms_accepted === true;
+    cloudTermsVersion =
+      typeof cloudUserData?.terms_accepted_version === "number"
+        ? cloudUserData.terms_accepted_version
+        : 0;
+
+    const authUser = auth.currentUser;
+    const authDisplayName = authUser?.displayName?.trim() || null;
+    const authEmail = authUser?.email?.trim() || null;
+    const authPhotoUrl = authUser?.photoURL || null;
+
+    if (mergedUserProfile || authUser) {
+      const baseProfile: UserProfile = mergedUserProfile || {
+        name: 'Usuário',
+        email: '',
+        photoUrl: null,
+        totalPoints: 0,
+        currentStreak: 0,
+        bestStreak: 0,
+        totalCompleted: 0,
+        focusMinutesToday: 0,
+        isLoggedIn: true,
+      };
+
+      const cloudPoints =
+        typeof cloudUserData?.points === "number" ? cloudUserData.points : null;
+      const cloudStreak =
+        typeof cloudUserData?.streak === "number" ? cloudUserData.streak : 0;
+
+      // Saldo de pontos (XP): respeita o saldo oficial do Firestore (onde as compras da loja debitam pontos)
+      // Se não houver saldo na nuvem ainda, utiliza o saldo local acumulado
+      const mergedPoints = cloudPoints !== null ? cloudPoints : baseProfile.totalPoints;
+      const mergedStreak = Math.max(baseProfile.currentStreak, cloudStreak);
+
+      const effectiveTotalCompleted = cleanLocalHabits.filter((h) => h.completed).length;
+
+      const cloudDisplayName =
+        typeof cloudUserData?.display_name === "string" &&
+        cloudUserData.display_name.trim().length > 0 &&
+        cloudUserData.display_name !== "Usuário"
+          ? cloudUserData.display_name.trim()
+          : null;
+      const cloudEmail =
+        typeof cloudUserData?.email === "string" &&
+        cloudUserData.email.trim().length > 0
+          ? cloudUserData.email.trim()
+          : null;
+
+      // Prioridade máxima para a conta oficial do Google / Firebase Auth:
+      const mergedName =
+        authDisplayName ||
+        cloudDisplayName ||
+        (baseProfile.name && baseProfile.name !== "Usuário" ? baseProfile.name : null) ||
+        (authEmail ? authEmail.split("@")[0] : null) ||
+        "Usuário";
+
+      const mergedEmail = authEmail || cloudEmail || baseProfile.email || "";
+      const mergedPhotoUrl = authPhotoUrl || baseProfile.photoUrl || null;
+
+      mergedUserProfile = {
+        ...baseProfile,
+        name: mergedName,
+        email: mergedEmail,
+        photoUrl: mergedPhotoUrl,
+        isLoggedIn: true,
+        totalPoints: mergedPoints,
+        currentStreak: mergedStreak,
+        totalCompleted: effectiveTotalCompleted,
+      };
+
+      // MANTÉM RIGOROSAMENTE APENAS OS CAMPOS DE UserData.kt:
+      // display_name, email, points, streak, terms_accepted, terms_accepted_version
+      const userProfilePayload: Record<string, any> = {
+        display_name: mergedName !== "Usuário" ? mergedName : null,
+        email: mergedEmail || null,
+        points: mergedPoints,
+        streak: mergedStreak,
+        terms_accepted: cloudTermsAccepted,
+        terms_accepted_version: cloudTermsVersion,
+      };
+
+      // Limpa os campos extras legados que causam crash no app nativo Kotlin:
+      const nonNativeFields = [
+        "bestStreak",
+        "currentStreak",
+        "focusMinutesToday",
+        "lastSyncAt",
+        "totalCompleted",
+        "purchased_stickers",
+        "photo_url",
+        "clearedAt",
+      ];
+
+      for (const field of nonNativeFields) {
+        if (field in cloudUserData) {
+          userProfilePayload[field] = deleteField();
+        }
+      }
+
+      await setDoc(userDocRef, userProfilePayload, { merge: true });
+    }
+  } catch (err) {
+    MomentusLog.sync.warn("Aviso ao sincronizar perfil do usuário no Firestore:", err);
+  }
+
+  return {
+    mergedHabits,
+    mergedCategories,
+    mergedTemplates,
+    mergedAchievements,
+    mergedMarketItems,
+    mergedUserProfile,
+    cloudTermsAccepted,
+    cloudTermsVersion,
+    result,
+  };
+}
+
+/**
+ * Salva o aceite dos termos no Firestore do usuário (espelho exato do UserRepository.kt -> acceptTerms).
+ */
+export async function saveTermsAcceptance(
+  userId: string,
+  version: number = 1
+): Promise<void> {
+  if (!userId || userId === "local_user") return;
+  const userDocRef = doc(firestore, "users", userId);
+  await setDoc(
+    userDocRef,
+    {
+      terms_accepted: true,
+      terms_accepted_version: version,
+      terms_accepted_at: new Date().toISOString(),
+    },
+    { merge: true }
+  );
+}
+
+/**
+ * Consulta se o usuário aceitou os termos no Firestore (espelho do UserRepository.kt -> hasAcceptedTerms).
+ */
+export async function hasAcceptedTermsCloud(
+  userId: string
+): Promise<{ accepted: boolean; version: number }> {
+  if (!userId || userId === "local_user") return { accepted: false, version: 0 };
+  try {
+    const userDocRef = doc(firestore, "users", userId);
+    const snap = await getDoc(userDocRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      return {
+        accepted: data?.terms_accepted === true,
+        version:
+          typeof data?.terms_accepted_version === "number"
+            ? data.terms_accepted_version
+            : 0,
+      };
+    }
+  } catch (err) {
+    MomentusLog.sync.warn("Erro ao consultar termos no Firestore:", err);
+  }
+  return { accepted: false, version: 0 };
+}
+
+/**
+ * Limpa todos os dados do usuário na nuvem (Firestore), espelhando fielmente o ClearCloudDataUseCase.kt.
+ */
+export async function clearCloudData(userId: string): Promise<boolean> {
+  if (!userId || userId === "local_user") {
+    return false;
+  }
+
+  let clearedAny = false;
+  const userDocRef = doc(firestore, "users", userId);
+  const collectionsToClear = [
+    EVENTS_COLLECTION,
+    CATEGORIES_COLLECTION,
+    COMPLETED_HABITS_COLLECTION,
+    UNLOCKED_ACHIEVEMENTS_COLLECTION,
+    TEMPLATES_COLLECTION,
+    INVENTORY_COLLECTION,
+  ];
+
+  for (const collectionName of collectionsToClear) {
+    try {
+      const colRef = collection(userDocRef, collectionName);
+      const snapshot = await getDocs(colRef);
+      if (!snapshot.empty) {
+        const batch = writeBatch(firestore);
+        snapshot.forEach((docSnap) => {
+          batch.delete(docSnap.ref);
+        });
+        await batch.commit();
+      }
+      clearedAny = true;
+    } catch {
+      // Subcoleção pode não conter documentos
+    }
+  }
+
+  try {
+    const userDocSnap = await getDoc(userDocRef);
+    const cloudData = userDocSnap.exists() ? userDocSnap.data() : {};
+
+    const resetPayload: Record<string, any> = {
+      display_name: null,
+      email: null,
+      points: 0,
+      streak: 0,
+      terms_accepted: true,
+      terms_accepted_version: 1,
+    };
+
+    const extraFields = [
+      "bestStreak",
+      "currentStreak",
+      "focusMinutesToday",
+      "lastSyncAt",
+      "totalCompleted",
+      "purchased_stickers",
+      "photo_url",
+      "clearedAt",
+    ];
+
+    for (const f of extraFields) {
+      if (f in cloudData) {
+        resetPayload[f] = deleteField();
+      }
+    }
+
+    await setDoc(userDocRef, resetPayload, { merge: true });
+    clearedAny = true;
+  } catch {}
+
+  // Recria apenas a categoria padrao 'Outros' no Firestore
+  try {
+    const defaultCatDocRef = doc(collection(userDocRef, CATEGORIES_COLLECTION), "cat-outros");
+    await setDoc(defaultCatDocRef, {
+      id: "cat-outros",
+      nome: "Outros",
+      corHex: "#616161",
+      stickerId: null,
+      metaMinutosSemanal: null,
+      isDeleted: false,
+      lastUpdated: new Date(),
+    });
+  } catch {}
+
+  return clearedAny;
+}
+
+/**
+ * Escuta atualizações em tempo real no Firestore para um usuário logado.
+ * Escuta tanto a coleção de eventos (ItemCronograma) quanto a de conclusões (HabitoConcluido).
+ */
+export function listenToFirestoreSync(
+  userId: string,
+  onRemoteChange: () => void,
+): Unsubscribe {
+  const eventsColRef = collection(
+    firestore,
+    "users",
+    userId,
+    EVENTS_COLLECTION,
+  );
+  const completedHabitsColRef = collection(
+    firestore,
+    "users",
+    userId,
+    COMPLETED_HABITS_COLLECTION,
+  );
+
+  const unsubEvents = onSnapshot(
+    eventsColRef,
+    () => {
+      onRemoteChange();
+    },
+    (err) => {
+      MomentusLog.sync.warn("Erro no SnapshotListener de events do Firestore:", err);
+    },
+  );
+
+  const unsubCompleted = onSnapshot(
+    completedHabitsColRef,
+    () => {
+      onRemoteChange();
+    },
+    (err) => {
+      MomentusLog.sync.warn("Erro no SnapshotListener de completed_habits do Firestore:", err);
+    },
+  );
+
+  return () => {
+    try {
+      unsubEvents();
+      unsubCompleted();
+    } catch {}
+  };
+}
+
+/**
+ * Salva ou atualiza uma categoria e sua meta no Firestore do usuário.
+ */
+export async function saveCategoryToFirestore(
+  userId: string,
+  category: Category,
+): Promise<void> {
+  try {
+    const userDocRef = doc(firestore, "users", userId);
+    const catDocRef = doc(collection(userDocRef, CATEGORIES_COLLECTION), category.id);
+    await setDoc(catDocRef, {
+      id: category.id,
+      nome: category.name,
+      descricao: null,
+      duracaoPadraoMinutos: 60,
+      cor: category.color || "#616161",
+      tag: null,
+      stickerId: category.stickerId || null,
+      lastUpdated: new Date(),
+    });
+
+    const metaDocRef = doc(collection(userDocRef, "metas"), category.id);
+    if (category.metaMinutosSemanal != null && category.metaMinutosSemanal > 0) {
+      await setDoc(metaDocRef, {
+        categoryId: category.id,
+        metaMinutosSemanal: category.metaMinutosSemanal,
+      });
+    } else {
+      try {
+        await deleteDoc(metaDocRef);
+      } catch {}
+    }
+  } catch (err) {
+    MomentusLog.sync.warn("Erro ao salvar categoria no Firestore:", err);
+  }
+}
+
+/**
+ * Remove uma categoria e sua respectiva meta do Firestore.
+ */
+export async function deleteCategoryFromFirestore(
+  userId: string,
+  categoryId: string,
+): Promise<void> {
+  try {
+    const userDocRef = doc(firestore, "users", userId);
+    const catDocRef = doc(collection(userDocRef, CATEGORIES_COLLECTION), categoryId);
+    const metaDocRef = doc(collection(userDocRef, "metas"), categoryId);
+    await deleteDoc(catDocRef);
+    try {
+      await deleteDoc(metaDocRef);
+    } catch {}
+  } catch (err) {
+    MomentusLog.sync.warn("Erro ao excluir categoria do Firestore:", err);
+  }
+}
+
+/**
+ * Salva ou atualiza um template e seus eventos no Firestore do usuário.
+ */
+export async function saveTemplateToFirestore(
+  userId: string,
+  template: RoutineTemplate,
+): Promise<void> {
+  try {
+    const userDocRef = doc(firestore, "users", userId);
+    const templateDocRef = doc(collection(userDocRef, TEMPLATES_COLLECTION), template.id);
+    const eventsColRef = collection(userDocRef, EVENTS_COLLECTION);
+
+    const batch = writeBatch(firestore);
+
+    // 1. Salva o documento do Template (Template.kt)
+    batch.set(templateDocRef, {
+      id: template.id,
+      nome: template.title,
+      descricao: template.description || null,
+      lastUpdated: new Date(),
+    });
+
+    // 2. Salva cada item do template como evento na coleção 'eventos' (ItemCronograma.kt)
+    template.items.forEach((item, idx) => {
+      const itemDocRef = doc(eventsColRef, item.id);
+      batch.set(itemDocRef, {
+        id: item.id,
+        titulo: item.title,
+        descricao: item.description || null,
+        data: null,
+        diaDaSemana: null,
+        horarioInicioString: formatTimeToIsoLocal(item.timeStart),
+        horarioTerminoString: formatTimeToIsoLocal(item.timeEnd || item.timeStart),
+        ordem: item.order ?? idx,
+        categoryId: item.categoryId || "cat-outros",
+        templateId: template.id,
+        googleCalendarEventId: null,
+        isDeleted: false,
+        lastUpdated: new Date(),
+      });
+    });
+
+    await batch.commit();
+  } catch (error) {
+    MomentusLog.sync.warn("Erro ao salvar template no Firestore:", error);
+  }
+}
+
+/**
+ * Remove um template e seus eventos associados do Firestore do usuário.
+ */
+export async function deleteTemplateFromFirestore(
+  userId: string,
+  templateId: string,
+): Promise<void> {
+  try {
+    const userDocRef = doc(firestore, "users", userId);
+    const templateDocRef = doc(collection(userDocRef, TEMPLATES_COLLECTION), templateId);
+    const eventsColRef = collection(userDocRef, EVENTS_COLLECTION);
+
+    // Busca eventos com templateId
+    const eventsQuery = query(eventsColRef, where("templateId", "==", templateId));
+    const eventsSnapshot = await getDocs(eventsQuery);
+
+    const batch = writeBatch(firestore);
+    batch.delete(templateDocRef);
+
+    eventsSnapshot.forEach((docSnap) => {
+      batch.delete(docSnap.ref);
+    });
+
+    await batch.commit();
+  } catch (error) {
+    MomentusLog.sync.warn("Erro ao deletar template do Firestore:", error);
+  }
+}
+
+/**
+ * Salva ou atualiza pontualmente um evento (hábito) no Firestore do usuário.
+ * Espelha fielmente o modelo ItemCronograma.kt
+ */
+export async function saveHabitToFirestore(
+  userId: string,
+  habit: HabitItem,
+): Promise<void> {
+  if (!userId || userId === "local_user") return;
+  try {
+    const userDocRef = doc(firestore, "users", userId);
+    const eventDocRef = doc(collection(userDocRef, EVENTS_COLLECTION), habit.id);
+
+    await setDoc(
+      eventDocRef,
+      {
+        id: habit.id,
+        titulo: habit.title,
+        descricao: habit.description || null,
+        data: dateToMillis(habit.date),
+        diaDaSemana: null,
+        horarioInicioString: formatTimeToIsoLocal(habit.timeStart),
+        horarioTerminoString: formatTimeToIsoLocal(habit.timeEnd || habit.timeStart),
+        ordem: 0,
+        categoryId: habit.categoryId,
+        templateId: habit.templateSourceId || null,
+        templateSourceId: habit.templateSourceId || null,
+        googleCalendarEventId: habit.googleCalendarEventId || null,
+        isDeleted: false,
+        lastUpdated: new Date(),
+      },
+      { merge: true },
+    );
+  } catch (err) {
+    MomentusLog.sync.warn("Erro ao salvar hábito no Firestore:", err);
+  }
+}
+
+/**
+ * Exclui pontualmente um evento no Firestore do usuário de forma definitiva.
+ * Espelha fielmente ScheduleRepository.kt do app nativo:
+ * firestore.collection("users").document(uid).collection(EVENTS_COLLECTION).document(item.id).delete()
+ */
+export async function deleteHabitFromFirestore(
+  userId: string,
+  habitId: string,
+): Promise<void> {
+  if (!userId || userId === "local_user") return;
+  try {
+    const userDocRef = doc(firestore, "users", userId);
+    const eventDocRef = doc(collection(userDocRef, EVENTS_COLLECTION), habitId);
+    const compDocRef = doc(collection(userDocRef, COMPLETED_HABITS_COLLECTION), habitId);
+
+    const batch = writeBatch(firestore);
+    batch.delete(eventDocRef);
+    batch.delete(compDocRef);
+    await batch.commit();
+  } catch (err) {
+    MomentusLog.sync.warn("Erro ao excluir hábito do Firestore:", err);
+  }
+}
+
+/**
+ * Exclui múltiplos eventos no Firestore em lote (batch).
+ */
+export async function deleteMultipleHabitsFromFirestore(
+  userId: string,
+  habitIds: string[],
+): Promise<void> {
+  if (!userId || userId === "local_user" || habitIds.length === 0) return;
+  try {
+    const userDocRef = doc(firestore, "users", userId);
+    const eventsCol = collection(userDocRef, EVENTS_COLLECTION);
+    const compCol = collection(userDocRef, COMPLETED_HABITS_COLLECTION);
+
+    const batch = writeBatch(firestore);
+    habitIds.forEach((id) => {
+      batch.delete(doc(eventsCol, id));
+      batch.delete(doc(compCol, id));
+    });
+    await batch.commit();
+  } catch (err) {
+    MomentusLog.sync.warn("Erro ao excluir múltiplos hábitos no Firestore:", err);
+  }
+}
+
+/**
+ * Registra a compra de um item da loja no Firestore e deduz os pontos do usuário.
+ * Espelha fielmente MarketRepository.kt:
+ * 1. userRepository.incrementPoints(-(item.finalPrice))
+ * 2. firestore.collection("users").document(uid).collection("inventory").document(item.id).set(...)
+ */
+export async function purchaseMarketItemInFirestore(
+  userId: string,
+  itemId: string,
+  newPoints: number,
+): Promise<void> {
+  if (!userId || userId === "local_user") return;
+  try {
+    const userDocRef = doc(firestore, "users", userId);
+    const inventoryDocRef = doc(
+      collection(userDocRef, INVENTORY_COLLECTION),
+      itemId,
+    );
+
+    const batch = writeBatch(firestore);
+    batch.set(userDocRef, { points: newPoints }, { merge: true });
+    batch.set(inventoryDocRef, {
+      purchasedAt: Date.now(),
+    });
+    await batch.commit();
+  } catch (err) {
+    MomentusLog.sync.warn("Erro ao registrar compra no Firestore:", err);
+  }
+}
+
+/**
+ * Registra ou remove a conclusão de um hábito no Firestore (completed_habits).
+ * Mantém paridade estrita com o app nativo Kotlin (CategoryRepository.kt:411 e 453):
+ * - O doc ID é o itemCronogramaId (habitId).
+ * - O campo dataConclusao é um número (timestamp epoch em ms).
+ */
+export async function saveHabitCompletionToFirestore(
+  userId: string,
+  habitId: string,
+  completedDate: string,
+  completed: boolean,
+): Promise<void> {
+  if (!userId || userId === "local_user") return;
+  try {
+    const userDocRef = doc(firestore, "users", userId);
+    // Usa ESTRITAMENTE o habitId como ID do documento, idêntico ao Kotlin:
+    // firestore.collection("users").document(userId).collection("completed_habits").document(itemCronogramaId)
+    const compDocRef = doc(collection(userDocRef, COMPLETED_HABITS_COLLECTION), habitId);
+    if (completed) {
+      const dateMillis = dateToMillis(completedDate) || Date.now();
+      await setDoc(compDocRef, {
+        itemCronogramaId: habitId,
+        dataConclusao: dateMillis,
+      });
+    } else {
+      await deleteDoc(compDocRef);
+    }
+
+    // Exclui também eventual registro legado criado no formato antigo `${habitId}_${completedDate}`
+    const legacyDocRef = doc(collection(userDocRef, COMPLETED_HABITS_COLLECTION), `${habitId}_${completedDate}`);
+    await deleteDoc(legacyDocRef).catch(() => {});
+  } catch (err) {
+    MomentusLog.sync.warn("Erro ao atualizar conclusão no Firestore:", err);
+  }
+}
+
+/**
+ * Salva pontualmente o perfil do usuário (pontos, ofensiva, etc.) no Firestore.
+ */
+export async function saveUserProfileToFirestore(
+  userId: string,
+  profile: Partial<UserProfile>,
+): Promise<void> {
+  if (!userId || userId === "local_user") return;
+  try {
+    const userDocRef = doc(firestore, "users", userId);
+    const payload: Record<string, any> = {};
+    if (typeof profile.totalPoints === "number") payload.points = profile.totalPoints;
+    if (typeof profile.currentStreak === "number") payload.streak = profile.currentStreak;
+    if (profile.name && profile.name !== "Usuário") payload.display_name = profile.name;
+    if (profile.email) payload.email = profile.email;
+
+    if (Object.keys(payload).length > 0) {
+      await setDoc(userDocRef, payload, { merge: true });
+    }
+  } catch (err) {
+    MomentusLog.sync.warn("Erro ao salvar perfil no Firestore:", err);
+  }
+}
+
+/**
+ * Salva pontualmente uma conquista desbloqueada no Firestore e incrementa os pontos no perfil.
+ * Mantém paridade com GamificationRepository.kt (unlockAchievement):
+ * - Cria o documento em users/{uid}/unlocked_achievements/{achievementId}
+ * - Atualiza os pontos atômicos com increment(xpReward) no documento users/{uid}
+ */
+export async function saveAchievementUnlockedToFirestore(
+  userId: string,
+  achievementId: string,
+  xpReward: number,
+): Promise<void> {
+  if (!userId || userId === "local_user") return;
+  try {
+    const userDocRef = doc(firestore, "users", userId);
+    const achDocRef = doc(
+      collection(userDocRef, UNLOCKED_ACHIEVEMENTS_COLLECTION),
+      achievementId,
+    );
+
+    await setDoc(achDocRef, {
+      achievementId,
+      dateUnlocked: new Date(),
+    });
+
+    if (xpReward > 0) {
+      await setDoc(
+        userDocRef,
+        {
+          points: increment(xpReward),
+        },
+        { merge: true },
+      );
+    }
+  } catch (err) {
+    MomentusLog.sync.warn("Erro ao salvar conquista desbloqueada no Firestore:", err);
+  }
+}
+
+
