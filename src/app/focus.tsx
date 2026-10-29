@@ -12,6 +12,7 @@ import {
   AppState,
   AppStateStatus,
   Animated,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, G } from 'react-native-svg';
@@ -695,12 +696,20 @@ export default function FocusScreen() {
     ? categories.find((c) => c.id === selectedHabit.categoryId)
     : null;
 
-  const RING_SIZE = 270;
-  const STROKE_WIDTH = 10;
+  const { height: windowHeight } = useWindowDimensions();
+  const isCompact = windowHeight < 740;
+  const isUltraCompact = windowHeight < 660;
+
+  const RING_SIZE = isUltraCompact ? 190 : isCompact ? 220 : 252;
+  const STROKE_WIDTH = isUltraCompact ? 8 : 10;
   const RADIUS = (RING_SIZE - STROKE_WIDTH) / 2;
   const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
   const progressFraction = totalSeconds > 0 ? timeLeft / totalSeconds : 0;
   const strokeDashoffset = CIRCUMFERENCE * (1 - progressFraction);
+
+  const haloSize = RING_SIZE + (isUltraCompact ? 18 : 24);
+  const innerSize = RING_SIZE - (STROKE_WIDTH * 2) - (isUltraCompact ? 14 : 20);
+  const timerFontSize = isUltraCompact ? 36 : isCompact ? 42 : 48;
 
   const openCycleSettings = () => {
     setTempFocus(Number(focusDurationMinutes) || 25);
@@ -912,17 +921,16 @@ export default function FocusScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: theme.background }]}
+      edges={['top', 'left', 'right']}>
       <StatusBar
         barStyle={theme.isDark ? 'light-content' : 'dark-content'}
         backgroundColor={theme.background}
       />
-      <ScrollView
-        style={{ flex: 1, backgroundColor: theme.background }}
-        contentContainerStyle={[styles.scrollContent, { backgroundColor: theme.background }]}
-        showsVerticalScrollIndicator={false}>
-        {/* Bloco Superior: Cabeçalho com Ações Rápidas, Pílula de Contexto e Abas */}
-        <Animated.View style={{ opacity: zenAnim }}>
+      <View style={[styles.mainContainer, { backgroundColor: theme.background }]}>
+        {/* Bloco Superior: Cabeçalho com Ações Rápidas, Pílula de Contexto, Meta Diária e Abas */}
+        <Animated.View style={[styles.topBlock, { opacity: zenAnim }]}>
           {/* Header com Título Principal, Subtítulo e Ações Rápidas */}
           <View style={styles.header}>
             <View style={styles.headerTitleCol}>
@@ -1226,12 +1234,15 @@ export default function FocusScreen() {
         </Animated.View>
 
         {/* Big Circular Timer Display com Anel SVG Dinâmico & Breathing Pulse */}
-        <View style={styles.timerCenter}>
+        <View style={[styles.timerCenter, { marginVertical: isCompact ? 4 : 10 }]}>
           {/* Halo pulsante de respiração externa */}
           <Animated.View
             style={[
               styles.haloCircle,
               {
+                width: haloSize,
+                height: haloSize,
+                borderRadius: haloSize / 2,
                 borderColor: activeColor,
                 transform: [{ scale: breathingAnim }],
                 opacity: isRunning ? 0.35 : 0.12,
@@ -1243,6 +1254,9 @@ export default function FocusScreen() {
             style={[
               styles.outerCircle,
               {
+                width: RING_SIZE,
+                height: RING_SIZE,
+                borderRadius: RING_SIZE / 2,
                 borderColor: 'transparent',
                 shadowColor: activeColor,
                 backgroundColor: theme.isDark
@@ -1280,94 +1294,108 @@ export default function FocusScreen() {
             <View
               style={[
                 styles.innerCircle,
-                { backgroundColor: theme.surface, borderColor: theme.outline },
+                {
+                  width: innerSize,
+                  height: innerSize,
+                  borderRadius: innerSize / 2,
+                  backgroundColor: theme.surface,
+                  borderColor: theme.outline,
+                },
               ]}>
-              <Text style={[styles.modeStatusLabel, { color: activeColor }]}>
+              <Text style={[styles.modeStatusLabel, { color: activeColor, fontSize: isUltraCompact ? 10 : 12 }]}>
                 {mode === 'FOCUS' ? 'FOCO' : mode === 'SHORT_BREAK' ? 'PAUSA CURTA' : 'PAUSA LONGA'}
               </Text>
-              <Text style={[styles.timerDisplay, { color: theme.textPrimary }]}>
+              <Text style={[styles.timerDisplay, { color: theme.textPrimary, fontSize: timerFontSize }]}>
                 {timeFormatted}
               </Text>
             </View>
           </View>
         </View>
 
-        {/* Controls: Reset, Play/Pause Central e Pular/Avançar com Proteção Anti-Cancelamento */}
-        <View style={styles.controlsRow}>
-          <TouchableOpacity
-            onPress={requestReset}
-            style={[
-              styles.controlIconBtn,
-              { backgroundColor: theme.surface, borderColor: theme.outline },
-            ]}
-            activeOpacity={0.7}
-            accessibilityLabel="Reiniciar cronômetro">
-            <Ionicons name="refresh" size={22} color={theme.textSecondary} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={toggleTimer}
-            style={[
-              styles.playBtn,
-              { backgroundColor: isRunning ? MomentusColors.dangerRed : activeColor },
-            ]}
-            activeOpacity={0.85}
-            accessibilityLabel={isRunning ? 'Pausar foco' : 'Iniciar foco'}>
-            <Ionicons
-              name={isRunning ? 'pause' : 'play'}
-              size={28}
-              color={isRunning ? '#FFFFFF' : getContrastTextColor(activeColor)}
-            />
-            <Text
+        {/* Bloco Inferior: Controles e Resumo de Sessão */}
+        <View style={[styles.bottomBlock, isCompact && { gap: 4 }]}>
+          {/* Controls: Reset, Play/Pause Central e Pular/Avançar com Proteção Anti-Cancelamento */}
+          <View style={styles.controlsRow}>
+            <TouchableOpacity
+              onPress={requestReset}
               style={[
-                styles.playBtnText,
-                { color: isRunning ? '#FFFFFF' : getContrastTextColor(activeColor) },
-              ]}>
-              {isRunning ? 'PAUSAR' : 'INICIAR'}
-            </Text>
-          </TouchableOpacity>
+                styles.controlIconBtn,
+                { backgroundColor: theme.surface, borderColor: theme.outline },
+                isCompact && { width: 44, height: 44, borderRadius: 22 },
+              ]}
+              activeOpacity={0.7}
+              accessibilityLabel="Reiniciar cronômetro">
+              <Ionicons name="refresh" size={isCompact ? 20 : 22} color={theme.textSecondary} />
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={requestSkip}
-            style={[
-              styles.controlIconBtn,
-              { backgroundColor: theme.surface, borderColor: theme.outline },
-            ]}
-            activeOpacity={0.7}
-            accessibilityLabel="Avançar próximo ciclo">
-            <Ionicons name="play-skip-forward-outline" size={22} color={theme.textSecondary} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Sessão Stats Resumo Leve em Linha Única (Modo Zen esmaece suavemente durante o foco) */}
-        <Animated.View style={{ opacity: zenAnim }}>
-          <View style={styles.statsSummaryRow}>
-            <View style={styles.statSummaryItem}>
-              <Ionicons name="checkmark-done-circle-outline" size={15} color={activeColor} />
-              <Text style={[styles.statSummaryText, { color: theme.textSecondary }]}>
-                <Text style={{ fontWeight: '800', color: theme.textPrimary }}>{completedSessions}</Text> ciclos
+            <TouchableOpacity
+              onPress={toggleTimer}
+              style={[
+                styles.playBtn,
+                { backgroundColor: isRunning ? MomentusColors.dangerRed : activeColor },
+                isCompact && { paddingHorizontal: 28, paddingVertical: 12 },
+              ]}
+              activeOpacity={0.85}
+              accessibilityLabel={isRunning ? 'Pausar foco' : 'Iniciar foco'}>
+              <Ionicons
+                name={isRunning ? 'pause' : 'play'}
+                size={isCompact ? 24 : 28}
+                color={isRunning ? '#FFFFFF' : getContrastTextColor(activeColor)}
+              />
+              <Text
+                style={[
+                  styles.playBtnText,
+                  { color: isRunning ? '#FFFFFF' : getContrastTextColor(activeColor) },
+                  isCompact && { fontSize: 14 },
+                ]}>
+                {isRunning ? 'PAUSAR' : 'INICIAR'}
               </Text>
-            </View>
+            </TouchableOpacity>
 
-            <Text style={[styles.statSummaryDot, { color: theme.outline }]}>•</Text>
-
-            <View style={styles.statSummaryItem}>
-              <Ionicons name="time-outline" size={15} color={activeColor} />
-              <Text style={[styles.statSummaryText, { color: theme.textSecondary }]}>
-                <Text style={{ fontWeight: '800', color: theme.textPrimary }}>{userProfile.focusMinutesToday}</Text> min hoje
-              </Text>
-            </View>
-
-            <Text style={[styles.statSummaryDot, { color: theme.outline }]}>•</Text>
-
-            <View style={styles.statSummaryItem}>
-              <Ionicons name="flash-outline" size={15} color={MomentusColors.gold} />
-              <Text style={[styles.statSummaryText, { color: theme.textSecondary }]}>
-                <Text style={{ fontWeight: '800', color: theme.textPrimary }}>+{xpGained}</Text> XP
-              </Text>
-            </View>
+            <TouchableOpacity
+              onPress={requestSkip}
+              style={[
+                styles.controlIconBtn,
+                { backgroundColor: theme.surface, borderColor: theme.outline },
+                isCompact && { width: 44, height: 44, borderRadius: 22 },
+              ]}
+              activeOpacity={0.7}
+              accessibilityLabel="Avançar próximo ciclo">
+              <Ionicons name="play-skip-forward-outline" size={isCompact ? 20 : 22} color={theme.textSecondary} />
+            </TouchableOpacity>
           </View>
-        </Animated.View>
+
+          {/* Sessão Stats Resumo Leve em Linha Única (Modo Zen esmaece suavemente durante o foco) */}
+          <Animated.View style={{ opacity: zenAnim }}>
+            <View style={[styles.statsSummaryRow, isCompact && { paddingVertical: 2, marginTop: 2 }]}>
+              <View style={styles.statSummaryItem}>
+                <Ionicons name="checkmark-done-circle-outline" size={14} color={activeColor} />
+                <Text style={[styles.statSummaryText, { color: theme.textSecondary }]}>
+                  <Text style={{ fontWeight: '800', color: theme.textPrimary }}>{completedSessions}</Text> ciclos
+                </Text>
+              </View>
+
+              <Text style={[styles.statSummaryDot, { color: theme.outline }]}>•</Text>
+
+              <View style={styles.statSummaryItem}>
+                <Ionicons name="time-outline" size={14} color={activeColor} />
+                <Text style={[styles.statSummaryText, { color: theme.textSecondary }]}>
+                  <Text style={{ fontWeight: '800', color: theme.textPrimary }}>{userProfile.focusMinutesToday}</Text> min hoje
+                </Text>
+              </View>
+
+              <Text style={[styles.statSummaryDot, { color: theme.outline }]}>•</Text>
+
+              <View style={styles.statSummaryItem}>
+                <Ionicons name="flash-outline" size={14} color={MomentusColors.gold} />
+                <Text style={[styles.statSummaryText, { color: theme.textSecondary }]}>
+                  <Text style={{ fontWeight: '800', color: theme.textPrimary }}>+{xpGained}</Text> XP
+                </Text>
+              </View>
+            </View>
+          </Animated.View>
+        </View>
+      </View>
 
         {/* Modal de Seleção de Hábito do Dia */}
         <Modal
@@ -2329,8 +2357,7 @@ export default function FocusScreen() {
             </View>
           </View>
         </Modal>
-      </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
   );
 }
 
@@ -2339,21 +2366,27 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
-  scrollContent: {
-    flexGrow: 1,
+  mainContainer: {
+    flex: 1,
     paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 28,
+    paddingTop: Platform.OS === 'android' ? 4 : 8,
+    paddingBottom: Platform.OS === 'ios' ? 8 : 12,
     maxWidth: 540,
     width: '100%',
     alignSelf: 'center',
-    gap: 12,
+    justifyContent: 'space-between',
+  },
+  topBlock: {
+    gap: 6,
+  },
+  bottomBlock: {
+    gap: 6,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 4,
+    paddingTop: 2,
   },
   headerTitleCol: {
     flex: 1,
@@ -2361,14 +2394,14 @@ const styles = StyleSheet.create({
   },
   title: {
     color: MomentusColors.textPrimary,
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '900',
     letterSpacing: -0.5,
   },
   subtitle: {
     color: MomentusColors.textSecondary,
-    fontSize: 13,
-    marginTop: 2,
+    fontSize: 12,
+    marginTop: 1,
   },
   headerRightActions: {
     flexDirection: 'row',
@@ -2385,14 +2418,14 @@ const styles = StyleSheet.create({
   },
   contextPillWrapper: {
     alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 4,
+    marginTop: 6,
+    marginBottom: 2,
   },
   contextPill: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'center',
-    paddingVertical: 7,
+    paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 18,
     borderWidth: 1,
@@ -2432,11 +2465,11 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     padding: 3,
-    marginTop: 4,
+    marginTop: 2,
   },
   modeTab: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 7,
     alignItems: 'center',
     borderRadius: 11,
   },
@@ -2447,20 +2480,13 @@ const styles = StyleSheet.create({
   timerCenter: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 14,
     position: 'relative',
   },
   haloCircle: {
     position: 'absolute',
-    width: 298,
-    height: 298,
-    borderRadius: 149,
     borderWidth: 2,
   },
   outerCircle: {
-    width: 270,
-    height: 270,
-    borderRadius: 135,
     backgroundColor: 'rgba(30, 41, 59, 0.6)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -2470,9 +2496,6 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   innerCircle: {
-    width: 228,
-    height: 228,
-    borderRadius: 114,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
