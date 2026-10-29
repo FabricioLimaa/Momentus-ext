@@ -562,6 +562,186 @@ export default function FocusScreen() {
     triggerHaptic('impact');
   };
 
+  const renderSoundscapeDialog = (isDeep: boolean) => {
+    const dialogBg = isDeep ? '#0D1527' : theme.surface;
+    const dialogBorder = isDeep ? 'rgba(255, 255, 255, 0.18)' : theme.outline;
+    const itemBg = isDeep ? 'rgba(255, 255, 255, 0.06)' : theme.surfaceElevated;
+    const itemBorder = isDeep ? 'rgba(255, 255, 255, 0.12)' : theme.outline;
+    const textPrimary = isDeep ? '#FFFFFF' : theme.textPrimary;
+    const textSecondary = isDeep ? 'rgba(255, 255, 255, 0.65)' : theme.textSecondary;
+    const closeBtnBg = isDeep ? 'rgba(255, 255, 255, 0.12)' : theme.surfaceElevated;
+
+    return (
+      <View
+        style={[
+          styles.pickerDialogContainer,
+          { backgroundColor: dialogBg, borderColor: dialogBorder },
+        ]}>
+        {/* Cabeçalho */}
+        <View style={styles.pickerHeader}>
+          <View style={styles.pickerHeaderLeft}>
+            <View style={[styles.pickerHeaderIconBg, { backgroundColor: `${activeColor}20` }]}>
+              <Ionicons name="musical-notes" size={18} color={activeColor} />
+            </View>
+            <View>
+              <Text style={[styles.pickerTitle, { color: textPrimary }]}>
+                Paisagens Sonoras
+              </Text>
+              <Text style={[styles.pickerSubtitle, { color: textSecondary }]}>
+                Áudio contínuo para isolamento acústico e foco
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            onPress={() => {
+              setShowSoundscapeModal(false);
+              triggerHaptic('impact');
+            }}
+            style={[styles.pickerCloseBtn, { backgroundColor: closeBtnBg }]}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel="Fechar seletor de som">
+            <Ionicons name="close" size={18} color={textSecondary} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Lista de Opções de Som */}
+        <View style={{ gap: 8, marginTop: 4 }}>
+          {SOUNDSCAPE_OPTIONS.map((opt) => {
+            const isSelected = soundscape === opt.id;
+            return (
+              <TouchableOpacity
+                key={opt.id}
+                style={[
+                  styles.soundscapeOptionItem,
+                  {
+                    backgroundColor: isSelected ? `${activeColor}20` : itemBg,
+                    borderColor: isSelected ? activeColor : itemBorder,
+                  },
+                ]}
+                onPress={() => selectSoundscape(opt.id)}
+                activeOpacity={0.75}>
+                <View style={styles.soundscapeOptionLeft}>
+                  <View
+                    style={[
+                      styles.soundscapeIconBg,
+                      {
+                        backgroundColor: isSelected
+                          ? `${activeColor}35`
+                          : isDeep
+                          ? 'rgba(255, 255, 255, 0.1)'
+                          : `${theme.textSecondary}15`,
+                      },
+                    ]}>
+                    <Ionicons
+                      name={opt.icon as any}
+                      size={18}
+                      color={isSelected ? activeColor : textSecondary}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={[
+                        styles.soundscapeOptionTitle,
+                        { color: isSelected ? activeColor : textPrimary },
+                      ]}>
+                      {opt.label}
+                    </Text>
+                    <Text
+                      style={[styles.soundscapeOptionSubtitle, { color: textSecondary }]}>
+                      {opt.sublabel}
+                    </Text>
+                  </View>
+                </View>
+                {isSelected && (
+                  <Ionicons name="checkmark-circle" size={20} color={activeColor} />
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Seletor de Volume (visível se tiver som selecionado) */}
+        {soundscape !== 'none' && (
+          <View
+            style={[
+              styles.soundscapeVolumeCard,
+              {
+                backgroundColor: itemBg,
+                borderColor: itemBorder,
+                borderWidth: isDeep ? 1 : 0,
+              },
+            ]}>
+            <View style={styles.soundscapeVolumeHeader}>
+              <Ionicons name="volume-medium-outline" size={16} color={textSecondary} />
+              <Text style={[styles.soundscapeVolumeTitle, { color: textSecondary }]}>
+                Volume do Ambiente: {Math.round(soundscapeVolume * 100)}%
+              </Text>
+            </View>
+            <View style={styles.volumePresetsRow}>
+              {[0.25, 0.5, 0.75, 1.0].map((v) => {
+                const isActive = Math.abs(soundscapeVolume - v) < 0.05;
+                return (
+                  <TouchableOpacity
+                    key={v}
+                    style={[
+                      styles.volumePresetBtn,
+                      {
+                        backgroundColor: isActive
+                          ? activeColor
+                          : isDeep
+                          ? 'rgba(255, 255, 255, 0.08)'
+                          : theme.surface,
+                        borderColor: isActive ? activeColor : itemBorder,
+                      },
+                    ]}
+                    onPress={() => changeSoundscapeVolume(v)}
+                    activeOpacity={0.7}>
+                    <Text
+                      style={[
+                        styles.volumePresetText,
+                        {
+                          color: isActive
+                            ? getContrastTextColor(activeColor)
+                            : textSecondary,
+                          fontWeight: isActive ? '800' : '600',
+                        },
+                      ]}>
+                      {Math.round(v * 100)}%
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
+        {/* Botão de Fechar */}
+        <View style={[styles.pickerActionsRow, { marginTop: 14 }]}>
+          <TouchableOpacity
+            style={[styles.pickerSaveBtn, { backgroundColor: activeColor, flex: 1 }]}
+            onPress={() => {
+              setShowSoundscapeModal(false);
+              triggerHaptic('impact');
+            }}
+            activeOpacity={0.85}>
+            <Ionicons
+              name="checkmark-circle"
+              size={18}
+              color={getContrastTextColor(activeColor)}
+            />
+            <Text
+              style={[
+                styles.pickerSaveBtnText,
+                { color: getContrastTextColor(activeColor) },
+              ]}>
+              Concluir
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <StatusBar
@@ -1431,157 +1611,19 @@ export default function FocusScreen() {
           </View>
         </Modal>
 
-        {/* Modal de Paisagens Sonoras / Som Ambiente (Pilar 2) */}
+        {/* Modal de Paisagens Sonoras / Som Ambiente (Modo Padrão) */}
         <Modal
-          visible={showSoundscapeModal}
+          visible={showSoundscapeModal && !isDeepFocus}
           transparent
           animationType="fade"
           onRequestClose={() => setShowSoundscapeModal(false)}>
           <View style={styles.pickerOverlay}>
-            <View
-              style={[
-                styles.pickerDialogContainer,
-                { backgroundColor: theme.surface, borderColor: theme.outline },
-              ]}>
-              {/* Cabeçalho */}
-              <View style={styles.pickerHeader}>
-                <View style={styles.pickerHeaderLeft}>
-                  <View style={[styles.pickerHeaderIconBg, { backgroundColor: `${activeColor}20` }]}>
-                    <Ionicons name="musical-notes" size={18} color={activeColor} />
-                  </View>
-                  <View>
-                    <Text style={[styles.pickerTitle, { color: theme.textPrimary }]}>
-                      Paisagens Sonoras
-                    </Text>
-                    <Text style={[styles.pickerSubtitle, { color: theme.textSecondary }]}>
-                      Áudio contínuo para isolamento acústico e foco
-                    </Text>
-                  </View>
-                </View>
-                <TouchableOpacity
-                  onPress={() => setShowSoundscapeModal(false)}
-                  style={[styles.pickerCloseBtn, { backgroundColor: theme.surfaceElevated }]}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Ionicons name="close" size={18} color={theme.textSecondary} />
-                </TouchableOpacity>
-              </View>
-
-              {/* Lista de Opções de Som */}
-              <View style={{ gap: 8, marginTop: 4 }}>
-                {SOUNDSCAPE_OPTIONS.map((opt) => {
-                  const isSelected = soundscape === opt.id;
-                  return (
-                    <TouchableOpacity
-                      key={opt.id}
-                      style={[
-                        styles.soundscapeOptionItem,
-                        {
-                          backgroundColor: isSelected ? `${activeColor}15` : theme.surfaceElevated,
-                          borderColor: isSelected ? activeColor : theme.outline,
-                        },
-                      ]}
-                      onPress={() => selectSoundscape(opt.id)}
-                      activeOpacity={0.75}>
-                      <View style={styles.soundscapeOptionLeft}>
-                        <View
-                          style={[
-                            styles.soundscapeIconBg,
-                            {
-                              backgroundColor: isSelected ? `${activeColor}30` : `${theme.textSecondary}15`,
-                            },
-                          ]}>
-                          <Ionicons
-                            name={opt.icon as any}
-                            size={18}
-                            color={isSelected ? activeColor : theme.textSecondary}
-                          />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text
-                            style={[
-                              styles.soundscapeOptionTitle,
-                              { color: isSelected ? activeColor : theme.textPrimary },
-                            ]}>
-                            {opt.label}
-                          </Text>
-                          <Text
-                            style={[styles.soundscapeOptionSubtitle, { color: theme.textSecondary }]}>
-                            {opt.sublabel}
-                          </Text>
-                        </View>
-                      </View>
-                      {isSelected && (
-                        <Ionicons name="checkmark-circle" size={20} color={activeColor} />
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              {/* Seletor de Volume (visível se tiver som selecionado) */}
-              {soundscape !== 'none' && (
-                <View style={[styles.soundscapeVolumeCard, { backgroundColor: theme.surfaceElevated }]}>
-                  <View style={styles.soundscapeVolumeHeader}>
-                    <Ionicons name="volume-medium-outline" size={16} color={theme.textSecondary} />
-                    <Text style={[styles.soundscapeVolumeTitle, { color: theme.textSecondary }]}>
-                      Volume do Ambiente: {Math.round(soundscapeVolume * 100)}%
-                    </Text>
-                  </View>
-                  <View style={styles.volumePresetsRow}>
-                    {[0.25, 0.5, 0.75, 1.0].map((v) => {
-                      const isActive = Math.abs(soundscapeVolume - v) < 0.05;
-                      return (
-                        <TouchableOpacity
-                          key={v}
-                          style={[
-                            styles.volumePresetBtn,
-                            {
-                              backgroundColor: isActive ? activeColor : theme.surface,
-                              borderColor: isActive ? activeColor : theme.outline,
-                            },
-                          ]}
-                          onPress={() => changeSoundscapeVolume(v)}
-                          activeOpacity={0.7}>
-                          <Text
-                            style={[
-                              styles.volumePresetText,
-                              {
-                                color: isActive
-                                  ? getContrastTextColor(activeColor)
-                                  : theme.textSecondary,
-                                fontWeight: isActive ? '800' : '600',
-                              },
-                            ]}>
-                            {Math.round(v * 100)}%
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </View>
-              )}
-
-              {/* Botão de Fechar */}
-              <View style={[styles.pickerActionsRow, { marginTop: 14 }]}>
-                <TouchableOpacity
-                  style={[styles.pickerSaveBtn, { backgroundColor: activeColor, flex: 1 }]}
-                  onPress={() => setShowSoundscapeModal(false)}
-                  activeOpacity={0.85}>
-                  <Ionicons
-                    name="checkmark-circle"
-                    size={18}
-                    color={getContrastTextColor(activeColor)}
-                  />
-                  <Text
-                    style={[
-                      styles.pickerSaveBtnText,
-                      { color: getContrastTextColor(activeColor) },
-                    ]}>
-                    Concluir
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+            <TouchableOpacity
+              style={StyleSheet.absoluteFill}
+              activeOpacity={1}
+              onPress={() => setShowSoundscapeModal(false)}
+            />
+            {renderSoundscapeDialog(false)}
           </View>
         </Modal>
 
@@ -1590,14 +1632,24 @@ export default function FocusScreen() {
           visible={isDeepFocus}
           animationType="fade"
           statusBarTranslucent
-          onRequestClose={() => setIsDeepFocus(false)}>
+          onRequestClose={() => {
+            if (showSoundscapeModal) {
+              setShowSoundscapeModal(false);
+            } else {
+              setIsDeepFocus(false);
+            }
+          }}>
           <View style={[styles.deepFocusContainer, { backgroundColor: theme.isDark ? '#040711' : '#0B1120' }]}>
             <StatusBar hidden />
             <TouchableOpacity
               activeOpacity={1}
               style={styles.deepFocusBackdrop}
               onPress={() => {
-                setDeepControlsVisible((prev) => !prev);
+                if (showSoundscapeModal) {
+                  setShowSoundscapeModal(false);
+                } else {
+                  setDeepControlsVisible((prev) => !prev);
+                }
               }}>
               {/* Header do Deep Focus (Animado / Fade) */}
               <View
@@ -1788,6 +1840,21 @@ export default function FocusScreen() {
                 </Text>
               </View>
             </TouchableOpacity>
+
+            {/* Seletor de Paisagem Sonora no Modo Foco Profundo (Sobreposição direta sem colisão de Modais nativos) */}
+            {showSoundscapeModal && (
+              <View style={styles.deepSoundscapeOverlay}>
+                <TouchableOpacity
+                  style={StyleSheet.absoluteFill}
+                  activeOpacity={1}
+                  onPress={() => {
+                    setShowSoundscapeModal(false);
+                    triggerHaptic('impact');
+                  }}
+                />
+                {renderSoundscapeDialog(true)}
+              </View>
+            )}
           </View>
         </Modal>
       </ScrollView>
@@ -2440,5 +2507,18 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.45)',
     fontWeight: '500',
     textAlign: 'center',
+  },
+  deepSoundscapeOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.78)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    zIndex: 999,
+    elevation: 24,
   },
 });
