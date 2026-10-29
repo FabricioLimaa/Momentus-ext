@@ -53,13 +53,6 @@ export default function FocusScreen() {
   const [shortBreakMinutes, setShortBreakMinutes] = useState(5);
   const [longBreakMinutes, setLongBreakMinutes] = useState(15);
 
-  // Pilar 1: Presets Rápidos de Duração
-  const PRESET_DURATIONS: Record<FocusMode, number[]> = {
-    FOCUS: [15, 25, 45, 60],
-    SHORT_BREAK: [3, 5, 10, 15],
-    LONG_BREAK: [10, 15, 20, 30],
-  };
-
   // Pilar 4: Auto-Avanço Contínuo
   const [autoStartBreaks, setAutoStartBreaks] = useState(false);
   const [autoStartFocus, setAutoStartFocus] = useState(false);
@@ -615,44 +608,6 @@ export default function FocusScreen() {
     setPendingAbandonAction(null);
   };
 
-  // Pilar 1: Presets Rápidos de Duração em 1 Toque
-  const currentDurationMin =
-    mode === 'FOCUS'
-      ? focusDurationMinutes
-      : mode === 'SHORT_BREAK'
-      ? shortBreakMinutes
-      : longBreakMinutes;
-
-  const handleSelectPresetDuration = (durationMin: number) => {
-    if (isRunning) return;
-    triggerHaptic('selection');
-    if (mode === 'FOCUS') {
-      setFocusDurationMinutes(durationMin);
-      setAppKv('focus_durations', {
-        focus: durationMin,
-        short: shortBreakMinutes,
-        long: longBreakMinutes,
-      }).catch(() => {});
-    } else if (mode === 'SHORT_BREAK') {
-      setShortBreakMinutes(durationMin);
-      setAppKv('focus_durations', {
-        focus: focusDurationMinutes,
-        short: durationMin,
-        long: longBreakMinutes,
-      }).catch(() => {});
-    } else {
-      setLongBreakMinutes(durationMin);
-      setAppKv('focus_durations', {
-        focus: focusDurationMinutes,
-        short: shortBreakMinutes,
-        long: durationMin,
-      }).catch(() => {});
-    }
-    const secs = durationMin * 60;
-    setTimeLeft(secs);
-    setTotalSeconds(secs);
-  };
-
   // Pilar 6: Ajuste da Meta Diária de Foco
   const handleSetDailyGoal = (targetMinutes: number) => {
     setDailyFocusGoal(targetMinutes);
@@ -782,116 +737,122 @@ export default function FocusScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Lista de Opções de Som */}
-        <View style={{ gap: 8, marginTop: 4 }}>
-          {SOUNDSCAPE_OPTIONS.map((opt) => {
-            const isSelected = soundscape === opt.id;
-            return (
-              <TouchableOpacity
-                key={opt.id}
-                style={[
-                  styles.soundscapeOptionItem,
-                  {
-                    backgroundColor: isSelected ? `${activeColor}20` : itemBg,
-                    borderColor: isSelected ? activeColor : itemBorder,
-                  },
-                ]}
-                onPress={() => selectSoundscape(opt.id)}
-                activeOpacity={0.75}>
-                <View style={styles.soundscapeOptionLeft}>
-                  <View
-                    style={[
-                      styles.soundscapeIconBg,
-                      {
-                        backgroundColor: isSelected
-                          ? `${activeColor}35`
-                          : isDeep
-                          ? 'rgba(255, 255, 255, 0.1)'
-                          : `${theme.textSecondary}15`,
-                      },
-                    ]}>
-                    <Ionicons
-                      name={opt.icon as any}
-                      size={18}
-                      color={isSelected ? activeColor : textSecondary}
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text
+        {/* Lista de Opções de Som e Volume com Scroll Suave */}
+        <ScrollView
+          style={styles.pickerModalScrollView}
+          contentContainerStyle={styles.pickerModalScrollContent}
+          showsVerticalScrollIndicator={false}
+          bounces={false}>
+          <View style={{ gap: 8, marginTop: 4 }}>
+            {SOUNDSCAPE_OPTIONS.map((opt) => {
+              const isSelected = soundscape === opt.id;
+              return (
+                <TouchableOpacity
+                  key={opt.id}
+                  style={[
+                    styles.soundscapeOptionItem,
+                    {
+                      backgroundColor: isSelected ? `${activeColor}20` : itemBg,
+                      borderColor: isSelected ? activeColor : itemBorder,
+                    },
+                  ]}
+                  onPress={() => selectSoundscape(opt.id)}
+                  activeOpacity={0.75}>
+                  <View style={styles.soundscapeOptionLeft}>
+                    <View
                       style={[
-                        styles.soundscapeOptionTitle,
-                        { color: isSelected ? activeColor : textPrimary },
-                      ]}>
-                      {opt.label}
-                    </Text>
-                    <Text
-                      style={[styles.soundscapeOptionSubtitle, { color: textSecondary }]}>
-                      {opt.sublabel}
-                    </Text>
-                  </View>
-                </View>
-                {isSelected && (
-                  <Ionicons name="checkmark-circle" size={20} color={activeColor} />
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* Seletor de Volume (visível se tiver som selecionado) */}
-        {soundscape !== 'none' && (
-          <View
-            style={[
-              styles.soundscapeVolumeCard,
-              {
-                backgroundColor: itemBg,
-                borderColor: itemBorder,
-                borderWidth: isDeep ? 1 : 0,
-              },
-            ]}>
-            <View style={styles.soundscapeVolumeHeader}>
-              <Ionicons name="volume-medium-outline" size={16} color={textSecondary} />
-              <Text style={[styles.soundscapeVolumeTitle, { color: textSecondary }]}>
-                Volume do Ambiente: {Math.round(soundscapeVolume * 100)}%
-              </Text>
-            </View>
-            <View style={styles.volumePresetsRow}>
-              {[0.25, 0.5, 0.75, 1.0].map((v) => {
-                const isActive = Math.abs(soundscapeVolume - v) < 0.05;
-                return (
-                  <TouchableOpacity
-                    key={v}
-                    style={[
-                      styles.volumePresetBtn,
-                      {
-                        backgroundColor: isActive
-                          ? activeColor
-                          : isDeep
-                          ? 'rgba(255, 255, 255, 0.08)'
-                          : theme.surface,
-                        borderColor: isActive ? activeColor : itemBorder,
-                      },
-                    ]}
-                    onPress={() => changeSoundscapeVolume(v)}
-                    activeOpacity={0.7}>
-                    <Text
-                      style={[
-                        styles.volumePresetText,
+                        styles.soundscapeIconBg,
                         {
-                          color: isActive
-                            ? getContrastTextColor(activeColor)
-                            : textSecondary,
-                          fontWeight: isActive ? '800' : '600',
+                          backgroundColor: isSelected
+                            ? `${activeColor}35`
+                            : isDeep
+                            ? 'rgba(255, 255, 255, 0.1)'
+                            : `${theme.textSecondary}15`,
                         },
                       ]}>
-                      {Math.round(v * 100)}%
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+                      <Ionicons
+                        name={opt.icon as any}
+                        size={18}
+                        color={isSelected ? activeColor : textSecondary}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={[
+                          styles.soundscapeOptionTitle,
+                          { color: isSelected ? activeColor : textPrimary },
+                        ]}>
+                        {opt.label}
+                      </Text>
+                      <Text
+                        style={[styles.soundscapeOptionSubtitle, { color: textSecondary }]}>
+                        {opt.sublabel}
+                      </Text>
+                    </View>
+                  </View>
+                  {isSelected && (
+                    <Ionicons name="checkmark-circle" size={20} color={activeColor} />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
           </View>
-        )}
+
+          {/* Seletor de Volume (visível se tiver som selecionado) */}
+          {soundscape !== 'none' && (
+            <View
+              style={[
+                styles.soundscapeVolumeCard,
+                {
+                  backgroundColor: itemBg,
+                  borderColor: itemBorder,
+                  borderWidth: isDeep ? 1 : 0,
+                },
+              ]}>
+              <View style={styles.soundscapeVolumeHeader}>
+                <Ionicons name="volume-medium-outline" size={16} color={textSecondary} />
+                <Text style={[styles.soundscapeVolumeTitle, { color: textSecondary }]}>
+                  Volume do Ambiente: {Math.round(soundscapeVolume * 100)}%
+                </Text>
+              </View>
+              <View style={styles.volumePresetsRow}>
+                {[0.25, 0.5, 0.75, 1.0].map((v) => {
+                  const isActive = Math.abs(soundscapeVolume - v) < 0.05;
+                  return (
+                    <TouchableOpacity
+                      key={v}
+                      style={[
+                        styles.volumePresetBtn,
+                        {
+                          backgroundColor: isActive
+                            ? activeColor
+                            : isDeep
+                            ? 'rgba(255, 255, 255, 0.08)'
+                            : theme.surface,
+                          borderColor: isActive ? activeColor : itemBorder,
+                        },
+                      ]}
+                      onPress={() => changeSoundscapeVolume(v)}
+                      activeOpacity={0.7}>
+                      <Text
+                        style={[
+                          styles.volumePresetText,
+                          {
+                            color: isActive
+                              ? getContrastTextColor(activeColor)
+                              : textSecondary,
+                            fontWeight: isActive ? '800' : '600',
+                          },
+                        ]}>
+                        {Math.round(v * 100)}%
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+        </ScrollView>
 
         {/* Botão de Fechar */}
         <View style={[styles.pickerActionsRow, { marginTop: 14 }]}>
@@ -928,7 +889,12 @@ export default function FocusScreen() {
         barStyle={theme.isDark ? 'light-content' : 'dark-content'}
         backgroundColor={theme.background}
       />
-      <View style={[styles.mainContainer, { backgroundColor: theme.background }]}>
+      <ScrollView
+        style={[styles.scrollView, { backgroundColor: theme.background }]}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+        keyboardShouldPersistTaps="handled">
         {/* Bloco Superior: Cabeçalho com Ações Rápidas, Pílula de Contexto, Meta Diária e Abas */}
         <Animated.View style={[styles.topBlock, { opacity: zenAnim }]}>
           {/* Header com Título Principal, Subtítulo e Ações Rápidas */}
@@ -1195,42 +1161,6 @@ export default function FocusScreen() {
               );
             })}
           </View>
-
-          {/* Pilar 1: Presets Rápidos de Duração em 1 Toque (Visíveis quando pausado) */}
-          {!isRunning && (
-            <View style={styles.presetsRowContainer}>
-              <View style={styles.presetsChipsRow}>
-                {PRESET_DURATIONS[mode].map((dur) => {
-                  const isSelected = currentDurationMin === dur;
-                  return (
-                    <TouchableOpacity
-                      key={dur}
-                      style={[
-                        styles.presetChip,
-                        {
-                          backgroundColor: isSelected ? `${activeColor}22` : theme.surface,
-                          borderColor: isSelected ? activeColor : theme.outline,
-                        },
-                      ]}
-                      onPress={() => handleSelectPresetDuration(dur)}
-                      activeOpacity={0.75}
-                      accessibilityLabel={`Selecionar duração de ${dur} minutos`}>
-                      <Text
-                        style={[
-                          styles.presetChipText,
-                          {
-                            color: isSelected ? activeColor : theme.textSecondary,
-                            fontWeight: isSelected ? '800' : '600',
-                          },
-                        ]}>
-                        {dur}m{dur === 25 && mode === 'FOCUS' ? ' 🍅' : ''}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-          )}
         </Animated.View>
 
         {/* Big Circular Timer Display com Anel SVG Dinâmico & Breathing Pulse */}
@@ -1395,7 +1325,7 @@ export default function FocusScreen() {
             </View>
           </Animated.View>
         </View>
-      </View>
+      </ScrollView>
 
         {/* Modal de Seleção de Hábito do Dia */}
         <Modal
@@ -1681,7 +1611,7 @@ export default function FocusScreen() {
                   activeOpacity={0.7}>
                   <Ionicons
                     name="cafe"
-                    size={14}
+                    size={13}
                     color={
                       activeSettingsTab === 'SHORT_BREAK'
                         ? getContrastTextColor(theme.primary)
@@ -1689,6 +1619,7 @@ export default function FocusScreen() {
                     }
                   />
                   <Text
+                    numberOfLines={1}
                     style={[
                       styles.pickerTabItemText,
                       {
@@ -1699,7 +1630,7 @@ export default function FocusScreen() {
                       },
                       activeSettingsTab === 'SHORT_BREAK' && styles.pickerTabItemTextActive,
                     ]}>
-                    Pausa Curta
+                    Curta
                   </Text>
                 </TouchableOpacity>
 
@@ -1718,7 +1649,7 @@ export default function FocusScreen() {
                   activeOpacity={0.7}>
                   <Ionicons
                     name="battery-charging"
-                    size={14}
+                    size={13}
                     color={
                       activeSettingsTab === 'LONG_BREAK'
                         ? getContrastTextColor(theme.primary)
@@ -1726,6 +1657,7 @@ export default function FocusScreen() {
                     }
                   />
                   <Text
+                    numberOfLines={1}
                     style={[
                       styles.pickerTabItemText,
                       {
@@ -1736,228 +1668,235 @@ export default function FocusScreen() {
                       },
                       activeSettingsTab === 'LONG_BREAK' && styles.pickerTabItemTextActive,
                     ]}>
-                    Pausa Longa
+                    Longa
                   </Text>
                 </TouchableOpacity>
               </View>
 
-              {/* Display Digital Minimalista (Idêntico ao TimePickerModal) */}
-              <View
-                style={[
-                  styles.pickerDisplayCard,
-                  { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
-                ]}>
-                <View style={styles.pickerDigitalRow}>
-                  <View
-                    style={[
-                      styles.pickerDigitalPill,
-                      {
-                        borderColor: `${theme.primary}50`,
-                        backgroundColor: `${theme.primary}15`,
-                      },
-                    ]}>
-                    <Text style={[styles.pickerDigitalNumber, { color: theme.textPrimary }]}>
-                      {String(
-                        activeSettingsTab === 'FOCUS'
-                          ? tempFocus
-                          : activeSettingsTab === 'SHORT_BREAK'
-                            ? tempShort
-                            : tempLong
-                      ).padStart(2, '0')}
-                    </Text>
-                    <Text style={[styles.pickerDigitalTag, { color: theme.primary }]}>MINUTOS</Text>
-                  </View>
-                </View>
-
-                {/* Badge de Status / Propósito */}
-                <View style={[styles.pickerPeriodBadge, { backgroundColor: `${theme.primary}15` }]}>
-                  <Text style={[styles.pickerPeriodText, { color: theme.primary }]}>
-                    {activeSettingsTab === 'FOCUS'
-                      ? 'Produtividade Máxima 🍅'
-                      : activeSettingsTab === 'SHORT_BREAK'
-                        ? 'Descanso Rápido ☕'
-                        : 'Recuperação Profunda 🔋'}
-                  </Text>
-                </View>
-              </View>
-
-              {/* 1. Chips de Opções Selecionáveis (5 opções por ciclo) */}
-              <View style={styles.pickerQuickChipsRow}>
-                {(activeSettingsTab === 'FOCUS'
-                  ? [15, 20, 25, 30, 45]
-                  : activeSettingsTab === 'SHORT_BREAK'
-                    ? [3, 5, 8, 10, 15]
-                    : [10, 15, 20, 25, 30]
-                ).map((val) => {
-                  const isCurrent =
-                    (activeSettingsTab === 'FOCUS' && tempFocus === val) ||
-                    (activeSettingsTab === 'SHORT_BREAK' && tempShort === val) ||
-                    (activeSettingsTab === 'LONG_BREAK' && tempLong === val);
-
-                  return (
-                    <TouchableOpacity
-                      key={val}
+              {/* Corpo Rolável do Modal (Garante compatibilidade total em qualquer tamanho de tela) */}
+              <ScrollView
+                style={styles.pickerModalScrollView}
+                contentContainerStyle={styles.pickerModalScrollContent}
+                showsVerticalScrollIndicator={false}
+                bounces={false}>
+                {/* Display Digital Minimalista (Idêntico ao TimePickerModal) */}
+                <View
+                  style={[
+                    styles.pickerDisplayCard,
+                    { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
+                  ]}>
+                  <View style={styles.pickerDigitalRow}>
+                    <View
                       style={[
-                        styles.pickerQuickChip,
-                        { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
-                        isCurrent && {
-                          backgroundColor: `${theme.primary}25`,
-                          borderColor: theme.primary,
+                        styles.pickerDigitalPill,
+                        {
+                          borderColor: `${theme.primary}50`,
+                          backgroundColor: `${theme.primary}15`,
                         },
-                      ]}
-                      onPress={() => {
-                        if (activeSettingsTab === 'FOCUS') setTempFocus(val);
-                        else if (activeSettingsTab === 'SHORT_BREAK') setTempShort(val);
-                        else setTempLong(val);
-                        triggerHaptic('impact');
-                      }}
-                      activeOpacity={0.7}>
-                      <Text
-                        style={[
-                          styles.pickerQuickChipText,
-                          { color: theme.textSecondary },
-                          isCurrent && { color: theme.primary, fontWeight: '800' },
-                        ]}>
-                        {val}m
+                      ]}>
+                      <Text style={[styles.pickerDigitalNumber, { color: theme.textPrimary }]}>
+                        {String(
+                          activeSettingsTab === 'FOCUS'
+                            ? tempFocus
+                            : activeSettingsTab === 'SHORT_BREAK'
+                              ? tempShort
+                              : tempLong
+                        ).padStart(2, '0')}
                       </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+                      <Text style={[styles.pickerDigitalTag, { color: theme.primary }]}>MINUTOS</Text>
+                    </View>
+                  </View>
 
-              {/* 2. Stepper de Ajuste Fino (Abaixo das opções selecionáveis) */}
-              <View style={[styles.pickerStepperCard, { borderColor: theme.outline }]}>
-                <TouchableOpacity
-                  style={[
-                    styles.pickerStepperBtn,
-                    { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
-                  ]}
-                  onPress={() => {
-                    if (activeSettingsTab === 'FOCUS') {
-                      setTempFocus((prev) => Math.max(1, Number(prev) - 1));
-                    } else if (activeSettingsTab === 'SHORT_BREAK') {
-                      setTempShort((prev) => Math.max(1, Number(prev) - 1));
-                    } else {
-                      setTempLong((prev) => Math.max(1, Number(prev) - 1));
-                    }
-                    triggerHaptic('impact');
-                  }}
-                  activeOpacity={0.7}>
-                  <Ionicons name="remove" size={18} color={theme.textPrimary} />
-                </TouchableOpacity>
+                  {/* Badge de Status / Propósito */}
+                  <View style={[styles.pickerPeriodBadge, { backgroundColor: `${theme.primary}15` }]}>
+                    <Text style={[styles.pickerPeriodText, { color: theme.primary }]}>
+                      {activeSettingsTab === 'FOCUS'
+                        ? 'Produtividade Máxima 🍅'
+                        : activeSettingsTab === 'SHORT_BREAK'
+                          ? 'Descanso Rápido ☕'
+                          : 'Recuperação Profunda 🔋'}
+                    </Text>
+                  </View>
+                </View>
 
-                <View style={styles.pickerStepperLabelCol}>
-                  <Text style={[styles.pickerStepperLabel, { color: theme.textSecondary }]}>
-                    Ajuste fino ±1 min
+                {/* 1. Chips de Opções Selecionáveis (5 opções por ciclo) */}
+                <View style={styles.pickerQuickChipsRow}>
+                  {(activeSettingsTab === 'FOCUS'
+                    ? [15, 20, 25, 30, 45]
+                    : activeSettingsTab === 'SHORT_BREAK'
+                      ? [3, 5, 8, 10, 15]
+                      : [10, 15, 20, 25, 30]
+                  ).map((val) => {
+                    const isCurrent =
+                      (activeSettingsTab === 'FOCUS' && tempFocus === val) ||
+                      (activeSettingsTab === 'SHORT_BREAK' && tempShort === val) ||
+                      (activeSettingsTab === 'LONG_BREAK' && tempLong === val);
+
+                    return (
+                      <TouchableOpacity
+                        key={val}
+                        style={[
+                          styles.pickerQuickChip,
+                          { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
+                          isCurrent && {
+                            backgroundColor: `${theme.primary}25`,
+                            borderColor: theme.primary,
+                          },
+                        ]}
+                        onPress={() => {
+                          if (activeSettingsTab === 'FOCUS') setTempFocus(val);
+                          else if (activeSettingsTab === 'SHORT_BREAK') setTempShort(val);
+                          else setTempLong(val);
+                          triggerHaptic('impact');
+                        }}
+                        activeOpacity={0.7}>
+                        <Text
+                          style={[
+                            styles.pickerQuickChipText,
+                            { color: theme.textSecondary },
+                            isCurrent && { color: theme.primary, fontWeight: '800' },
+                          ]}>
+                          {val}m
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {/* 2. Stepper de Ajuste Fino (Abaixo das opções selecionáveis) */}
+                <View style={[styles.pickerStepperCard, { borderColor: theme.outline }]}>
+                  <TouchableOpacity
+                    style={[
+                      styles.pickerStepperBtn,
+                      { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
+                    ]}
+                    onPress={() => {
+                      if (activeSettingsTab === 'FOCUS') {
+                        setTempFocus((prev) => Math.max(1, Number(prev) - 1));
+                      } else if (activeSettingsTab === 'SHORT_BREAK') {
+                        setTempShort((prev) => Math.max(1, Number(prev) - 1));
+                      } else {
+                        setTempLong((prev) => Math.max(1, Number(prev) - 1));
+                      }
+                      triggerHaptic('impact');
+                    }}
+                    activeOpacity={0.7}>
+                    <Ionicons name="remove" size={18} color={theme.textPrimary} />
+                  </TouchableOpacity>
+
+                  <View style={styles.pickerStepperLabelCol}>
+                    <Text style={[styles.pickerStepperLabel, { color: theme.textSecondary }]}>
+                      Ajuste fino ±1 min
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.pickerStepperBtn,
+                      { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
+                    ]}
+                    onPress={() => {
+                      if (activeSettingsTab === 'FOCUS') {
+                        setTempFocus((prev) => Math.min(120, Number(prev) + 1));
+                      } else if (activeSettingsTab === 'SHORT_BREAK') {
+                        setTempShort((prev) => Math.min(30, Number(prev) + 1));
+                      } else {
+                        setTempLong((prev) => Math.min(60, Number(prev) + 1));
+                      }
+                      triggerHaptic('impact');
+                    }}
+                    activeOpacity={0.7}>
+                    <Ionicons name="add" size={18} color={theme.textPrimary} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Resumo da Sequência Pomodoro */}
+                <View style={[styles.cycleSummaryCard, { backgroundColor: theme.surfaceElevated }]}>
+                  <Ionicons name="information-circle-outline" size={14} color={theme.textSecondary} />
+                  <Text style={[styles.cycleSummaryText, { color: theme.textSecondary }]}>
+                    Ciclo: {tempFocus}m foco • {tempShort}m curta • {tempLong}m longa
                   </Text>
                 </View>
 
-                <TouchableOpacity
+                {/* Pilar 4: Avanço Automático de Sessões (Hands-Free) */}
+                <View
                   style={[
-                    styles.pickerStepperBtn,
+                    styles.autoAdvanceCard,
                     { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
-                  ]}
-                  onPress={() => {
-                    if (activeSettingsTab === 'FOCUS') {
-                      setTempFocus((prev) => Math.min(120, Number(prev) + 1));
-                    } else if (activeSettingsTab === 'SHORT_BREAK') {
-                      setTempShort((prev) => Math.min(30, Number(prev) + 1));
-                    } else {
-                      setTempLong((prev) => Math.min(60, Number(prev) + 1));
-                    }
-                    triggerHaptic('impact');
-                  }}
-                  activeOpacity={0.7}>
-                  <Ionicons name="add" size={18} color={theme.textPrimary} />
-                </TouchableOpacity>
-              </View>
+                  ]}>
+                  <View style={styles.autoAdvanceHeader}>
+                    <Ionicons name="repeat" size={15} color={theme.primary} />
+                    <Text style={[styles.autoAdvanceSectionTitle, { color: theme.textPrimary }]}>
+                      Avanço Contínuo (Hands-free)
+                    </Text>
+                  </View>
 
-              {/* Resumo da Sequência Pomodoro */}
-              <View style={[styles.cycleSummaryCard, { backgroundColor: theme.surfaceElevated }]}>
-                <Ionicons name="information-circle-outline" size={14} color={theme.textSecondary} />
-                <Text style={[styles.cycleSummaryText, { color: theme.textSecondary }]}>
-                  Ciclo: {tempFocus}m foco • {tempShort}m curta • {tempLong}m longa
-                </Text>
-              </View>
+                  <TouchableOpacity
+                    style={styles.autoAdvanceRow}
+                    onPress={() => {
+                      const next = !autoStartBreaks;
+                      setAutoStartBreaks(next);
+                      setAppKv('focus_auto_start_breaks', next).catch(() => {});
+                      triggerHaptic('impact');
+                    }}
+                    activeOpacity={0.75}>
+                    <View style={{ flex: 1, paddingRight: 8 }}>
+                      <Text style={[styles.autoAdvanceLabel, { color: theme.textPrimary }]}>
+                        Iniciar pausas automaticamente
+                      </Text>
+                      <Text style={[styles.autoAdvanceSublabel, { color: theme.textSecondary }]}>
+                        Inicia a pausa logo após o foco terminar
+                      </Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.switchTrack,
+                        { backgroundColor: autoStartBreaks ? theme.primary : theme.outline },
+                      ]}>
+                      <View
+                        style={[
+                          styles.switchThumb,
+                          { transform: [{ translateX: autoStartBreaks ? 18 : 2 }] },
+                        ]}
+                      />
+                    </View>
+                  </TouchableOpacity>
 
-              {/* Pilar 4: Avanço Automático de Sessões (Hands-Free) */}
-              <View
-                style={[
-                  styles.autoAdvanceCard,
-                  { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
-                ]}>
-                <View style={styles.autoAdvanceHeader}>
-                  <Ionicons name="repeat" size={15} color={theme.primary} />
-                  <Text style={[styles.autoAdvanceSectionTitle, { color: theme.textPrimary }]}>
-                    Avanço Contínuo (Hands-free)
-                  </Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.autoAdvanceRow,
+                      { borderTopWidth: 1, borderTopColor: theme.outline, paddingTop: 8, marginTop: 4 },
+                    ]}
+                    onPress={() => {
+                      const next = !autoStartFocus;
+                      setAutoStartFocus(next);
+                      setAppKv('focus_auto_start_focus', next).catch(() => {});
+                      triggerHaptic('impact');
+                    }}
+                    activeOpacity={0.75}>
+                    <View style={{ flex: 1, paddingRight: 8 }}>
+                      <Text style={[styles.autoAdvanceLabel, { color: theme.textPrimary }]}>
+                        Iniciar próximo foco automaticamente
+                      </Text>
+                      <Text style={[styles.autoAdvanceSublabel, { color: theme.textSecondary }]}>
+                        Retoma o foco assim que o descanso terminar
+                      </Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.switchTrack,
+                        { backgroundColor: autoStartFocus ? theme.primary : theme.outline },
+                      ]}>
+                      <View
+                        style={[
+                          styles.switchThumb,
+                          { transform: [{ translateX: autoStartFocus ? 18 : 2 }] },
+                        ]}
+                      />
+                    </View>
+                  </TouchableOpacity>
                 </View>
-
-                <TouchableOpacity
-                  style={styles.autoAdvanceRow}
-                  onPress={() => {
-                    const next = !autoStartBreaks;
-                    setAutoStartBreaks(next);
-                    setAppKv('focus_auto_start_breaks', next).catch(() => {});
-                    triggerHaptic('impact');
-                  }}
-                  activeOpacity={0.75}>
-                  <View style={{ flex: 1, paddingRight: 8 }}>
-                    <Text style={[styles.autoAdvanceLabel, { color: theme.textPrimary }]}>
-                      Iniciar pausas automaticamente
-                    </Text>
-                    <Text style={[styles.autoAdvanceSublabel, { color: theme.textSecondary }]}>
-                      Inicia a pausa logo após o foco terminar
-                    </Text>
-                  </View>
-                  <View
-                    style={[
-                      styles.switchTrack,
-                      { backgroundColor: autoStartBreaks ? theme.primary : theme.outline },
-                    ]}>
-                    <View
-                      style={[
-                        styles.switchThumb,
-                        { transform: [{ translateX: autoStartBreaks ? 18 : 2 }] },
-                      ]}
-                    />
-                  </View>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.autoAdvanceRow,
-                    { borderTopWidth: 1, borderTopColor: theme.outline, paddingTop: 8, marginTop: 4 },
-                  ]}
-                  onPress={() => {
-                    const next = !autoStartFocus;
-                    setAutoStartFocus(next);
-                    setAppKv('focus_auto_start_focus', next).catch(() => {});
-                    triggerHaptic('impact');
-                  }}
-                  activeOpacity={0.75}>
-                  <View style={{ flex: 1, paddingRight: 8 }}>
-                    <Text style={[styles.autoAdvanceLabel, { color: theme.textPrimary }]}>
-                      Iniciar próximo foco automaticamente
-                    </Text>
-                    <Text style={[styles.autoAdvanceSublabel, { color: theme.textSecondary }]}>
-                      Retoma o foco assim que o descanso terminar
-                    </Text>
-                  </View>
-                  <View
-                    style={[
-                      styles.switchTrack,
-                      { backgroundColor: autoStartFocus ? theme.primary : theme.outline },
-                    ]}>
-                    <View
-                      style={[
-                        styles.switchThumb,
-                        { transform: [{ translateX: autoStartFocus ? 18 : 2 }] },
-                      ]}
-                    />
-                  </View>
-                </TouchableOpacity>
-              </View>
+              </ScrollView>
 
               {/* Botões Inferiores */}
               <View style={styles.pickerActionsRow}>
@@ -2366,11 +2305,14 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
-  mainContainer: {
+  scrollView: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: 20,
     paddingTop: Platform.OS === 'android' ? 4 : 8,
-    paddingBottom: Platform.OS === 'ios' ? 8 : 12,
+    paddingBottom: Platform.OS === 'ios' ? 12 : 16,
     maxWidth: 540,
     width: '100%',
     alignSelf: 'center',
@@ -2636,10 +2578,13 @@ const styles = StyleSheet.create({
   },
   pickerDialogContainer: {
     width: '100%',
-    maxWidth: 380,
+    maxWidth: 390,
+    maxHeight: '88%',
     borderRadius: 28,
     borderWidth: 1.5,
-    padding: 20,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.35,
@@ -2650,7 +2595,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   pickerHeaderLeft: {
     flexDirection: 'row',
@@ -2684,15 +2629,16 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     padding: 3,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   pickerTabItem: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 8,
+    gap: 4,
+    paddingVertical: 7,
+    paddingHorizontal: 4,
     borderRadius: 10,
   },
   pickerTabItemActive: {
@@ -2703,11 +2649,17 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   pickerTabItemText: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '600',
   },
   pickerTabItemTextActive: {
     fontWeight: '800',
+  },
+  pickerModalScrollView: {
+    flexShrink: 1,
+  },
+  pickerModalScrollContent: {
+    paddingBottom: 6,
   },
   pickerDisplayCard: {
     borderRadius: 20,
@@ -2811,6 +2763,10 @@ const styles = StyleSheet.create({
   pickerActionsRow: {
     flexDirection: 'row',
     gap: 10,
+    marginTop: 12,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.06)',
   },
   pickerCancelBtn: {
     flex: 1,
@@ -3061,26 +3017,6 @@ const styles = StyleSheet.create({
   dailyGoalFill: {
     height: '100%',
     borderRadius: 3,
-  },
-  /* Pilar 1: Presets Rápidos de Duração */
-  presetsRowContainer: {
-    marginTop: 8,
-  },
-  presetsChipsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  presetChip: {
-    flex: 1,
-    paddingVertical: 7,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  presetChipText: {
-    fontSize: 12,
   },
   /* Pilar 4: Avanço Automático de Sessões */
   autoAdvanceCard: {
