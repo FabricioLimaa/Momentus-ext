@@ -78,10 +78,7 @@ export default function FocusScreen() {
 
   const handleSoundscapePress = () => {
     triggerHaptic('impact');
-    Alert.alert(
-      'Em Desenvolvimento 🎧',
-      'As paisagens sonoras e ruídos de foco estão em fase de curadoria e calibração de áudio. Este recurso estará disponível em breve!'
-    );
+    setShowSoundscapeModal(true);
   };
 
   // Modo Imersivo / Deep Focus (Tela Cheia / Relógio de Mesa)
@@ -586,23 +583,32 @@ export default function FocusScreen() {
               </Text>
             </View>
             <View style={styles.headerRightActions}>
-              {/* Botão de Paisagem Sonora (Soundscape) - Em Desenvolvimento */}
+              {/* Botão de Paisagem Sonora (Soundscape) */}
               <TouchableOpacity
                 style={[
                   styles.headerIconBtn,
                   {
-                    backgroundColor: theme.surface,
-                    borderColor: theme.outline,
-                    opacity: 0.8,
+                    backgroundColor: soundscape !== 'none' ? `${activeColor}20` : theme.surface,
+                    borderColor: soundscape !== 'none' ? activeColor : theme.outline,
                   },
                 ]}
                 onPress={handleSoundscapePress}
                 activeOpacity={0.7}
-                accessibilityLabel="Paisagens Sonoras (Em desenvolvimento)">
+                accessibilityLabel="Paisagens Sonoras e ruído ambiente">
                 <Ionicons
-                  name="musical-notes-outline"
+                  name={
+                    soundscape === 'rain'
+                      ? 'rainy-outline'
+                      : soundscape === 'waves'
+                      ? 'water-outline'
+                      : soundscape === 'brown_noise'
+                      ? 'disc-outline'
+                      : soundscape === 'white_noise'
+                      ? 'radio-outline'
+                      : 'musical-notes-outline'
+                  }
                   size={18}
-                  color={theme.textSecondary}
+                  color={soundscape !== 'none' ? activeColor : theme.textSecondary}
                 />
               </TouchableOpacity>
 
@@ -1641,17 +1647,26 @@ export default function FocusScreen() {
                     style={[
                       styles.deepIconBtn,
                       {
-                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                        borderColor: 'rgba(255, 255, 255, 0.2)',
-                        opacity: 0.8,
+                        backgroundColor: soundscape !== 'none' ? `${activeColor}30` : 'rgba(255, 255, 255, 0.1)',
+                        borderColor: soundscape !== 'none' ? activeColor : 'rgba(255, 255, 255, 0.2)',
                       },
                     ]}
                     onPress={handleSoundscapePress}
-                    accessibilityLabel="Paisagens Sonoras (Em desenvolvimento)">
+                    accessibilityLabel="Paisagens Sonoras e ruído ambiente">
                     <Ionicons
-                      name="musical-notes-outline"
+                      name={
+                        soundscape === 'rain'
+                          ? 'rainy-outline'
+                          : soundscape === 'waves'
+                          ? 'water-outline'
+                          : soundscape === 'brown_noise'
+                          ? 'disc-outline'
+                          : soundscape === 'white_noise'
+                          ? 'radio-outline'
+                          : 'musical-notes-outline'
+                      }
                       size={18}
-                      color="#FFFFFF"
+                      color={soundscape !== 'none' ? activeColor : '#FFFFFF'}
                     />
                   </TouchableOpacity>
 

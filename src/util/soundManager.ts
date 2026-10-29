@@ -48,7 +48,7 @@ export const SOUNDSCAPE_OPTIONS: SoundscapeOption[] = [
 const SOUNDSCAPE_ASSETS: Record<Exclude<SoundscapeType, 'none'>, any> = {
   brown_noise: require('@/assets/sounds/brown_noise.mp3'),
   rain: require('@/assets/sounds/rain.mp3'),
-  waves: require('@/assets/sounds/waves.mp3'),
+  waves: require('@/assets/sounds/waves.m4a'),
   white_noise: require('@/assets/sounds/white_noise.mp3'),
 };
 
@@ -60,8 +60,8 @@ class SoundManager {
   private currentSoundscape: SoundscapeType = 'none';
   private soundscapeVolume: number = 0.5;
   private enabled: boolean = true;
-  // Recurso temporariamente em desenvolvimento / calibração de áudio
-  private soundscapesFeatureEnabled: boolean = false;
+  // Recurso de paisagens sonoras ativo com áudios de alta fidelidade
+  private soundscapesFeatureEnabled: boolean = true;
   private audioModule: ExpoAudioModule | null | undefined = undefined;
   private modeConfigured: boolean = false;
 
@@ -233,6 +233,13 @@ class SoundManager {
           const htmlAudio = new (window as any).Audio(audioUrl);
           htmlAudio.loop = true;
           htmlAudio.volume = this.soundscapeVolume;
+          // Fallback de garantia de loop infinito mesmo com tamanhos de áudio variados
+          htmlAudio.onended = () => {
+            try {
+              htmlAudio.currentTime = 0;
+              htmlAudio.play().catch(() => {});
+            } catch {}
+          };
           this.soundscapeWebAudio = htmlAudio;
           if (shouldPlay) {
             htmlAudio.play().catch(() => {});
@@ -248,6 +255,28 @@ class SoundManager {
       this.soundscapePlayer = Audio.createAudioPlayer(asset);
       this.soundscapePlayer.loop = true;
       this.soundscapePlayer.volume = this.soundscapeVolume;
+
+      // Garantia de loop contínuo independente do tamanho ou duração de cada faixa de áudio
+      if (typeof this.soundscapePlayer.addListener === 'function') {
+        this.soundscapePlayer.addListener('playbackStatusUpdate', (status: any) => {
+          if (
+            status &&
+            (status.didJustFinish ||
+              (status.isLoaded &&
+                typeof status.duration === 'number' &&
+                status.duration > 0 &&
+                status.currentTime >= status.duration))
+          ) {
+            try {
+              if (typeof this.soundscapePlayer?.seekTo === 'function') {
+                this.soundscapePlayer.seekTo(0);
+              }
+              this.soundscapePlayer?.play();
+            } catch {}
+          }
+        });
+      }
+
       if (shouldPlay) {
         this.soundscapePlayer.play();
       }
