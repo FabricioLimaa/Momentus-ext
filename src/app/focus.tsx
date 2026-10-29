@@ -52,6 +52,32 @@ export default function FocusScreen() {
   const [shortBreakMinutes, setShortBreakMinutes] = useState(5);
   const [longBreakMinutes, setLongBreakMinutes] = useState(15);
 
+  // Pilar 1: Presets Rápidos de Duração
+  const PRESET_DURATIONS: Record<FocusMode, number[]> = {
+    FOCUS: [15, 25, 45, 60],
+    SHORT_BREAK: [3, 5, 10, 15],
+    LONG_BREAK: [10, 15, 20, 30],
+  };
+
+  // Pilar 4: Auto-Avanço Contínuo
+  const [autoStartBreaks, setAutoStartBreaks] = useState(false);
+  const [autoStartFocus, setAutoStartFocus] = useState(false);
+  const autoStartBreaksRef = useRef(autoStartBreaks);
+  const autoStartFocusRef = useRef(autoStartFocus);
+
+  // Pilar 5: Proteção Contra Cancelamento Acidental
+  const [showAbandonModal, setShowAbandonModal] = useState(false);
+  const [pendingAbandonAction, setPendingAbandonAction] = useState<'RESET' | 'SKIP' | null>(null);
+
+  // Pilar 6: Meta Diária de Foco Visual
+  const [dailyFocusGoal, setDailyFocusGoal] = useState(100);
+  const [showGoalModal, setShowGoalModal] = useState(false);
+
+  useEffect(() => {
+    autoStartBreaksRef.current = autoStartBreaks;
+    autoStartFocusRef.current = autoStartFocus;
+  }, [autoStartBreaks, autoStartFocus]);
+
   const [mode, setMode] = useState<FocusMode>('FOCUS');
   const [isRunning, setIsRunning] = useState(false);
   const [completedSessions, setCompletedSessions] = useState(0);
@@ -168,6 +194,24 @@ export default function FocusScreen() {
       }
     });
 
+    getAppKv<boolean>('focus_auto_start_breaks').then((saved) => {
+      if (typeof saved === 'boolean') {
+        setAutoStartBreaks(saved);
+      }
+    });
+
+    getAppKv<boolean>('focus_auto_start_focus').then((saved) => {
+      if (typeof saved === 'boolean') {
+        setAutoStartFocus(saved);
+      }
+    });
+
+    getAppKv<number>('focus_daily_goal').then((savedGoal) => {
+      if (typeof savedGoal === 'number' && savedGoal > 0) {
+        setDailyFocusGoal(savedGoal);
+      }
+    });
+
     // Restaura sessão de foco ativa caso o usuário tenha trocado de aba ou recarregado
     getAppKv<{
       endTime: number;
@@ -248,6 +292,35 @@ export default function FocusScreen() {
 
   const activeColor = getModeColor(mode);
 
+  const startTimerDirectly = useCallback(
+    (targetMode: FocusMode, targetSecs: number) => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      const targetEndTime = Date.now() + targetSecs * 1000;
+      endTimeRef.current = targetEndTime;
+      setTimeLeft(targetSecs);
+      setTotalSeconds(targetSecs);
+      setIsRunning(true);
+      soundManager.playSuccessSound();
+
+      if (targetMode === 'FOCUS' && soundscape !== 'none') {
+        soundManager.resumeSoundscape();
+      }
+
+      const linkedHabit = habits.find((h) => h.id === selectedHabitId);
+      scheduleFocusNotification(targetSecs, targetMode, linkedHabit?.title).then((id) => {
+        notificationIdRef.current = id || null;
+      });
+
+      setAppKv('active_focus_timer', {
+        endTime: targetEndTime,
+        mode: targetMode,
+        selectedHabitId,
+        totalSeconds: targetSecs,
+      }).catch(() => {});
+    },
+    [habits, selectedHabitId, soundscape]
+  );
+
   const switchMode = useCallback(
     (newMode: FocusMode) => {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -299,14 +372,27 @@ export default function FocusScreen() {
       );
 
       // Auto-switch: a cada 4 sessões -> Pausa Longa
-      if (nextSessions % 4 === 0) {
-        switchMode('LONG_BREAK');
-      } else {
-        switchMode('SHORT_BREAK');
+      const nextMode: FocusMode = nextSessions % 4 === 0 ? 'LONG_BREAK' : 'SHORT_BREAK';
+      switchMode(nextMode);
+
+      // Pilar 4: Auto-Avanço Contínuo (inicia pausa automaticamente)
+      if (autoStartBreaksRef.current) {
+        const nextSecs = getDurationForMode(nextMode);
+        setTimeout(() => {
+          startTimerDirectly(nextMode, nextSecs);
+        }, 800);
       }
     } else {
       Alert.alert('Pausa Finalizada! ⚡', 'Hora de retomar o foco total.');
       switchMode('FOCUS');
+
+      // Pilar 4: Auto-Avanço Contínuo (inicia próximo foco automaticamente)
+      if (autoStartFocusRef.current) {
+        const nextSecs = getDurationForMode('FOCUS');
+        setTimeout(() => {
+          startTimerDirectly('FOCUS', nextSecs);
+        }, 800);
+      }
     }
   }, [
     mode,
@@ -319,6 +405,8 @@ export default function FocusScreen() {
     switchMode,
     showCelebration,
     triggerHaptic,
+    getDurationForMode,
+    startTimerDirectly,
   ]);
 
   // Mantém a referência do callback sempre fresca sem reiniciar o timer
@@ -450,7 +538,7 @@ export default function FocusScreen() {
     }
   };
 
-  const resetTimer = () => {
+  const executeReset = useCallback(() => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
@@ -465,6 +553,111 @@ export default function FocusScreen() {
     setTimeLeft(secs);
     setTotalSeconds(secs);
     triggerHaptic('impact');
+  }, [getDurationForMode, mode, triggerHaptic]);
+
+  const executeSkip = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    endTimeRef.current = null;
+    setIsRunning(false);
+    soundManager.pauseSoundscape();
+    cancelFocusNotification(notificationIdRef.current);
+    notificationIdRef.current = null;
+    setAppKv('active_focus_timer', null).catch(() => {});
+
+    if (mode === 'FOCUS') {
+      const nextSessions = completedSessions + 1;
+      setCompletedSessions(nextSessions);
+      if (nextSessions % 4 === 0) {
+        switchMode('LONG_BREAK');
+      } else {
+        switchMode('SHORT_BREAK');
+      }
+    } else {
+      switchMode('FOCUS');
+    }
+    triggerHaptic('impact');
+  }, [completedSessions, mode, switchMode, triggerHaptic]);
+
+  // Pilar 5: Proteção Contra Cancelamento Acidental (>60s decorridos ou em andamento)
+  const requestReset = () => {
+    const elapsed = totalSeconds - timeLeft;
+    if (mode === 'FOCUS' && (isRunning || elapsed >= 60)) {
+      triggerHaptic('impact');
+      setPendingAbandonAction('RESET');
+      setShowAbandonModal(true);
+    } else {
+      executeReset();
+    }
+  };
+
+  const requestSkip = () => {
+    const elapsed = totalSeconds - timeLeft;
+    if (mode === 'FOCUS' && (isRunning || elapsed >= 60)) {
+      triggerHaptic('impact');
+      setPendingAbandonAction('SKIP');
+      setShowAbandonModal(true);
+    } else {
+      executeSkip();
+    }
+  };
+
+  const confirmAbandon = () => {
+    setShowAbandonModal(false);
+    if (pendingAbandonAction === 'RESET') {
+      executeReset();
+    } else if (pendingAbandonAction === 'SKIP') {
+      executeSkip();
+    }
+    setPendingAbandonAction(null);
+  };
+
+  // Pilar 1: Presets Rápidos de Duração em 1 Toque
+  const currentDurationMin =
+    mode === 'FOCUS'
+      ? focusDurationMinutes
+      : mode === 'SHORT_BREAK'
+      ? shortBreakMinutes
+      : longBreakMinutes;
+
+  const handleSelectPresetDuration = (durationMin: number) => {
+    if (isRunning) return;
+    triggerHaptic('selection');
+    if (mode === 'FOCUS') {
+      setFocusDurationMinutes(durationMin);
+      setAppKv('focus_durations', {
+        focus: durationMin,
+        short: shortBreakMinutes,
+        long: longBreakMinutes,
+      }).catch(() => {});
+    } else if (mode === 'SHORT_BREAK') {
+      setShortBreakMinutes(durationMin);
+      setAppKv('focus_durations', {
+        focus: focusDurationMinutes,
+        short: durationMin,
+        long: longBreakMinutes,
+      }).catch(() => {});
+    } else {
+      setLongBreakMinutes(durationMin);
+      setAppKv('focus_durations', {
+        focus: focusDurationMinutes,
+        short: shortBreakMinutes,
+        long: durationMin,
+      }).catch(() => {});
+    }
+    const secs = durationMin * 60;
+    setTimeLeft(secs);
+    setTotalSeconds(secs);
+  };
+
+  // Pilar 6: Ajuste da Meta Diária de Foco
+  const handleSetDailyGoal = (targetMinutes: number) => {
+    setDailyFocusGoal(targetMinutes);
+    setAppKv('focus_daily_goal', targetMinutes).catch(() => {});
+    setShowGoalModal(false);
+    triggerHaptic('success');
   };
 
   const handleSaveSettings = () => {
@@ -518,31 +711,7 @@ export default function FocusScreen() {
     triggerHaptic('impact');
   };
 
-  const skipCycle = () => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    endTimeRef.current = null;
-    setIsRunning(false);
-    soundManager.pauseSoundscape();
-    cancelFocusNotification(notificationIdRef.current);
-    notificationIdRef.current = null;
-    setAppKv('active_focus_timer', null).catch(() => {});
 
-    if (mode === 'FOCUS') {
-      const nextSessions = completedSessions + 1;
-      setCompletedSessions(nextSessions);
-      if (nextSessions % 4 === 0) {
-        switchMode('LONG_BREAK');
-      } else {
-        switchMode('SHORT_BREAK');
-      }
-    } else {
-      switchMode('FOCUS');
-    }
-    triggerHaptic('impact');
-  };
 
   const selectSoundscape = (type: SoundscapeType) => {
     setSoundscape(type);
@@ -908,6 +1077,78 @@ export default function FocusScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* Pilar 6: Meta Diária de Foco Visual (Barra de Progresso & Troféu) */}
+          <TouchableOpacity
+            style={[
+              styles.dailyGoalCard,
+              { backgroundColor: theme.surface, borderColor: theme.outline },
+            ]}
+            onPress={() => {
+              setShowGoalModal(true);
+              triggerHaptic('impact');
+            }}
+            activeOpacity={0.8}
+            accessibilityLabel="Meta diária de minutos de foco. Toque para ajustar.">
+            <View style={styles.dailyGoalHeader}>
+              <View style={styles.dailyGoalLeft}>
+                <Ionicons
+                  name={userProfile.focusMinutesToday >= dailyFocusGoal ? 'trophy' : 'flame'}
+                  size={16}
+                  color={userProfile.focusMinutesToday >= dailyFocusGoal ? MomentusColors.gold : activeColor}
+                />
+                <Text style={[styles.dailyGoalTitle, { color: theme.textPrimary }]}>
+                  Meta Diária
+                </Text>
+                <Text style={[styles.dailyGoalProgressText, { color: theme.textSecondary }]}>
+                  {userProfile.focusMinutesToday} / {dailyFocusGoal} min
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.dailyGoalBadge,
+                  {
+                    backgroundColor:
+                      userProfile.focusMinutesToday >= dailyFocusGoal
+                        ? `${MomentusColors.gold}25`
+                        : `${activeColor}15`,
+                  },
+                ]}>
+                <Text
+                  style={[
+                    styles.dailyGoalBadgeText,
+                    {
+                      color:
+                        userProfile.focusMinutesToday >= dailyFocusGoal
+                          ? MomentusColors.gold
+                          : activeColor,
+                    },
+                  ]}>
+                  {userProfile.focusMinutesToday >= dailyFocusGoal
+                    ? 'Concluída! 🏆'
+                    : `${Math.min(100, Math.round((userProfile.focusMinutesToday / dailyFocusGoal) * 100))}%`}
+                </Text>
+              </View>
+            </View>
+            <View
+              style={[
+                styles.dailyGoalTrack,
+                { backgroundColor: theme.isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)' },
+              ]}>
+              <View
+                style={[
+                  styles.dailyGoalFill,
+                  {
+                    width: `${Math.min(100, Math.round((userProfile.focusMinutesToday / dailyFocusGoal) * 100))}%`,
+                    backgroundColor:
+                      userProfile.focusMinutesToday >= dailyFocusGoal
+                        ? MomentusColors.gold
+                        : activeColor,
+                  },
+                ]}
+              />
+            </View>
+          </TouchableOpacity>
+
           {/* Tab Switcher: Foco / Pausa Curta / Pausa Longa */}
           <View
             style={[
@@ -946,6 +1187,57 @@ export default function FocusScreen() {
               );
             })}
           </View>
+
+          {/* Pilar 1: Presets Rápidos de Duração em 1 Toque (Visíveis quando pausado) */}
+          {!isRunning && (
+            <View style={styles.presetsRowContainer}>
+              <View style={styles.presetsHeaderRow}>
+                <View style={styles.presetsHeaderLeft}>
+                  <Ionicons name="flash-outline" size={13} color={activeColor} />
+                  <Text style={[styles.presetsTitle, { color: theme.textSecondary }]}>
+                    Duração Rápida ({mode === 'FOCUS' ? 'Foco' : mode === 'SHORT_BREAK' ? 'Pausa' : 'Descanso'}):
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={openCycleSettings}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                  <Text style={[styles.presetsCustomBtn, { color: activeColor }]}>
+                    Ajustar
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.presetsChipsRow}>
+                {PRESET_DURATIONS[mode].map((dur) => {
+                  const isSelected = currentDurationMin === dur;
+                  return (
+                    <TouchableOpacity
+                      key={dur}
+                      style={[
+                        styles.presetChip,
+                        {
+                          backgroundColor: isSelected ? `${activeColor}22` : theme.surface,
+                          borderColor: isSelected ? activeColor : theme.outline,
+                        },
+                      ]}
+                      onPress={() => handleSelectPresetDuration(dur)}
+                      activeOpacity={0.75}
+                      accessibilityLabel={`Selecionar duração de ${dur} minutos`}>
+                      <Text
+                        style={[
+                          styles.presetChipText,
+                          {
+                            color: isSelected ? activeColor : theme.textSecondary,
+                            fontWeight: isSelected ? '800' : '600',
+                          },
+                        ]}>
+                        {dur}m{dur === 25 && mode === 'FOCUS' ? ' 🍅' : ''}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          )}
         </Animated.View>
 
         {/* Big Circular Timer Display com Anel SVG Dinâmico & Breathing Pulse */}
@@ -1015,10 +1307,10 @@ export default function FocusScreen() {
           </View>
         </View>
 
-        {/* Controls: Reset, Play/Pause Central e Pular/Avançar */}
+        {/* Controls: Reset, Play/Pause Central e Pular/Avançar com Proteção Anti-Cancelamento */}
         <View style={styles.controlsRow}>
           <TouchableOpacity
-            onPress={resetTimer}
+            onPress={requestReset}
             style={[
               styles.controlIconBtn,
               { backgroundColor: theme.surface, borderColor: theme.outline },
@@ -1051,7 +1343,7 @@ export default function FocusScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={skipCycle}
+            onPress={requestSkip}
             style={[
               styles.controlIconBtn,
               { backgroundColor: theme.surface, borderColor: theme.outline },
@@ -1575,6 +1867,85 @@ export default function FocusScreen() {
                 </Text>
               </View>
 
+              {/* Pilar 4: Avanço Automático de Sessões (Hands-Free) */}
+              <View
+                style={[
+                  styles.autoAdvanceCard,
+                  { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
+                ]}>
+                <View style={styles.autoAdvanceHeader}>
+                  <Ionicons name="repeat" size={15} color={theme.primary} />
+                  <Text style={[styles.autoAdvanceSectionTitle, { color: theme.textPrimary }]}>
+                    Avanço Contínuo (Hands-free)
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.autoAdvanceRow}
+                  onPress={() => {
+                    const next = !autoStartBreaks;
+                    setAutoStartBreaks(next);
+                    setAppKv('focus_auto_start_breaks', next).catch(() => {});
+                    triggerHaptic('impact');
+                  }}
+                  activeOpacity={0.75}>
+                  <View style={{ flex: 1, paddingRight: 8 }}>
+                    <Text style={[styles.autoAdvanceLabel, { color: theme.textPrimary }]}>
+                      Iniciar pausas automaticamente
+                    </Text>
+                    <Text style={[styles.autoAdvanceSublabel, { color: theme.textSecondary }]}>
+                      Inicia a pausa logo após o foco terminar
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.switchTrack,
+                      { backgroundColor: autoStartBreaks ? theme.primary : theme.outline },
+                    ]}>
+                    <View
+                      style={[
+                        styles.switchThumb,
+                        { transform: [{ translateX: autoStartBreaks ? 18 : 2 }] },
+                      ]}
+                    />
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.autoAdvanceRow,
+                    { borderTopWidth: 1, borderTopColor: theme.outline, paddingTop: 8, marginTop: 4 },
+                  ]}
+                  onPress={() => {
+                    const next = !autoStartFocus;
+                    setAutoStartFocus(next);
+                    setAppKv('focus_auto_start_focus', next).catch(() => {});
+                    triggerHaptic('impact');
+                  }}
+                  activeOpacity={0.75}>
+                  <View style={{ flex: 1, paddingRight: 8 }}>
+                    <Text style={[styles.autoAdvanceLabel, { color: theme.textPrimary }]}>
+                      Iniciar próximo foco automaticamente
+                    </Text>
+                    <Text style={[styles.autoAdvanceSublabel, { color: theme.textSecondary }]}>
+                      Retoma o foco assim que o descanso terminar
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.switchTrack,
+                      { backgroundColor: autoStartFocus ? theme.primary : theme.outline },
+                    ]}>
+                    <View
+                      style={[
+                        styles.switchThumb,
+                        { transform: [{ translateX: autoStartFocus ? 18 : 2 }] },
+                      ]}
+                    />
+                  </View>
+                </TouchableOpacity>
+              </View>
+
               {/* Botões Inferiores */}
               <View style={styles.pickerActionsRow}>
                 <TouchableOpacity
@@ -1791,7 +2162,7 @@ export default function FocusScreen() {
                 ]}>
                 <View style={styles.controlsRow}>
                   <TouchableOpacity
-                    onPress={resetTimer}
+                    onPress={requestReset}
                     style={[
                       styles.controlIconBtn,
                       { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderColor: 'rgba(255, 255, 255, 0.2)' },
@@ -1824,7 +2195,7 @@ export default function FocusScreen() {
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    onPress={skipCycle}
+                    onPress={requestSkip}
                     style={[
                       styles.controlIconBtn,
                       { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderColor: 'rgba(255, 255, 255, 0.2)' },
@@ -1855,6 +2226,122 @@ export default function FocusScreen() {
                 {renderSoundscapeDialog(true)}
               </View>
             )}
+          </View>
+        </Modal>
+
+        {/* Pilar 5: Modal de Proteção Contra Cancelamento Acidental */}
+        <Modal
+          visible={showAbandonModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowAbandonModal(false)}>
+          <View style={styles.pickerOverlay}>
+            <View
+              style={[
+                styles.abandonModalContainer,
+                { backgroundColor: theme.surface, borderColor: MomentusColors.dangerRed },
+              ]}>
+              <View style={styles.abandonIconRow}>
+                <View style={styles.abandonIconBg}>
+                  <Ionicons name="warning-outline" size={26} color={MomentusColors.dangerRed} />
+                </View>
+              </View>
+              <Text style={[styles.abandonTitle, { color: theme.textPrimary }]}>
+                {pendingAbandonAction === 'RESET' ? 'Reiniciar Sessão de Foco?' : 'Pular Sessão de Foco?'}
+              </Text>
+              <Text style={[styles.abandonMessage, { color: theme.textSecondary }]}>
+                Você já completou {Math.floor((totalSeconds - timeLeft) / 60)} min desta sessão.
+                {'\n'}Se abandonar agora, o tempo decorrido e o bônus de XP acumulados serão descartados.
+              </Text>
+
+              <View style={styles.abandonActionsCol}>
+                <TouchableOpacity
+                  style={[styles.abandonKeepBtn, { backgroundColor: activeColor }]}
+                  onPress={() => setShowAbandonModal(false)}
+                  activeOpacity={0.85}>
+                  <Ionicons name="play" size={16} color={getContrastTextColor(activeColor)} />
+                  <Text style={[styles.abandonKeepBtnText, { color: getContrastTextColor(activeColor) }]}>
+                    Continuar Focado
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.abandonConfirmBtn, { borderColor: theme.outline }]}
+                  onPress={confirmAbandon}
+                  activeOpacity={0.75}>
+                  <Text style={[styles.abandonConfirmBtnText, { color: MomentusColors.dangerRed }]}>
+                    Sim, Abandonar
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Pilar 6: Modal de Escolha da Meta Diária de Foco */}
+        <Modal
+          visible={showGoalModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowGoalModal(false)}>
+          <View style={styles.pickerOverlay}>
+            <View
+              style={[
+                styles.goalModalContainer,
+                { backgroundColor: theme.surface, borderColor: theme.outline },
+              ]}>
+              <View style={styles.pickerHeader}>
+                <View style={styles.pickerHeaderLeft}>
+                  <View style={[styles.pickerHeaderIconBg, { backgroundColor: `${activeColor}20` }]}>
+                    <Ionicons name="flame" size={18} color={activeColor} />
+                  </View>
+                  <View>
+                    <Text style={[styles.pickerTitle, { color: theme.textPrimary }]}>
+                      Meta Diária de Foco
+                    </Text>
+                    <Text style={[styles.pickerSubtitle, { color: theme.textSecondary }]}>
+                      Escolha seu objetivo diário de produtividade
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setShowGoalModal(false)}
+                  style={[styles.pickerCloseBtn, { backgroundColor: theme.surfaceElevated }]}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons name="close" size={18} color={theme.textSecondary} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.goalPresetsGrid}>
+                {[30, 60, 90, 100, 120, 180].map((goalOption) => {
+                  const isSelected = dailyFocusGoal === goalOption;
+                  return (
+                    <TouchableOpacity
+                      key={goalOption}
+                      style={[
+                        styles.goalOptionCard,
+                        {
+                          backgroundColor: isSelected ? `${activeColor}20` : theme.surfaceElevated,
+                          borderColor: isSelected ? activeColor : theme.outline,
+                        },
+                      ]}
+                      onPress={() => handleSetDailyGoal(goalOption)}
+                      activeOpacity={0.75}>
+                      <Text
+                        style={[
+                          styles.goalOptionNumber,
+                          { color: isSelected ? activeColor : theme.textPrimary },
+                        ]}>
+                        {goalOption}
+                      </Text>
+                      <Text style={[styles.goalOptionUnit, { color: theme.textSecondary }]}>
+                        min / dia
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
           </View>
         </Modal>
       </ScrollView>
@@ -2520,5 +3007,236 @@ const styles = StyleSheet.create({
     padding: 20,
     zIndex: 999,
     elevation: 24,
+  },
+  /* Pilar 6: Meta Diária de Foco */
+  dailyGoalCard: {
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginTop: 4,
+    gap: 8,
+  },
+  dailyGoalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dailyGoalLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  dailyGoalTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  dailyGoalProgressText: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 2,
+  },
+  dailyGoalBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  dailyGoalBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  dailyGoalTrack: {
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  dailyGoalFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  /* Pilar 1: Presets Rápidos de Duração */
+  presetsRowContainer: {
+    marginTop: 8,
+    gap: 6,
+  },
+  presetsHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 2,
+  },
+  presetsHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  presetsTitle: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  presetsCustomBtn: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  presetsChipsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  presetChip: {
+    flex: 1,
+    paddingVertical: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  presetChipText: {
+    fontSize: 12,
+  },
+  /* Pilar 4: Avanço Automático de Sessões */
+  autoAdvanceCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 14,
+    gap: 10,
+    marginTop: 8,
+  },
+  autoAdvanceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  autoAdvanceSectionTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  autoAdvanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  autoAdvanceLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  autoAdvanceSublabel: {
+    fontSize: 11,
+    marginTop: 1,
+  },
+  switchTrack: {
+    width: 42,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    paddingHorizontal: 1,
+  },
+  switchThumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  /* Pilar 5: Modal de Proteção Contra Cancelamento Acidental */
+  abandonModalContainer: {
+    width: '100%',
+    maxWidth: 360,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    padding: 22,
+    alignItems: 'center',
+    gap: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    elevation: 16,
+  },
+  abandonIconRow: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  abandonIconBg: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  abandonTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  abandonMessage: {
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: 'center',
+  },
+  abandonActionsCol: {
+    width: '100%',
+    gap: 8,
+    marginTop: 6,
+  },
+  abandonKeepBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 14,
+  },
+  abandonKeepBtnText: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  abandonConfirmBtn: {
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  abandonConfirmBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  /* Pilar 6: Modal de Meta Diária */
+  goalModalContainer: {
+    width: '100%',
+    maxWidth: 360,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    padding: 20,
+    gap: 14,
+  },
+  goalPresetsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'space-between',
+  },
+  goalOptionCard: {
+    width: '30%',
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  goalOptionNumber: {
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  goalOptionUnit: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
   },
 });
