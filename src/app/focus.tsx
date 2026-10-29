@@ -716,7 +716,7 @@ export default function FocusScreen() {
             <View style={[styles.pickerHeaderIconBg, { backgroundColor: `${activeColor}20` }]}>
               <Ionicons name="musical-notes" size={18} color={activeColor} />
             </View>
-            <View>
+            <View style={styles.pickerHeaderTitleCol}>
               <Text style={[styles.pickerTitle, { color: textPrimary }]}>
                 Paisagens Sonoras
               </Text>
@@ -1349,7 +1349,7 @@ export default function FocusScreen() {
                     ]}>
                     <Ionicons name="flag" size={18} color={activeColor} />
                   </View>
-                  <View>
+                  <View style={styles.pickerHeaderTitleCol}>
                     <Text style={[styles.pickerTitle, { color: theme.textPrimary }]}>
                       Vincular a um Hábito
                     </Text>
@@ -1536,7 +1536,7 @@ export default function FocusScreen() {
                   <View style={[styles.pickerHeaderIconBg, { backgroundColor: `${theme.primary}20` }]}>
                     <Ionicons name="timer" size={18} color={theme.primary} />
                   </View>
-                  <View>
+                  <View style={styles.pickerHeaderTitleCol}>
                     <Text style={[styles.pickerTitle, { color: theme.textPrimary }]}>
                       Configurar Ciclos
                     </Text>
@@ -2247,7 +2247,7 @@ export default function FocusScreen() {
                   <View style={[styles.pickerHeaderIconBg, { backgroundColor: `${activeColor}20` }]}>
                     <Ionicons name="flame" size={18} color={activeColor} />
                   </View>
-                  <View>
+                  <View style={styles.pickerHeaderTitleCol}>
                     <Text style={[styles.pickerTitle, { color: theme.textPrimary }]}>
                       Meta Diária de Foco
                     </Text>
@@ -2598,9 +2598,14 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   pickerHeaderLeft: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    paddingRight: 8,
+  },
+  pickerHeaderTitleCol: {
+    flex: 1,
   },
   pickerHeaderIconBg: {
     width: 36,
@@ -3134,11 +3139,12 @@ const styles = StyleSheet.create({
   /* Pilar 6: Modal de Meta Diária */
   goalModalContainer: {
     width: '100%',
-    maxWidth: 360,
+    maxWidth: 380,
     borderRadius: 24,
     borderWidth: 1.5,
     padding: 20,
     gap: 14,
+    overflow: 'hidden',
   },
   goalPresetsGrid: {
     flexDirection: 'row',
