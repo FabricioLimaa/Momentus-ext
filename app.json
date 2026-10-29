@@ -1,0 +1,97 @@
+{
+  "expo": {
+    "name": "Momentus",
+    "slug": "momentus",
+    "version": "1.6.6",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "momentus",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0F172A",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "br.com.fabriciolima.momentus",
+      "associatedDomains": [
+        "applinks:www.momentusapp.com.br",
+        "applinks:momentusapp.com.br"
+      ],
+      "infoPlist": {
+        "NSCalendarsUsageDescription": "O Momentus precisa de acesso ao seu calendário para sincronizar suas rotinas e hábitos.",
+        "NSRemindersUsageDescription": "O Momentus precisa de permissão para lembretes de rotinas."
+      }
+    },
+    "android": {
+      "package": "br.com.fabriciolima.momentus",
+      "adaptiveIcon": {
+        "backgroundColor": "#0F172A",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "www.momentusapp.com.br",
+              "pathPrefix": "/"
+            },
+            {
+              "scheme": "https",
+              "host": "momentusapp.com.br",
+              "pathPrefix": "/"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ],
+      "permissions": [
+        "NOTIFICATIONS",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "READ_CALENDAR",
+        "WRITE_CALENDAR"
+      ],
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0F172A",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 80
+        }
+      ],
+      "expo-notifications",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "O Momentus sincroniza suas tarefas diretamente na agenda do dispositivo."
+        }
+      ],
+      "expo-sqlite",
+      "expo-sharing",
+      "@react-native-google-signin/google-signin",
+      "expo-apple-authentication",
+      "expo-audio",
+      "expo-asset",
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
