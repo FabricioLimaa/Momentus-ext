@@ -20,3 +20,4 @@ export const APP_INFO = {
 } as const;
 
 export default APP_INFO;
+
