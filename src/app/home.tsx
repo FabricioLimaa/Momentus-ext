@@ -43,6 +43,7 @@ export default function HomeScreen() {
     habits,
     categories,
     userProfile,
+    userLevel,
     theme,
     isLoaded,
     toggleHabit,
@@ -97,8 +98,7 @@ export default function HomeScreen() {
     return todayHabits;
   }, [todayHabits, filterStatus]);
 
-  // Nível de XP dinâmico do usuário e data de hoje formatada por extenso
-  const userLevel = Math.floor((userProfile.totalPoints || 0) / 100) + 1;
+  // Data de hoje formatada por extenso
   const fullDateFormatted = useMemo(() => formatFullDateDisplay(todayStr), [todayStr]);
 
   // Frase motivacional contextualizada
@@ -397,12 +397,12 @@ export default function HomeScreen() {
                     <View
                       style={[
                         styles.gamificationChip,
-                        { backgroundColor: `${theme.primary}15`, borderColor: `${theme.primary}40` },
+                        { backgroundColor: `${userLevel.rankColor}15`, borderColor: `${userLevel.rankColor}40` },
                       ]}
                     >
-                      <Ionicons name="trophy-outline" size={12} color={theme.primary} />
-                      <Text style={[styles.gamificationChipText, { color: theme.primary }]}>
-                        Nv. {userLevel} • {userProfile.totalPoints || 0} XP
+                      <Ionicons name="trophy-outline" size={12} color={userLevel.rankColor} />
+                      <Text style={[styles.gamificationChipText, { color: userLevel.rankColor }]}>
+                        Nv. {userLevel.level} • {userProfile.totalPoints || 0} XP
                       </Text>
                     </View>
 
