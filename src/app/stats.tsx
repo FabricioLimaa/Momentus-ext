@@ -248,8 +248,27 @@ export default function StatsScreen() {
     const categoryRates = categories
       .map((cat) => {
         const totalInCat = currentPeriodHabits.filter((h) => h.categoryId === cat.id).length;
-        const completedInCat = currentPeriodHabits.filter((h) => h.categoryId === cat.id && h.completed).length;
+        const completedHabitsInCat = currentPeriodHabits.filter((h) => h.categoryId === cat.id && h.completed);
+        const completedInCat = completedHabitsInCat.length;
         const rate = totalInCat > 0 ? Math.round((completedInCat / totalInCat) * 100) : 0;
+
+        let completedMins = 0;
+        completedHabitsInCat.forEach((h) => {
+          let dur = 30;
+          if (h.timeStart && h.timeEnd) {
+            const [sH, sM] = h.timeStart.split(':').map((v) => parseInt(v, 10) || 0);
+            const [eH, eM] = h.timeEnd.split(':').map((v) => parseInt(v, 10) || 0);
+            const diff = (eH * 60 + eM) - (sH * 60 + sM);
+            if (diff > 0) dur = diff;
+          }
+          completedMins += dur;
+        });
+
+        const metaMinutosSemanal = cat.metaMinutosSemanal || null;
+        const goalProgressRate = metaMinutosSemanal && metaMinutosSemanal > 0
+          ? Math.min(100, Math.round((completedMins / metaMinutosSemanal) * 100))
+          : 0;
+
         return {
           id: cat.id,
           name: cat.name,
@@ -257,6 +276,9 @@ export default function StatsScreen() {
           completed: completedInCat,
           total: totalInCat,
           rate,
+          completedMins,
+          metaMinutosSemanal,
+          goalProgressRate,
         };
       })
       .sort((a, b) => b.total - a.total);
@@ -936,6 +958,37 @@ export default function StatsScreen() {
                         ]}
                       />
                     </View>
+
+                    {/* Meta Semanal de Tempo se Configurada */}
+                    {cat.metaMinutosSemanal && cat.metaMinutosSemanal > 0 && (
+                      <View style={styles.catMetaSubRow}>
+                        <View style={styles.catMetaSubLeft}>
+                          <Ionicons
+                            name={cat.completedMins >= cat.metaMinutosSemanal ? 'trophy' : 'flag-outline'}
+                            size={12}
+                            color={cat.completedMins >= cat.metaMinutosSemanal ? MomentusColors.gold : (cat.color || theme.primary)}
+                          />
+                          <Text style={[styles.catMetaSubText, { color: theme.textSecondary }]}>
+                            Meta Semanal:{' '}
+                            <Text style={{ fontWeight: '700', color: theme.textPrimary }}>
+                              {Math.floor(cat.completedMins / 60)}h {cat.completedMins % 60}m / {Math.floor(cat.metaMinutosSemanal / 60)}h{cat.metaMinutosSemanal % 60 > 0 ? ` ${cat.metaMinutosSemanal % 60}m` : ''}
+                            </Text>
+                          </Text>
+                        </View>
+                        <Text
+                          style={[
+                            styles.catMetaSubPercent,
+                            {
+                              color:
+                                cat.completedMins >= cat.metaMinutosSemanal
+                                  ? MomentusColors.gold
+                                  : (cat.color || theme.primary),
+                            },
+                          ]}>
+                          {cat.goalProgressRate}% {cat.completedMins >= cat.metaMinutosSemanal ? '🏆' : ''}
+                        </Text>
+                      </View>
+                    )}
                   </View>
                 ))
             )}
@@ -1191,6 +1244,24 @@ const styles = StyleSheet.create({
   catProgressBarFill: {
     height: '100%',
     borderRadius: 3,
+  },
+  catMetaSubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 3,
+  },
+  catMetaSubLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  catMetaSubText: {
+    fontSize: 11,
+  },
+  catMetaSubPercent: {
+    fontSize: 11,
+    fontWeight: '800',
   },
   headerTitleRow: {
     flexDirection: 'row',

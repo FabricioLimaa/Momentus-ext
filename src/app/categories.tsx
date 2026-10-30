@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -30,7 +30,7 @@ import {
 
 export default function CategoriesScreen() {
   const insets = useSafeAreaInsets();
-  const { categories, habits, marketItems, upsertCategory, deleteCategory, theme } = useMomentus();
+  const { categories, habits, marketItems, upsertCategory, deleteCategory, theme, triggerHaptic } = useMomentus();
 
   // Estados dos Diálogos
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -62,6 +62,48 @@ export default function CategoriesScreen() {
   const ownedStickers = marketItems.filter(
     (item) => item.isOwned && item.type === 'STICKER'
   );
+
+  // Obtém datas da semana atual (Segunda-feira a Domingo)
+  const currentWeekDates = useMemo(() => {
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + diffToMonday);
+
+    const dates: string[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      dates.push(`${year}-${month}-${day}`);
+    }
+    return dates;
+  }, []);
+
+  // Calcula minutos realizados por categoria na semana atual a partir dos hábitos concluídos
+  const categoryWeeklyProgressMap = useMemo(() => {
+    const map: Record<string, number> = {};
+
+    habits.forEach((h) => {
+      if (h.completed && currentWeekDates.includes(h.date)) {
+        let durationMinutes = 30; // Duração padrão se não especificada
+        if (h.timeStart && h.timeEnd) {
+          const [sH, sM] = h.timeStart.split(':').map((v) => parseInt(v, 10) || 0);
+          const [eH, eM] = h.timeEnd.split(':').map((v) => parseInt(v, 10) || 0);
+          const diff = (eH * 60 + eM) - (sH * 60 + sM);
+          if (diff > 0) {
+            durationMinutes = diff;
+          }
+        }
+        map[h.categoryId] = (map[h.categoryId] || 0) + durationMinutes;
+      }
+    });
+
+    return map;
+  }, [habits, currentWeekDates]);
 
   const handleOpenCreateModal = () => {
     setEditingCategory(null);
@@ -278,13 +320,67 @@ export default function CategoriesScreen() {
                     </View>
                   </View>
 
-                  {metaMinutos > 0 && (
-                    <View style={styles.metaRow}>
-                      <Text style={[styles.metaText, { color: theme.textSecondary }]}>
-                        Meta Semanal: {metaH}h {metaM}m
-                      </Text>
-                    </View>
-                  )}
+                  {metaMinutos > 0 && (() => {
+                    const realizedMinutes = categoryWeeklyProgressMap[cat.id] || 0;
+                    const progressRate = Math.min(100, Math.round((realizedMinutes / metaMinutos) * 100));
+                    const isGoalReached = realizedMinutes >= metaMinutos;
+                    const realizedH = Math.floor(realizedMinutes / 60);
+                    const realizedM = realizedMinutes % 60;
+
+                    return (
+                      <View style={styles.metaRow}>
+                        <View style={styles.metaProgressHeader}>
+                          <View style={styles.metaProgressHeaderLeft}>
+                            <Ionicons
+                              name={isGoalReached ? 'trophy' : 'flag'}
+                              size={13}
+                              color={isGoalReached ? MomentusColors.gold : (cat.color || theme.primary)}
+                            />
+                            <Text style={[styles.metaProgressTitle, { color: theme.textPrimary }]}>
+                              Meta Semanal
+                            </Text>
+                            {isGoalReached && (
+                              <View
+                                style={[
+                                  styles.goalReachedBadge,
+                                  {
+                                    backgroundColor: `${MomentusColors.gold}20`,
+                                    borderColor: `${MomentusColors.gold}50`,
+                                  },
+                                ]}>
+                                <Text style={[styles.goalReachedText, { color: MomentusColors.gold }]}>
+                                  Atingida! 🏆
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text style={[styles.metaProgressStats, { color: theme.textSecondary }]}>
+                            {realizedH > 0 ? `${realizedH}h ` : ''}{realizedM}m / {metaH > 0 ? `${metaH}h ` : ''}{metaM > 0 ? `${metaM}m` : ''} •{' '}
+                            <Text
+                              style={{
+                                fontWeight: '800',
+                                color: isGoalReached ? MomentusColors.gold : (cat.color || theme.primary),
+                              }}>
+                              {progressRate}%
+                            </Text>
+                          </Text>
+                        </View>
+
+                        {/* Barra de Progresso Horizontal Neon */}
+                        <View style={[styles.metaProgressBarTrack, { backgroundColor: theme.surfaceElevated }]}>
+                          <View
+                            style={[
+                              styles.metaProgressBarFill,
+                              {
+                                width: `${progressRate}%`,
+                                backgroundColor: isGoalReached ? MomentusColors.gold : (cat.color || theme.primary),
+                              },
+                            ]}
+                          />
+                        </View>
+                      </View>
+                    );
+                  })()}
                 </View>
               );
             })}
@@ -350,45 +446,183 @@ export default function CategoriesScreen() {
                   </Text>
                 )}
 
-                {/* Seção Informativa de Meta Semanal (Bloqueada com Badge "Em breve") */}
+                {/* Seção de Meta Semanal Interativa */}
                 <View
                   style={[
                     styles.metaCardContainer,
                     {
                       backgroundColor: theme.surfaceElevated,
-                      borderColor: theme.outline,
+                      borderColor: isMetaEnabled ? `${theme.primary}60` : theme.outline,
                     },
                   ]}>
                   <View style={styles.metaCardHeader}>
                     <View style={styles.metaCardTitleRow}>
-                      <Ionicons name="time-outline" size={17} color={theme.textSecondary} />
+                      <Ionicons
+                        name="flag"
+                        size={17}
+                        color={isMetaEnabled ? theme.primary : theme.textSecondary}
+                      />
                       <Text style={[styles.metaToggleTitle, { color: theme.textPrimary }]}>
-                        Meta Semanal
+                        Meta Semanal de Tempo
                       </Text>
-                      <View
-                        style={[
-                          styles.devBadge,
-                          {
-                            backgroundColor: `${MomentusColors.gold}20`,
-                            borderColor: `${MomentusColors.gold}50`,
-                          },
-                        ]}>
-                        <Ionicons name="lock-closed" size={10} color={MomentusColors.gold} />
-                        <Text style={[styles.devBadgeText, { color: MomentusColors.gold }]}>
-                          Em breve
+                    </View>
+                    <Switch
+                      value={isMetaEnabled}
+                      onValueChange={(val) => {
+                        triggerHaptic('impact');
+                        setIsMetaEnabled(val);
+                        if (val && (parseInt(metaHours, 10) || 0) === 0 && (parseInt(metaMinutes, 10) || 0) === 0) {
+                          setMetaHours('5');
+                          setMetaMinutes('0');
+                        }
+                      }}
+                      trackColor={{ false: theme.outline, true: `${theme.primary}80` }}
+                      thumbColor={isMetaEnabled ? theme.primary : theme.isDark ? '#475569' : '#94A3B8'}
+                    />
+                  </View>
+
+                  <Text style={[styles.metaToggleSub, { color: theme.textSecondary }]}>
+                    {isMetaEnabled
+                      ? 'Defina o tempo total que você pretende dedicar a esta categoria por semana.'
+                      : 'Ative para definir uma meta de tempo de dedicação semanal e acompanhar seu progresso.'}
+                  </Text>
+
+                  {isMetaEnabled && (
+                    <View style={styles.metaInputsBlock}>
+                      {/* Presets Rápidos de Meta Semanal */}
+                      <Text style={[styles.metaMiniLabel, { color: theme.textSecondary }]}>
+                        Sugestões de Meta Semanal:
+                      </Text>
+                      <View style={styles.metaPresetsRow}>
+                        {[2, 5, 10, 15, 20].map((hoursPreset) => {
+                          const isCurrent =
+                            parseInt(metaHours, 10) === hoursPreset &&
+                            (parseInt(metaMinutes, 10) === 0 || !metaMinutes);
+                          return (
+                            <TouchableOpacity
+                              key={hoursPreset}
+                              style={[
+                                styles.metaPresetChip,
+                                {
+                                  backgroundColor: isCurrent ? `${theme.primary}25` : theme.surface,
+                                  borderColor: isCurrent ? theme.primary : theme.outline,
+                                },
+                              ]}
+                              onPress={() => {
+                                setMetaHours(hoursPreset.toString());
+                                setMetaMinutes('0');
+                                triggerHaptic('selection');
+                              }}
+                              activeOpacity={0.75}>
+                              <Text
+                                style={[
+                                  styles.metaPresetChipText,
+                                  {
+                                    color: isCurrent ? theme.primary : theme.textSecondary,
+                                    fontWeight: isCurrent ? '800' : '600',
+                                  },
+                                ]}>
+                                {hoursPreset}h/sem
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+
+                      {/* Controles de Ajuste Fino de Horas e Minutos */}
+                      <View style={styles.metaSteppersRow}>
+                        {/* Stepper de Horas */}
+                        <View
+                          style={[
+                            styles.metaStepperBox,
+                            { backgroundColor: theme.surface, borderColor: theme.outline },
+                          ]}>
+                          <Text style={[styles.metaStepperLabel, { color: theme.textSecondary }]}>
+                            Horas
+                          </Text>
+                          <View style={styles.metaStepperControls}>
+                            <TouchableOpacity
+                              style={[styles.metaStepperBtn, { borderColor: theme.outline }]}
+                              onPress={() => {
+                                const current = parseInt(metaHours, 10) || 0;
+                                setMetaHours(Math.max(0, current - 1).toString());
+                                triggerHaptic('impact');
+                              }}
+                              activeOpacity={0.7}>
+                              <Ionicons name="remove" size={16} color={theme.textPrimary} />
+                            </TouchableOpacity>
+                            <Text style={[styles.metaStepperValue, { color: theme.textPrimary }]}>
+                              {metaHours}h
+                            </Text>
+                            <TouchableOpacity
+                              style={[styles.metaStepperBtn, { borderColor: theme.outline }]}
+                              onPress={() => {
+                                const current = parseInt(metaHours, 10) || 0;
+                                setMetaHours(Math.min(80, current + 1).toString());
+                                triggerHaptic('impact');
+                              }}
+                              activeOpacity={0.7}>
+                              <Ionicons name="add" size={16} color={theme.textPrimary} />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+
+                        {/* Stepper de Minutos */}
+                        <View
+                          style={[
+                            styles.metaStepperBox,
+                            { backgroundColor: theme.surface, borderColor: theme.outline },
+                          ]}>
+                          <Text style={[styles.metaStepperLabel, { color: theme.textSecondary }]}>
+                            Minutos
+                          </Text>
+                          <View style={styles.metaStepperControls}>
+                            <TouchableOpacity
+                              style={[styles.metaStepperBtn, { borderColor: theme.outline }]}
+                              onPress={() => {
+                                const current = parseInt(metaMinutes, 10) || 0;
+                                const step = [45, 30, 15, 0];
+                                const prev = step.find((s) => s < current) ?? 0;
+                                setMetaMinutes(String(prev));
+                                triggerHaptic('impact');
+                              }}
+                              activeOpacity={0.7}>
+                              <Ionicons name="remove" size={16} color={theme.textPrimary} />
+                            </TouchableOpacity>
+                            <Text style={[styles.metaStepperValue, { color: theme.textPrimary }]}>
+                              {metaMinutes}m
+                            </Text>
+                            <TouchableOpacity
+                              style={[styles.metaStepperBtn, { borderColor: theme.outline }]}
+                              onPress={() => {
+                                const current = parseInt(metaMinutes, 10) || 0;
+                                const step = [15, 30, 45, 0];
+                                const next = step.find((s) => s > current) ?? 0;
+                                setMetaMinutes(String(next));
+                                triggerHaptic('impact');
+                              }}
+                              activeOpacity={0.7}>
+                              <Ionicons name="add" size={16} color={theme.textPrimary} />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      </View>
+
+                      {/* Resumo da Meta */}
+                      <View style={[styles.metaSummaryBadge, { backgroundColor: `${theme.primary}15` }]}>
+                        <Ionicons name="checkmark-circle-outline" size={15} color={theme.primary} />
+                        <Text style={[styles.metaSummaryText, { color: theme.primary }]}>
+                          Meta:{' '}
+                          <Text style={{ fontWeight: '800' }}>
+                            {parseInt(metaHours, 10) || 0}h {parseInt(metaMinutes, 10) || 0}m por semana
+                          </Text>
+                          {((parseInt(metaHours, 10) || 0) * 60 + (parseInt(metaMinutes, 10) || 0) > 0)
+                            ? ` (${(parseInt(metaHours, 10) || 0) * 60 + (parseInt(metaMinutes, 10) || 0)} min total)`
+                            : ''}
                         </Text>
                       </View>
                     </View>
-                    <Switch
-                      value={false}
-                      disabled={true}
-                      trackColor={{ false: theme.outline, true: theme.primary }}
-                      thumbColor={theme.isDark ? '#475569' : '#94A3B8'}
-                    />
-                  </View>
-                  <Text style={[styles.metaToggleSub, { color: theme.textSecondary }]}>
-                    O planejamento de metas semanais e relatórios analíticos por categoria serão disponibilizados em uma próxima atualização.
-                  </Text>
+                  )}
                 </View>
 
                 {/* Seletor de Cores do Google Agenda */}
@@ -691,6 +925,47 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'rgba(148, 163, 184, 0.2)',
+    gap: 8,
+  },
+  metaProgressHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  metaProgressHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  metaProgressTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  goalReachedBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  goalReachedText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  metaProgressStats: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  metaProgressBarTrack: {
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  metaProgressBarFill: {
+    height: '100%',
+    borderRadius: 3,
   },
   metaText: {
     fontSize: 13,
@@ -780,6 +1055,74 @@ const styles = StyleSheet.create({
   metaToggleSub: {
     fontSize: 12,
     lineHeight: 17,
+  },
+  metaInputsBlock: {
+    marginTop: 8,
+    gap: 12,
+  },
+  metaMiniLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  metaPresetsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  metaPresetChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  metaPresetChipText: {
+    fontSize: 12,
+  },
+  metaSteppersRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  metaStepperBox: {
+    flex: 1,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 10,
+    gap: 6,
+  },
+  metaStepperLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  metaStepperControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  metaStepperBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  metaStepperValue: {
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  metaSummaryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    marginTop: 2,
+  },
+  metaSummaryText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   colorPaletteGrid: {
     flexDirection: 'row',
