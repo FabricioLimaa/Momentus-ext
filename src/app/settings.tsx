@@ -24,6 +24,20 @@ import {
   TypographyTokens,
 } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
+import { MomentusLog } from '@/util/logger';
+
+// Helper de timeout seguro para proteger chamadas assíncronas contra travamentos de rede
+const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number, timeoutErrorMsg: string): Promise<T> => {
+  let timer: any;
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(timeoutErrorMsg));
+    }, timeoutMs);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+};
 
 // Paleta completa de personalização com o Verde Esmeralda Neon como primeira opção
 export const MOMENTUS_THEME_COLORS = [
@@ -155,27 +169,65 @@ export default function SettingsScreen() {
   };
 
   const handleSyncNow = async () => {
+    if (isSyncing) return;
     setIsSyncing(true);
-    try {
-      // 1. Sincroniza diretamente com o Cloud Firestore
-      await syncCloudAction().catch(() => {});
+    triggerHaptic('impact');
 
-      // 2. Sincroniza com a agenda nativa apenas em dispositivos móveis (evita downloads de arquivos na Web)
-      let count = 0;
-      if (Platform.OS !== 'web') {
-        count = await syncAllHabitsToCalendarAction();
-      }
+    const SYNC_TIMEOUT_MS = 8000; // 8 segundos de limite estrito para proteção de UX
+
+    try {
+      const syncTask = async () => {
+        // 1. Sincroniza diretamente com o Cloud Firestore
+        await syncCloudAction();
+
+        // 2. Sincroniza com a agenda nativa apenas em dispositivos móveis (evita downloads de arquivos na Web)
+        let count = 0;
+        if (Platform.OS !== 'web') {
+          count = await syncAllHabitsToCalendarAction();
+        }
+        return count;
+      };
+
+      const count = await withTimeout(
+        syncTask(),
+        SYNC_TIMEOUT_MS,
+        'TIMEOUT_OFFLINE'
+      );
 
       setIsSyncing(false);
+      triggerHaptic('success');
       Alert.alert(
         'Sincronização Concluída! ☁️✨',
         count > 0
-          ? `${count} rotina(s) sincronizada(s) com a agenda e salvas na nuvem!`
+          ? `${count} rotina(s) sincronizada(s) com a agenda e salvas na nuvem com sucesso!`
           : 'Seus dados e rotinas estão 100% sincronizados com a nuvem e com o banco de dados.'
       );
-    } catch {
+    } catch (error: any) {
       setIsSyncing(false);
-      Alert.alert('Aviso', 'Não foi possível completar a sincronização. Verifique sua conexão e permissões.');
+      triggerHaptic('impact');
+      MomentusLog.sync.warn('Falha na sincronização manual:', error);
+
+      const isOfflineTimeout =
+        error?.message === 'TIMEOUT_OFFLINE' ||
+        error?.code === 'unavailable' ||
+        error?.message?.toLowerCase().includes('network') ||
+        error?.message?.toLowerCase().includes('offline') ||
+        error?.message?.toLowerCase().includes('timeout') ||
+        error?.message?.toLowerCase().includes('failed to fetch');
+
+      if (isOfflineTimeout) {
+        Alert.alert(
+          'Modo Offline Seguro 📱',
+          'Não foi possível conectar aos servidores no momento.\n\nSeus dados estão 100% salvos e seguros no seu dispositivo e serão sincronizados automaticamente assim que a conexão for restabelecida.',
+          [{ text: 'Entendi', style: 'default' }]
+        );
+      } else {
+        Alert.alert(
+          'Aviso de Sincronização',
+          'A sincronização não pôde ser concluída agora. Seus dados continuam preservados localmente no aparelho.',
+          [{ text: 'OK', style: 'default' }]
+        );
+      }
     }
   };
 
@@ -453,11 +505,18 @@ export default function SettingsScreen() {
           </View>
 
           <TouchableOpacity
-            style={[styles.syncNowBtn, { backgroundColor: primaryColorHex }]}
+            style={[
+              styles.syncNowBtn,
+              { backgroundColor: primaryColorHex, opacity: isSyncing ? 0.75 : 1 },
+            ]}
             onPress={handleSyncNow}
             disabled={isSyncing}
             activeOpacity={0.85}>
-            <Ionicons name="sync" size={18} color={getContrastTextColor(primaryColorHex)} />
+            {isSyncing ? (
+              <ActivityIndicator size="small" color={getContrastTextColor(primaryColorHex)} />
+            ) : (
+              <Ionicons name="sync" size={18} color={getContrastTextColor(primaryColorHex)} />
+            )}
             <Text style={[styles.syncNowBtnText, { color: getContrastTextColor(primaryColorHex) }]}>
               {isSyncing ? 'Sincronizando...' : 'Sincronizar Agenda e Nuvem Agora'}
             </Text>
