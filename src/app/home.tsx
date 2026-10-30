@@ -283,18 +283,11 @@ export default function HomeScreen() {
                 >
                   {greeting}
                 </Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text
-                    style={[styles.userNameText, { color: theme.textPrimary }]}
-                  >
-                    {userName}
-                  </Text>
-                  <View style={[styles.honorTitleChip, { backgroundColor: `${userLevel.rankColor}18`, borderColor: `${userLevel.rankColor}40` }]}>
-                    <Text style={[styles.honorTitleChipText, { color: userLevel.rankColor }]}>
-                      {userLevel.rankName}
-                    </Text>
-                  </View>
-                </View>
+                <Text
+                  style={[styles.userNameText, { color: theme.textPrimary }]}
+                >
+                  {userName}
+                </Text>
               </View>
             </TouchableOpacity>
 
@@ -819,16 +812,6 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     color: MomentusColors.textPrimary,
     marginTop: 2,
-  },
-  honorTitleChip: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  honorTitleChipText: {
-    fontSize: 10,
-    fontWeight: '800',
   },
   notificationButton: {
     width: 44,
