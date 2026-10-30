@@ -6,6 +6,7 @@ import { Platform } from 'react-native';
 import { MomentusColors } from '@/constants/theme';
 import { MomentusProvider, useMomentus } from '@/context/MomentusContext';
 import { CURRENT_TERMS_VERSION } from '@/constants/legalContent';
+import { BiometricGuard } from '@/components/momentus/BiometricGuard';
 
 function TabsNavigator() {
   const router = useRouter();
@@ -228,7 +229,9 @@ function TabsNavigator() {
 export default function RootLayout() {
   return (
     <MomentusProvider>
-      <TabsNavigator />
+      <BiometricGuard>
+        <TabsNavigator />
+      </BiometricGuard>
     </MomentusProvider>
   );
 }

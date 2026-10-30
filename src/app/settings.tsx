@@ -13,6 +13,7 @@ import {
   Modal,
   ActivityIndicator,
 } from 'react-native';
+import * as LocalAuthentication from 'expo-local-authentication';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -77,6 +78,7 @@ export default function SettingsScreen() {
   const [soundEnabled, setSoundEnabled] = useState(settings.soundEnabled);
   const [hapticsEnabled, setHapticsEnabled] = useState(settings.hapticsEnabled);
   const [syncEnabled, setSyncEnabled] = useState(settings.googleCalendarSyncEnabled ?? true);
+  const [biometricEnabled, setBiometricEnabled] = useState(settings.biometricLock ?? false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isClearModalVisible, setIsClearModalVisible] = useState(false);
   const [isClearingAll, setIsClearingAll] = useState(false);
@@ -89,6 +91,7 @@ export default function SettingsScreen() {
     setSoundEnabled(settings.soundEnabled);
     setHapticsEnabled(settings.hapticsEnabled);
     setSyncEnabled(settings.googleCalendarSyncEnabled ?? true);
+    setBiometricEnabled(settings.biometricLock ?? false);
   }, [
     settings.themeMode,
     settings.primaryColorHex,
@@ -96,6 +99,7 @@ export default function SettingsScreen() {
     settings.soundEnabled,
     settings.hapticsEnabled,
     settings.googleCalendarSyncEnabled,
+    settings.biometricLock,
   ]);
 
   // Ações com reatividade instantânea
@@ -135,6 +139,49 @@ export default function SettingsScreen() {
     triggerHaptic('impact');
   };
 
+  const handleToggleBiometrics = async (val: boolean) => {
+    if (Platform.OS === 'web') {
+      Alert.alert(
+        'Indisponível na Web',
+        'O bloqueio biométrico (Face ID / Impressão Digital) está disponível apenas no aplicativo móvel (Android e iOS).'
+      );
+      return;
+    }
+
+    if (val) {
+      try {
+        const hasHardware = await LocalAuthentication.hasHardwareAsync();
+        const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+
+        if (!hasHardware || !isEnrolled) {
+          Alert.alert(
+            'Biometria Não Encontrada',
+            'Seu aparelho não possui biometria configurada. Cadastre uma digital ou Face ID nas configurações do dispositivo para ativar esta proteção.'
+          );
+          return;
+        }
+
+        const authResult = await LocalAuthentication.authenticateAsync({
+          promptMessage: 'Confirme sua biometria para ativar a proteção de acesso',
+          cancelLabel: 'Cancelar',
+          fallbackLabel: 'Usar Senha',
+        });
+
+        if (!authResult.success) {
+          triggerHaptic('impact');
+          return;
+        }
+      } catch {
+        Alert.alert('Erro', 'Não foi possível validar a biometria no momento.');
+        return;
+      }
+    }
+
+    setBiometricEnabled(val);
+    updateSettings({ biometricLock: val });
+    triggerHaptic('success');
+  };
+
   const handleSave = () => {
     updateSettings({
       themeMode,
@@ -143,6 +190,7 @@ export default function SettingsScreen() {
       soundEnabled,
       hapticsEnabled,
       googleCalendarSyncEnabled: syncEnabled,
+      biometricLock: biometricEnabled,
     });
     triggerHaptic('success');
     Alert.alert('Sucesso!', 'Ajustes salvos e aplicados com sucesso.');
@@ -156,6 +204,7 @@ export default function SettingsScreen() {
       soundEnabled: true,
       hapticsEnabled: true,
       googleCalendarSyncEnabled: true,
+      biometricLock: false,
     };
     setThemeMode(defaults.themeMode);
     setPrimaryColorHex(defaults.primaryColorHex);
@@ -163,6 +212,7 @@ export default function SettingsScreen() {
     setSoundEnabled(defaults.soundEnabled);
     setHapticsEnabled(defaults.hapticsEnabled);
     setSyncEnabled(defaults.googleCalendarSyncEnabled);
+    setBiometricEnabled(false);
     updateSettings(defaults);
     triggerHaptic('impact');
     Alert.alert('Padrões Restaurados', 'As preferências visuais e de experiência foram restauradas aos padrões originais.');
@@ -459,6 +509,27 @@ export default function SettingsScreen() {
                   onValueChange={handleToggleSync}
                   trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: `${primaryColorHex}66` }}
                   thumbColor={syncEnabled ? primaryColorHex : '#94A3B8'}
+                  {...({ activeThumbColor: primaryColorHex } as any)}
+                />
+              </View>
+
+              <View style={[styles.divider, { backgroundColor: theme.outline }]} />
+
+              <View style={styles.switchRow}>
+                <View style={styles.switchCol}>
+                  <View style={styles.securityTitleRow}>
+                    <Ionicons name="finger-print" size={16} color={primaryColorHex} />
+                    <Text style={[styles.switchTitle, { color: theme.textPrimary }]}>Bloqueio Biométrico</Text>
+                  </View>
+                  <Text style={[styles.switchDesc, { color: theme.textSecondary }]}>
+                    Exigir Face ID ou biometria ao abrir o Momentus
+                  </Text>
+                </View>
+                <Switch
+                  value={biometricEnabled}
+                  onValueChange={handleToggleBiometrics}
+                  trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: `${primaryColorHex}66` }}
+                  thumbColor={biometricEnabled ? primaryColorHex : '#94A3B8'}
                   {...({ activeThumbColor: primaryColorHex } as any)}
                 />
               </View>
@@ -862,6 +933,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: MomentusColors.textPrimary,
+  },
+  securityTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   switchDesc: {
     fontSize: 12,
