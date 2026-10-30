@@ -169,6 +169,7 @@ interface MomentusContextData {
   triggerHaptic: (type: 'impact' | 'success' | 'selection') => void;
   // Settings Actions
   updateSettings: (newSettings: Partial<AppSettings>) => void;
+  updateUserProfile: (profileUpdates: Partial<UserProfile>) => void;
   clearAllLocalData: () => void;
   clearCloudDataAction: () => Promise<boolean>;
   resetAllDataAndLogout: () => Promise<boolean>;
@@ -1532,6 +1533,21 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
   };
 
+  const updateUserProfile = (profileUpdates: Partial<UserProfile>) => {
+    setUserProfile((prev) => {
+      const next = { ...prev, ...profileUpdates };
+      setAppKv('user_profile', next).catch(() => {});
+
+      const uid = firebaseAuth.currentUser?.uid;
+      if (uid) {
+        saveUserProfileToFirestore(uid, profileUpdates as any).catch((err) =>
+          MomentusLog.sync.warn('Erro ao atualizar perfil no Firestore:', err)
+        );
+      }
+      return next;
+    });
+  };
+
   const clearAllLocalData = () => {
     // 1. Cancela todas as notificações locais agendadas
     cancelAllNotifications().catch(() => {});
@@ -2044,6 +2060,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         addFocusMinutes,
         triggerHaptic,
         updateSettings,
+        updateUserProfile,
         clearAllLocalData,
         clearCloudDataAction,
         resetAllDataAndLogout,

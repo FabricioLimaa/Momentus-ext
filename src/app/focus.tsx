@@ -2603,9 +2603,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     paddingRight: 8,
+    minWidth: 0,
+    flexShrink: 1,
   },
   pickerHeaderTitleCol: {
     flex: 1,
+    minWidth: 0,
+    flexShrink: 1,
   },
   pickerHeaderIconBg: {
     width: 36,
@@ -2613,6 +2617,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   pickerTitle: {
     fontSize: 18,
@@ -2628,6 +2633,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
+    marginLeft: 6,
   },
   pickerTabsRow: {
     flexDirection: 'row',
@@ -3153,7 +3160,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   goalOptionCard: {
-    width: '30%',
+    width: '31%',
     paddingVertical: 14,
     borderRadius: 14,
     borderWidth: 1,

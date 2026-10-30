@@ -103,6 +103,7 @@ export interface UserProfile {
   totalCompleted: number;
   focusMinutesToday: number;
   isLoggedIn?: boolean;
+  selectedAvatarFrame?: 'frame_emerald' | 'frame_cyan' | 'frame_gold' | null;
 }
 
 export interface AppSettings {

@@ -25,6 +25,7 @@ import {
 } from "@/constants/theme";
 import { UserLevelInfo } from "@/domain/userLevel";
 import { UserProfile } from "@/types";
+import { AvatarWithFrame } from "@/components/momentus/AvatarWithFrame";
 
 export interface WeeklySummaryStats {
   perfectDaysCount: number;
@@ -56,7 +57,6 @@ export const WeeklySummaryModal: React.FC<WeeklySummaryModalProps> = ({
 }) => {
   const cardRef = useRef<View>(null);
   const [isSharing, setIsSharing] = useState(false);
-  const [avatarError, setAvatarError] = useState(false);
 
   const screenWidth = Dimensions.get("window").width;
   const cardWidth = Math.min(screenWidth - 48, 330);
@@ -77,11 +77,10 @@ export const WeeklySummaryModal: React.FC<WeeklySummaryModalProps> = ({
   }, [stats.perfectDaysCount, stats.currentCount]);
 
   const userName = userProfile?.name?.trim() || "Você";
-  const userInitial = userName.charAt(0).toUpperCase();
   const userPhoto = userProfile?.photoUrl || null;
   const rankTitle = userLevel
-    ? `Nível ${userLevel.level} • ${userLevel.rankName}`
-    : "Produtivo";
+    ? `Nível ${userLevel.level} • ${userLevel.honorTitle || userLevel.rankName}`
+    : "Iniciante Focado 🌱";
   const rankColor = userLevel?.rankColor || MomentusColors.gold;
 
   const triggerHaptic = () => {
@@ -258,21 +257,18 @@ export const WeeklySummaryModal: React.FC<WeeklySummaryModalProps> = ({
                   </View>
                 </View>
 
-                {/* Perfil & Nível com Foto do Usuário se Disponível */}
+                {/* Perfil & Nível com Moldura Cósmica de Avatar */}
                 <View style={styles.profileSection}>
-                  <View
-                    style={[styles.avatarCircle, { borderColor: primaryColor }]}
-                  >
-                    {userPhoto && !avatarError ? (
-                      <Image
-                        source={{ uri: userPhoto }}
-                        style={styles.avatarImage}
-                        onError={() => setAvatarError(true)}
-                      />
-                    ) : (
-                      <Text style={styles.avatarInitial}>{userInitial}</Text>
-                    )}
-                  </View>
+                  <AvatarWithFrame
+                    size={42}
+                    photoUrl={userPhoto}
+                    name={userName}
+                    frameId={userProfile?.selectedAvatarFrame}
+                    userLevel={userLevel}
+                    totalFocusMinutes={userProfile?.focusMinutesToday || 0}
+                    currentStreak={userProfile?.currentStreak || 0}
+                    bestStreak={userProfile?.bestStreak || 0}
+                  />
                   <View style={styles.profileInfo}>
                     <Text numberOfLines={1} style={styles.profileName}>
                       {userName}

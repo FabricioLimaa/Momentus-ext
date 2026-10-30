@@ -4,6 +4,7 @@ import { GlassCard } from "@/components/momentus/GlassCard";
 import { NewHabitModal } from "@/components/momentus/NewHabitModal";
 import { TimelineEventItem } from "@/components/momentus/TimelineEventItem";
 import { SplashScreen } from "@/components/momentus/SplashScreen";
+import { AvatarWithFrame } from "@/components/momentus/AvatarWithFrame";
 import { auth as firebaseAuth } from "@/config/firebase";
 import {
   getStreakColor,
@@ -60,7 +61,6 @@ export default function HomeScreen() {
   // Estados de seleção múltipla
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedHabitIds, setSelectedHabitIds] = useState<string[]>([]);
-  const [avatarError, setAvatarError] = useState(false);
 
   // Filtros rápidos da Home (Todas, Pendentes, Concluídas)
   const [filterStatus, setFilterStatus] = useState<"ALL" | "PENDING" | "COMPLETED">("ALL");
@@ -267,44 +267,34 @@ export default function HomeScreen() {
               style={styles.userProfileGreetingRow}
               activeOpacity={0.8}
             >
-              <View
-                style={[
-                  styles.homeAvatar,
-                  {
-                    borderColor: theme.primary,
-                    backgroundColor: `${theme.primary}18`,
-                  },
-                ]}
-              >
-                {displayPhoto && !avatarError ? (
-                  <Image
-                    source={{ uri: displayPhoto }}
-                    style={styles.homeAvatarImage}
-                    resizeMode="cover"
-                    onError={() => setAvatarError(true)}
-                    {...(Platform.OS === "web"
-                      ? { referrerPolicy: "no-referrer" }
-                      : {})}
-                  />
-                ) : (
-                  <Text
-                    style={[styles.homeAvatarText, { color: theme.primary }]}
-                  >
-                    {resolvedName ? resolvedName.charAt(0).toUpperCase() : "U"}
-                  </Text>
-                )}
-              </View>
-              <View>
+              <AvatarWithFrame
+                photoUrl={displayPhoto}
+                name={resolvedName}
+                size={42}
+                frameId={userProfile.selectedAvatarFrame}
+                userLevel={userLevel}
+                totalFocusMinutes={userProfile.focusMinutesToday || 0}
+                currentStreak={userProfile.currentStreak}
+                bestStreak={userProfile.bestStreak}
+              />
+              <View style={{ marginLeft: 8 }}>
                 <Text
                   style={[styles.greetingText, { color: theme.textSecondary }]}
                 >
                   {greeting}
                 </Text>
-                <Text
-                  style={[styles.userNameText, { color: theme.textPrimary }]}
-                >
-                  {userName} 👋
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text
+                    style={[styles.userNameText, { color: theme.textPrimary }]}
+                  >
+                    {userName}
+                  </Text>
+                  <View style={[styles.honorTitleChip, { backgroundColor: `${userLevel.rankColor}18`, borderColor: `${userLevel.rankColor}40` }]}>
+                    <Text style={[styles.honorTitleChipText, { color: userLevel.rankColor }]}>
+                      {userLevel.rankName}
+                    </Text>
+                  </View>
+                </View>
               </View>
             </TouchableOpacity>
 
@@ -825,10 +815,20 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   userNameText: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "900",
     color: MomentusColors.textPrimary,
     marginTop: 2,
+  },
+  honorTitleChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  honorTitleChipText: {
+    fontSize: 10,
+    fontWeight: '800',
   },
   notificationButton: {
     width: 44,

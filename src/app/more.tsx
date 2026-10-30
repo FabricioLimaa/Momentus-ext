@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -21,13 +21,13 @@ import {
   TypographyTokens,
 } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
+import { AvatarWithFrame } from '@/components/momentus/AvatarWithFrame';
 
 import { auth as firebaseAuth } from '@/config/firebase';
 
 export default function MoreScreen() {
   const router = useRouter();
   const { userProfile, userLevel, logout, theme } = useMomentus();
-  const [avatarError, setAvatarError] = useState(false);
 
   const authUser = firebaseAuth.currentUser;
   const displayName =
@@ -66,19 +66,16 @@ export default function MoreScreen() {
           showsVerticalScrollIndicator={false}>
           {/* User Profile Card */}
           <View style={[styles.profileCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
-            <View style={[styles.avatar, { borderColor: userLevel.rankColor, overflow: 'hidden' }]}>
-              {displayPhoto && !avatarError ? (
-                <Image
-                  source={{ uri: displayPhoto }}
-                  style={styles.avatarImage}
-                  resizeMode="cover"
-                  onError={() => setAvatarError(true)}
-                  {...(Platform.OS === 'web' ? { referrerPolicy: 'no-referrer' } : {})}
-                />
-              ) : (
-                <Text style={styles.avatarText}>{displayName.charAt(0).toUpperCase()}</Text>
-              )}
-            </View>
+            <AvatarWithFrame
+              photoUrl={displayPhoto}
+              name={displayName}
+              size={54}
+              frameId={userProfile.selectedAvatarFrame}
+              userLevel={userLevel}
+              totalFocusMinutes={userProfile.focusMinutesToday || 0}
+              currentStreak={userProfile.currentStreak}
+              bestStreak={userProfile.bestStreak}
+            />
             <View style={styles.profileInfo}>
               <Text style={[styles.userName, { color: theme.textPrimary }]}>{displayName}</Text>
               <Text style={[styles.userEmail, { color: theme.textSecondary }]}>{displayEmail}</Text>

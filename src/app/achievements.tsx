@@ -9,7 +9,6 @@ import {
   StatusBar,
   Modal,
   Alert,
-  Image,
 } from 'react-native';
 import { auth as firebaseAuth } from '@/config/firebase';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,6 +22,7 @@ import {
 import { useMomentus } from '@/context/MomentusContext';
 import { getStreakColor } from '@/constants/initialData';
 import { Achievement, MarketItem } from '@/types';
+import { AvatarWithFrame, AVATAR_FRAMES, AvatarFrameType } from '@/components/momentus/AvatarWithFrame';
 
 export const getIconForAchievement = (id: string): keyof typeof Ionicons.glyphMap => {
   switch (id) {
@@ -54,11 +54,14 @@ export default function AchievementsScreen() {
     userProfile,
     userLevel,
     buyMarketItem,
+    updateUserProfile,
+    triggerHaptic,
     theme,
     showCelebration,
   } = useMomentus();
   const [activeTab, setActiveTab] = useState<'achievements' | 'market'>('achievements');
   const [selectedAchievement, setSelectedAchievement] = useState<Achievement | null>(null);
+  const [isFrameModalOpen, setIsFrameModalOpen] = useState(false);
 
   const handleBuy = (item: MarketItem) => {
     if (item.isOwned) return;
@@ -94,7 +97,6 @@ export default function AchievementsScreen() {
     }
   };
 
-  const [avatarError, setAvatarError] = useState(false);
   const authUser = firebaseAuth.currentUser;
   const resolvedName =
     userProfile.name && userProfile.name !== 'Usuário'
@@ -116,21 +118,21 @@ export default function AchievementsScreen() {
             { backgroundColor: theme.surface, borderColor: theme.outline },
           ]}>
           <View style={styles.profileTopRow}>
-            <View style={[styles.avatarLarge, { borderColor: userLevel.rankColor, overflow: 'hidden' }]}>
-              {displayPhoto && !avatarError ? (
-                <Image
-                  source={{ uri: displayPhoto }}
-                  style={{ width: '100%', height: '100%' }}
-                  resizeMode="cover"
-                  onError={() => setAvatarError(true)}
-                  {...(Platform.OS === 'web' ? { referrerPolicy: 'no-referrer' } : {})}
-                />
-              ) : (
-                <Text style={styles.avatarLargeText}>
-                  {resolvedName ? resolvedName.charAt(0).toUpperCase() : 'U'}
-                </Text>
-              )}
-            </View>
+            <TouchableOpacity
+              onPress={() => setIsFrameModalOpen(true)}
+              activeOpacity={0.8}
+              accessibilityLabel="Trocar moldura do avatar">
+              <AvatarWithFrame
+                photoUrl={displayPhoto}
+                name={resolvedName}
+                size={58}
+                frameId={userProfile.selectedAvatarFrame}
+                userLevel={userLevel}
+                totalFocusMinutes={userProfile.focusMinutesToday || 0}
+                currentStreak={userProfile.currentStreak}
+                bestStreak={userProfile.bestStreak}
+              />
+            </TouchableOpacity>
 
             <View style={styles.profileDetails}>
               <Text style={[styles.profileName, { color: theme.textPrimary }]}>
@@ -422,6 +424,73 @@ export default function AchievementsScreen() {
                   </TouchableOpacity>
                 </>
               )}
+            </View>
+          </View>
+        </Modal>
+
+        {/* Modal de Escolha da Moldura de Avatar */}
+        <Modal
+          visible={isFrameModalOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setIsFrameModalOpen(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+              <View style={styles.modalIconCircle}>
+                <Ionicons name="color-palette-outline" size={30} color={theme.primary} />
+              </View>
+              <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Molduras de Avatar</Text>
+              <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>
+                Personalize a borda da sua foto de perfil conforme seu progresso de consistência e XP.
+              </Text>
+
+              <View style={styles.frameListContainer}>
+                {AVATAR_FRAMES.map((frame) => {
+                  const isUnlocked = frame.isUnlocked({
+                    level: userLevel.level,
+                    totalFocusMinutes: userProfile.focusMinutesToday || 0,
+                    currentStreak: userProfile.currentStreak,
+                    bestStreak: userProfile.bestStreak,
+                  });
+                  const isEquipped = (userProfile.selectedAvatarFrame || 'frame_emerald') === frame.id;
+
+                  return (
+                    <TouchableOpacity
+                      key={frame.id}
+                      style={[
+                        styles.frameOptionCard,
+                        { backgroundColor: theme.surfaceElevated, borderColor: isEquipped ? frame.borderColor : theme.outline },
+                        !isUnlocked && { opacity: 0.55 },
+                      ]}
+                      disabled={!isUnlocked}
+                      onPress={() => {
+                        updateUserProfile({ selectedAvatarFrame: frame.id as AvatarFrameType });
+                        triggerHaptic('success');
+                        setIsFrameModalOpen(false);
+                      }}
+                      activeOpacity={0.8}>
+                      <View style={[styles.framePreviewCircle, { borderColor: frame.borderColor, borderWidth: frame.borderWidth }]}>
+                        <Ionicons name={isEquipped ? 'checkmark' : isUnlocked ? 'sparkles' : 'lock-closed'} size={16} color={frame.borderColor} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.frameOptionName, { color: theme.textPrimary }]}>
+                          {frame.name}
+                        </Text>
+                        <Text style={[styles.frameOptionDesc, { color: theme.textSecondary }]}>
+                          {isUnlocked ? frame.description : `Bloqueada: ${frame.unlockRequirementText}`}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <TouchableOpacity
+                style={[styles.modalCloseBtn, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, borderWidth: 1 }]}
+                onPress={() => setIsFrameModalOpen(false)}
+                activeOpacity={0.85}>
+                <Text style={[styles.modalCloseBtnText, { color: theme.textPrimary }]}>Voltar</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </Modal>
@@ -786,5 +855,35 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     fontWeight: '800',
     fontSize: 14,
+  },
+  frameListContainer: {
+    width: '100%',
+    gap: 10,
+    marginBottom: 18,
+  },
+  frameOptionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: 1.5,
+  },
+  framePreviewCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  frameOptionName: {
+    fontSize: 13,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  frameOptionDesc: {
+    fontSize: 11,
+    lineHeight: 15,
   },
 });
