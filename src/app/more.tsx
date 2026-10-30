@@ -20,6 +20,7 @@ import {
   BorderRadiusTokens,
   TypographyTokens,
 } from '@/constants/theme';
+import { APP_INFO } from '@/constants/appInfo';
 import { useMomentus } from '@/context/MomentusContext';
 import { AvatarWithFrame } from '@/components/momentus/AvatarWithFrame';
 
@@ -211,7 +212,7 @@ export default function MoreScreen() {
             <View style={[styles.divider, { backgroundColor: theme.outline }]} />
 
             <TouchableOpacity
-              onPress={() => Linking.openURL('https://www.momentusapp.com.br/')}
+              onPress={() => Linking.openURL(APP_INFO.website)}
               style={styles.menuItem}>
               <View style={styles.menuItemLeft}>
                 <View style={[styles.iconBox, { backgroundColor: 'rgba(52, 211, 153, 0.15)' }]}>
@@ -219,7 +220,7 @@ export default function MoreScreen() {
                 </View>
                 <View>
                   <Text style={[styles.menuItemTitle, { color: theme.textPrimary }]}>Conheça Nosso Site</Text>
-                  <Text style={[styles.menuItemSub, { color: theme.textSecondary }]}>www.momentusapp.com.br</Text>
+                  <Text style={[styles.menuItemSub, { color: theme.textSecondary }]}>{APP_INFO.domains.official}</Text>
                 </View>
               </View>
               <Ionicons name="open-outline" size={18} color={theme.textSecondary} />
@@ -243,6 +244,14 @@ export default function MoreScreen() {
               style={styles.brandFooterLogo}
               resizeMode="contain"
             />
+            <Text style={[styles.brandCreditsText, { color: theme.textSecondary }]}>
+              Desenvolvido por {APP_INFO.developer}
+            </Text>
+            <TouchableOpacity onPress={() => Linking.openURL(`mailto:${APP_INFO.email}`)} activeOpacity={0.7}>
+              <Text style={[styles.brandEmailText, { color: theme.primary }]}>
+                {APP_INFO.email}
+              </Text>
+            </TouchableOpacity>
           </View>
 
           <View style={{ height: 20 }} />
@@ -409,6 +418,18 @@ const styles = StyleSheet.create({
     width: 180,
     height: 32,
     opacity: 0.9,
+  },
+  brandCreditsText: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  brandEmailText: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 3,
+    textAlign: 'center',
   },
 });
 

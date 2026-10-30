@@ -24,6 +24,7 @@ import {
   ComponentHeightTokens,
   TypographyTokens,
 } from '@/constants/theme';
+import { APP_INFO } from '@/constants/appInfo';
 import { useMomentus } from '@/context/MomentusContext';
 import { MomentusLog } from '@/util/logger';
 
@@ -567,7 +568,7 @@ export default function SettingsScreen() {
 
           <View style={[styles.cloudCard, { backgroundColor: theme.surfaceElevated }]}>
             <Text style={[styles.cloudCardLabel, { color: primaryColorHex }]}>Conta</Text>
-            <Text style={[styles.cloudCardValue, { color: theme.textPrimary }]}>{userProfile.email || 'contato@momentusapp.com.br'}</Text>
+            <Text style={[styles.cloudCardValue, { color: theme.textPrimary }]}>{userProfile.email || APP_INFO.email}</Text>
 
             <Text style={[styles.cloudCardLabel, { color: primaryColorHex, marginTop: 12 }]}>Último Backup / Sincronização</Text>
             <Text style={[styles.cloudCardValue, { color: theme.textPrimary }]}>
@@ -648,13 +649,35 @@ export default function SettingsScreen() {
 
             <TouchableOpacity
               style={styles.linkRow}
-              onPress={() => Linking.openURL('https://www.momentusapp.com.br/')}>
+              onPress={() => Linking.openURL(APP_INFO.website)}>
               <View style={styles.linkLeft}>
                 <Ionicons name="globe-outline" size={20} color={theme.primary} />
-                <Text style={[styles.linkText, { color: theme.textPrimary }]}>Site Oficial (momentusapp.com.br)</Text>
+                <Text style={[styles.linkText, { color: theme.textPrimary }]}>Site Oficial ({APP_INFO.domains.naked})</Text>
               </View>
               <Ionicons name="open-outline" size={18} color={theme.textSecondary} />
             </TouchableOpacity>
+
+            <View style={[styles.divider, { backgroundColor: theme.outline }]} />
+
+            <TouchableOpacity
+              style={styles.linkRow}
+              onPress={() => Linking.openURL(`mailto:${APP_INFO.email}`)}>
+              <View style={styles.linkLeft}>
+                <Ionicons name="mail-outline" size={20} color={theme.primary} />
+                <Text style={[styles.linkText, { color: theme.textPrimary }]}>Suporte ({APP_INFO.email})</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Rodapé Institucional */}
+          <View style={{ alignItems: 'center', marginTop: 16, marginBottom: 8 }}>
+            <Text style={{ fontSize: 12, fontWeight: '600', color: theme.textSecondary }}>
+              {APP_INFO.name} • Desenvolvido por {APP_INFO.developer}
+            </Text>
+            <Text style={{ fontSize: 11, color: theme.textSecondary, marginTop: 2 }}>
+              {APP_INFO.copyright}
+            </Text>
           </View>
 
           <View style={{ height: 40 }} />

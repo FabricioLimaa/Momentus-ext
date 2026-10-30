@@ -142,7 +142,7 @@ export const LEGAL_DOCUMENTS: Record<LegalLanguage, Record<LegalDocumentType, Le
           intro: 'O controlador dos seus dados pessoais no âmbito deste aplicativo é Fabricio Lima.',
           callout: {
             type: 'info',
-            text: 'Canal oficial do Encarregado de Dados (DPO): fabriciodacostalima@gmail.com',
+            text: 'Canal oficial do Encarregado de Dados (DPO): contato@momentusapp.com.br',
           },
         },
         {
@@ -215,7 +215,7 @@ export const LEGAL_DOCUMENTS: Record<LegalLanguage, Record<LegalDocumentType, Le
           intro: 'Podemos atualizar esta política periodicamente. Notificaremos sobre alterações através do próprio aplicativo.',
         },
       ],
-      conclusion: 'Dúvidas ou solicitações sobre privacidade: entre em contato em fabriciodacostalima@gmail.com.',
+      conclusion: 'Dúvidas ou solicitações sobre privacidade: entre em contato em contato@momentusapp.com.br.',
     },
     license: {
       id: 'license',
@@ -362,7 +362,7 @@ export const LEGAL_DOCUMENTS: Record<LegalLanguage, Record<LegalDocumentType, Le
           intro: 'The controller of your personal data within this application is Fabricio Lima.',
           callout: {
             type: 'info',
-            text: 'Official Data Protection contact: fabriciodacostalima@gmail.com',
+            text: 'Official Data Protection contact: contato@momentusapp.com.br',
           },
         },
         {
@@ -435,7 +435,7 @@ export const LEGAL_DOCUMENTS: Record<LegalLanguage, Record<LegalDocumentType, Le
           intro: 'We may update this policy periodically. We will notify you of any changes directly within the app.',
         },
       ],
-      conclusion: 'Questions regarding privacy: reach out to fabriciodacostalima@gmail.com.',
+      conclusion: 'Questions regarding privacy: reach out to contato@momentusapp.com.br.',
     },
     license: {
       id: 'license',

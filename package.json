@@ -1,7 +1,10 @@
 {
   "name": "momentus-ext",
-  "main": "expo-router/entry",
+  "displayName": "Momentus",
   "version": "1.0.0",
+  "author": "Fabricio Lima <contato@momentusapp.com.br>",
+  "homepage": "https://www.momentusapp.com.br/",
+  "main": "expo-router/entry",
   "dependencies": {
     "@expo/ui": "~57.0.26",
     "@expo/vector-icons": "^15.0.2",

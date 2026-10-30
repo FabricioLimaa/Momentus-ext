@@ -9,6 +9,7 @@ import {
   StatusBar,
   Modal,
   Alert,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +21,7 @@ import {
   ComponentHeightTokens,
   TypographyTokens,
 } from '@/constants/theme';
+import { APP_INFO } from '@/constants/appInfo';
 import { useMomentus } from '@/context/MomentusContext';
 import { GlassCard } from '@/components/momentus/GlassCard';
 
@@ -124,10 +126,18 @@ export default function UpdateNotesScreen() {
             <View style={[styles.footerLogoCircle, { backgroundColor: `${theme.primary}15` }]}>
               <Ionicons name="flame" size={32} color={theme.primary} />
             </View>
-            <Text style={[styles.footerCardTitle, { color: theme.textPrimary }]}>Momentus Premium</Text>
+            <Text style={[styles.footerCardTitle, { color: theme.textPrimary }]}>{APP_INFO.name}</Text>
             <Text style={[styles.footerCardSubtitle, { color: theme.textSecondary }]}>
-              Viva o presente, planeje o futuro.
+              {APP_INFO.tagline}
             </Text>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: theme.textSecondary, marginTop: 12 }}>
+              Desenvolvido por {APP_INFO.developer}
+            </Text>
+            <TouchableOpacity onPress={() => Linking.openURL(`mailto:${APP_INFO.email}`)} activeOpacity={0.7}>
+              <Text style={{ fontSize: 12, color: theme.primary, marginTop: 4, fontWeight: '600' }}>
+                {APP_INFO.email}
+              </Text>
+            </TouchableOpacity>
           </GlassCard>
 
           <View style={{ height: 40 }} />

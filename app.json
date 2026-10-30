@@ -13,7 +13,8 @@
       "bundleIdentifier": "br.com.fabriciolima.momentus",
       "associatedDomains": [
         "applinks:www.momentusapp.com.br",
-        "applinks:momentusapp.com.br"
+        "applinks:momentusapp.com.br",
+        "applinks:app.momentusapp.com.br"
       ],
       "infoPlist": {
         "NSCalendarsUsageDescription": "O Momentus precisa de acesso ao seu calendário para sincronizar suas rotinas e hábitos.",
@@ -41,6 +42,11 @@
             {
               "scheme": "https",
               "host": "momentusapp.com.br",
+              "pathPrefix": "/"
+            },
+            {
+              "scheme": "https",
+              "host": "app.momentusapp.com.br",
               "pathPrefix": "/"
             }
           ],
@@ -92,6 +98,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "appName": "Momentus",
+      "developer": "Fabricio Lima",
+      "contactEmail": "contato@momentusapp.com.br",
+      "officialWebsite": "https://www.momentusapp.com.br/",
+      "webAccess": "https://app.momentusapp.com.br/"
     }
   }
 }
