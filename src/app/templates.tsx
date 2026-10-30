@@ -27,6 +27,11 @@ import { useMomentus } from '@/context/MomentusContext';
 import { ApplyTemplateDialog } from '@/components/momentus/ApplyTemplateDialog';
 import { TimePickerModal } from '@/components/momentus/TimePickerModal';
 import { RoutineTemplate, TemplateItem, SharedTemplate } from '@/types';
+import {
+  COMMUNITY_TRACKS,
+  CommunityTemplate,
+} from '@/constants/communityTemplates';
+import { getTodayDateString } from '@/constants/initialData';
 
 interface EventFormState {
   id?: string;
@@ -42,12 +47,20 @@ export default function TemplatesScreen() {
   const {
     templates,
     categories,
+    addHabit,
     addTemplate,
     updateTemplate,
     deleteTemplate,
     applyTemplateToDates,
+    triggerHaptic,
     theme,
   } = useMomentus();
+
+  // Navegação por Abas Principais: Meus Templates vs Galeria da Comunidade
+  const [activeTab, setActiveTab] = useState<'my_templates' | 'community'>('my_templates');
+  const [communityTagFilter, setCommunityTagFilter] = useState<string>('Todas');
+  const [communitySearchQuery, setCommunitySearchQuery] = useState<string>('');
+  const [selectedCommunityTemplate, setSelectedCommunityTemplate] = useState<CommunityTemplate | null>(null);
 
   // Estados dos diálogos
   const [selectedTemplateForApply, setSelectedTemplateForApply] = useState<RoutineTemplate | null>(null);
@@ -379,11 +392,96 @@ export default function TemplatesScreen() {
     return 'Leve';
   };
 
+  // Helper de resolução de categoria por tag ou nome
+  const resolveCategoryId = (hint?: string) => {
+    if (!hint) return defaultCategoryId;
+    const match = categories.find((c) => c.name.toLowerCase() === hint.toLowerCase());
+    return match?.id || defaultCategoryId;
+  };
+
+  // 1-Toque: Adicionar template da comunidade na agenda de hoje
+  const handleApplyCommunityToToday = (template: CommunityTemplate) => {
+    const today = getTodayDateString();
+    template.items.forEach((item) => {
+      addHabit({
+        title: item.title,
+        description: item.description,
+        timeStart: item.timeStart,
+        timeEnd: item.timeEnd,
+        categoryId: resolveCategoryId(item.categoryHint),
+        date: today,
+        templateSourceId: template.id,
+      });
+    });
+    triggerHaptic('success');
+    if (selectedCommunityTemplate) {
+      setSelectedCommunityTemplate(null);
+    }
+    Alert.alert(
+      'Rotina Adicionada à Agenda Hoje! 🚀',
+      `"${template.title}" foi inserida na sua agenda de hoje com ${template.items.length} blocos de atividades prontos para execução!`,
+      [
+        { text: 'Ir para a Agenda', onPress: () => router.push('/calendar') },
+        { text: 'OK', style: 'cancel' },
+      ]
+    );
+  };
+
+  // 1-Toque: Salvar template da comunidade no acervo pessoal de templates
+  const handleSaveCommunityToMyTemplates = (template: CommunityTemplate) => {
+    const newItems: TemplateItem[] = template.items.map((it, idx) => ({
+      id: `ti-comm-${Date.now()}-${idx}`,
+      title: it.title,
+      description: it.description || null,
+      timeStart: it.timeStart,
+      timeEnd: it.timeEnd,
+      categoryId: resolveCategoryId(it.categoryHint),
+      order: idx,
+    }));
+
+    addTemplate({
+      title: template.title,
+      description: template.description,
+      icon: template.icon,
+      color: template.color,
+      items: newItems,
+    });
+
+    triggerHaptic('success');
+    if (selectedCommunityTemplate) {
+      setSelectedCommunityTemplate(null);
+    }
+    setActiveTab('my_templates');
+    Alert.alert(
+      'Salvo no Seu Acervo! 📂',
+      `O template "${template.title}" agora é seu! Você pode personalizá-lo livremente e agendar nas suas semanas.`
+    );
+  };
+
+  const TAG_OPTIONS = ['Todas', 'Manhã', 'Estudos', 'Saúde', 'Noite', 'Trabalho'];
+
+  const filteredCommunityTracks = COMMUNITY_TRACKS.map((track) => {
+    const filteredTemplates = track.templates.filter((tmpl) => {
+      const matchesTag =
+        communityTagFilter === 'Todas' ||
+        tmpl.tags.some((t) => t.toLowerCase() === communityTagFilter.toLowerCase());
+      const q = communitySearchQuery.trim().toLowerCase();
+      const matchesSearch =
+        !q ||
+        tmpl.title.toLowerCase().includes(q) ||
+        tmpl.description.toLowerCase().includes(q) ||
+        tmpl.tags.some((t) => t.toLowerCase().includes(q)) ||
+        tmpl.items.some((it) => it.title.toLowerCase().includes(q));
+      return matchesTag && matchesSearch;
+    });
+    return { ...track, templates: filteredTemplates };
+  }).filter((track) => track.templates.length > 0);
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} backgroundColor={theme.background} />
       <View style={[styles.container, { backgroundColor: theme.background }]}>
-        {/* TopBar idêntica ao TemplatesScreen.kt */}
+        {/* TopBar */}
         <View style={[styles.topBar, { borderBottomColor: theme.outline }]}>
           <TouchableOpacity
             style={styles.backButton}
@@ -393,19 +491,80 @@ export default function TemplatesScreen() {
             <Ionicons name="arrow-back" size={24} color={theme.textPrimary} />
           </TouchableOpacity>
 
-          <Text style={[styles.topBarTitle, { color: theme.textPrimary }]}>Meus Templates</Text>
+          <Text style={[styles.topBarTitle, { color: theme.textPrimary }]}>
+            {activeTab === 'my_templates' ? 'Meus Templates' : 'Galeria da Comunidade'}
+          </Text>
+
+          {activeTab === 'my_templates' ? (
+            <TouchableOpacity
+              style={styles.importTopBtn}
+              onPress={() => setIsImportModalOpen(true)}
+              activeOpacity={0.7}>
+              <Ionicons name="download-outline" size={18} color={theme.primary} />
+              <Text style={[styles.importTopBtnText, { color: theme.primary }]}>Importar</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={{ width: 40 }} />
+          )}
+        </View>
+
+        {/* Segmented Control: Meus Templates vs Galeria da Comunidade */}
+        <View style={[styles.mainTabsNav, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+          <TouchableOpacity
+            style={[
+              styles.mainTabBtn,
+              activeTab === 'my_templates' && [styles.mainTabBtnActive, { backgroundColor: theme.primary }],
+            ]}
+            onPress={() => {
+              setActiveTab('my_templates');
+              triggerHaptic('selection');
+            }}
+            activeOpacity={0.8}>
+            <Ionicons
+              name="folder-open-outline"
+              size={15}
+              color={activeTab === 'my_templates' ? '#0F172A' : theme.textSecondary}
+            />
+            <Text
+              style={[
+                styles.mainTabBtnText,
+                { color: activeTab === 'my_templates' ? '#0F172A' : theme.textSecondary },
+                activeTab === 'my_templates' && styles.mainTabBtnTextActive,
+              ]}>
+              Meus Templates ({templates.length})
+            </Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.importTopBtn}
-            onPress={() => setIsImportModalOpen(true)}
-            activeOpacity={0.7}>
-            <Ionicons name="download-outline" size={18} color={theme.primary} />
-            <Text style={[styles.importTopBtnText, { color: theme.primary }]}>Importar</Text>
+            style={[
+              styles.mainTabBtn,
+              activeTab === 'community' && [styles.mainTabBtnActive, { backgroundColor: theme.primary }],
+            ]}
+            onPress={() => {
+              setActiveTab('community');
+              triggerHaptic('selection');
+            }}
+            activeOpacity={0.8}>
+            <Ionicons
+              name="sparkles-outline"
+              size={15}
+              color={activeTab === 'community' ? '#0F172A' : theme.textSecondary}
+            />
+            <Text
+              style={[
+                styles.mainTabBtnText,
+                { color: activeTab === 'community' ? '#0F172A' : theme.textSecondary },
+                activeTab === 'community' && styles.mainTabBtnTextActive,
+              ]}>
+              Comunidade ✨
+            </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Conteúdo Principal */}
-        <ScrollView
+        {/* Conteúdo: Meus Templates vs Galeria da Comunidade */}
+        {activeTab === 'my_templates' ? (
+          <>
+            <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}>
@@ -563,13 +722,199 @@ export default function TemplatesScreen() {
           )}
         </ScrollView>
 
-        {/* FAB (+) para Criar Novo Template */}
-        <TouchableOpacity
-          style={[styles.fabButton, { backgroundColor: theme.primary }]}
-          onPress={handleOpenCreateModal}
-          activeOpacity={0.85}>
-          <Ionicons name="add" size={28} color="#0F172A" />
-        </TouchableOpacity>
+            {/* FAB (+) para Criar Novo Template */}
+            <TouchableOpacity
+              style={[styles.fabButton, { backgroundColor: theme.primary }]}
+              onPress={handleOpenCreateModal}
+              activeOpacity={0.85}>
+              <Ionicons name="add" size={28} color="#0F172A" />
+            </TouchableOpacity>
+          </>
+        ) : (
+          /* Conteúdo: Galeria da Comunidade ("Estilo Streaming / Netflix") */
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.communityScrollContent}
+            showsVerticalScrollIndicator={false}>
+            {/* Barra de Busca de Templates */}
+            <View style={[styles.searchBoxContainer, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+              <Ionicons name="search-outline" size={18} color={theme.textSecondary} />
+              <TextInput
+                style={[styles.searchTextInput, { color: theme.textPrimary }]}
+                placeholder="Buscar rotinas (ex: Pomodoro, Manhã, Sono...)"
+                placeholderTextColor={theme.textSecondary}
+                value={communitySearchQuery}
+                onChangeText={setCommunitySearchQuery}
+                clearButtonMode="while-editing"
+              />
+              {communitySearchQuery.length > 0 ? (
+                <TouchableOpacity onPress={() => setCommunitySearchQuery('')}>
+                  <Ionicons name="close-circle" size={18} color={theme.textSecondary} />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            {/* Chips de Tags / Filtros Rápidos */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.tagsFilterRow}>
+              {TAG_OPTIONS.map((tag) => {
+                const isSelected = communityTagFilter === tag;
+                return (
+                  <TouchableOpacity
+                    key={tag}
+                    style={[
+                      styles.tagChip,
+                      { backgroundColor: theme.surface, borderColor: theme.outline },
+                      isSelected && { backgroundColor: `${theme.primary}25`, borderColor: theme.primary },
+                    ]}
+                    onPress={() => {
+                      setCommunityTagFilter(tag);
+                      triggerHaptic('impact');
+                    }}
+                    activeOpacity={0.7}>
+                    <Text
+                      style={[
+                        styles.tagChipText,
+                        { color: theme.textSecondary },
+                        isSelected && { color: theme.primary, fontWeight: '800' },
+                      ]}>
+                      {tag}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            {/* Trilhas Temáticas de Rotinas */}
+            {filteredCommunityTracks.length === 0 ? (
+              <View style={styles.emptyCommunityContainer}>
+                <Ionicons name="search-outline" size={44} color={`${theme.textSecondary}60`} />
+                <Text style={[styles.emptyCommunityTitle, { color: theme.textPrimary }]}>
+                  Nenhuma rotina encontrada
+                </Text>
+                <Text style={[styles.emptyCommunityDesc, { color: theme.textSecondary }]}>
+                  Tente alterar os termos de busca ou selecionar outra categoria.
+                </Text>
+              </View>
+            ) : (
+              filteredCommunityTracks.map((track) => (
+                <View key={track.id} style={styles.trackSection}>
+                  {/* Cabeçalho da Trilha */}
+                  <View style={styles.trackHeader}>
+                    <View style={[styles.trackIconCircle, { backgroundColor: `${track.badgeColor}20` }]}>
+                      <Ionicons name={track.icon as any} size={18} color={track.badgeColor} />
+                    </View>
+                    <View style={styles.trackHeaderInfo}>
+                      <Text style={[styles.trackTitle, { color: theme.textPrimary }]}>
+                        {track.title}
+                      </Text>
+                      <Text style={[styles.trackSubtitle, { color: theme.textSecondary }]}>
+                        {track.subtitle}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Carrossel Horizontal Estilo Netflix */}
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.carouselContainer}>
+                    {track.templates.map((tmpl) => {
+                      const totalMinutes = tmpl.items.reduce((acc, it) => acc + (it.durationMinutes || 0), 0);
+
+                      return (
+                        <View
+                          key={tmpl.id}
+                          style={[
+                            styles.communityCard,
+                            { backgroundColor: theme.surface, borderColor: theme.outline },
+                          ]}>
+                          <TouchableOpacity
+                            activeOpacity={0.88}
+                            onPress={() => {
+                              setSelectedCommunityTemplate(tmpl);
+                              triggerHaptic('impact');
+                            }}>
+                            {/* Linha Superior: Badge & Tempo */}
+                            <View style={styles.commCardTopRow}>
+                              {tmpl.badge ? (
+                                <View style={[styles.commBadge, { backgroundColor: `${tmpl.color}20`, borderColor: `${tmpl.color}40` }]}>
+                                  <Text style={[styles.commBadgeText, { color: tmpl.color }]}>
+                                    {tmpl.badge}
+                                  </Text>
+                                </View>
+                              ) : <View />}
+
+                              <View style={[styles.commTimePill, { backgroundColor: `${theme.textSecondary}15` }]}>
+                                <Ionicons name="time-outline" size={11} color={theme.textSecondary} />
+                                <Text style={[styles.commTimePillText, { color: theme.textSecondary }]}>
+                                  {totalMinutes}m • {tmpl.items.length} hábitos
+                                </Text>
+                              </View>
+                            </View>
+
+                            {/* Ícone e Título */}
+                            <View style={styles.commCardMain}>
+                              <View style={[styles.commIconBg, { backgroundColor: `${tmpl.color}15` }]}>
+                                <Ionicons name={tmpl.icon as any} size={22} color={tmpl.color} />
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <Text style={[styles.commCardTitle, { color: theme.textPrimary }]} numberOfLines={1}>
+                                  {tmpl.title}
+                                </Text>
+                                <Text style={[styles.commCardDesc, { color: theme.textSecondary }]} numberOfLines={2}>
+                                  {tmpl.description}
+                                </Text>
+                              </View>
+                            </View>
+
+                            {/* Prévia dos Primeiros Passos */}
+                            <View style={styles.commStepsPreview}>
+                              {tmpl.items.slice(0, 2).map((it) => (
+                                <View key={it.id} style={styles.commStepRow}>
+                                  <View style={[styles.commStepDot, { backgroundColor: tmpl.color }]} />
+                                  <Text style={[styles.commStepText, { color: theme.textSecondary }]} numberOfLines={1}>
+                                    <Text style={{ fontWeight: '700', color: theme.textPrimary }}>{it.timeStart}</Text> {it.title}
+                                  </Text>
+                                </View>
+                              ))}
+                              {tmpl.items.length > 2 && (
+                                <Text style={[styles.commMoreStepsText, { color: tmpl.color }]}>
+                                  + {tmpl.items.length - 2} etapas na rotina...
+                                </Text>
+                              )}
+                            </View>
+                          </TouchableOpacity>
+
+                          {/* Botões de Ação de 1-Toque */}
+                          <View style={styles.commActionsRow}>
+                            <TouchableOpacity
+                              style={[styles.commTodayBtn, { backgroundColor: theme.primary }]}
+                              onPress={() => handleApplyCommunityToToday(tmpl)}
+                              activeOpacity={0.85}>
+                              <Ionicons name="flash" size={14} color="#0F172A" />
+                              <Text style={styles.commTodayBtnText}>+ Hoje</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              style={[styles.commSaveBtn, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}
+                              onPress={() => handleSaveCommunityToMyTemplates(tmpl)}
+                              activeOpacity={0.8}>
+                              <Ionicons name="bookmark-outline" size={14} color={theme.textPrimary} />
+                              <Text style={[styles.commSaveBtnText, { color: theme.textPrimary }]}>Salvar</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              ))
+            )}
+          </ScrollView>
+        )}
       </View>
 
       {/* Modal de Criação / Edição de Template (CreateTemplateDialog.kt) */}
@@ -945,6 +1290,116 @@ export default function TemplatesScreen() {
                 onPress={handleExecuteDeleteTemplate}
                 activeOpacity={0.85}>
                 <Text style={styles.deleteConfirmBtnText}>Excluir</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal Detalhado de Prévia da Rotina da Comunidade */}
+      <Modal
+        visible={!!selectedCommunityTemplate}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedCommunityTemplate(null)}>
+        <View style={styles.commModalOverlay}>
+          <View style={[styles.commModalCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+            {/* Cabeçalho */}
+            <View style={styles.commModalHeader}>
+              <View style={styles.commModalHeaderLeft}>
+                <View
+                  style={[
+                    styles.commModalIconBg,
+                    { backgroundColor: `${selectedCommunityTemplate?.color || theme.primary}20` },
+                  ]}>
+                  <Ionicons
+                    name={(selectedCommunityTemplate?.icon as any) || 'sparkles'}
+                    size={24}
+                    color={selectedCommunityTemplate?.color || theme.primary}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.commModalTitle, { color: theme.textPrimary }]} numberOfLines={1}>
+                    {selectedCommunityTemplate?.title}
+                  </Text>
+                  <Text style={[styles.commModalTrack, { color: theme.primary }]}>
+                    {selectedCommunityTemplate?.trackTitle}
+                  </Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.commModalCloseBtn, { backgroundColor: theme.surfaceElevated }]}
+                onPress={() => setSelectedCommunityTemplate(null)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="close" size={20} color={theme.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Descrição e Tags */}
+            <Text style={[styles.commModalDesc, { color: theme.textSecondary }]}>
+              {selectedCommunityTemplate?.description}
+            </Text>
+
+            <View style={styles.commModalTagsRow}>
+              {selectedCommunityTemplate?.tags.map((tg) => (
+                <View key={tg} style={[styles.commModalTag, { backgroundColor: `${theme.primary}15` }]}>
+                  <Text style={[styles.commModalTagText, { color: theme.primary }]}>#{tg}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Lista Rolável de Etapas */}
+            <Text style={[styles.commModalSectionTitle, { color: theme.textPrimary }]}>
+              Etapas da Rotina ({selectedCommunityTemplate?.items.length || 0})
+            </Text>
+
+            <ScrollView
+              style={styles.commModalScroll}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8, paddingBottom: 10 }}>
+              {selectedCommunityTemplate?.items.map((step, idx) => (
+                <View
+                  key={step.id || idx}
+                  style={[styles.commModalStepCard, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}>
+                  <View style={[styles.commModalStepDot, { backgroundColor: selectedCommunityTemplate.color }]} />
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.commModalStepTop}>
+                      <Text style={[styles.commModalStepTitle, { color: theme.textPrimary }]}>
+                        {step.title}
+                      </Text>
+                      <Text style={[styles.commModalStepTime, { color: theme.textSecondary }]}>
+                        {step.timeStart} - {step.timeEnd} ({step.durationMinutes}m)
+                      </Text>
+                    </View>
+                    {step.description ? (
+                      <Text style={[styles.commModalStepDesc, { color: theme.textSecondary }]}>
+                        {step.description}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+
+            {/* Botões de Ação de 1-Toque */}
+            <View style={styles.commModalFooter}>
+              <TouchableOpacity
+                style={[styles.commModalTodayBtn, { backgroundColor: theme.primary }]}
+                onPress={() => selectedCommunityTemplate && handleApplyCommunityToToday(selectedCommunityTemplate)}
+                activeOpacity={0.85}>
+                <Ionicons name="flash" size={18} color="#0F172A" />
+                <Text style={styles.commModalTodayBtnText}>+ Adicionar à Agenda Hoje</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.commModalSaveBtn, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}
+                onPress={() => selectedCommunityTemplate && handleSaveCommunityToMyTemplates(selectedCommunityTemplate)}
+                activeOpacity={0.8}>
+                <Ionicons name="bookmark-outline" size={18} color={theme.textPrimary} />
+                <Text style={[styles.commModalSaveBtnText, { color: theme.textPrimary }]}>
+                  Salvar no Meu Acervo
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1526,5 +1981,383 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '800',
+  },
+  /* Abas Principais: Meus Templates vs Galeria da Comunidade */
+  mainTabsNav: {
+    flexDirection: 'row',
+    marginHorizontal: LayoutTokens.pagePaddingHorizontal,
+    marginTop: 10,
+    marginBottom: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 3,
+    gap: 4,
+  },
+  mainTabBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 11,
+    gap: 7,
+  },
+  mainTabBtnActive: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  mainTabBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  mainTabBtnTextActive: {
+    fontWeight: '800',
+  },
+  /* Galeria da Comunidade */
+  communityScrollContent: {
+    paddingBottom: 40,
+  },
+  searchBoxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: LayoutTokens.pagePaddingHorizontal,
+    marginBottom: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 10,
+  },
+  searchTextInput: {
+    flex: 1,
+    fontSize: 13,
+    padding: 0,
+  },
+  tagsFilterRow: {
+    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
+    gap: 8,
+    marginBottom: 16,
+  },
+  tagChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  tagChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  emptyCommunityContainer: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  emptyCommunityTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  emptyCommunityDesc: {
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
+    maxWidth: 260,
+  },
+  trackSection: {
+    marginBottom: 24,
+  },
+  trackHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
+    marginBottom: 12,
+    gap: 10,
+  },
+  trackIconCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trackHeaderInfo: {
+    flex: 1,
+  },
+  trackTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  trackSubtitle: {
+    fontSize: 12,
+    marginTop: 1,
+  },
+  carouselContainer: {
+    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
+    gap: 14,
+  },
+  communityCard: {
+    width: 280,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 16,
+    justifyContent: 'space-between',
+  },
+  commCardTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  commBadge: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  commBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  commTimePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  commTimePillText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  commCardMain: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 12,
+  },
+  commIconBg: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  commCardTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: 3,
+  },
+  commCardDesc: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  commStepsPreview: {
+    gap: 6,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    marginBottom: 14,
+  },
+  commStepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  commStepDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  commStepText: {
+    fontSize: 11,
+    flex: 1,
+  },
+  commMoreStepsText: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  commActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  commTodayBtn: {
+    flex: 1.2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: 11,
+  },
+  commTodayBtnText: {
+    color: '#0F172A',
+    fontWeight: '800',
+    fontSize: 12,
+  },
+  commSaveBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 9,
+    borderRadius: 11,
+    borderWidth: 1,
+  },
+  commSaveBtnText: {
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  /* Modal de Detalhes da Rotina */
+  commModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.78)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  commModalCard: {
+    width: '100%',
+    maxWidth: 440,
+    maxHeight: '88%',
+    borderRadius: 24,
+    borderWidth: 1.5,
+    padding: 20,
+  },
+  commModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  commModalHeaderLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingRight: 8,
+  },
+  commModalIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  commModalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  commModalTrack: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  commModalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  commModalDesc: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 10,
+  },
+  commModalTagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 14,
+  },
+  commModalTag: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  commModalTagText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  commModalSectionTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  commModalScroll: {
+    maxHeight: 280,
+    marginBottom: 14,
+  },
+  commModalStepCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  commModalStepDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginTop: 5,
+  },
+  commModalStepTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  commModalStepTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+    paddingRight: 8,
+  },
+  commModalStepTime: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  commModalStepDesc: {
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  commModalFooter: {
+    gap: 8,
+  },
+  commModalTodayBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 14,
+  },
+  commModalTodayBtnText: {
+    color: '#0F172A',
+    fontWeight: '800',
+    fontSize: 13,
+  },
+  commModalSaveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  commModalSaveBtnText: {
+    fontWeight: '700',
+    fontSize: 13,
   },
 });
