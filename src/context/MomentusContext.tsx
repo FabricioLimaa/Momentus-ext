@@ -258,6 +258,13 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     validatedDayDatesRef.current = validatedDayDates;
   }, [validatedDayDates]);
 
+  // Registro das rotinas cujos pontos de conclusão já foram validados (Anti-Abuse)
+  const [validatedRoutineKeys, setValidatedRoutineKeys] = useState<string[]>([]);
+  const validatedRoutineKeysRef = useRef<string[]>([]);
+  useEffect(() => {
+    validatedRoutineKeysRef.current = validatedRoutineKeys;
+  }, [validatedRoutineKeys]);
+
   // Ref para permitir chamada segura de syncCloudAction a partir de callbacks externos
   const syncCloudActionRef = useRef<(targetUid?: string) => Promise<void>>(async () => {});
   // Trava para evitar execuções duplicadas e concorrentes de sincronização com o Firestore
@@ -474,6 +481,12 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         } else if (initialCompletedDays.length > 0) {
           setValidatedDayDates(initialCompletedDays);
           await setAppKv('validated_day_dates', initialCompletedDays).catch(() => {});
+        }
+
+        // Carrega rotinas já validadas de bônus para evitar pontos duplicados
+        const savedValidatedRoutines = await getAppKv<string[]>('validated_routine_keys');
+        if (Array.isArray(savedValidatedRoutines)) {
+          setValidatedRoutineKeys(savedValidatedRoutines);
         }
 
         const cleanAchievements =
@@ -798,6 +811,9 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     let targetDate = '';
     let isDayFullyComplete = false;
     let isFirstTimeDayValidated = false;
+    let isRoutineFullyComplete = false;
+    let isFirstTimeRoutineValidated = false;
+    let completedRoutineTitle = '';
     let nextTotalHabitsCompleted = 0;
     let nextStreak = userProfile.currentStreak;
 
@@ -846,12 +862,34 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             setAppKv('validated_day_dates', nextValidated).catch(() => {});
           }
         }
+
+        // 3.1 Verificação de Rotina Concluída (Template de múltiplos hábitos)
+        if (targetHabit.templateSourceId) {
+          const routineHabits = updated.filter(
+            (h) => h.date === targetDate && h.templateSourceId === targetHabit.templateSourceId
+          );
+          if (routineHabits.length > 1 && routineHabits.every((h) => h.completed)) {
+            isRoutineFullyComplete = true;
+            const routineKey = `${targetDate}_${targetHabit.templateSourceId}`;
+            const currentValidatedRoutines = validatedRoutineKeysRef.current;
+            if (!currentValidatedRoutines.includes(routineKey)) {
+              isFirstTimeRoutineValidated = true;
+              const nextValidatedRoutines = [...currentValidatedRoutines, routineKey];
+              setValidatedRoutineKeys(nextValidatedRoutines);
+              setAppKv('validated_routine_keys', nextValidatedRoutines).catch(() => {});
+
+              const foundTmpl = templates.find((t) => t.id === targetHabit.templateSourceId);
+              completedRoutineTitle = foundTmpl?.title || 'Rotina';
+            }
+          }
+        }
       }
 
       setUserProfile((p) => {
         const habitDeltaPoints = nextCompleted ? 15 : -15;
         const dayBonusPoints = isFirstTimeDayValidated ? 25 : 0;
-        const nextPoints = Math.max(0, p.totalPoints + habitDeltaPoints + dayBonusPoints);
+        const routineBonusPoints = isFirstTimeRoutineValidated ? 20 : 0;
+        const nextPoints = Math.max(0, p.totalPoints + habitDeltaPoints + dayBonusPoints + routineBonusPoints);
         const nextBestStreak = Math.max(p.bestStreak, nextStreak);
         const nextProfile: UserProfile = {
           ...p,
@@ -878,11 +916,14 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
 
     if (isDayFullyComplete) {
+      const combinedPoints = (isFirstTimeDayValidated ? 25 : 0) + (isFirstTimeRoutineValidated ? 20 : 0);
       if (isFirstTimeDayValidated) {
         showCelebration(
           'Dia Conquistado! 🌟',
-          'Parabéns! Você concluiu 100% das suas tarefas planejadas.',
-          25
+          isFirstTimeRoutineValidated
+            ? `Incrível! Você concluiu a rotina "${completedRoutineTitle}" e 100% de todas as suas tarefas do dia!`
+            : 'Parabéns! Você concluiu 100% das suas tarefas planejadas.',
+          combinedPoints
         );
       } else {
         showCelebration(
@@ -891,6 +932,12 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           0
         );
       }
+    } else if (isRoutineFullyComplete && isFirstTimeRoutineValidated) {
+      showCelebration(
+        'Rotina Concluída! 📋✨',
+        `Parabéns! Você completou todas as atividades da rotina "${completedRoutineTitle}".`,
+        20
+      );
     }
 
     checkAndUnlockAchievements(nextStreak, nextTotalHabitsCompleted, templates.length);
