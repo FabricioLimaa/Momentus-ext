@@ -8,60 +8,227 @@ import {
   Platform,
   StatusBar,
   Modal,
-  Alert,
   Linking,
+  Share,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import {
-  MomentusColors,
+  getContrastTextColor,
   LayoutTokens,
   BorderRadiusTokens,
-  ComponentHeightTokens,
-  TypographyTokens,
 } from '@/constants/theme';
 import { APP_INFO } from '@/constants/appInfo';
 import { useMomentus } from '@/context/MomentusContext';
-import { GlassCard } from '@/components/momentus/GlassCard';
+
+export type UpdateTagType = 'NOVO' | 'MELHORIA' | 'DESIGN' | 'SEGURANCA' | 'CORRECAO';
+
+export interface UpdateItem {
+  id: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  tag: UpdateTagType;
+  title: string;
+  description: string;
+  actionRoute?: string;
+  actionLabel?: string;
+}
+
+export interface VersionRelease {
+  version: string;
+  codename: string;
+  date: string;
+  isCurrent: boolean;
+  highlights: string;
+  items: UpdateItem[];
+}
+
+export const CHANGELOG_DATA: VersionRelease[] = [
+  {
+    version: '2.1.0',
+    codename: 'Evolução, Foco & Imersão',
+    date: 'Novembro de 2026',
+    isCurrent: true,
+    highlights: 'Timer Pomodoro profundo, Galeria de templates estilo Netflix, Gamificação com molduras cósmicas e proteção biométrica.',
+    items: [
+      {
+        id: 'feat-focus',
+        icon: 'timer-outline',
+        tag: 'NOVO',
+        title: 'Timer Pomodoro Imersivo com Sons & Metas',
+        description: 'Treine seu foco profundo com ciclos customizáveis (15m a 60m), metas diárias de foco e alertas suaves de transição.',
+        actionRoute: '/focus',
+        actionLabel: 'Experimentar Foco →',
+      },
+      {
+        id: 'feat-templates',
+        icon: 'sparkles-outline',
+        tag: 'NOVO',
+        title: 'Galeria de Templates "Estilo Netflix"',
+        description: 'Adote rotinas consagradas de alta performance com 1 toque através de trilhas horizontais de manhã, estudos, saúde e desaceleração.',
+        actionRoute: '/templates',
+        actionLabel: 'Explorar Templates →',
+      },
+      {
+        id: 'feat-gamification',
+        icon: 'trophy-outline',
+        tag: 'MELHORIA',
+        title: 'Títulos Honorários, Tiers & Molduras Cósmicas',
+        description: 'Seu progresso de XP agora desbloqueia molduras de avatar neon, títulos de prestígio e novos tiers de medalhas.',
+        actionRoute: '/achievements',
+        actionLabel: 'Ver Conquistas →',
+      },
+      {
+        id: 'feat-categories',
+        icon: 'color-palette-outline',
+        tag: 'DESIGN',
+        title: 'Paleta Neon Expandida & Catálogo de Ícones',
+        description: 'Mais de 18 novos ícones universais e 12 cores neon para organizar suas categorias com visualização ao vivo no editor.',
+        actionRoute: '/categories',
+        actionLabel: 'Personalizar Categorias →',
+      },
+      {
+        id: 'feat-security',
+        icon: 'finger-print-outline',
+        tag: 'SEGURANCA',
+        title: 'Bloqueio Biométrico por Face ID & Digital',
+        description: 'Camada de proteção extra para blindar sua privacidade e exigir confirmação biométrica ao abrir o Momentus.',
+        actionRoute: '/settings',
+        actionLabel: 'Configurar Ajustes →',
+      },
+      {
+        id: 'fix-sync',
+        icon: 'cloud-done-outline',
+        tag: 'CORRECAO',
+        title: 'Resiliência Offline & Timeout na Sincronização',
+        description: 'Sincronização manual protegida com limite estrito de 8 segundos, prevenindo bloqueios de tela caso a internet oscile.',
+      },
+    ],
+  },
+  {
+    version: '2.0.0',
+    codename: 'Salto Visual, Cloud & Agenda',
+    date: 'Outubro de 2026',
+    isCurrent: false,
+    highlights: 'Sincronização bilateral com o Google Calendar, persistência em Cloud Firestore e SQLite local em repouso.',
+    items: [
+      {
+        id: 'feat-gcal',
+        icon: 'calendar-outline',
+        tag: 'NOVO',
+        title: 'Sincronização com o Google Calendar',
+        description: 'Seus hábitos e rotinas sincronizados diretamente com seu calendário oficial sem duplicidade.',
+      },
+      {
+        id: 'feat-cloud-sync',
+        icon: 'cloud-upload-outline',
+        tag: 'MELHORIA',
+        title: 'Arquitetura Híbrida Offline-First',
+        description: 'Seus dados funcionam 100% offline no celular e sincronizam automaticamente na nuvem ao restabelecer a conexão.',
+      },
+      {
+        id: 'feat-glass-design',
+        icon: 'eye-outline',
+        tag: 'DESIGN',
+        title: 'Design System Zen com Glassmorphism',
+        description: 'Superfícies em vidro fosco translúcido e ergonomia mobile de ponta a ponta.',
+      },
+    ],
+  },
+  {
+    version: '1.9.0',
+    codename: 'Fundamentos de Hábitos & Streaks',
+    date: 'Setembro de 2026',
+    isCurrent: false,
+    highlights: 'Rastreamento contínuo de hábitos, cálculo automático de sequências (streaks) e relatórios de produtividade.',
+    items: [
+      {
+        id: 'feat-streaks',
+        icon: 'flame-outline',
+        tag: 'NOVO',
+        title: 'Cálculo Dinâmico de Streaks & Dias Conquistados',
+        description: 'Acompanhe quantos dias seguidos você manteve sua consistência diária e ganhe bônus de XP.',
+      },
+      {
+        id: 'feat-stats',
+        icon: 'bar-chart-outline',
+        tag: 'MELHORIA',
+        title: 'Gráficos e Estatísticas de Produtividade',
+        description: 'Visão clara dos hábitos mais consistentes da semana com taxa percentual de sucesso.',
+      },
+    ],
+  },
+];
 
 export default function UpdateNotesScreen() {
   const router = useRouter();
-  const { theme } = useMomentus();
-  const [showUpdateDialog, setShowUpdateDialog] = useState(false);
+  const { theme, triggerHaptic } = useMomentus();
 
-  const updates = [
-    {
-      icon: 'sparkles' as const,
-      title: 'Novo Visual Moderno e Confortável',
-      description:
-        'Uma interface mais limpa, elegante e agradável para os olhos, com transições suaves para você acompanhar sua rotina com tranquilidade.',
-    },
-    {
-      icon: 'notifications' as const,
-      title: 'Lembretes Inteligentes para Não Perder o Ritmo',
-      description:
-        'Conclua ou adie suas tarefas com apenas um toque direto nas notificações, sem precisar abrir o aplicativo.',
-    },
-    {
-      icon: 'cloud-done' as const,
-      title: 'Seus Dados Salvos com Segurança Máxima',
-      description:
-        'Seus dados ficam salvos com segurança máxima no seu aparelho e sincronizam automaticamente na nuvem para você acessar de qualquer lugar.',
-    },
-    {
-      icon: 'calendar' as const,
-      title: 'Linha do Tempo e Organização Contínua',
-      description:
-        'Acompanhe o início e término das suas atividades em uma faixa contínua, clara e fácil de ler ao longo de toda a semana.',
-    },
-    {
-      icon: 'bag-handle' as const,
-      title: 'Recompensas e Conquistas Positivas',
-      description:
-        'Ganhe pontos e suba de nível ao cumprir hábitos e sessões de foco, personalizando suas categorias com cores e adesivos exclusivos.',
-    },
-  ];
+  const [activeFilter, setActiveFilter] = useState<'ALL' | UpdateTagType>('ALL');
+  const [showUpdateDialog, setShowUpdateDialog] = useState(false);
+  const [isCheckingVersion, setIsCheckingVersion] = useState(false);
+
+  const getTagBadgeStyle = (tag: UpdateTagType) => {
+    switch (tag) {
+      case 'NOVO':
+        return { bg: `${theme.primary}20`, border: theme.primary, text: theme.primary, label: '✨ NOVO' };
+      case 'MELHORIA':
+        return { bg: 'rgba(56, 189, 248, 0.15)', border: '#38BDF8', text: '#38BDF8', label: '⚡ MELHORIA' };
+      case 'DESIGN':
+        return { bg: 'rgba(168, 85, 247, 0.15)', border: '#A855F7', text: '#A855F7', label: '🎨 DESIGN' };
+      case 'SEGURANCA':
+        return { bg: 'rgba(245, 158, 11, 0.15)', border: '#F59E0B', text: '#F59E0B', label: '🔒 SEGURANÇA' };
+      case 'CORRECAO':
+        return { bg: 'rgba(251, 113, 133, 0.15)', border: '#FB7185', text: '#FB7185', label: '🐛 CORREÇÃO' };
+      default:
+        return { bg: `${theme.textSecondary}15`, border: theme.outline, text: theme.textSecondary, label: tag };
+    }
+  };
+
+  const handleShareUpdates = async () => {
+    triggerHaptic('impact');
+    const shareMessage = [
+      `✨ Confira as novidades do ${APP_INFO.name} (Versão 2.1.0)!`,
+      '',
+      '• ⏱️ Novo Timer Pomodoro profundo com metas diárias',
+      '• 🎬 Galeria de Rotinas estilo streaming (1-toque)',
+      '• 🏆 Títulos honorários, molduras cósmicas e medalhas',
+      '• 🔒 Bloqueio biométrico por Face ID ou Digital',
+      '• ☁️ Sincronização offline-first com Google Calendar',
+      '',
+      `Conheça e experimente no site oficial: ${APP_INFO.website}`,
+    ].join('\n');
+
+    try {
+      await Share.share({
+        message: shareMessage,
+        title: `Novidades ${APP_INFO.name} 2.1.0`,
+      });
+    } catch (e) {
+      console.warn('Erro ao compartilhar changelog:', e);
+    }
+  };
+
+  const handleCheckVersion = () => {
+    triggerHaptic('impact');
+    setIsCheckingVersion(true);
+
+    setTimeout(() => {
+      setIsCheckingVersion(false);
+      triggerHaptic('success');
+      setShowUpdateDialog(true);
+    }, 1200);
+  };
+
+  const handleSendFeedback = () => {
+    triggerHaptic('impact');
+    const subject = encodeURIComponent(`Sugestão para o ${APP_INFO.name} v2.1.0`);
+    const body = encodeURIComponent(
+      `Olá ${APP_INFO.developer},\n\nGostaria de sugerir o seguinte recurso para a próxima versão do Momentus:\n\n[Descreva sua ideia aqui]\n\nObrigado!\n`
+    );
+    Linking.openURL(`mailto:${APP_INFO.email}?subject=${subject}&body=${body}`);
+  };
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
@@ -69,81 +236,274 @@ export default function UpdateNotesScreen() {
       <View style={[styles.container, { backgroundColor: theme.background }]}>
         {/* TopBar */}
         <View style={styles.topBar}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backButton}
+            accessibilityRole="button"
+            accessibilityLabel="Voltar">
             <Ionicons name="arrow-back" size={24} color={theme.textPrimary} />
           </TouchableOpacity>
           <Text style={[styles.topBarTitle, { color: theme.textPrimary }]}>Novidades</Text>
-          <TouchableOpacity
-            onPress={() => setShowUpdateDialog(true)}
-            style={[styles.checkUpdateBtn, { backgroundColor: `${theme.primary}15` }]}>
-            <Ionicons name="cloud-download-outline" size={18} color={theme.primary} />
-          </TouchableOpacity>
+
+          <View style={styles.topBarActions}>
+            <TouchableOpacity
+              onPress={handleShareUpdates}
+              style={[styles.topBarBtn, { backgroundColor: theme.surface, borderColor: theme.outline }]}
+              accessibilityRole="button"
+              accessibilityLabel="Compartilhar novidades">
+              <Ionicons name="share-social-outline" size={18} color={theme.textPrimary} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={handleCheckVersion}
+              disabled={isCheckingVersion}
+              style={[styles.topBarBtn, { backgroundColor: `${theme.primary}20`, borderColor: theme.primary }]}
+              accessibilityRole="button"
+              accessibilityLabel="Verificar atualização">
+              {isCheckingVersion ? (
+                <ActivityIndicator size="small" color={theme.primary} />
+              ) : (
+                <Ionicons name="cloud-download-outline" size={18} color={theme.primary} />
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
 
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}>
-          <Text style={[styles.mainTitle, { color: theme.textPrimary }]}>O que há de novo?</Text>
 
-          {/* Versão Pill */}
-          <View style={styles.versionRow}>
-            <View style={[styles.versionBadge, { backgroundColor: `${theme.primary}15`, borderColor: theme.primary }]}>
-              <Text style={[styles.versionBadgeText, { color: theme.primary }]}>
-                Versão 2.1.0 • Disponível no Web, Android e iOS
-              </Text>
+          {/* Banner de Versão Atual com Brilho Neon */}
+          <View style={[styles.versionBannerCard, { backgroundColor: theme.surface, borderColor: theme.primary }]}>
+            <View style={styles.versionBannerTop}>
+              <View style={[styles.versionBadge, { backgroundColor: `${theme.primary}25`, borderColor: theme.primary }]}>
+                <Ionicons name="sparkles" size={14} color={theme.primary} />
+                <Text style={[styles.versionBadgeText, { color: theme.primary }]}>Versão 2.1.0 • Oficial</Text>
+              </View>
+              <Text style={[styles.releaseDateText, { color: theme.textSecondary }]}>Novembro de 2026</Text>
             </View>
 
-            <TouchableOpacity
-              onPress={() => setShowUpdateDialog(true)}
-              style={[styles.verifyBtn, { borderColor: theme.outline, backgroundColor: theme.surface }]}
-              activeOpacity={0.8}>
-              <Ionicons name="refresh-outline" size={14} color={theme.textPrimary} />
-              <Text style={[styles.verifyBtnText, { color: theme.textPrimary }]}>Verificar Versão</Text>
-            </TouchableOpacity>
+            <Text style={[styles.bannerTitle, { color: theme.textPrimary }]}>
+              Evolução, Foco & Imersão ✨
+            </Text>
+            <Text style={[styles.bannerSubtitle, { color: theme.textSecondary }]}>
+              {CHANGELOG_DATA[0].highlights}
+            </Text>
+
+            <View style={[styles.bannerVerifyRow, { borderTopColor: theme.outline }]}>
+              <TouchableOpacity
+                onPress={handleCheckVersion}
+                style={[styles.verifyBtn, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}
+                activeOpacity={0.8}>
+                <Ionicons name="checkmark-circle-outline" size={15} color={theme.primary} />
+                <Text style={[styles.verifyBtnText, { color: theme.textPrimary }]}>
+                  {isCheckingVersion ? 'Verificando...' : 'Verificar Atualizações'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
-          {/* Lista de Novidades */}
-          <View style={styles.updatesList}>
-            {updates.map((item, index) => (
-              <GlassCard key={index} style={styles.updateCard}>
-                <View style={styles.cardRow}>
-                  <View style={[styles.iconCircle, { backgroundColor: `${theme.primary}15` }]}>
-                    <Ionicons name={item.icon} size={22} color={theme.primary} />
+          {/* Filtros Rápidos por Pílula */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filtersScrollContent}
+            style={styles.filtersScrollView}>
+            {[
+              { id: 'ALL' as const, label: 'Todas' },
+              { id: 'NOVO' as const, label: '✨ Recursos' },
+              { id: 'MELHORIA' as const, label: '⚡ Melhorias' },
+              { id: 'DESIGN' as const, label: '🎨 Design' },
+              { id: 'SEGURANCA' as const, label: '🔒 Segurança' },
+              { id: 'CORRECAO' as const, label: '🐛 Correções' },
+            ].map((pill) => {
+              const isSelected = activeFilter === pill.id;
+              return (
+                <TouchableOpacity
+                  key={pill.id}
+                  style={[
+                    styles.filterPill,
+                    {
+                      backgroundColor: isSelected ? `${theme.primary}25` : theme.surface,
+                      borderColor: isSelected ? theme.primary : theme.outline,
+                    },
+                  ]}
+                  onPress={() => {
+                    triggerHaptic('selection');
+                    setActiveFilter(pill.id);
+                  }}
+                  activeOpacity={0.7}>
+                  <Text
+                    style={[
+                      styles.filterPillText,
+                      { color: isSelected ? theme.primary : theme.textSecondary },
+                      isSelected && { fontWeight: '800' },
+                    ]}>
+                    {pill.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          {/* Linha do Tempo Histórica do Changelog */}
+          <View style={styles.timelineContainer}>
+            {CHANGELOG_DATA.map((release) => {
+              const filteredItems = release.items.filter(
+                (item) => activeFilter === 'ALL' || item.tag === activeFilter
+              );
+
+              if (filteredItems.length === 0) return null;
+
+              return (
+                <View key={release.version} style={styles.releaseSection}>
+                  {/* Cabeçalho da Versão na Timeline */}
+                  <View style={styles.releaseHeaderRow}>
+                    <View
+                      style={[
+                        styles.timelineDot,
+                        {
+                          backgroundColor: release.isCurrent ? theme.primary : theme.surfaceElevated,
+                          borderColor: release.isCurrent ? theme.primary : theme.outline,
+                        },
+                      ]}>
+                      <Ionicons
+                        name={release.isCurrent ? 'star' : 'ellipse'}
+                        size={release.isCurrent ? 12 : 8}
+                        color={release.isCurrent ? '#0F172A' : theme.textSecondary}
+                      />
+                    </View>
+
+                    <View style={styles.releaseHeaderTitleCol}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Text style={[styles.releaseVersionTitle, { color: theme.textPrimary }]}>
+                          v{release.version}
+                        </Text>
+                        <Text style={[styles.releaseCodename, { color: release.isCurrent ? theme.primary : theme.textSecondary }]}>
+                          {release.codename}
+                        </Text>
+                      </View>
+                      <Text style={[styles.releaseDateSmall, { color: theme.textSecondary }]}>
+                        {release.date}
+                      </Text>
+                    </View>
                   </View>
 
-                  <View style={styles.cardContent}>
-                    <Text style={[styles.updateItemTitle, { color: theme.textPrimary }]}>{item.title}</Text>
-                    <Text style={[styles.updateItemDescription, { color: theme.textSecondary }]}>{item.description}</Text>
+                  {/* Itens de Novidade da Versão com Linha Conectora Vertical */}
+                  <View style={styles.itemsWrapperWithLine}>
+                    {/* Linha Vertical Luminosa */}
+                    <View
+                      style={[
+                        styles.verticalTimelineLine,
+                        { backgroundColor: release.isCurrent ? `${theme.primary}50` : theme.outline },
+                      ]}
+                    />
+
+                    <View style={styles.itemsListCol}>
+                      {filteredItems.map((item) => {
+                        const badgeStyle = getTagBadgeStyle(item.tag);
+                        return (
+                          <View
+                            key={item.id}
+                            style={[
+                              styles.updateCard,
+                              { backgroundColor: theme.surface, borderColor: theme.outline },
+                              release.isCurrent && item.tag === 'NOVO' && { borderColor: `${theme.primary}40` },
+                            ]}>
+                            <View style={styles.cardHeaderRow}>
+                              <View style={[styles.iconCircle, { backgroundColor: badgeStyle.bg }]}>
+                                <Ionicons name={item.icon} size={20} color={badgeStyle.text} />
+                              </View>
+
+                              <View style={{ flex: 1 }}>
+                                <View style={styles.cardTitleTop}>
+                                  <Text style={[styles.itemTitle, { color: theme.textPrimary }]}>
+                                    {item.title}
+                                  </Text>
+                                  <View
+                                    style={[
+                                      styles.tagBadge,
+                                      { backgroundColor: badgeStyle.bg, borderColor: badgeStyle.border },
+                                    ]}>
+                                    <Text style={[styles.tagBadgeText, { color: badgeStyle.text }]}>
+                                      {badgeStyle.label}
+                                    </Text>
+                                  </View>
+                                </View>
+                                <Text style={[styles.itemDescription, { color: theme.textSecondary }]}>
+                                  {item.description}
+                                </Text>
+                              </View>
+                            </View>
+
+                            {/* Ação Rápida de Deep Link ("Experimentar Agora") */}
+                            {item.actionRoute && (
+                              <TouchableOpacity
+                                style={[styles.actionTourBtn, { backgroundColor: `${theme.primary}15` }]}
+                                onPress={() => {
+                                  triggerHaptic('impact');
+                                  router.push(item.actionRoute as any);
+                                }}
+                                activeOpacity={0.8}>
+                                <Text style={[styles.actionTourBtnText, { color: theme.primary }]}>
+                                  {item.actionLabel || 'Experimentar Agora →'}
+                                </Text>
+                                <Ionicons name="arrow-forward" size={13} color={theme.primary} />
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        );
+                      })}
+                    </View>
                   </View>
                 </View>
-              </GlassCard>
-            ))}
+              );
+            })}
           </View>
 
-          {/* Footer Card */}
-          <GlassCard style={styles.footerCard}>
-            <View style={[styles.footerLogoCircle, { backgroundColor: `${theme.primary}15` }]}>
-              <Ionicons name="flame" size={32} color={theme.primary} />
+          {/* Canal de Sugestões & Feedback da Comunidade */}
+          <View style={[styles.feedbackCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+            <View style={[styles.feedbackIconCircle, { backgroundColor: `${theme.primary}20` }]}>
+              <Ionicons name="bulb-outline" size={24} color={theme.primary} />
             </View>
-            <Text style={[styles.footerCardTitle, { color: theme.textPrimary }]}>{APP_INFO.name}</Text>
-            <Text style={[styles.footerCardSubtitle, { color: theme.textSecondary }]}>
-              {APP_INFO.tagline}
+            <Text style={[styles.feedbackTitle, { color: theme.textPrimary }]}>
+              Tem uma ideia para a próxima versão?
             </Text>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: theme.textSecondary, marginTop: 12 }}>
-              Desenvolvido por {APP_INFO.developer}
+            <Text style={[styles.feedbackSubtitle, { color: theme.textSecondary }]}>
+              O {APP_INFO.name} evolui com você. Conte para a nossa equipe qual recurso tornaria a sua rotina ainda mais produtiva e tranquila.
             </Text>
-            <TouchableOpacity onPress={() => Linking.openURL(`mailto:${APP_INFO.email}`)} activeOpacity={0.7}>
-              <Text style={{ fontSize: 12, color: theme.primary, marginTop: 4, fontWeight: '600' }}>
-                {APP_INFO.email}
+
+            <TouchableOpacity
+              style={[styles.feedbackBtn, { backgroundColor: theme.primary }]}
+              onPress={handleSendFeedback}
+              activeOpacity={0.85}>
+              <Ionicons name="mail" size={16} color={getContrastTextColor(theme.primary)} />
+              <Text style={[styles.feedbackBtnText, { color: getContrastTextColor(theme.primary) }]}>
+                Enviar Minha Sugestão 💡
               </Text>
             </TouchableOpacity>
-          </GlassCard>
+          </View>
 
-          <View style={{ height: 40 }} />
+          {/* Rodapé Institucional */}
+          <View style={styles.footerBrand}>
+            <Text style={[styles.footerText, { color: theme.textSecondary }]}>
+              {APP_INFO.name} • Desenvolvido por {APP_INFO.developer}
+            </Text>
+            <Text style={[styles.footerCopyright, { color: theme.textSecondary }]}>
+              {APP_INFO.copyright}
+            </Text>
+            <TouchableOpacity onPress={() => Linking.openURL(APP_INFO.website)} activeOpacity={0.7}>
+              <Text style={[styles.footerUrl, { color: theme.primary }]}>
+                {APP_INFO.domains.official}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={{ height: 32 }} />
         </ScrollView>
 
-        {/* Modal: UpdateAvailableDialog (espelhando UpdateAvailableDialog.kt) */}
+        {/* Modal de Status de Versão Recente */}
         <Modal
           visible={showUpdateDialog}
           transparent
@@ -152,31 +512,24 @@ export default function UpdateNotesScreen() {
           <View style={styles.dialogOverlay}>
             <View style={[styles.dialogCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
               <View style={[styles.dialogIconBox, { backgroundColor: `${theme.primary}20` }]}>
-                <Ionicons name="sparkles" size={30} color={theme.primary} />
+                <Ionicons name="checkmark-done" size={32} color={theme.primary} />
               </View>
 
               <Text style={[styles.dialogTitle, { color: theme.textPrimary }]}>
-                Momentus 2.1.0 Ativo!
+                Você está atualizado! 🎉
               </Text>
 
               <Text style={[styles.dialogDesc, { color: theme.textSecondary }]}>
-                O Momentus evoluiu! Você já está utilizando a versão mais recente com seus dados salvos com segurança máxima no aparelho, sincronização contínua na nuvem e lembretes inteligentes.
+                O {APP_INFO.name} está na versão mais recente (v2.1.0). Todos os recursos de Pomodoro, galeria de rotinas e biometria estão 100% ativos e seguros no seu dispositivo.
               </Text>
 
               <TouchableOpacity
                 style={[styles.dialogPrimaryBtn, { backgroundColor: theme.primary }]}
-                onPress={() => {
-                  setShowUpdateDialog(false);
-                  Alert.alert('Tudo Atualizado! ✨', 'Nenhuma atualização pendente no momento.');
-                }}
+                onPress={() => setShowUpdateDialog(false)}
                 activeOpacity={0.85}>
-                <Text style={styles.dialogPrimaryBtnText}>EXCELENTE</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.dialogDismissBtn}
-                onPress={() => setShowUpdateDialog(false)}>
-                <Text style={[styles.dialogDismissText, { color: theme.textSecondary }]}>Fechar</Text>
+                <Text style={[styles.dialogPrimaryBtnText, { color: getContrastTextColor(theme.primary) }]}>
+                  EXCELENTE
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -202,25 +555,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
-    paddingVertical: LayoutTokens.pagePaddingTop,
+    paddingVertical: 12,
   },
   backButton: {
-    width: ComponentHeightTokens.iconButton,
-    height: ComponentHeightTokens.iconButton,
-    borderRadius: ComponentHeightTokens.iconButton / 2,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  checkUpdateBtn: {
-    width: ComponentHeightTokens.iconButton,
-    height: ComponentHeightTokens.iconButton,
-    borderRadius: ComponentHeightTokens.iconButton / 2,
-    justifyContent: 'center',
-    alignItems: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   topBarTitle: {
-    ...TypographyTokens.screenTitle,
-    color: MomentusColors.textPrimary,
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  topBarActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  topBarBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   scroll: {
     flex: 1,
@@ -230,111 +591,261 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: LayoutTokens.pagePaddingBottom,
   },
-  mainTitle: {
-    fontSize: 28,
-    fontWeight: '900',
-    color: MomentusColors.textPrimary,
+  versionBannerCard: {
+    borderRadius: BorderRadiusTokens.card,
+    borderWidth: 1.5,
+    padding: 18,
+    marginBottom: 16,
+  },
+  versionBannerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 10,
   },
-  versionRow: {
+  versionBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 24,
-    gap: 10,
-  },
-  versionBadge: {
-    backgroundColor: 'rgba(52, 211, 153, 0.12)',
+    gap: 6,
     borderWidth: 1,
-    borderColor: 'rgba(52, 211, 153, 0.25)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 10,
   },
   versionBadgeText: {
-    color: MomentusColors.emeraldNeon,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
+  },
+  releaseDateText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  bannerTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    marginBottom: 4,
+  },
+  bannerSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 14,
+  },
+  bannerVerifyRow: {
+    borderTopWidth: 1,
+    paddingTop: 12,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
   },
   verifyBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 7,
     borderRadius: 10,
     borderWidth: 1,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   verifyBtnText: {
     fontSize: 12,
     fontWeight: '700',
   },
-  updatesList: {
-    gap: 12,
-    marginBottom: 24,
+  filtersScrollView: {
+    marginBottom: 18,
   },
-  updateCard: {
-    padding: 16,
+  filtersScrollContent: {
+    gap: 8,
+    paddingRight: 10,
   },
-  cardRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 14,
-  },
-  iconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(52, 211, 153, 0.12)',
+  filterPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(52, 211, 153, 0.2)',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  },
+  filterPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  timelineContainer: {
+    marginBottom: 16,
+  },
+  releaseSection: {
+    marginBottom: 20,
+  },
+  releaseHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  timelineDot: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  cardContent: {
+  releaseHeaderTitleCol: {
     flex: 1,
   },
-  updateItemTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: MomentusColors.textPrimary,
+  releaseVersionTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  releaseCodename: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  releaseDateSmall: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  itemsWrapperWithLine: {
+    flexDirection: 'row',
+    position: 'relative',
+    marginLeft: 11,
+  },
+  verticalTimelineLine: {
+    width: 2,
+    position: 'absolute',
+    left: 0,
+    top: -4,
+    bottom: 8,
+  },
+  itemsListCol: {
+    flex: 1,
+    paddingLeft: 20,
+    gap: 12,
+  },
+  updateCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 14,
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  iconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardTitleTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 6,
     marginBottom: 4,
   },
-  updateItemDescription: {
-    fontSize: 13,
-    lineHeight: 20,
-    color: MomentusColors.textSecondary,
+  itemTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    flex: 1,
   },
-  footerCard: {
-    padding: 28,
+  tagBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  tagBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  itemDescription: {
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  actionTourBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 7,
+    borderRadius: 10,
+    marginTop: 10,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
-  footerLogoCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(52, 211, 153, 0.12)',
+  actionTourBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  feedbackCard: {
+    borderRadius: BorderRadiusTokens.card,
+    borderWidth: 1,
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  feedbackIconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 12,
   },
-  footerCardTitle: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: MomentusColors.textPrimary,
+  feedbackTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 6,
   },
-  footerCardSubtitle: {
+  feedbackSubtitle: {
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 17,
+    marginBottom: 16,
+  },
+  feedbackBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 14,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  },
+  feedbackBtnText: {
+    fontWeight: '800',
     fontSize: 13,
-    color: MomentusColors.textSecondary,
+  },
+  footerBrand: {
+    alignItems: 'center',
+    marginTop: 4,
+    marginBottom: 12,
+  },
+  footerText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  footerCopyright: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  footerUrl: {
+    fontSize: 11,
+    fontWeight: '700',
     marginTop: 4,
   },
   dialogOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.78)',
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: 20,
   },
   dialogCard: {
     width: '100%',
@@ -353,35 +864,27 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   dialogTitle: {
-    fontSize: 21,
+    fontSize: 20,
     fontWeight: '900',
     textAlign: 'center',
-    marginBottom: 10,
   },
   dialogDesc: {
     fontSize: 13,
-    lineHeight: 20,
     textAlign: 'center',
-    marginBottom: 24,
+    lineHeight: 19,
+    marginTop: 8,
+    marginBottom: 20,
   },
   dialogPrimaryBtn: {
     width: '100%',
-    height: 48,
+    paddingVertical: 14,
     borderRadius: 16,
-    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    justifyContent: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   dialogPrimaryBtnText: {
-    color: '#0F172A',
     fontSize: 14,
-    fontWeight: '900',
-  },
-  dialogDismissBtn: {
-    paddingVertical: 8,
-  },
-  dialogDismissText: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '800',
   },
 });
