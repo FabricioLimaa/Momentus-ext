@@ -30,6 +30,7 @@ export interface LegalDocument {
   subtitle: string;
   lastUpdated: string;
   intro: string;
+  tldr?: string;
   sections: LegalSection[];
   conclusion?: string;
 }
@@ -43,6 +44,8 @@ export const LEGAL_DOCUMENTS: Record<LegalLanguage, Record<LegalDocumentType, Le
       lastUpdated: TERMS_LAST_UPDATED_PT,
       intro:
         'Estes Termos e Condições de Uso ("Termos") regem o seu acesso e uso do aplicativo Momentus ("Aplicativo"), desenvolvido por Fabricio Lima ("Autor"). Ao acessar ou usar o Aplicativo, você concorda expressamente em cumprir estes Termos.',
+      tldr:
+        'O Momentus é uma ferramenta focada na sua rotina e produtividade pessoal. Seus dados pertencem a você e não é permitida a clonagem ou engenharia reversa do software.',
       sections: [
         {
           badge: '1.0',

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,16 +8,18 @@ import {
   Platform,
   StatusBar,
   Alert,
+  Linking,
+  Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
-  MomentusColors,
+  getContrastTextColor,
   LayoutTokens,
   BorderRadiusTokens,
-  ComponentHeightTokens,
 } from '@/constants/theme';
+import { APP_INFO } from '@/constants/appInfo';
 import { useMomentus } from '@/context/MomentusContext';
 import {
   LEGAL_DOCUMENTS,
@@ -28,6 +30,7 @@ import {
 
 export default function LegalScreen() {
   const router = useRouter();
+  const scrollViewRef = useRef<ScrollView>(null);
   const { mandatory } = useLocalSearchParams<{ mandatory?: string }>();
   const {
     theme,
@@ -36,12 +39,15 @@ export default function LegalScreen() {
     declineTermsAction,
     isTermsAccepted,
     userProfile,
+    triggerHaptic,
   } = useMomentus();
 
   const [language, setLanguage] = useState<LegalLanguage>('pt');
   const [selectedDoc, setSelectedDoc] = useState<LegalDocumentType>('terms');
   const [isAgreed, setIsAgreed] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [showScrollTop, setShowScrollTop] = useState<boolean>(false);
+  const [fontSizeStep, setFontSizeStep] = useState<number>(0); // -1, 0, 1, 2
 
   const isAccepted = isTermsAccepted();
   const isMandatory = mandatory === 'true' || !isAccepted;
@@ -110,7 +116,43 @@ export default function LegalScreen() {
     }
   };
 
-  const fontSizeScale = settings.fontSizeMultiplier || 1.0;
+  const handleShareTerms = async () => {
+    triggerHaptic('impact');
+    const isPt = language === 'pt';
+    const message = isPt
+      ? `📜 ${currentDoc.title} do ${APP_INFO.name}:\n${APP_INFO.website}terms\n\nDesenvolvido por ${APP_INFO.developer}`
+      : `📜 ${currentDoc.title} - ${APP_INFO.name}:\n${APP_INFO.website}terms\n\nDeveloped by ${APP_INFO.developer}`;
+
+    try {
+      await Share.share({
+        message,
+        title: currentDoc.title,
+      });
+    } catch (e) {
+      console.warn('Erro ao compartilhar termos:', e);
+    }
+  };
+
+  const handleCycleFontSize = () => {
+    triggerHaptic('selection');
+    setFontSizeStep((prev) => (prev >= 2 ? -1 : prev + 1));
+  };
+
+  const handleScrollToTop = () => {
+    triggerHaptic('impact');
+    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+  };
+
+  const handleContactDpo = () => {
+    triggerHaptic('impact');
+    const subject = encodeURIComponent(`Dúvida sobre Privacidade e LGPD - ${APP_INFO.name}`);
+    const body = encodeURIComponent(
+      `Olá ${APP_INFO.developer} (Encarregado de Proteção de Dados - DPO),\n\nGostaria de solicitar informações / esclarecimentos sobre meus dados e privacidade no aplicativo Momentus:\n\n[Descreva sua solicitação aqui]\n`
+    );
+    Linking.openURL(`mailto:${APP_INFO.dpoContact}?subject=${subject}&body=${body}`);
+  };
+
+  const fontSizeScale = (settings.fontSizeMultiplier || 1.0) + fontSizeStep * 0.12;
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
@@ -125,7 +167,9 @@ export default function LegalScreen() {
             onPress={handleBackPress}
             style={[styles.backButton, { backgroundColor: theme.surfaceElevated }]}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            activeOpacity={0.7}>
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Voltar">
             <Ionicons
               name={isMandatory ? 'close' : 'arrow-back'}
               size={22}
@@ -142,41 +186,68 @@ export default function LegalScreen() {
             </Text>
           </View>
 
-          {/* Language Switcher Pill */}
-          <View style={[styles.langSwitcher, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}>
+          {/* Ações do Cabeçalho: Tamanho de Fonte (A+/A-), Compartilhar e Idioma */}
+          <View style={styles.headerActionsRow}>
             <TouchableOpacity
-              onPress={() => setLanguage('pt')}
-              style={[
-                styles.langOption,
-                language === 'pt' && [styles.langOptionActive, { backgroundColor: theme.primary }],
-              ]}
-              activeOpacity={0.8}>
-              <Text
-                style={[
-                  styles.langText,
-                  { color: language === 'pt' ? '#0F172A' : theme.textSecondary },
-                  language === 'pt' && styles.langTextActive,
-                ]}>
-                PT
+              onPress={handleCycleFontSize}
+              style={[styles.headerIconBtn, { backgroundColor: theme.surfaceElevated }]}
+              accessibilityRole="button"
+              accessibilityLabel="Ajustar tamanho da fonte">
+              <Text style={[styles.fontSizerText, { color: theme.textPrimary }]}>
+                {fontSizeStep === -1 ? 'A-' : fontSizeStep === 0 ? 'A' : fontSizeStep === 1 ? 'A+' : 'A++'}
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => setLanguage('en')}
-              style={[
-                styles.langOption,
-                language === 'en' && [styles.langOptionActive, { backgroundColor: theme.primary }],
-              ]}
-              activeOpacity={0.8}>
-              <Text
-                style={[
-                  styles.langText,
-                  { color: language === 'en' ? '#0F172A' : theme.textSecondary },
-                  language === 'en' && styles.langTextActive,
-                ]}>
-                EN
-              </Text>
+              onPress={handleShareTerms}
+              style={[styles.headerIconBtn, { backgroundColor: theme.surfaceElevated }]}
+              accessibilityRole="button"
+              accessibilityLabel="Compartilhar termos">
+              <Ionicons name="share-social-outline" size={17} color={theme.textPrimary} />
             </TouchableOpacity>
+
+            {/* Language Switcher Pill */}
+            <View style={[styles.langSwitcher, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}>
+              <TouchableOpacity
+                onPress={() => {
+                  triggerHaptic('selection');
+                  setLanguage('pt');
+                }}
+                style={[
+                  styles.langOption,
+                  language === 'pt' && [styles.langOptionActive, { backgroundColor: theme.primary }],
+                ]}
+                activeOpacity={0.8}>
+                <Text
+                  style={[
+                    styles.langText,
+                    { color: language === 'pt' ? '#0F172A' : theme.textSecondary },
+                    language === 'pt' && styles.langTextActive,
+                  ]}>
+                  PT
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => {
+                  triggerHaptic('selection');
+                  setLanguage('en');
+                }}
+                style={[
+                  styles.langOption,
+                  language === 'en' && [styles.langOptionActive, { backgroundColor: theme.primary }],
+                ]}
+                activeOpacity={0.8}>
+                <Text
+                  style={[
+                    styles.langText,
+                    { color: language === 'en' ? '#0F172A' : theme.textSecondary },
+                    language === 'en' && styles.langTextActive,
+                  ]}>
+                  EN
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 
@@ -203,7 +274,10 @@ export default function LegalScreen() {
             return (
               <TouchableOpacity
                 key={tab.id}
-                onPress={() => setSelectedDoc(tab.id)}
+                onPress={() => {
+                  triggerHaptic('selection');
+                  setSelectedDoc(tab.id);
+                }}
                 style={[
                   styles.tabItem,
                   isSelected && [styles.tabItemActive, { borderBottomColor: theme.primary }],
@@ -230,9 +304,34 @@ export default function LegalScreen() {
 
         {/* Main Document Content */}
         <ScrollView
+          ref={scrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}>
+          showsVerticalScrollIndicator={false}
+          scrollEventThrottle={16}
+          onScroll={(e) => {
+            const y = e.nativeEvent.contentOffset.y;
+            if (y > 320 && !showScrollTop) setShowScrollTop(true);
+            else if (y <= 320 && showScrollTop) setShowScrollTop(false);
+          }}>
+
+          {/* Resumo Executivo em 1 Minuto (TL;DR Card) */}
+          {currentDoc.tldr && (
+            <View style={[styles.tldrCard, { backgroundColor: `${theme.primary}12`, borderColor: theme.primary }]}>
+              <View style={styles.tldrHeaderRow}>
+                <View style={[styles.tldrIconBox, { backgroundColor: `${theme.primary}25` }]}>
+                  <Ionicons name="flash" size={16} color={theme.primary} />
+                </View>
+                <Text style={[styles.tldrTitle, { color: theme.primary }]}>
+                  {language === 'pt' ? 'Resumo Executivo em 1 Minuto (TL;DR)' : '1-Minute Executive Summary (TL;DR)'}
+                </Text>
+              </View>
+              <Text style={[styles.tldrText, { color: theme.textPrimary, fontSize: 13.5 * fontSizeScale }]}>
+                {currentDoc.tldr}
+              </Text>
+            </View>
+          )}
+
           {/* Document Header Card */}
           <View style={[styles.docHeaderCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
             <View style={styles.docHeaderTop}>
@@ -445,8 +544,66 @@ export default function LegalScreen() {
             </View>
           ) : null}
 
-          <View style={{ height: 24 }} />
+          {/* Card Interativo de Contato com o DPO & Canais Oficiais */}
+          <View style={[styles.dpoContactCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+            <View style={[styles.dpoIconBox, { backgroundColor: `${theme.primary}20` }]}>
+              <Ionicons name="shield-checkmark" size={22} color={theme.primary} />
+            </View>
+
+            <Text style={[styles.dpoTitle, { color: theme.textPrimary }]}>
+              {language === 'pt' ? 'Encarregado de Proteção de Dados (DPO)' : 'Data Protection Officer (DPO)'}
+            </Text>
+            <Text style={[styles.dpoDesc, { color: theme.textSecondary }]}>
+              {language === 'pt'
+                ? 'Para exercer seus direitos de titular previstos na LGPD (Art. 18), solicitar esclarecimentos ou exclusão definitiva:'
+                : 'To exercise your rights under privacy regulations (LGPD / GDPR) or request clarifications:'}
+            </Text>
+
+            <TouchableOpacity
+              style={[styles.dpoEmailBtn, { backgroundColor: theme.primary }]}
+              onPress={handleContactDpo}
+              activeOpacity={0.85}>
+              <Ionicons name="mail" size={16} color={getContrastTextColor(theme.primary)} />
+              <Text style={[styles.dpoEmailBtnText, { color: getContrastTextColor(theme.primary) }]}>
+                {language === 'pt' ? 'Falar com o DPO' : 'Contact DPO'} ({APP_INFO.dpoContact})
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.dpoWebLink, { borderColor: theme.outline }]}
+              onPress={() => Linking.openURL(APP_INFO.website + 'terms')}
+              activeOpacity={0.7}>
+              <Ionicons name="globe-outline" size={15} color={theme.textSecondary} />
+              <Text style={[styles.dpoWebLinkText, { color: theme.textSecondary }]}>
+                {APP_INFO.domains.official}/terms
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Rodapé Institucional Oficial */}
+          <View style={styles.legalFooterBrand}>
+            <Text style={[styles.legalFooterText, { color: theme.textSecondary }]}>
+              {APP_INFO.name} • Desenvolvido por {APP_INFO.developer}
+            </Text>
+            <Text style={[styles.legalFooterCopyright, { color: theme.textSecondary }]}>
+              {APP_INFO.copyright}
+            </Text>
+          </View>
+
+          <View style={{ height: 32 }} />
         </ScrollView>
+
+        {/* Botão Flutuante "Voltar ao Topo" (Scroll to Top) */}
+        {showScrollTop && (
+          <TouchableOpacity
+            style={[styles.scrollToTopBtn, { backgroundColor: theme.primary }]}
+            onPress={handleScrollToTop}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Voltar ao topo">
+            <Ionicons name="arrow-up" size={20} color={getContrastTextColor(theme.primary)} />
+          </TouchableOpacity>
+        )}
 
         {/* Bottom Acceptance / Status Bar */}
         <View style={[styles.bottomBar, { backgroundColor: theme.surface, borderTopColor: theme.outline }]}>
@@ -455,7 +612,10 @@ export default function LegalScreen() {
               {/* Checkbox agreement */}
               <TouchableOpacity
                 style={styles.checkboxRow}
-                onPress={() => setIsAgreed(!isAgreed)}
+                onPress={() => {
+                  triggerHaptic('selection');
+                  setIsAgreed(!isAgreed);
+                }}
                 activeOpacity={0.7}>
                 <View
                   style={[
@@ -501,34 +661,21 @@ export default function LegalScreen() {
                     : 'Accept & Continue'}
                 </Text>
               </TouchableOpacity>
-
-              {/* Decline Link */}
-              <TouchableOpacity
-                style={styles.declineBtn}
-                onPress={handleConfirmDecline}
-                activeOpacity={0.7}>
-                <Ionicons name="log-out-outline" size={16} color={MomentusColors.error} />
-                <Text style={[styles.declineBtnText, { color: MomentusColors.error }]}>
-                  {language === 'pt' ? 'Recusar e Sair da Conta' : 'Decline and Sign Out'}
-                </Text>
-              </TouchableOpacity>
             </View>
           ) : (
-            <View style={styles.acceptedContainer}>
-              <View style={styles.acceptedRow}>
-                <View style={[styles.acceptedIconBox, { backgroundColor: theme.primary + '20' }]}>
-                  <Ionicons name="shield-checkmark" size={22} color={theme.primary} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.acceptedTitle, { color: theme.textPrimary }]}>
-                    {language === 'pt' ? 'Termos e Privacidade Aceitos' : 'Terms & Privacy Accepted'}
-                  </Text>
-                  <Text style={[styles.acceptedSub, { color: theme.textSecondary }]}>
-                    {language === 'pt'
-                      ? `Versão ${settings.termsAcceptedVersion || CURRENT_TERMS_VERSION} • Confirmado em ${settings.termsAcceptedAt || 'dispositivo'}`
-                      : `Version ${settings.termsAcceptedVersion || CURRENT_TERMS_VERSION} • Confirmed on ${settings.termsAcceptedAt || 'device'}`}
-                  </Text>
-                </View>
+            <View style={styles.acceptedStatusRow}>
+              <View style={[styles.statusIconCircle, { backgroundColor: `${theme.primary}20` }]}>
+                <Ionicons name="checkmark-circle" size={20} color={theme.primary} />
+              </View>
+              <View style={styles.statusTextCol}>
+                <Text style={[styles.acceptedTitle, { color: theme.textPrimary }]}>
+                  {language === 'pt' ? 'Termos Aceitos e Válidos' : 'Terms Accepted & Active'}
+                </Text>
+                <Text style={[styles.acceptedSubtitle, { color: theme.textSecondary }]}>
+                  {language === 'pt'
+                    ? `Consentimento registrado na versão ${CURRENT_TERMS_VERSION}.0`
+                    : `Consent recorded on version ${CURRENT_TERMS_VERSION}.0`}
+                </Text>
               </View>
             </View>
           )}
@@ -541,7 +688,6 @@ export default function LegalScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: MomentusColors.navyBackground,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   container: {
@@ -555,43 +701,58 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
-    paddingVertical: LayoutTokens.pagePaddingTop,
-    borderBottomWidth: 1,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   backButton: {
-    width: ComponentHeightTokens.iconButton,
-    height: ComponentHeightTokens.iconButton,
-    borderRadius: ComponentHeightTokens.iconButton / 2,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     justifyContent: 'center',
     alignItems: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   headerTitleContainer: {
     flex: 1,
-    alignItems: 'center',
-    paddingHorizontal: 8,
+    marginLeft: 12,
   },
   headerTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '800',
   },
   headerSubtitle: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '500',
     marginTop: 1,
+  },
+  headerActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  headerIconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  },
+  fontSizerText: {
+    fontSize: 12,
+    fontWeight: '800',
   },
   langSwitcher: {
     flexDirection: 'row',
     borderRadius: 10,
     borderWidth: 1,
     padding: 2,
-    gap: 2,
   },
   langOption: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   langOptionActive: {},
   langText: {
@@ -599,25 +760,25 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   langTextActive: {
-    fontWeight: '800',
+    fontWeight: '900',
   },
   mandatoryBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 10,
     borderBottomWidth: 1,
     gap: 10,
   },
   mandatoryBannerText: {
-    flex: 1,
     fontSize: 12,
-    fontWeight: '600',
     lineHeight: 16,
+    flex: 1,
+    fontWeight: '600',
   },
   tabBar: {
     flexDirection: 'row',
-    borderBottomWidth: 1,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   tabItem: {
     flex: 1,
@@ -627,6 +788,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   tabItemActive: {},
   tabItemText: {
@@ -641,25 +803,54 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
-    paddingVertical: 16,
-    paddingBottom: LayoutTokens.pagePaddingBottom,
-    gap: 14,
+    paddingTop: 14,
+    paddingBottom: 24,
+  },
+  tldrCard: {
+    borderRadius: BorderRadiusTokens.card,
+    borderWidth: 1.5,
+    padding: 14,
+    marginBottom: 14,
+  },
+  tldrHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  tldrIconBox: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tldrTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  tldrText: {
+    lineHeight: 20,
+    fontWeight: '500',
   },
   docHeaderCard: {
-    borderRadius: 16,
+    borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
     padding: 16,
-    gap: 12,
+    marginBottom: 14,
   },
   docHeaderTop: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    marginBottom: 12,
   },
   docIconBox: {
     width: 44,
     height: 44,
-    borderRadius: 12,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -668,7 +859,6 @@ const styles = StyleSheet.create({
   },
   docTitle: {
     fontWeight: '800',
-    lineHeight: 22,
   },
   docSubtitle: {
     fontSize: 12,
@@ -676,15 +866,16 @@ const styles = StyleSheet.create({
   },
   docMetaRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    borderTopWidth: 1,
+    alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
     paddingTop: 10,
+    marginBottom: 10,
   },
   docMetaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
   },
   docMetaText: {
     fontSize: 11,
@@ -693,64 +884,66 @@ const styles = StyleSheet.create({
   docBadgePill: {
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 6,
+    borderRadius: 8,
   },
   docBadgeText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
   },
   docIntroBox: {
-    borderRadius: 10,
     padding: 12,
+    borderRadius: 10,
   },
   docIntroText: {
-    lineHeight: 20,
-    fontStyle: 'italic',
+    lineHeight: 18,
   },
   sectionCard: {
     borderRadius: 16,
     borderWidth: 1,
     padding: 16,
-    gap: 12,
+    marginBottom: 14,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
+    marginBottom: 10,
   },
   sectionBadge: {
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 6,
+    borderRadius: 8,
   },
   sectionBadgeText: {
-    color: '#0F172A',
     fontSize: 11,
     fontWeight: '900',
+    color: '#0F172A',
   },
   sectionTitle: {
-    flex: 1,
     fontWeight: '800',
+    flex: 1,
   },
   sectionIntro: {
-    lineHeight: 20,
+    lineHeight: 18,
+    marginBottom: 12,
   },
   calloutBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    borderRadius: 10,
-    borderWidth: 1,
-    padding: 12,
     gap: 10,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
   },
   calloutText: {
-    flex: 1,
     lineHeight: 18,
+    flex: 1,
     fontWeight: '600',
   },
   bulletsList: {
     gap: 8,
-    paddingLeft: 4,
+    marginBottom: 8,
   },
   bulletItem: {
     flexDirection: 'row',
@@ -761,70 +954,157 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    marginTop: 7,
+    marginTop: 6,
   },
   bulletText: {
+    lineHeight: 18,
     flex: 1,
-    lineHeight: 20,
   },
   subsectionsList: {
     gap: 10,
+    marginTop: 4,
   },
   subsectionBox: {
     borderRadius: 12,
     borderWidth: 1,
     padding: 12,
-    gap: 8,
   },
   subsectionTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
+    marginBottom: 6,
   },
   subBadge: {
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: 6,
   },
   subBadgeText: {
     fontSize: 10,
-    fontWeight: '800',
-  },
-  subTitle: {
-    flex: 1,
     fontWeight: '700',
   },
+  subTitle: {
+    fontWeight: '700',
+    flex: 1,
+  },
   subText: {
-    lineHeight: 18,
+    lineHeight: 17,
   },
   subBulletsList: {
     gap: 6,
-    marginTop: 4,
-    paddingLeft: 4,
+    marginTop: 8,
   },
   subBulletDot: {
     width: 5,
     height: 5,
     borderRadius: 2.5,
-    marginTop: 7,
+    marginTop: 6,
   },
   conclusionCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
     borderRadius: 12,
     borderWidth: 1,
-    padding: 14,
-    gap: 10,
+    padding: 12,
+    marginBottom: 14,
   },
   conclusionText: {
     flex: 1,
-    lineHeight: 18,
-    fontStyle: 'italic',
+    lineHeight: 17,
+  },
+  dpoContactCard: {
+    borderRadius: BorderRadiusTokens.card,
+    borderWidth: 1,
+    padding: 18,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  dpoIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  dpoTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  dpoDesc: {
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 17,
+    marginBottom: 14,
+  },
+  dpoEmailBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 14,
+    marginBottom: 8,
+    width: '100%',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  },
+  dpoEmailBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  dpoWebLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    width: '100%',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  },
+  dpoWebLinkText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  legalFooterBrand: {
+    alignItems: 'center',
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  legalFooterText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  legalFooterCopyright: {
+    fontSize: 10,
+    marginTop: 2,
+  },
+  scrollToTopBtn: {
+    position: 'absolute',
+    right: 20,
+    bottom: 80,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   bottomBar: {
-    borderTopWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
+    paddingVertical: 12,
   },
   actionContainer: {
     gap: 12,
@@ -833,6 +1113,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   checkboxBox: {
     width: 22,
@@ -843,54 +1124,45 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   checkboxLabel: {
+    fontSize: 12,
+    lineHeight: 16,
     flex: 1,
-    fontSize: 12.5,
     fontWeight: '600',
-    lineHeight: 17,
   },
   acceptBtn: {
-    height: ComponentHeightTokens.buttonHero,
-    borderRadius: BorderRadiusTokens.button,
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
+    height: 48,
+    borderRadius: BorderRadiusTokens.button,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   acceptBtnText: {
     fontSize: 15,
     fontWeight: '800',
   },
-  declineBtn: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 4,
-    gap: 6,
-  },
-  declineBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  acceptedContainer: {
-    paddingVertical: 4,
-  },
-  acceptedRow: {
+  acceptedStatusRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    paddingVertical: 4,
   },
-  acceptedIconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+  statusIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  statusTextCol: {
+    flex: 1,
   },
   acceptedTitle: {
     fontSize: 14,
     fontWeight: '800',
   },
-  acceptedSub: {
+  acceptedSubtitle: {
     fontSize: 12,
-    marginTop: 2,
+    marginTop: 1,
   },
 });
