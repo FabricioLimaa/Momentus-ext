@@ -378,6 +378,13 @@ export const INITIAL_SETTINGS: AppSettings = {
   termsAccepted: false,
   termsAcceptedVersion: 0,
   termsAcceptedAt: null,
+  notificationsEnabled: true,
+  reminderAdvanceMinutes: 15,
+  morningBriefingEnabled: true,
+  eveningReflectionEnabled: true,
+  defaultFocusMinutes: 25,
+  defaultBreakMinutes: 5,
+  autoStartBreaks: false,
 };
 
 export function getStreakColor(streakCount: number): string {

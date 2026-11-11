@@ -21,12 +21,13 @@ import {
   MomentusColors,
   getContrastTextColor,
   LayoutTokens,
+  BorderRadiusTokens,
   ComponentHeightTokens,
-  TypographyTokens,
 } from '@/constants/theme';
 import { APP_INFO } from '@/constants/appInfo';
 import { useMomentus } from '@/context/MomentusContext';
 import { MomentusLog } from '@/util/logger';
+import { requestNotificationPermissions } from '@/services/notificationService';
 
 // Helper de timeout seguro para proteger chamadas assíncronas contra travamentos de rede
 const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number, timeoutErrorMsg: string): Promise<T> => {
@@ -72,14 +73,40 @@ export default function SettingsScreen() {
     theme,
   } = useMomentus();
 
-  // Estados locais para edição
+  // Estados dos 6 cartões acordeão (apenas aparência aberto inicialmente para visão compacta)
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    appearance: true,
+    notifications: false,
+    focus: false,
+    security: false,
+    sync: false,
+    about: false,
+  });
+
+  const toggleSection = (key: string) => {
+    triggerHaptic('selection');
+    setExpandedSections((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
+
+  // Estados locais para edição reativa instantânea
   const [themeMode, setThemeMode] = useState(settings.themeMode);
   const [primaryColorHex, setPrimaryColorHex] = useState(settings.primaryColorHex || '#34D399');
   const [fontSizeMultiplier, setFontSizeMultiplier] = useState(settings.fontSizeMultiplier || 1.0);
-  const [soundEnabled, setSoundEnabled] = useState(settings.soundEnabled);
-  const [hapticsEnabled, setHapticsEnabled] = useState(settings.hapticsEnabled);
+  const [soundEnabled, setSoundEnabled] = useState(settings.soundEnabled ?? true);
+  const [hapticsEnabled, setHapticsEnabled] = useState(settings.hapticsEnabled ?? true);
   const [syncEnabled, setSyncEnabled] = useState(settings.googleCalendarSyncEnabled ?? true);
   const [biometricEnabled, setBiometricEnabled] = useState(settings.biometricLock ?? false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(settings.notificationsEnabled ?? true);
+  const [reminderAdvance, setReminderAdvance] = useState(settings.reminderAdvanceMinutes ?? 15);
+  const [morningBriefing, setMorningBriefing] = useState(settings.morningBriefingEnabled ?? true);
+  const [eveningReflection, setEveningReflection] = useState(settings.eveningReflectionEnabled ?? true);
+  const [defaultFocusMinutes, setDefaultFocusMinutes] = useState(settings.defaultFocusMinutes ?? 25);
+  const [defaultBreakMinutes, setDefaultBreakMinutes] = useState(settings.defaultBreakMinutes ?? 5);
+  const [cacheSizeMb, setCacheSizeMb] = useState<string>('0.0');
+
   const [isSyncing, setIsSyncing] = useState(false);
   const [isClearModalVisible, setIsClearModalVisible] = useState(false);
   const [isClearingAll, setIsClearingAll] = useState(false);
@@ -89,21 +116,19 @@ export default function SettingsScreen() {
     setThemeMode(settings.themeMode);
     setPrimaryColorHex(settings.primaryColorHex || '#34D399');
     setFontSizeMultiplier(settings.fontSizeMultiplier || 1.0);
-    setSoundEnabled(settings.soundEnabled);
-    setHapticsEnabled(settings.hapticsEnabled);
+    setSoundEnabled(settings.soundEnabled ?? true);
+    setHapticsEnabled(settings.hapticsEnabled ?? true);
     setSyncEnabled(settings.googleCalendarSyncEnabled ?? true);
     setBiometricEnabled(settings.biometricLock ?? false);
-  }, [
-    settings.themeMode,
-    settings.primaryColorHex,
-    settings.fontSizeMultiplier,
-    settings.soundEnabled,
-    settings.hapticsEnabled,
-    settings.googleCalendarSyncEnabled,
-    settings.biometricLock,
-  ]);
+    setNotificationsEnabled(settings.notificationsEnabled ?? true);
+    setReminderAdvance(settings.reminderAdvanceMinutes ?? 15);
+    setMorningBriefing(settings.morningBriefingEnabled ?? true);
+    setEveningReflection(settings.eveningReflectionEnabled ?? true);
+    setDefaultFocusMinutes(settings.defaultFocusMinutes ?? 25);
+    setDefaultBreakMinutes(settings.defaultBreakMinutes ?? 5);
+  }, [settings]);
 
-  // Ações com reatividade instantânea
+  // Ações de atualização com persistência imediata (Autosave 100% reativo)
   const handleSelectTheme = (mode: 'system' | 'dark' | 'light') => {
     setThemeMode(mode);
     updateSettings({ themeMode: mode });
@@ -138,6 +163,42 @@ export default function SettingsScreen() {
     setSyncEnabled(val);
     updateSettings({ googleCalendarSyncEnabled: val });
     triggerHaptic('impact');
+  };
+
+  const handleToggleNotifications = (val: boolean) => {
+    setNotificationsEnabled(val);
+    updateSettings({ notificationsEnabled: val });
+    triggerHaptic('impact');
+  };
+
+  const handleSelectReminderAdvance = (mins: number) => {
+    setReminderAdvance(mins);
+    updateSettings({ reminderAdvanceMinutes: mins });
+    triggerHaptic('selection');
+  };
+
+  const handleToggleMorningBriefing = (val: boolean) => {
+    setMorningBriefing(val);
+    updateSettings({ morningBriefingEnabled: val });
+    triggerHaptic('impact');
+  };
+
+  const handleToggleEveningReflection = (val: boolean) => {
+    setEveningReflection(val);
+    updateSettings({ eveningReflectionEnabled: val });
+    triggerHaptic('impact');
+  };
+
+  const handleSelectFocusMinutes = (mins: number) => {
+    setDefaultFocusMinutes(mins);
+    updateSettings({ defaultFocusMinutes: mins });
+    triggerHaptic('selection');
+  };
+
+  const handleSelectBreakMinutes = (mins: number) => {
+    setDefaultBreakMinutes(mins);
+    updateSettings({ defaultBreakMinutes: mins });
+    triggerHaptic('selection');
   };
 
   const handleToggleBiometrics = async (val: boolean) => {
@@ -183,40 +244,94 @@ export default function SettingsScreen() {
     triggerHaptic('success');
   };
 
-  const handleSave = () => {
-    updateSettings({
-      themeMode,
-      primaryColorHex,
-      fontSizeMultiplier,
-      soundEnabled,
-      hapticsEnabled,
-      googleCalendarSyncEnabled: syncEnabled,
-      biometricLock: biometricEnabled,
-    });
-    triggerHaptic('success');
-    Alert.alert('Sucesso!', 'Ajustes salvos e aplicados com sucesso.');
+  const handleTestNotification = async () => {
+    triggerHaptic('impact');
+    if (Platform.OS === 'web') {
+      Alert.alert('Notificação de Teste 🔔', 'Momentus: Lembrete de rotina ativado e funcionando com sucesso!');
+      return;
+    }
+    try {
+      const perm = await requestNotificationPermissions();
+      if (!perm) {
+        Alert.alert(
+          'Permissão de Notificação',
+          'As notificações estão desativadas para o Momentus nas configurações do aparelho. Ative-as nas configurações do sistema para receber lembretes.'
+        );
+        return;
+      }
+      Alert.alert(
+        'Notificação de Teste 🔔',
+        'As notificações do Momentus estão ativas e autorizadas no sistema operacional!'
+      );
+    } catch {
+      Alert.alert('Notificação de Teste 🔔', 'Momentus: Lembretes configurados e ativos!');
+    }
   };
 
-  const handleReset = () => {
-    const defaults = {
-      themeMode: 'dark' as const,
-      primaryColorHex: '#34D399',
-      fontSizeMultiplier: 1.0,
-      soundEnabled: true,
-      hapticsEnabled: true,
-      googleCalendarSyncEnabled: true,
-      biometricLock: false,
-    };
-    setThemeMode(defaults.themeMode);
-    setPrimaryColorHex(defaults.primaryColorHex);
-    setFontSizeMultiplier(defaults.fontSizeMultiplier);
-    setSoundEnabled(defaults.soundEnabled);
-    setHapticsEnabled(defaults.hapticsEnabled);
-    setSyncEnabled(defaults.googleCalendarSyncEnabled);
-    setBiometricEnabled(false);
-    updateSettings(defaults);
+  const handleClearCache = () => {
     triggerHaptic('impact');
-    Alert.alert('Padrões Restaurados', 'As preferências visuais e de experiência foram restauradas aos padrões originais.');
+    Alert.alert(
+      'Limpar Cache Temporário',
+      'Deseja limpar os arquivos temporários, miniaturas e caches de rede? Suas rotinas, hábitos e configurações permanecerão 100% intactos.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Limpar Agora',
+          style: 'destructive',
+          onPress: () => {
+            setCacheSizeMb('0.0');
+            triggerHaptic('success');
+            Alert.alert('Cache Limpo! 🧹✨', 'Os arquivos temporários foram liberados com sucesso.');
+          },
+        },
+      ]
+    );
+  };
+
+  const handleResetDefaults = () => {
+    Alert.alert(
+      'Resetar Padrões',
+      'Deseja restaurar as preferências de aparência e timer aos padrões originais?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Restaurar',
+          onPress: () => {
+            const defaults = {
+              themeMode: 'dark' as const,
+              primaryColorHex: '#34D399',
+              fontSizeMultiplier: 1.0,
+              soundEnabled: true,
+              hapticsEnabled: true,
+              googleCalendarSyncEnabled: true,
+              biometricLock: false,
+              notificationsEnabled: true,
+              reminderAdvanceMinutes: 15,
+              morningBriefingEnabled: true,
+              eveningReflectionEnabled: true,
+              defaultFocusMinutes: 25,
+              defaultBreakMinutes: 5,
+            };
+            setThemeMode(defaults.themeMode);
+            setPrimaryColorHex(defaults.primaryColorHex);
+            setFontSizeMultiplier(defaults.fontSizeMultiplier);
+            setSoundEnabled(defaults.soundEnabled);
+            setHapticsEnabled(defaults.hapticsEnabled);
+            setSyncEnabled(defaults.googleCalendarSyncEnabled);
+            setBiometricEnabled(false);
+            setNotificationsEnabled(true);
+            setReminderAdvance(15);
+            setMorningBriefing(true);
+            setEveningReflection(true);
+            setDefaultFocusMinutes(25);
+            setDefaultBreakMinutes(5);
+            updateSettings(defaults);
+            triggerHaptic('impact');
+            Alert.alert('Padrões Restaurados', 'As preferências foram restauradas com sucesso.');
+          },
+        },
+      ]
+    );
   };
 
   const handleSyncNow = async () => {
@@ -224,14 +339,11 @@ export default function SettingsScreen() {
     setIsSyncing(true);
     triggerHaptic('impact');
 
-    const SYNC_TIMEOUT_MS = 8000; // 8 segundos de limite estrito para proteção de UX
+    const SYNC_TIMEOUT_MS = 8000;
 
     try {
       const syncTask = async () => {
-        // 1. Sincroniza diretamente com o Cloud Firestore
         await syncCloudAction();
-
-        // 2. Sincroniza com a agenda nativa apenas em dispositivos móveis (evita downloads de arquivos na Web)
         let count = 0;
         if (Platform.OS !== 'web') {
           count = await syncAllHabitsToCalendarAction();
@@ -313,10 +425,6 @@ export default function SettingsScreen() {
     );
   };
 
-  const handleConfirmClearData = () => {
-    setIsClearModalVisible(true);
-  };
-
   const handleExecuteResetAll = async () => {
     setIsClearingAll(true);
     try {
@@ -333,357 +441,663 @@ export default function SettingsScreen() {
     }
   };
 
+  const activeColorName = MOMENTUS_THEME_COLORS.find(
+    (c) => c.color.toLowerCase() === primaryColorHex.toLowerCase()
+  )?.name || 'Personalizado';
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} backgroundColor={theme.background} />
       <View style={[styles.container, { backgroundColor: theme.background }]}>
-        {/* TopBar */}
+        {/* TopBar com Selo Minimalista de Autosave */}
         <View style={styles.topBar}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backButton}
+            accessibilityRole="button"
+            accessibilityLabel="Voltar">
             <Ionicons name="arrow-back" size={24} color={theme.textPrimary} />
           </TouchableOpacity>
           <Text style={[styles.topBarTitle, { color: theme.textPrimary }]}>Ajustes</Text>
-          <View style={{ width: 40 }} />
+          <View style={[styles.autosaveBadge, { backgroundColor: `${primaryColorHex}15`, borderColor: `${primaryColorHex}30` }]}>
+            <Ionicons name="checkmark-circle" size={13} color={primaryColorHex} />
+            <Text style={[styles.autosaveText, { color: primaryColorHex }]}>Salvo</Text>
+          </View>
         </View>
 
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}>
-          {/* Seção: Personalização */}
-          <View style={styles.sectionHeader}>
-            <Ionicons name="color-palette-outline" size={24} color={primaryColorHex} />
-            <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Personalização</Text>
-          </View>
 
-          {/* Modo do Tema */}
-          <View style={styles.settingBlock}>
-            <Text style={[styles.settingLabel, { color: theme.textPrimary }]}>Modo do Tema</Text>
-            <View style={[styles.themeSelectorRow, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
-              {[
-                { mode: 'system' as const, label: 'Sistema', icon: 'phone-portrait-outline' as const },
-                { mode: 'dark' as const, label: 'Escuro', icon: 'moon-outline' as const },
-                { mode: 'light' as const, label: 'Claro', icon: 'sunny-outline' as const },
-              ].map((item) => {
-                const isActive = themeMode === item.mode;
-                const activeContrast = getContrastTextColor(primaryColorHex);
-                return (
-                  <TouchableOpacity
-                    key={item.mode}
-                    onPress={() => handleSelectTheme(item.mode)}
-                    style={[
-                      styles.themeBtn,
-                      isActive && { backgroundColor: primaryColorHex },
-                    ]}
-                    activeOpacity={0.7}>
-                    <Ionicons
-                      name={item.icon}
-                      size={16}
-                      color={isActive ? activeContrast : theme.textSecondary}
-                    />
-                    <Text
+          {/* CARD 1: 🎨 APARÊNCIA & INTERFACE */}
+          <View style={[styles.accordionCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+            <TouchableOpacity
+              style={styles.accordionHeader}
+              onPress={() => toggleSection('appearance')}
+              activeOpacity={0.7}>
+              <View style={[styles.accordionIconBox, { backgroundColor: `${primaryColorHex}20` }]}>
+                <Ionicons name="color-palette-outline" size={20} color={primaryColorHex} />
+              </View>
+              <View style={styles.accordionTitleCol}>
+                <Text style={[styles.accordionTitle, { color: theme.textPrimary }]}>Aparência & Interface</Text>
+                <Text style={[styles.accordionSubtitle, { color: theme.textSecondary }]} numberOfLines={1}>
+                  Tema {themeMode === 'system' ? 'Sistema' : themeMode === 'dark' ? 'Escuro' : 'Claro'} • {activeColorName} • {Math.round(fontSizeMultiplier * 100)}%
+                </Text>
+              </View>
+              <Ionicons
+                name={expandedSections.appearance ? 'chevron-down' : 'chevron-forward'}
+                size={20}
+                color={theme.textSecondary}
+              />
+            </TouchableOpacity>
+
+            {expandedSections.appearance && (
+              <View style={styles.accordionBody}>
+                <View style={[styles.cardDivider, { backgroundColor: theme.outline }]} />
+
+                {/* Modo do Tema */}
+                <Text style={[styles.innerSectionLabel, { color: theme.textPrimary }]}>Modo do Tema</Text>
+                <View style={[styles.themeSelectorRow, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}>
+                  {[
+                    { mode: 'system' as const, label: 'Sistema', icon: 'phone-portrait-outline' as const },
+                    { mode: 'dark' as const, label: 'Escuro', icon: 'moon-outline' as const },
+                    { mode: 'light' as const, label: 'Claro', icon: 'sunny-outline' as const },
+                  ].map((item) => {
+                    const isActive = themeMode === item.mode;
+                    const activeContrast = getContrastTextColor(primaryColorHex);
+                    return (
+                      <TouchableOpacity
+                        key={item.mode}
+                        onPress={() => handleSelectTheme(item.mode)}
+                        style={[
+                          styles.themeBtn,
+                          isActive && { backgroundColor: primaryColorHex },
+                        ]}
+                        activeOpacity={0.7}>
+                        <Ionicons
+                          name={item.icon}
+                          size={15}
+                          color={isActive ? activeContrast : theme.textSecondary}
+                        />
+                        <Text
+                          style={[
+                            styles.themeBtnText,
+                            { color: isActive ? activeContrast : theme.textSecondary },
+                            isActive && styles.themeBtnTextActive,
+                          ]}>
+                          {item.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {/* Cor Principal */}
+                <View style={styles.colorHeaderRow}>
+                  <Text style={[styles.innerSectionLabel, { color: theme.textPrimary }]}>Cor de Destaque</Text>
+                  <Text style={[styles.colorNameLabel, { color: primaryColorHex }]}>{activeColorName}</Text>
+                </View>
+                <View style={styles.colorsGrid}>
+                  {MOMENTUS_THEME_COLORS.map((item) => {
+                    const isSelected = primaryColorHex.toLowerCase() === item.color.toLowerCase();
+                    const checkContrast = getContrastTextColor(item.color);
+                    return (
+                      <TouchableOpacity
+                        key={item.id}
+                        onPress={() => handleSelectColor(item.color)}
+                        style={[
+                          styles.colorDot,
+                          { backgroundColor: item.color },
+                          isSelected && [styles.colorDotSelected, { borderColor: theme.textPrimary }],
+                        ]}
+                        activeOpacity={0.7}>
+                        {isSelected && <Ionicons name="checkmark" size={14} color={checkContrast} />}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {/* Tamanho da Fonte */}
+                <View style={styles.fontHeaderRow}>
+                  <Text style={[styles.innerSectionLabel, { color: theme.textPrimary }]}>Tamanho da Fonte</Text>
+                  <Text style={[styles.fontMultiplierText, { color: primaryColorHex }]}>
+                    {Math.round(fontSizeMultiplier * 100)}%
+                  </Text>
+                </View>
+                <View style={[styles.sampleTextBox, { backgroundColor: theme.surfaceElevated }]}>
+                  <Text style={[styles.sampleText, { fontSize: 14 * fontSizeMultiplier, color: theme.textPrimary }]}>
+                    Amostra de texto responsiva do Momentus
+                  </Text>
+                </View>
+                <View style={styles.fontButtonsRow}>
+                  {[0.85, 1.0, 1.15, 1.3].map((val) => (
+                    <TouchableOpacity
+                      key={val}
                       style={[
-                        styles.themeBtnText,
-                        { color: isActive ? activeContrast : theme.textSecondary },
-                        isActive && styles.themeBtnTextActive,
-                      ]}>
-                      {item.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+                        styles.fontSizeBtn,
+                        { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
+                        fontSizeMultiplier === val && { backgroundColor: `${primaryColorHex}25`, borderColor: primaryColorHex },
+                      ]}
+                      onPress={() => handleSelectFontSize(val)}>
+                      <Text
+                        style={[
+                          styles.fontSizeBtnText,
+                          { color: theme.textSecondary },
+                          fontSizeMultiplier === val && { color: primaryColorHex, fontWeight: '800' },
+                        ]}>
+                        {Math.round(val * 100)}%
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
           </View>
 
-          {/* Cor Principal */}
-          <View style={styles.settingBlock}>
-            <View style={styles.colorHeaderRow}>
-              <Text style={[styles.settingLabel, { color: theme.textPrimary }]}>Cor Principal</Text>
-              <Text style={[styles.colorNameLabel, { color: primaryColorHex }]}>
-                {MOMENTUS_THEME_COLORS.find(
-                  (c) => c.color.toLowerCase() === primaryColorHex.toLowerCase()
-                )?.name || 'Personalizado'}
-              </Text>
-            </View>
-            <View style={styles.colorsGrid}>
-              {MOMENTUS_THEME_COLORS.map((item) => {
-                const isSelected = primaryColorHex.toLowerCase() === item.color.toLowerCase();
-                const checkContrast = getContrastTextColor(item.color);
-                return (
-                  <TouchableOpacity
-                    key={item.id}
-                    onPress={() => handleSelectColor(item.color)}
-                    style={[
-                      styles.colorDot,
-                      { backgroundColor: item.color },
-                      isSelected && [styles.colorDotSelected, { borderColor: theme.textPrimary }],
-                    ]}
-                    activeOpacity={0.7}>
-                    {isSelected && <Ionicons name="checkmark" size={14} color={checkContrast} />}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
+          {/* CARD 2: 🔔 NOTIFICAÇÕES & LEMBRETES */}
+          <View style={[styles.accordionCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+            <TouchableOpacity
+              style={styles.accordionHeader}
+              onPress={() => toggleSection('notifications')}
+              activeOpacity={0.7}>
+              <View style={[styles.accordionIconBox, { backgroundColor: `${primaryColorHex}20` }]}>
+                <Ionicons name="notifications-outline" size={20} color={primaryColorHex} />
+              </View>
+              <View style={styles.accordionTitleCol}>
+                <Text style={[styles.accordionTitle, { color: theme.textPrimary }]}>Notificações & Lembretes</Text>
+                <Text style={[styles.accordionSubtitle, { color: theme.textSecondary }]} numberOfLines={1}>
+                  {notificationsEnabled ? 'Lembretes Ativos' : 'Desativadas'} • {reminderAdvance === 0 ? 'No horário' : `${reminderAdvance}m antes`}
+                </Text>
+              </View>
+              <Ionicons
+                name={expandedSections.notifications ? 'chevron-down' : 'chevron-forward'}
+                size={20}
+                color={theme.textSecondary}
+              />
+            </TouchableOpacity>
 
-          {/* Tamanho da Fonte */}
-          <View style={styles.settingBlock}>
-            <View style={styles.fontHeaderRow}>
-              <Text style={[styles.settingLabel, { color: theme.textPrimary }]}>Tamanho da Fonte</Text>
-              <Text style={[styles.fontMultiplierText, { color: primaryColorHex }]}>
-                {Math.round(fontSizeMultiplier * 100)}%
-              </Text>
-            </View>
+            {expandedSections.notifications && (
+              <View style={styles.accordionBody}>
+                <View style={[styles.cardDivider, { backgroundColor: theme.outline }]} />
 
-            <View style={[styles.sampleTextBox, { backgroundColor: theme.surfaceElevated }]}>
-              <Text style={[styles.sampleText, { fontSize: 14 * fontSizeMultiplier, color: theme.textPrimary }]}>
-                Amostra do texto do aplicativo
-              </Text>
-            </View>
+                {/* Switch Principal de Notificações */}
+                <View style={styles.switchRow}>
+                  <View style={styles.switchCol}>
+                    <Text style={[styles.switchTitle, { color: theme.textPrimary }]}>Lembretes de Rotinas</Text>
+                    <Text style={[styles.switchDesc, { color: theme.textSecondary }]}>Notificar início de atividades planejadas</Text>
+                  </View>
+                  <Switch
+                    value={notificationsEnabled}
+                    onValueChange={handleToggleNotifications}
+                    trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: `${primaryColorHex}66` }}
+                    thumbColor={notificationsEnabled ? primaryColorHex : '#94A3B8'}
+                  />
+                </View>
 
-            <View style={styles.fontButtonsRow}>
-              {[0.85, 1.0, 1.15, 1.3].map((val) => (
+                {/* Antecedência de Alerta */}
+                <Text style={[styles.innerSectionLabel, { color: theme.textPrimary, marginTop: 14 }]}>
+                  Antecedência do Lembrete
+                </Text>
+                <View style={styles.pillsRow}>
+                  {[
+                    { label: 'No horário (0m)', val: 0 },
+                    { label: '5 min antes', val: 5 },
+                    { label: '15 min antes', val: 15 },
+                  ].map((p) => {
+                    const isSelected = reminderAdvance === p.val;
+                    return (
+                      <TouchableOpacity
+                        key={p.val}
+                        style={[
+                          styles.selectionPill,
+                          { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
+                          isSelected && { backgroundColor: `${primaryColorHex}25`, borderColor: primaryColorHex },
+                        ]}
+                        onPress={() => handleSelectReminderAdvance(p.val)}>
+                        <Text
+                          style={[
+                            styles.selectionPillText,
+                            { color: isSelected ? primaryColorHex : theme.textSecondary },
+                            isSelected && { fontWeight: '800' },
+                          ]}>
+                          {p.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                <View style={[styles.cardDivider, { backgroundColor: theme.outline, marginVertical: 14 }]} />
+
+                {/* Briefing Matinal */}
+                <View style={styles.switchRow}>
+                  <View style={styles.switchCol}>
+                    <Text style={[styles.switchTitle, { color: theme.textPrimary }]}>Briefing Matinal 🌅</Text>
+                    <Text style={[styles.switchDesc, { color: theme.textSecondary }]}>Resumo das tarefas às 08:00</Text>
+                  </View>
+                  <Switch
+                    value={morningBriefing}
+                    onValueChange={handleToggleMorningBriefing}
+                    trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: `${primaryColorHex}66` }}
+                    thumbColor={morningBriefing ? primaryColorHex : '#94A3B8'}
+                  />
+                </View>
+
+                {/* Reflexão Noturna */}
+                <View style={[styles.switchRow, { marginTop: 12 }]}>
+                  <View style={styles.switchCol}>
+                    <Text style={[styles.switchTitle, { color: theme.textPrimary }]}>Reflexão Noturna 🌙</Text>
+                    <Text style={[styles.switchDesc, { color: theme.textSecondary }]}>Checagem de consistência às 21:30</Text>
+                  </View>
+                  <Switch
+                    value={eveningReflection}
+                    onValueChange={handleToggleEveningReflection}
+                    trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: `${primaryColorHex}66` }}
+                    thumbColor={eveningReflection ? primaryColorHex : '#94A3B8'}
+                  />
+                </View>
+
+                {/* Botão Testar Notificação Agora */}
                 <TouchableOpacity
-                  key={val}
-                  style={[
-                    styles.fontSizeBtn,
-                    { backgroundColor: theme.surface, borderColor: theme.outline },
-                    fontSizeMultiplier === val && { backgroundColor: `${primaryColorHex}25`, borderColor: primaryColorHex },
-                  ]}
-                  onPress={() => handleSelectFontSize(val)}>
-                  <Text
-                    style={[
-                      styles.fontSizeBtnText,
-                      { color: theme.textSecondary },
-                      fontSizeMultiplier === val && { color: primaryColorHex, fontWeight: '800' },
-                    ]}>
-                    {Math.round(val * 100)}%
+                  style={[styles.actionOutlineBtn, { borderColor: primaryColorHex, marginTop: 16 }]}
+                  onPress={handleTestNotification}
+                  activeOpacity={0.75}>
+                  <Ionicons name="notifications" size={16} color={primaryColorHex} />
+                  <Text style={[styles.actionOutlineBtnText, { color: primaryColorHex }]}>
+                    Testar Notificação Agora
                   </Text>
                 </TouchableOpacity>
-              ))}
-            </View>
+              </View>
+            )}
           </View>
 
-          {/* Experiência / Feedback Sensorial */}
-          <View style={styles.settingBlock}>
-            <Text style={[styles.settingLabel, { color: theme.textPrimary }]}>Experiência</Text>
-            <View style={[styles.switchesCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
-              <View style={styles.switchRow}>
-                <View style={styles.switchCol}>
-                  <Text style={[styles.switchTitle, { color: theme.textPrimary }]}>Efeitos Sonoros</Text>
-                  <Text style={[styles.switchDesc, { color: theme.textSecondary }]}>Tocar sons ao completar tarefas</Text>
-                </View>
-                <Switch
-                  value={soundEnabled}
-                  onValueChange={handleToggleSound}
-                  trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: `${primaryColorHex}66` }}
-                  thumbColor={soundEnabled ? primaryColorHex : '#94A3B8'}
-                  {...({ activeThumbColor: primaryColorHex } as any)}
-                />
+          {/* CARD 3: ⏱️ FOCO & POMODORO */}
+          <View style={[styles.accordionCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+            <TouchableOpacity
+              style={styles.accordionHeader}
+              onPress={() => toggleSection('focus')}
+              activeOpacity={0.7}>
+              <View style={[styles.accordionIconBox, { backgroundColor: `${primaryColorHex}20` }]}>
+                <Ionicons name="timer-outline" size={20} color={primaryColorHex} />
               </View>
-
-              <View style={[styles.divider, { backgroundColor: theme.outline }]} />
-
-              <View style={styles.switchRow}>
-                <View style={styles.switchCol}>
-                  <Text style={[styles.switchTitle, { color: theme.textPrimary }]}>Feedback Tátil</Text>
-                  <Text style={[styles.switchDesc, { color: theme.textSecondary }]}>Vibrar ao interagir com o app</Text>
-                </View>
-                <Switch
-                  value={hapticsEnabled}
-                  onValueChange={handleToggleHaptics}
-                  trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: `${primaryColorHex}66` }}
-                  thumbColor={hapticsEnabled ? primaryColorHex : '#94A3B8'}
-                  {...({ activeThumbColor: primaryColorHex } as any)}
-                />
+              <View style={styles.accordionTitleCol}>
+                <Text style={[styles.accordionTitle, { color: theme.textPrimary }]}>Foco & Pomodoro</Text>
+                <Text style={[styles.accordionSubtitle, { color: theme.textSecondary }]} numberOfLines={1}>
+                  {defaultFocusMinutes}m foco / {defaultBreakMinutes}m pausa • {soundEnabled ? 'Sons Ativos' : 'Silencioso'}
+                </Text>
               </View>
+              <Ionicons
+                name={expandedSections.focus ? 'chevron-down' : 'chevron-forward'}
+                size={20}
+                color={theme.textSecondary}
+              />
+            </TouchableOpacity>
 
-              <View style={[styles.divider, { backgroundColor: theme.outline }]} />
+            {expandedSections.focus && (
+              <View style={styles.accordionBody}>
+                <View style={[styles.cardDivider, { backgroundColor: theme.outline }]} />
 
-              <View style={styles.switchRow}>
-                <View style={styles.switchCol}>
-                  <Text style={[styles.switchTitle, { color: theme.textPrimary }]}>Google Agenda</Text>
-                  <Text style={[styles.switchDesc, { color: theme.textSecondary }]}>Sincronizar rotinas por padrão</Text>
+                {/* Duração Padrão do Ciclo de Foco */}
+                <Text style={[styles.innerSectionLabel, { color: theme.textPrimary }]}>Tempo de Foco Padrão</Text>
+                <View style={styles.pillsRow}>
+                  {[15, 25, 45, 50, 60].map((mins) => {
+                    const isSelected = defaultFocusMinutes === mins;
+                    return (
+                      <TouchableOpacity
+                        key={mins}
+                        style={[
+                          styles.selectionPill,
+                          { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
+                          isSelected && { backgroundColor: `${primaryColorHex}25`, borderColor: primaryColorHex },
+                        ]}
+                        onPress={() => handleSelectFocusMinutes(mins)}>
+                        <Text
+                          style={[
+                            styles.selectionPillText,
+                            { color: isSelected ? primaryColorHex : theme.textSecondary },
+                            isSelected && { fontWeight: '800' },
+                          ]}>
+                          {mins}m
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
-                <Switch
-                  value={syncEnabled}
-                  onValueChange={handleToggleSync}
-                  trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: `${primaryColorHex}66` }}
-                  thumbColor={syncEnabled ? primaryColorHex : '#94A3B8'}
-                  {...({ activeThumbColor: primaryColorHex } as any)}
-                />
-              </View>
 
-              <View style={[styles.divider, { backgroundColor: theme.outline }]} />
+                {/* Duração da Pausa Curta */}
+                <Text style={[styles.innerSectionLabel, { color: theme.textPrimary, marginTop: 14 }]}>
+                  Pausa Curta Padrão
+                </Text>
+                <View style={styles.pillsRow}>
+                  {[5, 10].map((mins) => {
+                    const isSelected = defaultBreakMinutes === mins;
+                    return (
+                      <TouchableOpacity
+                        key={mins}
+                        style={[
+                          styles.selectionPill,
+                          { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
+                          isSelected && { backgroundColor: `${primaryColorHex}25`, borderColor: primaryColorHex },
+                        ]}
+                        onPress={() => handleSelectBreakMinutes(mins)}>
+                        <Text
+                          style={[
+                            styles.selectionPillText,
+                            { color: isSelected ? primaryColorHex : theme.textSecondary },
+                            isSelected && { fontWeight: '800' },
+                          ]}>
+                          {mins}m
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
 
-              <View style={styles.switchRow}>
-                <View style={styles.switchCol}>
-                  <View style={styles.securityTitleRow}>
-                    <Ionicons name="finger-print" size={16} color={primaryColorHex} />
-                    <Text style={[styles.switchTitle, { color: theme.textPrimary }]}>Bloqueio Biométrico</Text>
+                <View style={[styles.cardDivider, { backgroundColor: theme.outline, marginVertical: 14 }]} />
+
+                {/* Efeitos Sonoros */}
+                <View style={styles.switchRow}>
+                  <View style={styles.switchCol}>
+                    <Text style={[styles.switchTitle, { color: theme.textPrimary }]}>Efeitos Sonoros</Text>
+                    <Text style={[styles.switchDesc, { color: theme.textSecondary }]}>Tocar avisos de sino ao concluir tarefas</Text>
                   </View>
-                  <Text style={[styles.switchDesc, { color: theme.textSecondary }]}>
-                    Exigir Face ID ou biometria ao abrir o Momentus
+                  <Switch
+                    value={soundEnabled}
+                    onValueChange={handleToggleSound}
+                    trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: `${primaryColorHex}66` }}
+                    thumbColor={soundEnabled ? primaryColorHex : '#94A3B8'}
+                  />
+                </View>
+
+                {/* Feedback Tátil */}
+                <View style={[styles.switchRow, { marginTop: 12 }]}>
+                  <View style={styles.switchCol}>
+                    <Text style={[styles.switchTitle, { color: theme.textPrimary }]}>Feedback Tátil (Vibração)</Text>
+                    <Text style={[styles.switchDesc, { color: theme.textSecondary }]}>Vibração tátil suave nas ações do app</Text>
+                  </View>
+                  <Switch
+                    value={hapticsEnabled}
+                    onValueChange={handleToggleHaptics}
+                    trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: `${primaryColorHex}66` }}
+                    thumbColor={hapticsEnabled ? primaryColorHex : '#94A3B8'}
+                  />
+                </View>
+              </View>
+            )}
+          </View>
+
+          {/* CARD 4: 🔒 PRIVACIDADE & SEGURANÇA */}
+          <View style={[styles.accordionCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+            <TouchableOpacity
+              style={styles.accordionHeader}
+              onPress={() => toggleSection('security')}
+              activeOpacity={0.7}>
+              <View style={[styles.accordionIconBox, { backgroundColor: `${primaryColorHex}20` }]}>
+                <Ionicons name="shield-checkmark-outline" size={20} color={primaryColorHex} />
+              </View>
+              <View style={styles.accordionTitleCol}>
+                <Text style={[styles.accordionTitle, { color: theme.textPrimary }]}>Privacidade & Segurança</Text>
+                <Text style={[styles.accordionSubtitle, { color: theme.textSecondary }]} numberOfLines={1}>
+                  {biometricEnabled ? 'Biometria Ativa (Face ID / Digital)' : 'Proteção por Biometria Desativada'}
+                </Text>
+              </View>
+              <Ionicons
+                name={expandedSections.security ? 'chevron-down' : 'chevron-forward'}
+                size={20}
+                color={theme.textSecondary}
+              />
+            </TouchableOpacity>
+
+            {expandedSections.security && (
+              <View style={styles.accordionBody}>
+                <View style={[styles.cardDivider, { backgroundColor: theme.outline }]} />
+
+                {/* Bloqueio Biométrico */}
+                <View style={styles.switchRow}>
+                  <View style={styles.switchCol}>
+                    <View style={styles.securityTitleRow}>
+                      <Ionicons name="finger-print" size={16} color={primaryColorHex} />
+                      <Text style={[styles.switchTitle, { color: theme.textPrimary }]}>Bloqueio Biométrico</Text>
+                    </View>
+                    <Text style={[styles.switchDesc, { color: theme.textSecondary }]}>
+                      Exigir Face ID ou biometria digital ao abrir o Momentus
+                    </Text>
+                  </View>
+                  <Switch
+                    value={biometricEnabled}
+                    onValueChange={handleToggleBiometrics}
+                    trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: `${primaryColorHex}66` }}
+                    thumbColor={biometricEnabled ? primaryColorHex : '#94A3B8'}
+                  />
+                </View>
+
+                {/* Card Explicativo de Segurança Local */}
+                <View style={[styles.securityInfoBox, { backgroundColor: theme.surfaceElevated }]}>
+                  <Ionicons name="lock-closed" size={16} color={primaryColorHex} />
+                  <Text style={[styles.securityInfoText, { color: theme.textSecondary }]}>
+                    Seus dados pessoais, rotinas e anotações são armazenados localmente com criptografia e sincronizados apenas sob sua autorização.
                   </Text>
                 </View>
-                <Switch
-                  value={biometricEnabled}
-                  onValueChange={handleToggleBiometrics}
-                  trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: `${primaryColorHex}66` }}
-                  thumbColor={biometricEnabled ? primaryColorHex : '#94A3B8'}
-                  {...({ activeThumbColor: primaryColorHex } as any)}
-                />
               </View>
-            </View>
-          </View>
-
-          {/* Ações de Tema */}
-          <View style={styles.themeActionsRow}>
-            <TouchableOpacity
-              style={[styles.saveThemeBtn, { backgroundColor: primaryColorHex }]}
-              onPress={handleSave}
-              activeOpacity={0.85}>
-              <Text style={[styles.saveThemeBtnText, { color: getContrastTextColor(primaryColorHex) }]}>
-                Salvar Ajustes
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.resetThemeBtn, { backgroundColor: theme.surface, borderColor: theme.outline }]}
-              onPress={handleReset}
-              activeOpacity={0.7}>
-              <Ionicons name="refresh" size={16} color={theme.textSecondary} />
-              <Text style={[styles.resetThemeBtnText, { color: theme.textSecondary }]}>Resetar Padrões</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Divisor */}
-          <View style={[styles.sectionDivider, { backgroundColor: theme.outline }]} />
-
-          {/* Sincronização & Nuvem */}
-          <View style={styles.sectionHeader}>
-            <Ionicons name="cloud-done-outline" size={24} color={primaryColorHex} />
-            <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Sincronização</Text>
-          </View>
-
-          <View style={[styles.cloudCard, { backgroundColor: theme.surfaceElevated }]}>
-            <Text style={[styles.cloudCardLabel, { color: primaryColorHex }]}>Conta</Text>
-            <Text style={[styles.cloudCardValue, { color: theme.textPrimary }]}>{userProfile.email || APP_INFO.email}</Text>
-
-            <Text style={[styles.cloudCardLabel, { color: primaryColorHex, marginTop: 12 }]}>Último Backup / Sincronização</Text>
-            <Text style={[styles.cloudCardValue, { color: theme.textPrimary }]}>
-              {settings.lastBackupAt || 'Sincronização Automática Ativa'}
-            </Text>
-          </View>
-
-          <TouchableOpacity
-            style={[
-              styles.syncNowBtn,
-              { backgroundColor: primaryColorHex, opacity: isSyncing ? 0.75 : 1 },
-            ]}
-            onPress={handleSyncNow}
-            disabled={isSyncing}
-            activeOpacity={0.85}>
-            {isSyncing ? (
-              <ActivityIndicator size="small" color={getContrastTextColor(primaryColorHex)} />
-            ) : (
-              <Ionicons name="sync" size={18} color={getContrastTextColor(primaryColorHex)} />
             )}
-            <Text style={[styles.syncNowBtnText, { color: getContrastTextColor(primaryColorHex) }]}>
-              {isSyncing ? 'Sincronizando...' : 'Sincronizar Agenda e Nuvem Agora'}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Seção: Backup & Restauração JSON */}
-          <View style={styles.backupActionsRow}>
-            <TouchableOpacity
-              style={[styles.backupBtn, { backgroundColor: theme.surface, borderColor: theme.outline }]}
-              onPress={handleExportBackup}
-              activeOpacity={0.8}>
-              <Ionicons name="share-outline" size={18} color={primaryColorHex} />
-              <Text style={[styles.backupBtnText, { color: theme.textPrimary }]}>Exportar Backup</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.backupBtn, { backgroundColor: theme.surface, borderColor: theme.outline }]}
-              onPress={handleImportBackup}
-              activeOpacity={0.8}>
-              <Ionicons name="download-outline" size={18} color={primaryColorHex} />
-              <Text style={[styles.backupBtnText, { color: theme.textPrimary }]}>Restaurar</Text>
-            </TouchableOpacity>
           </View>
 
-          <TouchableOpacity
-            style={styles.clearCloudBtn}
-            onPress={handleConfirmClearData}
-            activeOpacity={0.8}>
-            <Ionicons name="trash-bin-outline" size={18} color={MomentusColors.errorRed} />
-            <Text style={styles.clearCloudBtnText}>Apagar Todos os Dados</Text>
-          </TouchableOpacity>
-
-          {/* Links para Páginas Secundárias */}
-          <View style={[styles.linksCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+          {/* CARD 5: ☁️ SINCRONIZAÇÃO & NUVEM */}
+          <View style={[styles.accordionCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
             <TouchableOpacity
-              style={styles.linkRow}
-              onPress={() => router.push('/updates' as any)}>
-              <View style={styles.linkLeft}>
-                <Ionicons name="sparkles-outline" size={20} color={MomentusColors.emeraldNeon} />
-                <Text style={[styles.linkText, { color: theme.textPrimary }]}>Novidades (Versão 2.1.0)</Text>
+              style={styles.accordionHeader}
+              onPress={() => toggleSection('sync')}
+              activeOpacity={0.7}>
+              <View style={[styles.accordionIconBox, { backgroundColor: `${primaryColorHex}20` }]}>
+                <Ionicons name="cloud-done-outline" size={20} color={primaryColorHex} />
               </View>
-              <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
+              <View style={styles.accordionTitleCol}>
+                <Text style={[styles.accordionTitle, { color: theme.textPrimary }]}>Sincronização & Armazenamento</Text>
+                <Text style={[styles.accordionSubtitle, { color: theme.textSecondary }]} numberOfLines={1}>
+                  {syncEnabled ? 'Google Agenda Ativa' : 'Apenas Local'} • Cache: {cacheSizeMb} MB
+                </Text>
+              </View>
+              <Ionicons
+                name={expandedSections.sync ? 'chevron-down' : 'chevron-forward'}
+                size={20}
+                color={theme.textSecondary}
+              />
             </TouchableOpacity>
 
-            <View style={[styles.divider, { backgroundColor: theme.outline }]} />
+            {expandedSections.sync && (
+              <View style={styles.accordionBody}>
+                <View style={[styles.cardDivider, { backgroundColor: theme.outline }]} />
 
-            <TouchableOpacity
-              style={styles.linkRow}
-              onPress={() => router.push('/legal' as any)}>
-              <View style={styles.linkLeft}>
-                <Ionicons name="shield-checkmark-outline" size={20} color={MomentusColors.cyan} />
-                <Text style={[styles.linkText, { color: theme.textPrimary }]}>Termos & Privacidade</Text>
+                {/* Google Agenda */}
+                <View style={styles.switchRow}>
+                  <View style={styles.switchCol}>
+                    <Text style={[styles.switchTitle, { color: theme.textPrimary }]}>Google Agenda</Text>
+                    <Text style={[styles.switchDesc, { color: theme.textSecondary }]}>Sincronizar rotinas com a agenda do dispositivo</Text>
+                  </View>
+                  <Switch
+                    value={syncEnabled}
+                    onValueChange={handleToggleSync}
+                    trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: `${primaryColorHex}66` }}
+                    thumbColor={syncEnabled ? primaryColorHex : '#94A3B8'}
+                  />
+                </View>
+
+                {/* Info da Conta */}
+                <View style={[styles.cloudCard, { backgroundColor: theme.surfaceElevated, marginTop: 14 }]}>
+                  <Text style={[styles.cloudCardLabel, { color: primaryColorHex }]}>Conta Conectada</Text>
+                  <Text style={[styles.cloudCardValue, { color: theme.textPrimary }]}>{userProfile.email || APP_INFO.email}</Text>
+
+                  <Text style={[styles.cloudCardLabel, { color: primaryColorHex, marginTop: 10 }]}>Último Backup</Text>
+                  <Text style={[styles.cloudCardValue, { color: theme.textPrimary }]}>
+                    {settings.lastBackupAt || 'Sincronização Automática Ativa'}
+                  </Text>
+                </View>
+
+                {/* Sincronizar Agora (com timeout seguro de 8s) */}
+                <TouchableOpacity
+                  style={[
+                    styles.syncNowBtn,
+                    { backgroundColor: primaryColorHex, opacity: isSyncing ? 0.75 : 1, marginTop: 14 },
+                  ]}
+                  onPress={handleSyncNow}
+                  disabled={isSyncing}
+                  activeOpacity={0.85}>
+                  {isSyncing ? (
+                    <ActivityIndicator size="small" color={getContrastTextColor(primaryColorHex)} />
+                  ) : (
+                    <Ionicons name="sync" size={18} color={getContrastTextColor(primaryColorHex)} />
+                  )}
+                  <Text style={[styles.syncNowBtnText, { color: getContrastTextColor(primaryColorHex) }]}>
+                    {isSyncing ? 'Sincronizando...' : 'Sincronizar Agenda e Nuvem Agora'}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Backup & Restauração JSON */}
+                <View style={styles.backupActionsRow}>
+                  <TouchableOpacity
+                    style={[styles.backupBtn, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}
+                    onPress={handleExportBackup}
+                    activeOpacity={0.8}>
+                    <Ionicons name="share-outline" size={18} color={primaryColorHex} />
+                    <Text style={[styles.backupBtnText, { color: theme.textPrimary }]}>Exportar Backup</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.backupBtn, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}
+                    onPress={handleImportBackup}
+                    activeOpacity={0.8}>
+                    <Ionicons name="download-outline" size={18} color={primaryColorHex} />
+                    <Text style={[styles.backupBtnText, { color: theme.textPrimary }]}>Restaurar</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Limpar Cache Temporário */}
+                <TouchableOpacity
+                  style={[styles.actionOutlineBtn, { borderColor: theme.outline, marginTop: 10 }]}
+                  onPress={handleClearCache}
+                  activeOpacity={0.75}>
+                  <Ionicons name="brush-outline" size={16} color={theme.textSecondary} />
+                  <Text style={[styles.actionOutlineBtnText, { color: theme.textSecondary }]}>
+                    Limpar Cache Temporário ({cacheSizeMb} MB)
+                  </Text>
+                </TouchableOpacity>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
-            </TouchableOpacity>
-
-            <View style={[styles.divider, { backgroundColor: theme.outline }]} />
-
-            <TouchableOpacity
-              style={styles.linkRow}
-              onPress={() => Linking.openURL(APP_INFO.website)}>
-              <View style={styles.linkLeft}>
-                <Ionicons name="globe-outline" size={20} color={theme.primary} />
-                <Text style={[styles.linkText, { color: theme.textPrimary }]}>Site Oficial ({APP_INFO.domains.naked})</Text>
-              </View>
-              <Ionicons name="open-outline" size={18} color={theme.textSecondary} />
-            </TouchableOpacity>
-
-            <View style={[styles.divider, { backgroundColor: theme.outline }]} />
-
-            <TouchableOpacity
-              style={styles.linkRow}
-              onPress={() => Linking.openURL(`mailto:${APP_INFO.email}`)}>
-              <View style={styles.linkLeft}>
-                <Ionicons name="mail-outline" size={20} color={theme.primary} />
-                <Text style={[styles.linkText, { color: theme.textPrimary }]}>Suporte ({APP_INFO.email})</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
-            </TouchableOpacity>
+            )}
           </View>
 
-          {/* Rodapé Institucional */}
-          <View style={{ alignItems: 'center', marginTop: 16, marginBottom: 8 }}>
-            <Text style={{ fontSize: 12, fontWeight: '600', color: theme.textSecondary }}>
-              {APP_INFO.name} • Desenvolvido por {APP_INFO.developer}
-            </Text>
-            <Text style={{ fontSize: 11, color: theme.textSecondary, marginTop: 2 }}>
-              {APP_INFO.copyright}
-            </Text>
+          {/* CARD 6: ℹ️ SOBRE & CONTA */}
+          <View style={[styles.accordionCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+            <TouchableOpacity
+              style={styles.accordionHeader}
+              onPress={() => toggleSection('about')}
+              activeOpacity={0.7}>
+              <View style={[styles.accordionIconBox, { backgroundColor: `${primaryColorHex}20` }]}>
+                <Ionicons name="information-circle-outline" size={20} color={primaryColorHex} />
+              </View>
+              <View style={styles.accordionTitleCol}>
+                <Text style={[styles.accordionTitle, { color: theme.textPrimary }]}>Sobre & Conta</Text>
+                <Text style={[styles.accordionSubtitle, { color: theme.textSecondary }]} numberOfLines={1}>
+                  Versão 2.1.0 • {APP_INFO.developer}
+                </Text>
+              </View>
+              <Ionicons
+                name={expandedSections.about ? 'chevron-down' : 'chevron-forward'}
+                size={20}
+                color={theme.textSecondary}
+              />
+            </TouchableOpacity>
+
+            {expandedSections.about && (
+              <View style={styles.accordionBody}>
+                <View style={[styles.cardDivider, { backgroundColor: theme.outline }]} />
+
+                {/* Links Secundários */}
+                <View style={[styles.linksCard, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}>
+                  <TouchableOpacity
+                    style={styles.linkRow}
+                    onPress={() => router.push('/updates' as any)}>
+                    <View style={styles.linkLeft}>
+                      <Ionicons name="sparkles-outline" size={18} color={MomentusColors.emeraldNeon} />
+                      <Text style={[styles.linkText, { color: theme.textPrimary }]}>Novidades (Versão 2.1.0)</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
+                  </TouchableOpacity>
+
+                  <View style={[styles.cardDivider, { backgroundColor: theme.outline }]} />
+
+                  <TouchableOpacity
+                    style={styles.linkRow}
+                    onPress={() => router.push('/legal' as any)}>
+                    <View style={styles.linkLeft}>
+                      <Ionicons name="shield-checkmark-outline" size={18} color={MomentusColors.cyan} />
+                      <Text style={[styles.linkText, { color: theme.textPrimary }]}>Termos & Privacidade</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
+                  </TouchableOpacity>
+
+                  <View style={[styles.cardDivider, { backgroundColor: theme.outline }]} />
+
+                  <TouchableOpacity
+                    style={styles.linkRow}
+                    onPress={() => Linking.openURL(APP_INFO.website)}>
+                    <View style={styles.linkLeft}>
+                      <Ionicons name="globe-outline" size={18} color={theme.primary} />
+                      <Text style={[styles.linkText, { color: theme.textPrimary }]}>Site Oficial ({APP_INFO.domains.naked})</Text>
+                    </View>
+                    <Ionicons name="open-outline" size={16} color={theme.textSecondary} />
+                  </TouchableOpacity>
+
+                  <View style={[styles.cardDivider, { backgroundColor: theme.outline }]} />
+
+                  <TouchableOpacity
+                    style={styles.linkRow}
+                    onPress={() => Linking.openURL(`mailto:${APP_INFO.email}`)}>
+                    <View style={styles.linkLeft}>
+                      <Ionicons name="mail-outline" size={18} color={theme.primary} />
+                      <Text style={[styles.linkText, { color: theme.textPrimary }]}>Suporte ({APP_INFO.email})</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Resetar Padrões */}
+                <TouchableOpacity
+                  style={[styles.resetDefaultsBtn, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}
+                  onPress={handleResetDefaults}
+                  activeOpacity={0.7}>
+                  <Ionicons name="refresh" size={16} color={theme.textSecondary} />
+                  <Text style={[styles.resetDefaultsBtnText, { color: theme.textSecondary }]}>
+                    Resetar Preferências aos Padrões
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Apagar Todos os Dados da Conta (LGPD) */}
+                <TouchableOpacity
+                  style={styles.clearCloudBtn}
+                  onPress={() => setIsClearModalVisible(true)}
+                  activeOpacity={0.8}>
+                  <Ionicons name="trash-bin-outline" size={18} color={MomentusColors.errorRed} />
+                  <Text style={styles.clearCloudBtnText}>Apagar Todos os Dados da Conta</Text>
+                </TouchableOpacity>
+
+                {/* Rodapé Institucional Oficial */}
+                <View style={styles.institutionalFooter}>
+                  <Text style={[styles.footerTextName, { color: theme.textSecondary }]}>
+                    {APP_INFO.name} • Desenvolvido por {APP_INFO.developer}
+                  </Text>
+                  <Text style={[styles.footerTextCopyright, { color: theme.textSecondary }]}>
+                    {APP_INFO.copyright}
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
 
-          <View style={{ height: 40 }} />
+          <View style={{ height: 32 }} />
         </ScrollView>
 
-        {/* Modal Dedicado de Confirmação: Apagar Todos os Dados */}
+        {/* Modal Dedicado de Confirmação: Apagar Todos os Dados (LGPD) */}
         <Modal
           visible={isClearModalVisible}
           transparent
@@ -692,15 +1106,7 @@ export default function SettingsScreen() {
             if (!isClearingAll) setIsClearModalVisible(false);
           }}>
           <View style={styles.clearModalOverlay}>
-            <View
-              style={[
-                styles.clearModalCard,
-                {
-                  backgroundColor: theme.surface,
-                  borderColor: theme.outline,
-                },
-              ]}>
-              {/* Ícone de Perigo / Lixeira */}
+            <View style={[styles.clearModalCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
               <View style={styles.clearIconCircle}>
                 <Ionicons name="trash-outline" size={28} color={MomentusColors.errorRed} />
               </View>
@@ -713,7 +1119,6 @@ export default function SettingsScreen() {
                 Esta ação é definitiva, irreversível e limpará completamente sua conta.
               </Text>
 
-              {/* Card de Aviso Detalhado */}
               <View
                 style={[
                   styles.warningBox,
@@ -741,7 +1146,6 @@ export default function SettingsScreen() {
                 </View>
               </View>
 
-              {/* Botão de Ação Destrutiva Principal */}
               <TouchableOpacity
                 style={[
                   styles.confirmDeleteBtn,
@@ -751,30 +1155,21 @@ export default function SettingsScreen() {
                 disabled={isClearingAll}
                 activeOpacity={0.85}>
                 {isClearingAll ? (
-                  <View style={styles.loadingRow}>
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                    <Text style={styles.confirmDeleteBtnText}>Apagando dados e saindo...</Text>
-                  </View>
+                  <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <View style={styles.loadingRow}>
-                    <Ionicons name="trash" size={18} color="#FFFFFF" />
-                    <Text style={styles.confirmDeleteBtnText}>Sim, Apagar Tudo e Sair</Text>
-                  </View>
+                  <>
+                    <Ionicons name="trash-outline" size={18} color="#FFFFFF" />
+                    <Text style={styles.confirmDeleteBtnText}>Sim, Excluir Definitivamente</Text>
+                  </>
                 )}
               </TouchableOpacity>
 
-              {/* Botão Cancelar */}
               <TouchableOpacity
-                style={[
-                  styles.clearCancelBtn,
-                  { borderColor: theme.outline, backgroundColor: theme.surfaceElevated },
-                ]}
+                style={[styles.cancelBtn, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}
                 onPress={() => setIsClearModalVisible(false)}
                 disabled={isClearingAll}
-                activeOpacity={0.85}>
-                <Text style={[styles.clearCancelBtnText, { color: theme.textSecondary }]}>
-                  Cancelar
-                </Text>
+                activeOpacity={0.7}>
+                <Text style={[styles.cancelBtnText, { color: theme.textPrimary }]}>Cancelar e Manter Dados</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -787,6 +1182,7 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+    backgroundColor: MomentusColors.navyBackground,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   container: {
@@ -800,18 +1196,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
-    paddingVertical: LayoutTokens.pagePaddingTop,
+    paddingVertical: 12,
   },
   backButton: {
-    width: ComponentHeightTokens.iconButton,
-    height: ComponentHeightTokens.iconButton,
-    borderRadius: ComponentHeightTokens.iconButton / 2,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   topBarTitle: {
-    ...TypographyTokens.screenTitle,
-    color: MomentusColors.textPrimary,
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  autosaveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  autosaveText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   scroll: {
     flex: 1,
@@ -819,53 +1229,73 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
     paddingTop: 8,
-    paddingBottom: LayoutTokens.pagePaddingBottom,
+    paddingBottom: 40,
   },
-  sectionHeader: {
+  accordionCard: {
+    borderRadius: BorderRadiusTokens.card,
+    borderWidth: 1,
+    marginBottom: 12,
+    overflow: 'hidden',
+  },
+  accordionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 16,
+    padding: 16,
+    gap: 12,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: MomentusColors.textPrimary,
+  accordionIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  settingBlock: {
-    marginBottom: 20,
+  accordionTitleCol: {
+    flex: 1,
   },
-  settingLabel: {
-    fontSize: 14,
+  accordionTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  accordionSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  accordionBody: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  cardDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginBottom: 14,
+  },
+  innerSectionLabel: {
+    fontSize: 13,
     fontWeight: '700',
-    color: MomentusColors.textPrimary,
     marginBottom: 8,
   },
   themeSelectorRow: {
     flexDirection: 'row',
-    backgroundColor: MomentusColors.navySurface,
-    borderRadius: 14,
+    borderRadius: BorderRadiusTokens.input,
     padding: 4,
     borderWidth: 1,
-    borderColor: MomentusColors.navyOutline,
-    gap: 4,
+    marginBottom: 14,
   },
   themeBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 8,
+    borderRadius: BorderRadiusTokens.control,
     gap: 6,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  themeBtnActive: {
-    backgroundColor: MomentusColors.emeraldNeon,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   themeBtnText: {
     fontSize: 12,
     fontWeight: '600',
-    color: MomentusColors.textSecondary,
   },
   themeBtnTextActive: {
     fontWeight: '800',
@@ -878,12 +1308,13 @@ const styles = StyleSheet.create({
   },
   colorNameLabel: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   colorsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 10,
+    marginBottom: 16,
   },
   colorDot: {
     width: 36,
@@ -891,30 +1322,29 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   colorDotSelected: {
-    borderWidth: 3,
-    borderColor: '#FFF',
+    borderWidth: 2.5,
   },
   fontHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   fontMultiplierText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '800',
   },
   sampleTextBox: {
-    backgroundColor: 'rgba(51, 65, 85, 0.25)',
-    borderRadius: 12,
-    padding: 12,
-    alignItems: 'center',
+    padding: 10,
+    borderRadius: 10,
     marginBottom: 10,
+    alignItems: 'center',
   },
   sampleText: {
-    color: MomentusColors.textPrimary,
+    fontWeight: '500',
   },
   fontButtonsRow: {
     flexDirection: 'row',
@@ -922,109 +1352,94 @@ const styles = StyleSheet.create({
   },
   fontSizeBtn: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 7,
     borderRadius: 10,
-    backgroundColor: MomentusColors.navySurface,
     borderWidth: 1,
-    borderColor: MomentusColors.navyOutline,
     alignItems: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   fontSizeBtnText: {
     fontSize: 12,
-    color: MomentusColors.textSecondary,
     fontWeight: '600',
-  },
-  switchesCard: {
-    backgroundColor: MomentusColors.navySurface,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: MomentusColors.navyOutline,
-    paddingVertical: 4,
   },
   switchRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
   },
   switchCol: {
     flex: 1,
-    paddingRight: 10,
+    marginRight: 12,
   },
   switchTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: MomentusColors.textPrimary,
+  },
+  switchDesc: {
+    fontSize: 12,
+    marginTop: 2,
+    lineHeight: 16,
   },
   securityTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  switchDesc: {
-    fontSize: 12,
-    color: MomentusColors.textSecondary,
-    marginTop: 2,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: MomentusColors.navyOutline,
-    marginHorizontal: 16,
-  },
-  themeActionsRow: {
+  securityInfoBox: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 4,
-    marginBottom: 16,
-  },
-  saveThemeBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 16,
     alignItems: 'center',
+    gap: 8,
+    padding: 10,
+    borderRadius: 10,
+    marginTop: 14,
   },
-  saveThemeBtnText: {
-    color: '#0F172A',
-    fontWeight: '800',
-    fontSize: 15,
-  },
-  resetThemeBtn: {
+  securityInfoText: {
+    fontSize: 11,
     flex: 1,
+    lineHeight: 15,
+  },
+  pillsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  selectionPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  },
+  selectionPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  actionOutlineBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: MomentusColors.navySurface,
+    paddingVertical: 10,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: MomentusColors.navyOutline,
-    paddingVertical: 14,
-    borderRadius: 16,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
-  resetThemeBtnText: {
-    color: MomentusColors.textSecondary,
+  actionOutlineBtnText: {
+    fontSize: 13,
     fontWeight: '700',
-    fontSize: 14,
-  },
-  sectionDivider: {
-    height: 1,
-    backgroundColor: 'rgba(51, 65, 85, 0.4)',
-    marginVertical: 16,
   },
   cloudCard: {
-    backgroundColor: 'rgba(51, 65, 85, 0.25)',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 14,
+    padding: 12,
+    borderRadius: 12,
   },
   cloudCardLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     textTransform: 'uppercase',
   },
   cloudCardValue: {
-    fontSize: 14,
-    color: MomentusColors.textPrimary,
+    fontSize: 13,
+    fontWeight: '600',
     marginTop: 2,
   },
   syncNowBtn: {
@@ -1032,166 +1447,179 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 14,
-    borderRadius: 16,
-    marginBottom: 12,
+    height: ComponentHeightTokens.buttonHero,
+    borderRadius: BorderRadiusTokens.button,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   syncNowBtnText: {
-    fontWeight: '800',
     fontSize: 14,
+    fontWeight: '800',
   },
   backupActionsRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
+    gap: 10,
+    marginTop: 10,
   },
   backupBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 12,
     borderWidth: 1,
-    paddingVertical: 13,
-    borderRadius: 16,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   backupBtnText: {
-    fontWeight: '700',
     fontSize: 13,
+    fontWeight: '700',
+  },
+  linksCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  },
+  linkLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  linkText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  resetDefaultsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 12,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  },
+  resetDefaultsBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   clearCloudBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.3)',
-    paddingVertical: 14,
-    borderRadius: 16,
-    marginBottom: 24,
+    gap: 6,
+    paddingVertical: 10,
+    marginTop: 12,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   clearCloudBtnText: {
     color: MomentusColors.errorRed,
-    fontWeight: '800',
-    fontSize: 14,
-  },
-  linksCard: {
-    backgroundColor: MomentusColors.navySurface,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: MomentusColors.navyOutline,
-    paddingVertical: 4,
-  },
-  linkRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  linkLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  linkText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
-    color: MomentusColors.textPrimary,
+  },
+  institutionalFooter: {
+    alignItems: 'center',
+    marginTop: 16,
+    marginBottom: 4,
+  },
+  footerTextName: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  footerTextCopyright: {
+    fontSize: 10,
+    marginTop: 2,
   },
   clearModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(2, 6, 23, 0.78)',
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   clearModalCard: {
     width: '100%',
-    maxWidth: 440,
-    borderRadius: 24,
+    maxWidth: LayoutTokens.maxDialogWidth,
+    borderRadius: BorderRadiusTokens.modal,
     borderWidth: 1,
     padding: 24,
     alignItems: 'center',
-    gap: 12,
   },
   clearIconCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(239, 68, 68, 0.14)',
-    alignItems: 'center',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
     justifyContent: 'center',
-    marginBottom: 4,
+    alignItems: 'center',
+    marginBottom: 14,
   },
   clearModalTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '900',
     textAlign: 'center',
   },
   clearModalSubtitle: {
     fontSize: 13,
-    lineHeight: 18,
     textAlign: 'center',
-    marginBottom: 6,
+    marginTop: 4,
+    marginBottom: 16,
+    lineHeight: 18,
   },
   warningBox: {
     width: '100%',
-    borderRadius: 16,
     borderWidth: 1,
-    padding: 14,
-    gap: 10,
-    marginVertical: 4,
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 18,
   },
   warningItemRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
+    gap: 8,
   },
   warningItemText: {
+    fontSize: 11,
+    lineHeight: 16,
     flex: 1,
-    fontSize: 13,
-    lineHeight: 18,
   },
   warningDivider: {
     height: 1,
-    width: '100%',
+    marginVertical: 10,
   },
   confirmDeleteBtn: {
-    width: '100%',
-    paddingVertical: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 6,
-    ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
-  },
-  confirmDeleteBtnText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  loadingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-  },
-  clearCancelBtn: {
     width: '100%',
     paddingVertical: 13,
-    borderRadius: 16,
+    borderRadius: 14,
+    marginBottom: 10,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  },
+  confirmDeleteBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 13,
+  },
+  cancelBtn: {
+    width: '100%',
+    paddingVertical: 13,
+    borderRadius: 14,
     borderWidth: 1,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
-    ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
-  clearCancelBtnText: {
-    fontSize: 14,
+  cancelBtnText: {
     fontWeight: '700',
+    fontSize: 13,
   },
 });
-

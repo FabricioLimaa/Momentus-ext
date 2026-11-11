@@ -118,6 +118,13 @@ export interface AppSettings {
   termsAccepted?: boolean;
   termsAcceptedVersion?: number;
   termsAcceptedAt?: string | null;
+  notificationsEnabled?: boolean;
+  reminderAdvanceMinutes?: number;
+  morningBriefingEnabled?: boolean;
+  eveningReflectionEnabled?: boolean;
+  defaultFocusMinutes?: number;
+  defaultBreakMinutes?: number;
+  autoStartBreaks?: boolean;
 }
 
 
