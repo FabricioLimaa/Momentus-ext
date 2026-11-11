@@ -55,6 +55,7 @@ import {
 } from '@/services/calendarService';
 import {
   getAllCategories,
+  upsertCategoryDb,
   setAllCategoriesDb,
   getAllHabits,
   upsertHabitDb,
@@ -158,7 +159,8 @@ interface MomentusContextData {
     name: string,
     color: string,
     stickerId: string | null,
-    metaMinutosSemanal: number | null
+    metaMinutosSemanal: number | null,
+    icon?: string | null
   ) => void;
   deleteCategory: (id: string) => void;
   // Market Actions
@@ -1357,16 +1359,19 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     name: string,
     color: string,
     stickerId: string | null,
-    metaMinutosSemanal: number | null
+    metaMinutosSemanal: number | null,
+    icon?: string | null
   ) => {
     let targetCat: Category;
     if (id) {
+      const existing = categories.find((c) => c.id === id);
       targetCat = {
         id,
         name,
         color,
         stickerId,
         metaMinutosSemanal,
+        icon: icon !== undefined ? (icon || undefined) : existing?.icon,
       };
       setCategories((prev) =>
         prev.map((c) => (c.id === id ? targetCat : c))
@@ -1378,9 +1383,14 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         color,
         stickerId,
         metaMinutosSemanal,
+        icon: icon || undefined,
       };
       setCategories((prev) => [...prev, targetCat]);
     }
+
+    upsertCategoryDb(targetCat).catch((err) => {
+      MomentusLog.sync.warn('Erro ao salvar categoria no banco local:', err);
+    });
 
     const currentUid = firebaseAuth.currentUser?.uid;
     if (currentUid) {

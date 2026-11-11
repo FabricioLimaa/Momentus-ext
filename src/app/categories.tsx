@@ -19,7 +19,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMomentus } from '@/context/MomentusContext';
 import { Category } from '@/types';
-import { GOOGLE_CALENDAR_COLORS } from '@/constants/initialData';
+import {
+  EXTENDED_CATEGORY_COLORS,
+  CATEGORY_ICONS,
+} from '@/constants/categoryPresets';
 import {
   MomentusColors,
   LayoutTokens,
@@ -39,7 +42,8 @@ export default function CategoriesScreen() {
 
   // Estados do Formulário de Categoria
   const [formName, setFormName] = useState('');
-  const [formColor, setFormColor] = useState(GOOGLE_CALENDAR_COLORS[0].color);
+  const [formColor, setFormColor] = useState(EXTENDED_CATEGORY_COLORS[0].color);
+  const [formIcon, setFormIcon] = useState<string | null>(null);
   const [formStickerId, setFormStickerId] = useState<string | null>(null);
   const [isMetaEnabled, setIsMetaEnabled] = useState(false);
   const [metaHours, setMetaHours] = useState('0');
@@ -108,18 +112,21 @@ export default function CategoriesScreen() {
   const handleOpenCreateModal = () => {
     setEditingCategory(null);
     setFormName('');
-    setFormColor(GOOGLE_CALENDAR_COLORS[0].color);
+    setFormColor(EXTENDED_CATEGORY_COLORS[0].color);
+    setFormIcon(null);
     setFormStickerId(null);
     setIsMetaEnabled(false);
     setMetaHours('0');
     setMetaMinutes('0');
     setIsCreateModalOpen(true);
+    triggerHaptic('impact');
   };
 
   const handleOpenEditModal = (cat: Category) => {
     setEditingCategory(cat);
     setFormName(cat.name);
-    setFormColor(cat.color || GOOGLE_CALENDAR_COLORS[0].color);
+    setFormColor(cat.color || EXTENDED_CATEGORY_COLORS[0].color);
+    setFormIcon(cat.icon || null);
     setFormStickerId(cat.stickerId || null);
     if (cat.metaMinutosSemanal && cat.metaMinutosSemanal > 0) {
       setIsMetaEnabled(true);
@@ -131,6 +138,7 @@ export default function CategoriesScreen() {
       setMetaMinutes('0');
     }
     setIsCreateModalOpen(true);
+    triggerHaptic('impact');
   };
 
   const handleSaveCategory = () => {
@@ -170,7 +178,8 @@ export default function CategoriesScreen() {
       finalName,
       formColor,
       formStickerId,
-      calculatedMeta
+      calculatedMeta,
+      formIcon
     );
 
     setIsCreateModalOpen(false);
@@ -238,6 +247,7 @@ export default function CategoriesScreen() {
           <View style={styles.categoryList}>
             {categories.map((cat) => {
               const stickerIcon = getStickerIconName(cat.stickerId);
+              const iconToDisplay = stickerIcon || cat.icon || null;
               const metaMinutos = cat.metaMinutosSemanal || 0;
               const metaH = Math.floor(metaMinutos / 60);
               const metaM = metaMinutos % 60;
@@ -252,15 +262,25 @@ export default function CategoriesScreen() {
                     { backgroundColor: theme.surface, borderColor: theme.outline },
                   ]}>
                   <View style={styles.cardMainRow}>
-                    <View style={styles.cardLeft}>
+                    <TouchableOpacity
+                      style={styles.cardLeft}
+                      activeOpacity={0.75}
+                      onPress={() => {
+                        triggerHaptic('selection');
+                        handleOpenEditModal(cat);
+                      }}>
                       <View
                         style={[
                           styles.colorCircle,
                           { backgroundColor: cat.color || '#616161' },
                         ]}>
-                        {stickerIcon ? (
-                          <Ionicons name={stickerIcon} size={16} color="#FFFFFF" />
-                        ) : null}
+                        {iconToDisplay ? (
+                          <Ionicons name={iconToDisplay as any} size={18} color="#FFFFFF" />
+                        ) : (
+                          <Text style={styles.colorCircleInitial}>
+                            {cat.name.charAt(0).toUpperCase()}
+                          </Text>
+                        )}
                       </View>
                       <View style={styles.categoryTitleCol}>
                         <View style={styles.nameRow}>
@@ -290,7 +310,7 @@ export default function CategoriesScreen() {
                             : `${linkedHabitsCount} rotina${linkedHabitsCount === 1 ? '' : 's'} vinculada${linkedHabitsCount === 1 ? '' : 's'}`}
                         </Text>
                       </View>
-                    </View>
+                    </TouchableOpacity>
 
                     <View style={styles.cardActions}>
                       <TouchableOpacity
@@ -416,6 +436,65 @@ export default function CategoriesScreen() {
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                     <Ionicons name="close" size={24} color={theme.textSecondary} />
                   </TouchableOpacity>
+                </View>
+
+                {/* Card de Live Preview Dinâmico */}
+                <View
+                  style={[
+                    styles.livePreviewCard,
+                    {
+                      backgroundColor: theme.surfaceElevated,
+                      borderColor: `${formColor}55`,
+                    },
+                  ]}>
+                  <View style={styles.livePreviewHeaderRow}>
+                    <View
+                      style={[
+                        styles.livePreviewBadge,
+                        { backgroundColor: `${formColor}20`, borderColor: `${formColor}40` },
+                      ]}>
+                      <Text style={[styles.livePreviewBadgeText, { color: formColor }]}>
+                        PRÉ-VISUALIZAÇÃO
+                      </Text>
+                    </View>
+                    <Text style={[styles.livePreviewSub, { color: theme.textSecondary }]}>
+                      Em tempo real
+                    </Text>
+                  </View>
+
+                  <View style={styles.livePreviewMainRow}>
+                    <View style={[styles.livePreviewCircle, { backgroundColor: formColor }]}>
+                      {formIcon ? (
+                        <Ionicons name={formIcon as any} size={22} color="#FFFFFF" />
+                      ) : formName.trim() ? (
+                        <Text style={styles.livePreviewInitial}>
+                          {formName.trim().charAt(0).toUpperCase()}
+                        </Text>
+                      ) : (
+                        <Ionicons name="folder-outline" size={20} color="#FFFFFF" />
+                      )}
+                    </View>
+
+                    <View style={styles.livePreviewInfoCol}>
+                      <Text
+                        numberOfLines={1}
+                        style={[styles.livePreviewName, { color: theme.textPrimary }]}>
+                        {formName.trim() || 'Nome da Categoria'}
+                      </Text>
+                      {isMetaEnabled && (parseInt(metaHours, 10) > 0 || parseInt(metaMinutes, 10) > 0) ? (
+                        <View style={styles.livePreviewMetaPill}>
+                          <Ionicons name="flag" size={12} color={formColor} />
+                          <Text style={[styles.livePreviewMetaText, { color: theme.textSecondary }]}>
+                            Meta Semanal: {metaHours}h {parseInt(metaMinutes, 10) > 0 ? `${metaMinutes}m ` : ''}
+                          </Text>
+                        </View>
+                      ) : (
+                        <Text style={[styles.livePreviewHelpText, { color: theme.textSecondary }]}>
+                          Selecione cor, ícone e meta abaixo
+                        </Text>
+                      )}
+                    </View>
+                  </View>
                 </View>
 
                 {/* Nome */}
@@ -625,24 +704,34 @@ export default function CategoriesScreen() {
                   )}
                 </View>
 
-                {/* Seletor de Cores do Google Agenda */}
-                <Text style={[styles.inputLabel, { color: theme.textPrimary, marginTop: 18 }]}>
-                  Cor da Categoria
-                </Text>
+                {/* Seletor de Cores: Google Agenda & Tons Neon */}
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={[styles.inputLabel, { color: theme.textPrimary, marginTop: 18 }]}>
+                    Cor da Categoria
+                  </Text>
+                  <Text style={[styles.colorCounterLabel, { color: theme.textSecondary, marginTop: 18 }]}>
+                    {EXTENDED_CATEGORY_COLORS.length} opções
+                  </Text>
+                </View>
+
                 <View style={styles.colorPaletteGrid}>
-                  {GOOGLE_CALENDAR_COLORS.map((item) => {
+                  {EXTENDED_CATEGORY_COLORS.map((item) => {
                     const isSelected = formColor.toUpperCase() === item.color.toUpperCase();
                     return (
                       <TouchableOpacity
                         key={item.id}
-                        onPress={() => setFormColor(item.color)}
+                        onPress={() => {
+                          setFormColor(item.color);
+                          triggerHaptic('selection');
+                        }}
                         activeOpacity={0.8}
+                        accessibilityLabel={`Cor ${item.name}`}
                         style={[
                           styles.colorPaletteItem,
                           { backgroundColor: item.color },
                           isSelected && [
                             styles.colorPaletteItemSelected,
-                            { borderColor: theme.primary },
+                            { borderColor: theme.textPrimary },
                           ],
                         ]}>
                         {isSelected && (
@@ -652,6 +741,100 @@ export default function CategoriesScreen() {
                     );
                   })}
                 </View>
+
+                {/* Seletor de Ícones Universais */}
+                <View style={[styles.sectionHeaderRow, { marginTop: 18 }]}>
+                  <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>
+                    Ícone da Categoria
+                  </Text>
+                  {formIcon && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        setFormIcon(null);
+                        triggerHaptic('selection');
+                      }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Text style={[styles.clearIconLink, { color: theme.primary }]}>
+                        Remover ícone
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.iconScrollGrid}>
+                  <TouchableOpacity
+                    style={[
+                      styles.iconOptionItem,
+                      {
+                        backgroundColor: theme.surfaceElevated,
+                        borderColor: formIcon === null ? theme.primary : theme.outline,
+                      },
+                      formIcon === null && { backgroundColor: `${theme.primary}20` },
+                    ]}
+                    onPress={() => {
+                      setFormIcon(null);
+                      triggerHaptic('selection');
+                    }}
+                    activeOpacity={0.75}>
+                    <Ionicons
+                      name="remove-circle-outline"
+                      size={20}
+                      color={formIcon === null ? theme.primary : theme.textSecondary}
+                    />
+                    <Text
+                      style={[
+                        styles.iconOptionText,
+                        { color: formIcon === null ? theme.primary : theme.textSecondary },
+                      ]}>
+                      Nenhum
+                    </Text>
+                  </TouchableOpacity>
+
+                  {CATEGORY_ICONS.map((ico) => {
+                    const isSelected = formIcon === ico.name;
+                    return (
+                      <TouchableOpacity
+                        key={ico.name}
+                        style={[
+                          styles.iconOptionItem,
+                          {
+                            backgroundColor: theme.surfaceElevated,
+                            borderColor: isSelected ? formColor : theme.outline,
+                          },
+                          isSelected && {
+                            backgroundColor: `${formColor}22`,
+                            borderWidth: 2,
+                            borderColor: formColor,
+                          },
+                        ]}
+                        onPress={() => {
+                          setFormIcon(ico.name);
+                          triggerHaptic('selection');
+                        }}
+                        activeOpacity={0.75}>
+                        <Ionicons
+                          name={ico.name}
+                          size={20}
+                          color={isSelected ? formColor : theme.textPrimary}
+                        />
+                        <Text
+                          numberOfLines={1}
+                          style={[
+                            styles.iconOptionText,
+                            {
+                              color: isSelected ? formColor : theme.textSecondary,
+                              fontWeight: isSelected ? '800' : '500',
+                            },
+                          ]}>
+                          {ico.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
 
                 {/* Seletor de Stickers Adquiridos */}
                 {ownedStickers.length > 0 && (
@@ -1236,5 +1419,109 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '800',
+  },
+  colorCircleInitial: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  livePreviewCard: {
+    borderRadius: 16,
+    borderWidth: 1.5,
+    padding: 14,
+    marginBottom: 18,
+    gap: 10,
+  },
+  livePreviewHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  livePreviewBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  livePreviewBadgeText: {
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  livePreviewSub: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  livePreviewMainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  livePreviewCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  livePreviewInitial: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  livePreviewInfoCol: {
+    flex: 1,
+    gap: 3,
+  },
+  livePreviewName: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  livePreviewMetaPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 2,
+  },
+  livePreviewMetaText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  livePreviewHelpText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  colorCounterLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  clearIconLink: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  iconScrollGrid: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 2,
+  },
+  iconOptionItem: {
+    width: 64,
+    height: 64,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    padding: 4,
+  },
+  iconOptionText: {
+    fontSize: 10,
+    textAlign: 'center',
   },
 });

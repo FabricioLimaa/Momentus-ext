@@ -12,7 +12,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { MomentusColors, getContrastTextColor } from '@/constants/theme';
-import { GOOGLE_CALENDAR_COLORS } from '@/constants/initialData';
+import {
+  EXTENDED_CATEGORY_COLORS,
+  CATEGORY_ICONS,
+} from '@/constants/categoryPresets';
 import { useMomentus } from '@/context/MomentusContext';
 import { Category } from '@/types';
 
@@ -30,7 +33,8 @@ export const CategoriesModal: React.FC<CategoriesModalProps> = ({ visible, onClo
 
   // Form states
   const [name, setName] = useState('');
-  const [selectedColor, setSelectedColor] = useState(GOOGLE_CALENDAR_COLORS[0].color);
+  const [selectedColor, setSelectedColor] = useState(EXTENDED_CATEGORY_COLORS[0].color);
+  const [selectedIcon, setSelectedIcon] = useState<string | null>(null);
   const [selectedSticker, setSelectedSticker] = useState<string | null>(null);
   const [isMetaEnabled, setIsMetaEnabled] = useState(false);
   const [metaHours, setMetaHours] = useState('5');
@@ -41,7 +45,8 @@ export const CategoriesModal: React.FC<CategoriesModalProps> = ({ visible, onClo
   const openCreate = () => {
     setEditingCategory(null);
     setName('');
-    setSelectedColor(GOOGLE_CALENDAR_COLORS[0].color);
+    setSelectedColor(EXTENDED_CATEGORY_COLORS[0].color);
+    setSelectedIcon(null);
     setSelectedSticker(null);
     setIsMetaEnabled(false);
     setMetaHours('5');
@@ -53,6 +58,7 @@ export const CategoriesModal: React.FC<CategoriesModalProps> = ({ visible, onClo
     setEditingCategory(cat);
     setName(cat.name);
     setSelectedColor(cat.color);
+    setSelectedIcon(cat.icon || null);
     setSelectedSticker(cat.stickerId || null);
     const hasMeta = cat.metaMinutosSemanal != null && cat.metaMinutosSemanal > 0;
     setIsMetaEnabled(hasMeta);
@@ -81,7 +87,8 @@ export const CategoriesModal: React.FC<CategoriesModalProps> = ({ visible, onClo
       name.trim(),
       selectedColor,
       selectedSticker,
-      totalMinutes
+      totalMinutes,
+      selectedIcon
     );
 
     setEditModalVisible(false);
@@ -132,6 +139,8 @@ export const CategoriesModal: React.FC<CategoriesModalProps> = ({ visible, onClo
                     <View style={[styles.catColorDot, { backgroundColor: cat.color }]}>
                       {cat.stickerId ? (
                         <Ionicons name="sparkles" size={12} color="#FFF" />
+                      ) : cat.icon ? (
+                        <Ionicons name={cat.icon as any} size={12} color="#FFF" />
                       ) : null}
                     </View>
                     <Text style={[styles.catName, { color: theme.textPrimary }]}>{cat.name}</Text>
@@ -192,9 +201,9 @@ export const CategoriesModal: React.FC<CategoriesModalProps> = ({ visible, onClo
                   onChangeText={setName}
                 />
 
-                <Text style={[styles.fieldLabel, { color: theme.textPrimary }]}>Cor da Agenda Google</Text>
+                <Text style={[styles.fieldLabel, { color: theme.textPrimary }]}>Cor da Categoria (Google & Neon)</Text>
                 <View style={styles.colorPaletteGrid}>
-                  {GOOGLE_CALENDAR_COLORS.map((c) => {
+                  {EXTENDED_CATEGORY_COLORS.map((c) => {
                     const isSelected = selectedColor === c.color;
                     return (
                       <TouchableOpacity
@@ -210,6 +219,61 @@ export const CategoriesModal: React.FC<CategoriesModalProps> = ({ visible, onClo
                     );
                   })}
                 </View>
+
+                {/* Seletor de Ícones Universais */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14 }}>
+                  <Text style={[styles.fieldLabel, { color: theme.textPrimary, marginTop: 0 }]}>Ícone da Categoria</Text>
+                  {selectedIcon && (
+                    <TouchableOpacity onPress={() => setSelectedIcon(null)}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: theme.primary }}>Remover</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ flexDirection: 'row', gap: 8, paddingVertical: 6 }}>
+                  <TouchableOpacity
+                    style={[
+                      {
+                        width: 48,
+                        height: 48,
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: theme.surfaceElevated,
+                        borderColor: selectedIcon === null ? theme.primary : theme.outline,
+                      },
+                      selectedIcon === null && { backgroundColor: `${theme.primary}20` },
+                    ]}
+                    onPress={() => setSelectedIcon(null)}>
+                    <Ionicons name="remove-circle-outline" size={18} color={selectedIcon === null ? theme.primary : theme.textSecondary} />
+                  </TouchableOpacity>
+                  {CATEGORY_ICONS.map((ico) => {
+                    const isSel = selectedIcon === ico.name;
+                    return (
+                      <TouchableOpacity
+                        key={ico.name}
+                        style={[
+                          {
+                            width: 48,
+                            height: 48,
+                            borderRadius: 12,
+                            borderWidth: 1,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: theme.surfaceElevated,
+                            borderColor: isSel ? selectedColor : theme.outline,
+                          },
+                          isSel && { backgroundColor: `${selectedColor}22`, borderWidth: 2 },
+                        ]}
+                        onPress={() => setSelectedIcon(ico.name)}>
+                        <Ionicons name={ico.name} size={18} color={isSel ? selectedColor : theme.textPrimary} />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
 
                 {ownedStickers.length > 0 && (
                   <>
