@@ -32,6 +32,7 @@ import {
   CommunityTemplate,
 } from '@/constants/communityTemplates';
 import { getTodayDateString } from '@/constants/initialData';
+import { APP_INFO } from '@/constants/appInfo';
 
 interface EventFormState {
   id?: string;
@@ -61,6 +62,17 @@ export default function TemplatesScreen() {
   const [communityTagFilter, setCommunityTagFilter] = useState<string>('Todas');
   const [communitySearchQuery, setCommunitySearchQuery] = useState<string>('');
   const [selectedCommunityTemplate, setSelectedCommunityTemplate] = useState<CommunityTemplate | null>(null);
+
+  // Estado de acordeão dos templates salvos (Tap-to-expand)
+  const [expandedTemplateIds, setExpandedTemplateIds] = useState<Record<string, boolean>>({});
+
+  const toggleTemplateExpand = (templateId: string) => {
+    triggerHaptic('selection');
+    setExpandedTemplateIds((prev) => ({
+      ...prev,
+      [templateId]: !prev[templateId],
+    }));
+  };
 
   // Estados dos diálogos
   const [selectedTemplateForApply, setSelectedTemplateForApply] = useState<RoutineTemplate | null>(null);
@@ -178,6 +190,53 @@ export default function TemplatesScreen() {
     ]);
   };
 
+  const handleMoveEvent = (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= formEvents.length) return;
+    triggerHaptic('selection');
+    setFormEvents((prev) => {
+      const next = [...prev];
+      const item = next[index];
+      next[index] = next[targetIndex];
+      next[targetIndex] = item;
+      return next;
+    });
+  };
+
+  const applyDurationPreset = (index: number, addMinutes: number) => {
+    triggerHaptic('selection');
+    const currentStart = formEvents[index]?.timeStart || '08:00';
+    const startMins = parseTimeToMinutes(currentStart);
+    const endMins = (startMins + addMinutes) % (24 * 60);
+    const h = Math.floor(endMins / 60).toString().padStart(2, '0');
+    const m = (endMins % 60).toString().padStart(2, '0');
+    handleUpdateEventField(index, { timeEnd: `${h}:${m}` });
+  };
+
+  const handleDuplicateTemplate = (template: RoutineTemplate) => {
+    triggerHaptic('impact');
+    const clonedItems: TemplateItem[] = template.items.map((it, idx) => ({
+      id: `ti-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
+      title: it.title,
+      description: it.description || null,
+      timeStart: it.timeStart || '08:00',
+      timeEnd: it.timeEnd || it.timeStart || '08:30',
+      categoryId: it.categoryId || defaultCategoryId,
+      order: it.order ?? idx,
+    }));
+
+    addTemplate({
+      title: `${template.title} (Cópia)`,
+      description: template.description || null,
+      icon: template.icon || 'sparkles',
+      color: template.color || '#34D399',
+      items: clonedItems,
+    });
+
+    triggerHaptic('success');
+    Alert.alert('Template Duplicado', `O template "${template.title} (Cópia)" foi criado com sucesso.`);
+  };
+
   const handleRemoveEventField = (index: number) => {
     if (formEvents.length <= 1) return;
     setFormEvents((prev) => prev.filter((_, i) => i !== index));
@@ -280,9 +339,27 @@ export default function TemplatesScreen() {
         })),
       };
 
-      const jsonString = JSON.stringify(shareData, null, 2);
+      const totalMins = template.items.reduce((acc, it) => {
+        const s = parseTimeToMinutes(it.timeStart);
+        const e = parseTimeToMinutes(it.timeEnd || it.timeStart);
+        return acc + (e > s ? e - s : 30);
+      }, 0);
+      const durationStr = totalMins >= 60 ? `${Math.floor(totalMins / 60)}h ${totalMins % 60}m` : `${totalMins}m`;
+
+      const humanLines = [
+        `✨ Rotina: ${template.title}`,
+        template.description ? `📝 ${template.description}` : '',
+        `⏱ ${template.items.length} etapas (${durationStr} total):`,
+        ...template.items.map((it) => `• ${it.timeStart} às ${it.timeEnd || it.timeStart} - ${it.title}`),
+        '',
+        `📱 Criado no ${APP_INFO.name} (${APP_INFO.website})`,
+        '',
+        '--- CÓDIGO DO TEMPLATE (Cole no app para importar) ---',
+        JSON.stringify(shareData),
+      ].filter(Boolean);
+
       await Share.share({
-        message: jsonString,
+        message: humanLines.join('\n'),
         title: `Template Momentus: ${template.title}`,
       });
     } catch (err: any) {
@@ -589,8 +666,6 @@ export default function TemplatesScreen() {
             templates.map((template) => {
               const complexity = getComplexity(template.items.length);
               const sortedEvents = [...template.items].sort((a, b) => a.timeStart.localeCompare(b.timeStart));
-              const previewEvents = sortedEvents.slice(0, 4);
-              const remainingCount = template.items.length - 4;
 
               const totalDurationMinutes = template.items.reduce((acc, it) => {
                 const start = parseTimeToMinutes(it.timeStart);
@@ -637,19 +712,29 @@ export default function TemplatesScreen() {
                       <TouchableOpacity
                         style={styles.iconBtn}
                         onPress={() => handleShareTemplate(template)}
-                        activeOpacity={0.7}>
+                        activeOpacity={0.7}
+                        accessibilityLabel="Compartilhar template">
                         <Ionicons name="share-social-outline" size={18} color={theme.textSecondary} />
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.iconBtn}
+                        onPress={() => handleDuplicateTemplate(template)}
+                        activeOpacity={0.7}
+                        accessibilityLabel="Duplicar template">
+                        <Ionicons name="copy-outline" size={18} color={theme.textSecondary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.iconBtn}
                         onPress={() => handleOpenEditModal(template)}
-                        activeOpacity={0.7}>
+                        activeOpacity={0.7}
+                        accessibilityLabel="Editar template">
                         <Ionicons name="pencil-outline" size={18} color={theme.textSecondary} />
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.iconBtn}
                         onPress={() => handleDeleteTemplateConfirm(template)}
-                        activeOpacity={0.7}>
+                        activeOpacity={0.7}
+                        accessibilityLabel="Excluir template">
                         <Ionicons name="trash-outline" size={18} color={MomentusColors.errorRed} />
                       </TouchableOpacity>
                     </View>
@@ -673,40 +758,49 @@ export default function TemplatesScreen() {
                     </View>
                   </View>
 
-                  <View style={[styles.divider, { backgroundColor: theme.outline }]} />
+                  {/* Alternador de Sanfona / Acordeão (Tap-to-Expand) */}
+                  <TouchableOpacity
+                    style={styles.accordionToggleBtn}
+                    onPress={() => toggleTemplateExpand(template.id)}
+                    activeOpacity={0.7}>
+                    <Text style={[styles.accordionToggleText, { color: theme.primary }]}>
+                      {expandedTemplateIds[template.id]
+                        ? 'Ocultar atividades ▲'
+                        : `Ver atividades (${template.items.length}) ▼`}
+                    </Text>
+                  </TouchableOpacity>
 
-                  {/* Prévia das Atividades */}
-                  <View style={styles.previewEventsList}>
-                    {previewEvents.map((item, idx) => {
-                      const category = categories.find((c) => c.id === item.categoryId);
-                      const catColor = category?.color || '#616161';
+                  {/* Prévia das Atividades (Expandida sob demanda) */}
+                  {expandedTemplateIds[template.id] && (
+                    <>
+                      <View style={[styles.divider, { backgroundColor: theme.outline, marginVertical: 8 }]} />
+                      <View style={styles.previewEventsList}>
+                        {sortedEvents.map((item, idx) => {
+                          const category = categories.find((c) => c.id === item.categoryId);
+                          const catColor = category?.color || '#616161';
 
-                      return (
-                        <View key={item.id || idx} style={styles.previewEventRow}>
-                          <View style={[styles.categoryDot, { backgroundColor: catColor }]} />
-                          <View style={styles.previewEventInfo}>
-                            <Text style={[styles.previewEventTitle, { color: theme.textPrimary }]} numberOfLines={1}>
-                              {item.title}
-                            </Text>
-                            {item.description ? (
-                              <Text style={[styles.previewEventDesc, { color: theme.textSecondary }]} numberOfLines={1}>
-                                {item.description}
+                          return (
+                            <View key={item.id || idx} style={styles.previewEventRow}>
+                              <View style={[styles.categoryDot, { backgroundColor: catColor }]} />
+                              <View style={styles.previewEventInfo}>
+                                <Text style={[styles.previewEventTitle, { color: theme.textPrimary }]} numberOfLines={1}>
+                                  {item.title}
+                                </Text>
+                                {item.description ? (
+                                  <Text style={[styles.previewEventDesc, { color: theme.textSecondary }]} numberOfLines={1}>
+                                    {item.description}
+                                  </Text>
+                                ) : null}
+                              </View>
+                              <Text style={[styles.previewEventTime, { color: theme.textSecondary }]}>
+                                {item.timeStart} - {item.timeEnd || item.timeStart}
                               </Text>
-                            ) : null}
-                          </View>
-                          <Text style={[styles.previewEventTime, { color: theme.textSecondary }]}>
-                            {item.timeStart} - {item.timeEnd || item.timeStart}
-                          </Text>
-                        </View>
-                      );
-                    })}
-
-                    {remainingCount > 0 ? (
-                      <Text style={[styles.remainingText, { color: theme.primary }]}>
-                        + {remainingCount} atividades...
-                      </Text>
-                    ) : null}
-                  </View>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    </>
+                  )}
 
                   {/* Botão Primário: Aplicar Template */}
                   <TouchableOpacity
@@ -996,19 +1090,43 @@ export default function TemplatesScreen() {
                       { backgroundColor: theme.surface, borderColor: theme.outline },
                     ]}>
                     <View style={styles.eventFormCardHeader}>
-                      <Text style={[styles.eventFormIndex, { color: theme.primary }]}>
-                        Evento {index + 1}
-                      </Text>
-                      {formEvents.length > 1 ? (
-                        <TouchableOpacity
-                          onPress={() => handleRemoveEventField(index)}
-                          style={styles.removeEventBtn}
-                          activeOpacity={0.7}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Remover evento ${index + 1}`}>
-                          <Ionicons name="trash-outline" size={18} color={MomentusColors.errorRed} />
-                        </TouchableOpacity>
-                      ) : null}
+                      <View style={styles.eventIndexWrapper}>
+                        <Text style={[styles.eventFormIndex, { color: theme.primary }]}>
+                          Evento {index + 1}
+                        </Text>
+                      </View>
+                      <View style={styles.eventHeaderActions}>
+                        {index > 0 && (
+                          <TouchableOpacity
+                            onPress={() => handleMoveEvent(index, 'up')}
+                            style={styles.reorderEventBtn}
+                            activeOpacity={0.7}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Mover evento ${index + 1} para cima`}>
+                            <Ionicons name="arrow-up" size={16} color={theme.textSecondary} />
+                          </TouchableOpacity>
+                        )}
+                        {index < formEvents.length - 1 && (
+                          <TouchableOpacity
+                            onPress={() => handleMoveEvent(index, 'down')}
+                            style={styles.reorderEventBtn}
+                            activeOpacity={0.7}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Mover evento ${index + 1} para baixo`}>
+                            <Ionicons name="arrow-down" size={16} color={theme.textSecondary} />
+                          </TouchableOpacity>
+                        )}
+                        {formEvents.length > 1 ? (
+                          <TouchableOpacity
+                            onPress={() => handleRemoveEventField(index)}
+                            style={styles.removeEventBtn}
+                            activeOpacity={0.7}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Remover evento ${index + 1}`}>
+                            <Ionicons name="trash-outline" size={18} color={MomentusColors.errorRed} />
+                          </TouchableOpacity>
+                        ) : null}
+                      </View>
                     </View>
 
                     {/* Título do Evento */}
@@ -1129,6 +1247,25 @@ export default function TemplatesScreen() {
                               </Text>
                             </View>
                           )}
+
+                          {/* Chips Rápidos de Duração Pré-definida */}
+                          <View style={styles.durationPresetsRow}>
+                            <Text style={[styles.durationPresetsLabel, { color: theme.textSecondary }]}>Duração rápida:</Text>
+                            {[15, 30, 45, 60, 120].map((mins) => (
+                              <TouchableOpacity
+                                key={mins}
+                                style={[
+                                  styles.durationPresetChip,
+                                  { backgroundColor: theme.surface, borderColor: theme.outline },
+                                ]}
+                                onPress={() => applyDurationPreset(index, mins)}
+                                activeOpacity={0.7}>
+                                <Text style={[styles.durationPresetText, { color: theme.primary }]}>
+                                  +{mins >= 60 ? `${mins / 60}h` : `${mins}m`}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
                         </View>
                       );
                     })()}
@@ -1595,11 +1732,57 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
-  remainingText: {
-    fontSize: 12,
+  accordionToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    marginTop: 8,
+    marginBottom: 6,
+  },
+  accordionToggleText: {
+    fontSize: 13,
     fontWeight: '700',
-    paddingLeft: 20,
-    marginTop: 2,
+  },
+  eventIndexWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  eventHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  reorderEventBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 2,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  },
+  durationPresetsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 8,
+  },
+  durationPresetsLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  durationPresetChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  },
+  durationPresetText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   applyButton: {
     flexDirection: 'row',
