@@ -9,7 +9,9 @@ import {
   StatusBar,
   Modal,
   Alert,
+  Share,
 } from 'react-native';
+import { APP_INFO } from '@/constants/appInfo';
 import { auth as firebaseAuth } from '@/config/firebase';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,6 +25,58 @@ import { useMomentus } from '@/context/MomentusContext';
 import { getStreakColor } from '@/constants/initialData';
 import { Achievement, MarketItem } from '@/types';
 import { AvatarWithFrame, AVATAR_FRAMES, AvatarFrameType } from '@/components/momentus/AvatarWithFrame';
+
+export type AchievementTier = 'bronze' | 'silver' | 'gold' | 'diamond';
+
+export interface TierInfo {
+  tier: AchievementTier;
+  label: string;
+  emoji: string;
+  color: string;
+  borderColor: string;
+  badgeBg: string;
+}
+
+export const getAchievementTier = (ach: Achievement): TierInfo => {
+  if (ach.xpReward >= 200 || ach.maxProgress >= 100) {
+    return {
+      tier: 'diamond',
+      label: 'Diamante',
+      emoji: '💎',
+      color: '#38BDF8',
+      borderColor: '#38BDF8',
+      badgeBg: 'rgba(56, 189, 248, 0.15)',
+    };
+  }
+  if (ach.xpReward >= 70 || ach.maxProgress >= 30) {
+    return {
+      tier: 'gold',
+      label: 'Ouro',
+      emoji: '🥇',
+      color: '#F59E0B',
+      borderColor: '#F59E0B',
+      badgeBg: 'rgba(245, 158, 11, 0.15)',
+    };
+  }
+  if (ach.xpReward >= 30 || ach.maxProgress >= 7) {
+    return {
+      tier: 'silver',
+      label: 'Prata',
+      emoji: '🥈',
+      color: '#94A3B8',
+      borderColor: '#94A3B8',
+      badgeBg: 'rgba(148, 163, 184, 0.15)',
+    };
+  }
+  return {
+    tier: 'bronze',
+    label: 'Bronze',
+    emoji: '🥉',
+    color: '#D97706',
+    borderColor: '#D97706',
+    badgeBg: 'rgba(217, 119, 6, 0.15)',
+  };
+};
 
 export const getIconForAchievement = (id: string): keyof typeof Ionicons.glyphMap => {
   switch (id) {
@@ -41,7 +95,19 @@ export const getIconForAchievement = (id: string): keyof typeof Ionicons.glyphMa
     case 'COMPLETED_50':
       return 'ribbon';
     case 'COMPLETED_100':
-      return 'diamond';
+      return 'shield-checkmark';
+    case 'FOCUS_FIRST':
+      return 'timer';
+    case 'FOCUS_10H':
+      return 'flame';
+    case 'FOCUS_50H':
+      return 'bulb';
+    case 'EARLY_BIRD':
+      return 'sunny';
+    case 'PERFECT_DAY':
+      return 'star-half';
+    case 'GOAL_MASTER':
+      return 'pie-chart';
     default:
       return 'star';
   }
@@ -62,6 +128,30 @@ export default function AchievementsScreen() {
   const [activeTab, setActiveTab] = useState<'achievements' | 'market'>('achievements');
   const [selectedAchievement, setSelectedAchievement] = useState<Achievement | null>(null);
   const [isFrameModalOpen, setIsFrameModalOpen] = useState(false);
+  const [achievementFilter, setAchievementFilter] = useState<'all' | 'unlocked' | 'in_progress' | 'closest'>('all');
+
+  const handleShareAchievement = async (ach: Achievement) => {
+    triggerHaptic('impact');
+    const tier = getAchievementTier(ach);
+    const shareText = [
+      `🏆 Desbloqueei a conquista "${ach.title}" no ${APP_INFO.name}!`,
+      `✨ Tier: ${tier.emoji} ${tier.label}`,
+      `📜 "${ach.description}"`,
+      `⭐ Recompensa: +${ach.xpReward} XP`,
+      '',
+      `Organize seus hábitos e evolua seu foco no ${APP_INFO.name}:`,
+      APP_INFO.website,
+    ].join('\n');
+
+    try {
+      await Share.share({
+        message: shareText,
+        title: `Conquista Momentus: ${ach.title}`,
+      });
+    } catch (e) {
+      console.warn('Erro ao compartilhar conquista:', e);
+    }
+  };
 
   const handleBuy = (item: MarketItem) => {
     if (item.isOwned) return;
@@ -198,6 +288,35 @@ export default function AchievementsScreen() {
               <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Hábitos concluídos</Text>
             </View>
           </View>
+
+          {/* Barra de Progresso de XP Dinâmica */}
+          <View style={[styles.xpProgressContainer, { borderTopColor: theme.outline }]}>
+            <View style={styles.xpProgressHeader}>
+              <View style={styles.xpProgressTitleRow}>
+                <Ionicons name="trending-up" size={14} color={theme.primary} />
+                <Text style={[styles.xpProgressTitle, { color: theme.textSecondary }]}>
+                  Evolução para o Nível {userLevel.level + 1}
+                </Text>
+              </View>
+              <Text style={[styles.xpProgressValues, { color: theme.primary }]}>
+                {userLevel.currentXp} / {userLevel.nextLevelXp} XP ({Math.min(100, Math.round(userLevel.progress * 100))}%)
+              </Text>
+            </View>
+            <View style={[styles.xpProgressTrack, { backgroundColor: theme.surfaceElevated }]}>
+              <View
+                style={[
+                  styles.xpProgressFill,
+                  {
+                    width: `${Math.min(100, Math.max(5, userLevel.progress * 100))}%`,
+                    backgroundColor: userLevel.rankColor || theme.primary,
+                  },
+                ]}
+              />
+            </View>
+            <Text style={[styles.xpMotivationText, { color: theme.textSecondary }]}>
+              ⚡ Faltam {Math.max(0, userLevel.nextLevelXp - userLevel.currentXp)} XP para o próximo nível ({userLevel.honorTitle})
+            </Text>
+          </View>
         </View>
 
         {/* Tab Switcher: Conquistas / Loja */}
@@ -251,68 +370,144 @@ export default function AchievementsScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Pílulas de Filtragem Rápida (Apenas na aba de medalhas) */}
+        {activeTab === 'achievements' && (
+          <View style={styles.filterPillsRow}>
+            {[
+              { id: 'all', label: 'Todas' },
+              { id: 'unlocked', label: `Desbloqueadas (${unlockedCount})` },
+              { id: 'in_progress', label: 'Em Progresso' },
+              { id: 'closest', label: 'Mais Próximas ⏳' },
+            ].map((pill) => {
+              const isSelected = achievementFilter === pill.id;
+              return (
+                <TouchableOpacity
+                  key={pill.id}
+                  style={[
+                    styles.filterPill,
+                    {
+                      backgroundColor: isSelected ? `${theme.primary}20` : theme.surface,
+                      borderColor: isSelected ? theme.primary : theme.outline,
+                    },
+                  ]}
+                  onPress={() => {
+                    triggerHaptic('selection');
+                    setAchievementFilter(pill.id as any);
+                  }}
+                  activeOpacity={0.7}>
+                  <Text
+                    style={[
+                      styles.filterPillText,
+                      { color: isSelected ? theme.primary : theme.textSecondary },
+                      isSelected && { fontWeight: '800' },
+                    ]}>
+                    {pill.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+
         {/* Conteúdo das Abas */}
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}>
           {activeTab === 'achievements' ? (
-            /* Lista de Medalhas */
-            achievements.map((ach) => {
-              const icon = getIconForAchievement(ach.id);
-              const percent = Math.min(100, Math.round((ach.progress / ach.maxProgress) * 100));
+            /* Lista de Medalhas Filtrada e Ordenada */
+            achievements
+              .filter((ach) => {
+                if (achievementFilter === 'unlocked') return ach.unlocked;
+                if (achievementFilter === 'in_progress') return !ach.unlocked;
+                return true;
+              })
+              .sort((a, b) => {
+                if (achievementFilter === 'closest') {
+                  const pctA = a.unlocked ? -1 : a.progress / a.maxProgress;
+                  const pctB = b.unlocked ? -1 : b.progress / b.maxProgress;
+                  return pctB - pctA;
+                }
+                if (a.unlocked && !b.unlocked) return -1;
+                if (!a.unlocked && b.unlocked) return 1;
+                return b.xpReward - a.xpReward;
+              })
+              .map((ach) => {
+                const icon = getIconForAchievement(ach.id);
+                const tier = getAchievementTier(ach);
+                const percent = Math.min(100, Math.round((ach.progress / ach.maxProgress) * 100));
 
-              return (
-                <TouchableOpacity
-                  key={ach.id}
-                  onPress={() => setSelectedAchievement(ach)}
-                  style={[
-                    styles.itemCard,
-                    { backgroundColor: theme.surface, borderColor: theme.outline },
-                    ach.unlocked && { borderColor: `${theme.primary}60` },
-                  ]}
-                  activeOpacity={0.75}>
-                  <View
+                return (
+                  <TouchableOpacity
+                    key={ach.id}
+                    onPress={() => {
+                      triggerHaptic('selection');
+                      setSelectedAchievement(ach);
+                    }}
                     style={[
-                      styles.iconCircle,
-                      ach.unlocked
-                        ? { backgroundColor: `${theme.primary}25`, borderColor: theme.primary }
-                        : { backgroundColor: theme.surfaceElevated, borderColor: 'transparent' },
-                    ]}>
-                    <Ionicons
-                      name={ach.unlocked ? icon : 'lock-closed'}
-                      size={24}
-                      color={ach.unlocked ? theme.primary : theme.textSecondary}
-                    />
-                  </View>
+                      styles.itemCard,
+                      { backgroundColor: theme.surface, borderColor: theme.outline },
+                      ach.unlocked && { borderColor: `${tier.borderColor}60` },
+                    ]}
+                    activeOpacity={0.75}>
+                    <View
+                      style={[
+                        styles.iconCircle,
+                        ach.unlocked
+                          ? { backgroundColor: tier.badgeBg, borderColor: tier.borderColor }
+                          : { backgroundColor: theme.surfaceElevated, borderColor: 'transparent' },
+                      ]}>
+                      <Ionicons
+                        name={ach.unlocked ? icon : 'lock-closed'}
+                        size={24}
+                        color={ach.unlocked ? tier.color : theme.textSecondary}
+                      />
+                    </View>
 
-                  <View style={styles.itemInfo}>
-                    <View style={styles.itemTitleRow}>
-                      <Text style={[styles.itemTitle, { color: theme.textPrimary }]}>{ach.title}</Text>
-                      {ach.unlocked ? (
-                        <View style={[styles.unlockedTag, { backgroundColor: `${theme.primary}20` }]}>
-                          <Text style={[styles.unlockedTagText, { color: theme.primary }]}>Desbloqueado</Text>
+                    <View style={styles.itemInfo}>
+                      <View style={styles.itemTitleRow}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 6 }}>
+                          <Text style={[styles.itemTitle, { color: theme.textPrimary }]} numberOfLines={1}>
+                            {ach.title}
+                          </Text>
+                          <View style={[styles.tierBadge, { backgroundColor: tier.badgeBg, borderColor: tier.borderColor }]}>
+                            <Text style={[styles.tierBadgeText, { color: tier.color }]}>
+                              {tier.label}
+                            </Text>
+                          </View>
                         </View>
-                      ) : (
-                        <Text style={[styles.lockedRewardText, { color: theme.primary }]}>+{ach.xpReward} XP</Text>
-                      )}
-                    </View>
-
-                    <Text style={[styles.itemDesc, { color: theme.textSecondary }]}>{ach.description}</Text>
-
-                    {/* Progress Bar */}
-                    <View style={styles.progressRow}>
-                      <View style={[styles.progressBarTrack, { backgroundColor: theme.surfaceElevated }]}>
-                        <View style={[styles.progressBarFill, { width: `${percent}%`, backgroundColor: theme.primary }]} />
+                        {ach.unlocked ? (
+                          <View style={[styles.unlockedTag, { backgroundColor: `${theme.primary}20` }]}>
+                            <Text style={[styles.unlockedTagText, { color: theme.primary }]}>Conquistada</Text>
+                          </View>
+                        ) : (
+                          <Text style={[styles.lockedRewardText, { color: theme.primary }]}>+{ach.xpReward} XP</Text>
+                        )}
                       </View>
-                      <Text style={[styles.progressText, { color: theme.textSecondary }]}>
-                        {ach.progress}/{ach.maxProgress}
-                      </Text>
+
+                      <Text style={[styles.itemDesc, { color: theme.textSecondary }]}>{ach.description}</Text>
+
+                      {/* Progress Bar */}
+                      <View style={styles.progressRow}>
+                        <View style={[styles.progressBarTrack, { backgroundColor: theme.surfaceElevated }]}>
+                          <View
+                            style={[
+                              styles.progressBarFill,
+                              {
+                                width: `${percent}%`,
+                                backgroundColor: ach.unlocked ? tier.color : theme.primary,
+                              },
+                            ]}
+                          />
+                        </View>
+                        <Text style={[styles.progressText, { color: theme.textSecondary }]}>
+                          {ach.progress}/{ach.maxProgress}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                </TouchableOpacity>
-              );
-            })
+                  </TouchableOpacity>
+                );
+              })
           ) : (
             /* Loja de Stickers / Badges */
             marketItems.map((item) => {
@@ -408,6 +603,17 @@ export default function AchievementsScreen() {
                     <Text style={[styles.modalRewardValue, { color: theme.primary }]}>+{selectedAchievement.xpReward} XP</Text>
                   </View>
 
+                  {(() => {
+                    const tier = getAchievementTier(selectedAchievement);
+                    return (
+                      <View style={[styles.modalTierPill, { backgroundColor: tier.badgeBg, borderColor: tier.borderColor }]}>
+                        <Text style={[styles.modalTierPillText, { color: tier.color }]}>
+                          Tier {tier.emoji} {tier.label}
+                        </Text>
+                      </View>
+                    );
+                  })()}
+
                   <View style={[styles.modalStatusBox, { backgroundColor: theme.surfaceElevated }]}>
                     <Text style={[styles.modalStatusText, { color: theme.textSecondary }]}>
                       {selectedAchievement.unlocked
@@ -416,11 +622,23 @@ export default function AchievementsScreen() {
                     </Text>
                   </View>
 
+                  {selectedAchievement.unlocked && (
+                    <TouchableOpacity
+                      style={[styles.modalShareBtn, { backgroundColor: theme.primary }]}
+                      onPress={() => handleShareAchievement(selectedAchievement)}
+                      activeOpacity={0.85}>
+                      <Ionicons name="share-social-outline" size={18} color={getContrastTextColor(theme.primary)} />
+                      <Text style={[styles.modalShareBtnText, { color: getContrastTextColor(theme.primary) }]}>
+                        Compartilhar Conquista 🚀
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
                   <TouchableOpacity
-                    style={[styles.modalCloseBtn, { backgroundColor: theme.primary }]}
+                    style={[styles.modalCloseBtn, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, borderWidth: 1 }]}
                     onPress={() => setSelectedAchievement(null)}
                     activeOpacity={0.85}>
-                    <Text style={[styles.modalCloseBtnText, { color: getContrastTextColor(theme.primary) }]}>Fechar</Text>
+                    <Text style={[styles.modalCloseBtnText, { color: theme.textPrimary }]}>Fechar</Text>
                   </TouchableOpacity>
                 </>
               )}
@@ -773,6 +991,102 @@ const styles = StyleSheet.create({
   },
   purchasedBtnText: {
     color: MomentusColors.textSecondary,
+  },
+  xpProgressContainer: {
+    borderTopWidth: 1,
+    paddingTop: 12,
+    marginTop: 14,
+  },
+  xpProgressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  xpProgressTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  xpProgressTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  xpProgressValues: {
+    fontSize: 11,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  xpProgressTrack: {
+    height: 7,
+    borderRadius: 3.5,
+    overflow: 'hidden',
+    marginBottom: 6,
+  },
+  xpProgressFill: {
+    height: '100%',
+    borderRadius: 3.5,
+  },
+  xpMotivationText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  filterPillsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginHorizontal: LayoutTokens.pagePaddingHorizontal,
+    marginBottom: 14,
+  },
+  filterPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  },
+  filterPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  tierBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  tierBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  modalTierPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  modalTierPillText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  modalShareBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: 16,
+    marginBottom: 10,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  },
+  modalShareBtnText: {
+    fontSize: 14,
+    fontWeight: '800',
   },
   modalOverlay: {
     flex: 1,

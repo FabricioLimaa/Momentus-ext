@@ -492,10 +492,25 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           setValidatedRoutineKeys(savedValidatedRoutines);
         }
 
-        const cleanAchievements =
+        const rawDbAchievements =
           dbAchievements.length > 0
             ? dbAchievements
-            : (legacyParsed?.achievements || INITIAL_ACHIEVEMENTS);
+            : (legacyParsed?.achievements || []);
+        const existingAchsMap = new Map<string, Achievement>(
+          rawDbAchievements.map((a: Achievement) => [a.id, a])
+        );
+        const cleanAchievements: Achievement[] = INITIAL_ACHIEVEMENTS.map((initAch) => {
+          const existing = existingAchsMap.get(initAch.id);
+          if (existing) {
+            return {
+              ...initAch,
+              unlocked: existing.unlocked,
+              unlockedAt: existing.unlockedAt,
+              progress: Math.max(initAch.progress, existing.progress || 0),
+            };
+          }
+          return initAch;
+        });
 
         // Garante que conquistas já desbloqueadas tenham seus pontos somados ao saldo do usuário
         const savedCreditedAchs = await getAppKv<string[]>('credited_achievement_ids');
@@ -722,7 +737,11 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const checkAndUnlockAchievements = (
     streakCount: number,
     totalCompleted: number,
-    totalTemplates: number
+    totalTemplates: number,
+    totalFocusMinutes: number = 0,
+    hasCompletedEarlyHabit: boolean = false,
+    hasPerfectDay: boolean = false,
+    hasCompletedCategoryGoal: boolean = false
   ) => {
     setAchievements((prev) => {
       let newlyUnlocked = false;
@@ -764,6 +783,36 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           case 'FIRST_TEMPLATE':
             progress = Math.max(ach.progress, totalTemplates);
             if (progress >= 1) shouldUnlock = true;
+            break;
+          case 'FOCUS_FIRST':
+            progress = totalFocusMinutes >= 1 ? 1 : ach.progress;
+            if (progress >= 1) shouldUnlock = true;
+            break;
+          case 'FOCUS_10H':
+            progress = Math.max(ach.progress, Math.min(600, totalFocusMinutes));
+            if (progress >= 600) shouldUnlock = true;
+            break;
+          case 'FOCUS_50H':
+            progress = Math.max(ach.progress, Math.min(3000, totalFocusMinutes));
+            if (progress >= 3000) shouldUnlock = true;
+            break;
+          case 'EARLY_BIRD':
+            if (hasCompletedEarlyHabit) {
+              progress = 1;
+              shouldUnlock = true;
+            }
+            break;
+          case 'PERFECT_DAY':
+            if (hasPerfectDay) {
+              progress = 1;
+              shouldUnlock = true;
+            }
+            break;
+          case 'GOAL_MASTER':
+            if (hasCompletedCategoryGoal) {
+              progress = 1;
+              shouldUnlock = true;
+            }
             break;
         }
 
@@ -943,9 +992,19 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       );
     }
 
-    checkAndUnlockAchievements(nextStreak, nextTotalHabitsCompleted, templates.length);
-
     const currentHabit = habits.find((h) => h.id === id);
+    const isEarly = !!(currentHabit && currentHabit.timeStart && parseInt(currentHabit.timeStart.split(':')[0] || '12', 10) < 8);
+    const allTimeFocus = Object.values(focusHistoryMap).reduce((a, b) => a + b, 0);
+    checkAndUnlockAchievements(
+      nextStreak,
+      nextTotalHabitsCompleted,
+      templates.length,
+      allTimeFocus,
+      isEarly && nextCompleted,
+      isDayFullyComplete,
+      false
+    );
+
     if (currentHabit) {
       upsertHabitDb({
         ...currentHabit,
@@ -1521,6 +1580,14 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       );
       return nextMap;
     });
+
+    const totalAllTimeFocus = Object.values({ ...focusHistoryMap, [todayDateStr]: (focusHistoryMap[todayDateStr] || 0) + minutes }).reduce((a, b) => a + b, 0);
+    checkAndUnlockAchievements(
+      userProfile.currentStreak,
+      userProfile.totalCompleted,
+      templates.length,
+      totalAllTimeFocus
+    );
 
     const uid = firebaseAuth.currentUser?.uid;
     if (uid) {
