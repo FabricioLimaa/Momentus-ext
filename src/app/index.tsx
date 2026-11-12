@@ -72,6 +72,11 @@ export default function IndexScreen() {
   const primaryColor = settings.primaryColorHex || MomentusColors.emeraldNeon;
   const appVersion = Constants.expoConfig?.version || '1.6.6';
 
+  const isIosWeb =
+    Platform.OS === 'web' &&
+    typeof navigator !== 'undefined' &&
+    /iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+
   const isUserLoggedIn = !!userProfile.isLoggedIn;
 
   // Carrega e-mail e preferência de Lembrar-me salvos localmente
@@ -380,12 +385,11 @@ export default function IndexScreen() {
           )}
 
           {/* Aviso informativo de login no navegador iOS (iPhone/iPad) */}
-          {Platform.OS === 'web' && typeof navigator !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent) && (
+          {isIosWeb && (
             <View style={[styles.iosWebNoticeBox, { borderColor: theme.outline }]}>
               <Ionicons name="information-circle-outline" size={16} color={primaryColor} />
               <Text style={[styles.iosWebNoticeText, { color: theme.textSecondary }]}>
-                Acesso via navegador no iPhone / iPad:{' '}
-                <Text style={{ color: primaryColor, fontWeight: '700' }}>Em desenvolvimento</Text>. Para melhor experiência, utilize o login por e-mail ou o aplicativo móvel.
+                <Text style={{ color: primaryColor, fontWeight: '700' }}>Aplicativo iOS em breve na App Store</Text> • Continue usando normalmente todas as funcionalidades pelo navegador.
               </Text>
             </View>
           )}

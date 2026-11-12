@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "br.com.fabriciolima.momentus",
+      "sha256_cert_fingerprints": [
+        "14:6D:E8:CC:AB:70:E1:B5:7F:30:E6:B0:9E:C5:3A:E3:6F:5E:82:11:00:26:A5:A8:EE:19:3F:BC:D6:7F:E1:23"
+      ]
+    }
+  }
+]

@@ -7,6 +7,7 @@ import { MomentusColors } from '@/constants/theme';
 import { MomentusProvider, useMomentus } from '@/context/MomentusContext';
 import { CURRENT_TERMS_VERSION } from '@/constants/legalContent';
 import { BiometricGuard } from '@/components/momentus/BiometricGuard';
+import { AdaptiveOrientationWrapper } from '@/components/momentus/AdaptiveOrientationWrapper';
 
 function TabsNavigator() {
   const router = useRouter();
@@ -230,7 +231,9 @@ export default function RootLayout() {
   return (
     <MomentusProvider>
       <BiometricGuard>
-        <TabsNavigator />
+        <AdaptiveOrientationWrapper>
+          <TabsNavigator />
+        </AdaptiveOrientationWrapper>
       </BiometricGuard>
     </MomentusProvider>
   );
