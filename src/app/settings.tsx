@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
+import Constants from 'expo-constants';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -823,6 +824,43 @@ export default function SettingsScreen() {
                     thumbColor={hapticsEnabled ? primaryColorHex : '#94A3B8'}
                   />
                 </View>
+
+                {/* Início da Semana */}
+                <View style={[styles.cardDivider, { backgroundColor: theme.outline, marginVertical: 14 }]} />
+                <Text style={[styles.innerSectionLabel, { color: theme.textPrimary }]}>Início da Semana</Text>
+                <View style={[styles.themeSelectorRow, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, marginTop: 8 }]}>
+                  {[
+                    { val: false, label: 'Segunda-feira', icon: 'briefcase-outline' as const },
+                    { val: true, label: 'Domingo', icon: 'calendar-outline' as const },
+                  ].map((item) => {
+                    const isActive = (settings.weekStartsOnSunday ?? false) === item.val;
+                    const activeContrast = getContrastTextColor(primaryColorHex);
+                    return (
+                      <TouchableOpacity
+                        key={item.label}
+                        onPress={() => updateSettings({ weekStartsOnSunday: item.val })}
+                        style={[
+                          styles.themeBtn,
+                          isActive && { backgroundColor: primaryColorHex },
+                        ]}
+                        activeOpacity={0.7}>
+                        <Ionicons
+                          name={item.icon}
+                          size={14}
+                          color={isActive ? activeContrast : theme.textSecondary}
+                        />
+                        <Text
+                          style={[
+                            styles.themeBtnText,
+                            { color: isActive ? activeContrast : theme.textSecondary },
+                            isActive && styles.themeBtnTextActive,
+                          ]}>
+                          {item.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
             )}
           </View>
@@ -998,7 +1036,7 @@ export default function SettingsScreen() {
               <View style={styles.accordionTitleCol}>
                 <Text style={[styles.accordionTitle, { color: theme.textPrimary }]}>Sobre & Conta</Text>
                 <Text style={[styles.accordionSubtitle, { color: theme.textSecondary }]} numberOfLines={1}>
-                  Versão 2.1.0 • {APP_INFO.developer}
+                  Versão {Constants.expoConfig?.version || '2.1.0'} • {APP_INFO.developer}
                 </Text>
               </View>
               <Ionicons

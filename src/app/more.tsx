@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import Constants from 'expo-constants';
 import {
   MomentusColors,
   LayoutTokens,
@@ -39,6 +40,7 @@ export default function MoreScreen() {
   const displayPhoto = userProfile.photoUrl || authUser?.photoURL || null;
 
   const isCloudConnected = !!authUser;
+  const appVersion = Constants.expoConfig?.version || '2.1.0';
 
   const handleLogout = () => {
     triggerHaptic('impact');
@@ -317,7 +319,7 @@ export default function MoreScreen() {
                   <Ionicons name="sparkles-outline" size={20} color={MomentusColors.gold} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.menuItemTitle, { color: theme.textPrimary }]}>Novidades (Versão 2.1.0)</Text>
+                  <Text style={[styles.menuItemTitle, { color: theme.textPrimary }]}>Novidades (Versão {appVersion})</Text>
                   <Text style={[styles.menuItemSub, { color: theme.textSecondary }]}>Timeline histórica e melhorias recentes</Text>
                 </View>
               </View>

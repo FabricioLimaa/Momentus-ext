@@ -125,6 +125,7 @@ export interface AppSettings {
   defaultFocusMinutes?: number;
   defaultBreakMinutes?: number;
   autoStartBreaks?: boolean;
+  weekStartsOnSunday?: boolean;
 }
 
 

@@ -10,6 +10,7 @@ import {
   Alert,
   Linking,
   Share,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -48,6 +49,8 @@ export default function LegalScreen() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [showScrollTop, setShowScrollTop] = useState<boolean>(false);
   const [fontSizeStep, setFontSizeStep] = useState<number>(0); // -1, 0, 1, 2
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const sectionOffsetsRef = useRef<Record<string, number>>({});
 
   const isAccepted = isTermsAccepted();
   const isMandatory = mandatory === 'true' || !isAccepted;
@@ -55,6 +58,19 @@ export default function LegalScreen() {
   const currentDoc = useMemo(() => {
     return LEGAL_DOCUMENTS[language][selectedDoc];
   }, [language, selectedDoc]);
+
+  const displayedSections = useMemo(() => {
+    if (!searchQuery.trim()) return currentDoc.sections;
+    const q = searchQuery.toLowerCase().trim();
+    return currentDoc.sections.filter((s) => {
+      const matchTitle = s.title.toLowerCase().includes(q);
+      const matchIntro = (s.intro || '').toLowerCase().includes(q);
+      const matchSub = (s.subsections || []).some(
+        (sub) => sub.subtitle.toLowerCase().includes(q) || (sub.text || '').toLowerCase().includes(q)
+      );
+      return matchTitle || matchIntro || matchSub;
+    });
+  }, [currentDoc.sections, searchQuery]);
 
   const tabs: { id: LegalDocumentType; labelPt: string; labelEn: string; icon: keyof typeof Ionicons.glyphMap }[] = [
     { id: 'terms', labelPt: 'Termos', labelEn: 'Terms', icon: 'document-text-outline' },
@@ -302,6 +318,47 @@ export default function LegalScreen() {
           })}
         </View>
 
+        {/* Barra de Pesquisa de Cláusulas */}
+        <View style={[styles.legalSearchRow, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+          <Ionicons name="search-outline" size={16} color={theme.textSecondary} style={{ marginRight: 8 }} />
+          <TextInput
+            style={[styles.legalSearchInput, { color: theme.textPrimary }]}
+            placeholder={language === 'pt' ? 'Buscar cláusula (ex: LGPD, dados, conta)...' : 'Search terms...'}
+            placeholderTextColor={theme.textSecondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close-circle" size={16} color={theme.textSecondary} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Pílulas de Navegação Rápida (Anchor Jump) */}
+        <View style={styles.anchorPillsWrapper}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.anchorPillsContainer}>
+            {currentDoc.sections.map((section, idx) => (
+              <TouchableOpacity
+                key={section.badge || idx}
+                onPress={() => {
+                  triggerHaptic('selection');
+                  const offset = sectionOffsetsRef.current[section.badge] || (idx * 280);
+                  scrollViewRef.current?.scrollTo({ y: Math.max(0, offset - 10), animated: true });
+                }}
+                style={[styles.anchorPill, { backgroundColor: theme.surface, borderColor: theme.outline }]}
+                activeOpacity={0.75}>
+                <Text style={[styles.anchorPillText, { color: theme.primary }]}>
+                  {section.badge} {section.title.split(' ')[0]}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
         {/* Main Document Content */}
         <ScrollView
           ref={scrollViewRef}
@@ -382,9 +439,12 @@ export default function LegalScreen() {
           </View>
 
           {/* Sections List */}
-          {currentDoc.sections.map((section, sIdx) => (
+          {displayedSections.map((section, sIdx) => (
             <View
               key={`section-${sIdx}`}
+              onLayout={(e) => {
+                sectionOffsetsRef.current[section.badge] = e.nativeEvent.layout.y;
+              }}
               style={[styles.sectionCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
               {/* Section Header */}
               <View style={styles.sectionHeader}>
@@ -1164,5 +1224,37 @@ const styles = StyleSheet.create({
   acceptedSubtitle: {
     fontSize: 12,
     marginTop: 1,
+  },
+  legalSearchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 40,
+    marginHorizontal: 16,
+    marginBottom: 8,
+  },
+  legalSearchInput: {
+    flex: 1,
+    fontSize: 13,
+    height: '100%',
+  },
+  anchorPillsWrapper: {
+    marginBottom: 8,
+  },
+  anchorPillsContainer: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  anchorPill: {
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  anchorPillText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

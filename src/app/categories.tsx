@@ -37,6 +37,16 @@ export default function CategoriesScreen() {
 
   // Estados dos Diálogos
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterPill, setFilterPill] = useState<'TODAS' | 'COM_METAS' | 'MAIS_USADAS'>('TODAS');
+  const [expandedCategoryHabitsId, setExpandedCategoryHabitsId] = useState<string | null>(null);
+
+  const WELCOME_PRESETS = [
+    { name: 'Trabalho', icon: 'briefcase', color: '#039BE5' },
+    { name: 'Estudos', icon: 'book', color: '#8B5CF6' },
+    { name: 'Saúde', icon: 'fitness', color: '#10B981' },
+    { name: 'Finanças', icon: 'wallet', color: '#F59E0B' },
+  ];
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
 
@@ -122,6 +132,24 @@ export default function CategoriesScreen() {
     triggerHaptic('impact');
   };
 
+  const handleOpenGoalShortcut = (cat: Category) => {
+    triggerHaptic('impact');
+    setEditingCategory(cat);
+    setFormName(cat.name);
+    setFormColor(cat.color || EXTENDED_CATEGORY_COLORS[0].color);
+    setFormIcon(cat.icon || null);
+    setFormStickerId(cat.stickerId || null);
+    setIsMetaEnabled(true);
+    setMetaHours('5');
+    setMetaMinutes('0');
+    setIsCreateModalOpen(true);
+  };
+
+  const handleApplyWelcomePreset = (preset: { name: string; icon: string; color: string }) => {
+    triggerHaptic('impact');
+    upsertCategory(null, preset.name, preset.color, null, null, preset.icon);
+  };
+
   const handleOpenEditModal = (cat: Category) => {
     setEditingCategory(cat);
     setFormName(cat.name);
@@ -140,6 +168,30 @@ export default function CategoriesScreen() {
     setIsCreateModalOpen(true);
     triggerHaptic('impact');
   };
+
+  // Filtro e ordenação das categorias
+  const filteredCategories = useMemo(() => {
+    let result = [...categories];
+
+    // Busca por texto
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      result = result.filter((c) => (c.name || '').toLowerCase().includes(q));
+    }
+
+    // Filtros por pílulas
+    if (filterPill === 'COM_METAS') {
+      result = result.filter((c) => (c.metaMinutosSemanal || 0) > 0);
+    } else if (filterPill === 'MAIS_USADAS') {
+      result.sort((a, b) => {
+        const countA = habits.filter((h) => h.categoryId === a.id).length;
+        const countB = habits.filter((h) => h.categoryId === b.id).length;
+        return countB - countA;
+      });
+    }
+
+    return result;
+  }, [categories, searchQuery, filterPill, habits]);
 
   const handleSaveCategory = () => {
     const trimmedName = formName.trim();
@@ -234,6 +286,81 @@ export default function CategoriesScreen() {
             Crie suas categorias do seu jeito
           </Text>
 
+                    {/* Campo de Busca Rápida */}
+          <View style={[styles.searchContainer, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+            <Ionicons name="search" size={18} color={theme.textSecondary} style={{ marginRight: 8 }} />
+            <TextInput
+              style={[styles.searchInput, { color: theme.textPrimary }]}
+              placeholder="Buscar categoria..."
+              placeholderTextColor={theme.textSecondary}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="close-circle" size={18} color={theme.textSecondary} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Filtros em Pílulas */}
+          <View style={styles.filterPillsRow}>
+            {(['TODAS', 'COM_METAS', 'MAIS_USADAS'] as const).map((pill) => {
+              const isActive = filterPill === pill;
+              const labels = {
+                TODAS: 'Todas',
+                COM_METAS: 'Com Metas 🎯',
+                MAIS_USADAS: 'Mais Usadas 🔥',
+              };
+              return (
+                <TouchableOpacity
+                  key={pill}
+                  onPress={() => {
+                    triggerHaptic('selection');
+                    setFilterPill(pill);
+                  }}
+                  style={[
+                    styles.filterPill,
+                    {
+                      backgroundColor: isActive ? theme.primary : theme.surface,
+                      borderColor: isActive ? theme.primary : theme.outline,
+                    },
+                  ]}>
+                  <Text
+                    style={[
+                      styles.filterPillText,
+                      { color: isActive ? '#0F172A' : theme.textSecondary },
+                    ]}>
+                    {labels[pill]}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Carrossel de Boas-Vindas quando houver apenas a padrão */}
+          {categories.length <= 2 && (
+            <View style={styles.welcomePresetsContainer}>
+              <Text style={[styles.welcomePresetsTitle, { color: theme.textSecondary }]}>
+                Sugestões rápidas para começar:
+              </Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.welcomePresetsScroll}>
+                {WELCOME_PRESETS.map((preset) => (
+                  <TouchableOpacity
+                    key={preset.name}
+                    onPress={() => handleApplyWelcomePreset(preset)}
+                    style={[styles.welcomePresetCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+                    <View style={[styles.welcomePresetIconBox, { backgroundColor: preset.color }]}>
+                      <Ionicons name={preset.icon as any} size={16} color="#FFFFFF" />
+                    </View>
+                    <Text style={[styles.welcomePresetName, { color: theme.textPrimary }]}>{preset.name}</Text>
+                    <Ionicons name="add-circle" size={16} color={theme.primary} />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
           {/* Botão Nova Categoria */}
           <TouchableOpacity
             style={[styles.newCategoryBtn, { backgroundColor: theme.primary }]}
@@ -245,7 +372,7 @@ export default function CategoriesScreen() {
 
           {/* Lista de Categorias */}
           <View style={styles.categoryList}>
-            {categories.map((cat) => {
+            {filteredCategories.map((cat) => {
               const stickerIcon = getStickerIconName(cat.stickerId);
               const iconToDisplay = stickerIcon || cat.icon || null;
               const metaMinutos = cat.metaMinutosSemanal || 0;
@@ -304,11 +431,25 @@ export default function CategoriesScreen() {
                             </View>
                           )}
                         </View>
-                        <Text style={[styles.categoryHabitCount, { color: theme.textSecondary }]}>
-                          {linkedHabitsCount === 0
-                            ? 'Nenhuma rotina vinculada'
-                            : `${linkedHabitsCount} rotina${linkedHabitsCount === 1 ? '' : 's'} vinculada${linkedHabitsCount === 1 ? '' : 's'}`}
-                        </Text>
+                        <TouchableOpacity
+                          onPress={() => {
+                            triggerHaptic('selection');
+                            setExpandedCategoryHabitsId(expandedCategoryHabitsId === cat.id ? null : cat.id);
+                          }}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Text style={[styles.categoryHabitCount, { color: theme.textSecondary }]}>
+                            {linkedHabitsCount === 0
+                              ? 'Nenhuma rotina vinculada'
+                              : `${linkedHabitsCount} rotina${linkedHabitsCount === 1 ? '' : 's'} vinculada${linkedHabitsCount === 1 ? '' : 's'}`}
+                          </Text>
+                          {linkedHabitsCount > 0 && (
+                            <Ionicons
+                              name={expandedCategoryHabitsId === cat.id ? 'chevron-up' : 'chevron-down'}
+                              size={12}
+                              color={theme.textSecondary}
+                            />
+                          )}
+                        </TouchableOpacity>
                       </View>
                     </TouchableOpacity>
 
@@ -401,6 +542,34 @@ export default function CategoriesScreen() {
                       </View>
                     );
                   })()}
+                  {/* Mini-acordeão de rotinas vinculadas */}
+                  {expandedCategoryHabitsId === cat.id && linkedHabitsCount > 0 && (
+                    <View style={[styles.linkedHabitsBox, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}>
+                      {habits
+                        .filter((h) => h.categoryId === cat.id)
+                        .map((h) => (
+                          <View key={h.id} style={styles.linkedHabitItem}>
+                            <View style={[styles.linkedHabitDot, { backgroundColor: cat.color || theme.primary }]} />
+                            <Text style={[styles.linkedHabitText, { color: theme.textPrimary }]} numberOfLines={1}>
+                              {h.title}
+                            </Text>
+                          </View>
+                        ))}
+                    </View>
+                  )}
+
+                  {/* Atalho direto para definir meta quando não houver */}
+                  {metaMinutos === 0 && (
+                    <TouchableOpacity
+                      onPress={() => handleOpenGoalShortcut(cat)}
+                      style={[styles.quickGoalBtn, { borderColor: `${theme.primary}50` }]}
+                      activeOpacity={0.75}>
+                      <Ionicons name="flag-outline" size={14} color={theme.primary} />
+                      <Text style={[styles.quickGoalBtnText, { color: theme.primary }]}>
+                        + Definir Meta Semanal
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               );
             })}
@@ -974,6 +1143,103 @@ export default function CategoriesScreen() {
 }
 
 const styles = StyleSheet.create({
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 44,
+    marginBottom: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    height: '100%',
+  },
+  filterPillsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  filterPill: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  filterPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  welcomePresetsContainer: {
+    marginBottom: 16,
+  },
+  welcomePresetsTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  welcomePresetsScroll: {
+    gap: 8,
+  },
+  welcomePresetCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  welcomePresetIconBox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  welcomePresetName: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  linkedHabitsBox: {
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 6,
+  },
+  linkedHabitItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  linkedHabitDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  linkedHabitText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  quickGoalBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 10,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+  },
+  quickGoalBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+
   safeArea: {
     flex: 1,
     width: '100%',

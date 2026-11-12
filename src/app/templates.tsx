@@ -443,11 +443,12 @@ export default function TemplatesScreen() {
   const handleApplyConfirm = (
     dates: string[],
     saveToGoogle: boolean,
-    mode: 'merge' | 'incremental' = 'merge'
+    mode: 'merge' | 'incremental' = 'merge',
+    timeShiftStart?: string
   ) => {
     if (!selectedTemplateForApply) return;
 
-    applyTemplateToDates(selectedTemplateForApply.id, dates, saveToGoogle, mode);
+    applyTemplateToDates(selectedTemplateForApply.id, dates, saveToGoogle, mode, timeShiftStart);
 
     const templateName = selectedTemplateForApply.title;
     setSelectedTemplateForApply(null);

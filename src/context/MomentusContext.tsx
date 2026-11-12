@@ -148,7 +148,8 @@ interface MomentusContextData {
     templateId: string,
     dates: string[],
     saveToGoogle?: boolean,
-    mode?: 'merge' | 'incremental'
+    mode?: 'merge' | 'incremental',
+    timeShiftStart?: string
   ) => void;
   addTemplate: (template: Omit<RoutineTemplate, 'id'>) => void;
   updateTemplate: (template: RoutineTemplate) => void;
@@ -1248,7 +1249,8 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     templateId: string,
     dates: string[],
     saveToGoogle?: boolean,
-    mode: 'merge' | 'incremental' = 'merge'
+    mode: 'merge' | 'incremental' = 'merge',
+    timeShiftStart?: string
   ) => {
     const template = templates.find((t) => t.id === templateId);
     if (!template || dates.length === 0) return;
@@ -1262,6 +1264,24 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         idx === self.findIndex((t) => `${t.title}-${t.timeStart}-${t.categoryId}` === `${item.title}-${item.timeStart}-${item.categoryId}`)
     );
 
+    const parseMin = (t: string) => {
+      const [h, m] = t.split(':').map(Number);
+      return (h || 0) * 60 + (m || 0);
+    };
+    const formatMin = (mins: number) => {
+      const norm = ((mins % 1440) + 1440) % 1440;
+      const h = String(Math.floor(norm / 60)).padStart(2, '0');
+      const m = String(norm % 60).padStart(2, '0');
+      return `${h}:${m}`;
+    };
+
+    let shiftDeltaMinutes = 0;
+    if (timeShiftStart && uniqueTemplateItems.length > 0) {
+      const firstStart = parseMin(uniqueTemplateItems[0].timeStart || '08:00');
+      const targetStart = parseMin(timeShiftStart);
+      shiftDeltaMinutes = targetStart - firstStart;
+    }
+
     const nowTimestamp = Date.now();
 
     dates.forEach((targetDate, dateIdx) => {
@@ -1272,14 +1292,23 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             ? `applied_${itemIdStr}_${targetDate}_${nowTimestamp}_${dateIdx}_${itemIdx}`
             : `applied_${itemIdStr}_${targetDate}`;
 
+        let finalTimeStart = item.timeStart || '08:00';
+        let finalTimeEnd = item.timeEnd;
+        if (shiftDeltaMinutes !== 0) {
+          finalTimeStart = formatMin(parseMin(finalTimeStart) + shiftDeltaMinutes);
+          if (finalTimeEnd) {
+            finalTimeEnd = formatMin(parseMin(finalTimeEnd) + shiftDeltaMinutes);
+          }
+        }
+
         // Remove do cache de IDs deletados para permitir re-aplicar o template no mesmo dia
         deletedHabitIdsRef.current.delete(deterministicId);
         newHabits.push({
           id: deterministicId,
           title: item.title,
           description: item.description || undefined,
-          timeStart: item.timeStart || '08:00',
-          timeEnd: item.timeEnd,
+          timeStart: finalTimeStart,
+          timeEnd: finalTimeEnd,
           categoryId: item.categoryId,
           completed: false,
           date: targetDate,

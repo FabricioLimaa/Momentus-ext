@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import Constants from 'expo-constants';
 import {
   getContrastTextColor,
   LayoutTokens,
@@ -230,6 +231,15 @@ export default function UpdateNotesScreen() {
     Linking.openURL(`mailto:${APP_INFO.email}?subject=${subject}&body=${body}`);
   };
 
+  const handleReportBug = () => {
+    triggerHaptic('impact');
+    const subject = encodeURIComponent(`Relato de Problema - ${APP_INFO.name} v2.1.0`);
+    const body = encodeURIComponent(
+      `Olá ${APP_INFO.developer},\n\nIdentifiquei a seguinte questão no aplicativo:\n\n[Descreva o problema observado]\n\nDispositivo: ${Platform.OS}\n`
+    );
+    Linking.openURL(`mailto:${APP_INFO.email}?subject=${subject}&body=${body}`);
+  };
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} backgroundColor={theme.background} />
@@ -279,7 +289,9 @@ export default function UpdateNotesScreen() {
             <View style={styles.versionBannerTop}>
               <View style={[styles.versionBadge, { backgroundColor: `${theme.primary}25`, borderColor: theme.primary }]}>
                 <Ionicons name="sparkles" size={14} color={theme.primary} />
-                <Text style={[styles.versionBadgeText, { color: theme.primary }]}>Versão 2.1.0 • Oficial</Text>
+                <Text style={[styles.versionBadgeText, { color: theme.primary }]}>
+                  Versão {Constants.expoConfig?.version || '2.1.0'} • Oficial
+                </Text>
               </View>
               <Text style={[styles.releaseDateText, { color: theme.textSecondary }]}>Novembro de 2026</Text>
             </View>
@@ -483,6 +495,16 @@ export default function UpdateNotesScreen() {
                 Enviar Minha Sugestão 💡
               </Text>
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.reportBugBtn, { borderColor: theme.outline, backgroundColor: theme.surfaceElevated }]}
+              onPress={handleReportBug}
+              activeOpacity={0.8}>
+              <Ionicons name="bug-outline" size={16} color={theme.textSecondary} />
+              <Text style={[styles.reportBugBtnText, { color: theme.textSecondary }]}>
+                Relatar um Problema 🐛
+              </Text>
+            </TouchableOpacity>
           </View>
 
           {/* Rodapé Institucional */}
@@ -529,6 +551,21 @@ export default function UpdateNotesScreen() {
                 activeOpacity={0.85}>
                 <Text style={[styles.dialogPrimaryBtnText, { color: getContrastTextColor(theme.primary) }]}>
                   EXCELENTE
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.dialogSecondaryBtn, { borderColor: theme.outline, backgroundColor: theme.surfaceElevated, marginTop: 8 }]}
+                onPress={() => {
+                  const url = Platform.OS === 'ios'
+                    ? 'itms-apps://itunes.apple.com/app/id6742055620'
+                    : 'market://details?id=br.com.fabriciolima.momentus';
+                  Linking.openURL(url).catch(() => Linking.openURL(APP_INFO.website));
+                }}
+                activeOpacity={0.8}>
+                <Ionicons name="logo-google-playstore" size={15} color={theme.primary} />
+                <Text style={[styles.dialogSecondaryBtnText, { color: theme.primary }]}>
+                  Ver na Loja Oficial
                 </Text>
               </TouchableOpacity>
             </View>
@@ -886,5 +923,36 @@ const styles = StyleSheet.create({
   dialogPrimaryBtnText: {
     fontSize: 14,
     fontWeight: '800',
+  },
+  dialogSecondaryBtn: {
+    width: '100%',
+    paddingVertical: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  },
+  dialogSecondaryBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  reportBugBtn: {
+    width: '100%',
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 8,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  },
+  reportBugBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

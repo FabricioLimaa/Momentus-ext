@@ -21,7 +21,8 @@ interface ApplyTemplateDialogProps {
   onConfirm: (
     selectedDates: string[],
     saveToGoogle: boolean,
-    mode: 'merge' | 'incremental'
+    mode: 'merge' | 'incremental',
+    timeShiftStart?: string
   ) => void;
 }
 
@@ -64,6 +65,8 @@ export const ApplyTemplateDialog: React.FC<ApplyTemplateDialogProps> = ({
   });
 
   const [saveToGoogle, setSaveToGoogle] = useState(false);
+  const [isTimeShiftEnabled, setIsTimeShiftEnabled] = useState(false);
+  const [selectedShiftTime, setSelectedShiftTime] = useState('08:00');
 
   const prevMonth = () => {
     setCurrentYearMonth((prev) => {
@@ -101,7 +104,7 @@ export const ApplyTemplateDialog: React.FC<ApplyTemplateDialogProps> = ({
     if (conflictingDates.length > 0) {
       setStep('DECISION');
     } else {
-      onConfirm(selectedDates, saveToGoogle, 'merge');
+      onConfirm(selectedDates, saveToGoogle, 'merge', isTimeShiftEnabled ? selectedShiftTime : undefined);
     }
   };
 
@@ -180,7 +183,7 @@ export const ApplyTemplateDialog: React.FC<ApplyTemplateDialogProps> = ({
                       borderColor: theme.primary,
                     },
                   ]}
-                  onPress={() => onConfirm(selectedDates, saveToGoogle, 'merge')}
+                  onPress={() => onConfirm(selectedDates, saveToGoogle, 'merge', isTimeShiftEnabled ? selectedShiftTime : undefined)}
                   activeOpacity={0.8}>
                   <View style={styles.decisionCardHeader}>
                     <View style={styles.decisionCardTitleRow}>
@@ -213,7 +216,7 @@ export const ApplyTemplateDialog: React.FC<ApplyTemplateDialogProps> = ({
                       borderColor: theme.outline,
                     },
                   ]}
-                  onPress={() => onConfirm(selectedDates, saveToGoogle, 'incremental')}
+                  onPress={() => onConfirm(selectedDates, saveToGoogle, 'incremental', isTimeShiftEnabled ? selectedShiftTime : undefined)}
                   activeOpacity={0.8}>
                   <View style={styles.decisionCardHeader}>
                     <View style={styles.decisionCardTitleRow}>
@@ -336,6 +339,54 @@ export const ApplyTemplateDialog: React.FC<ApplyTemplateDialogProps> = ({
                     ? '1 data selecionada'
                     : `${selectedDates.length} datas selecionadas`}
                 </Text>
+
+                {/* Deslocamento Temporal (Time Shift) */}
+                <View style={[styles.timeShiftBox, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}>
+                  <View style={styles.timeShiftHeaderRow}>
+                    <View style={styles.timeShiftTitleCol}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Ionicons name="time-outline" size={16} color={theme.primary} />
+                        <Text style={[styles.timeShiftTitle, { color: theme.textPrimary }]}>
+                          Ajustar início da rotina
+                        </Text>
+                      </View>
+                      <Text style={[styles.timeShiftSub, { color: theme.textSecondary }]}>
+                        {isTimeShiftEnabled ? `Iniciando às ${selectedShiftTime}` : 'Manter horários originais'}
+                      </Text>
+                    </View>
+                    <Switch
+                      value={isTimeShiftEnabled}
+                      onValueChange={setIsTimeShiftEnabled}
+                      trackColor={{ false: theme.isDark ? '#334155' : '#CBD5E1', true: `${theme.primary}66` }}
+                      thumbColor={isTimeShiftEnabled ? theme.primary : '#94A3B8'}
+                    />
+                  </View>
+
+                  {isTimeShiftEnabled && (
+                    <View style={styles.timeShiftPresetsRow}>
+                      {['06:00', '07:00', '08:00', '09:00', '10:00', '14:00'].map((t) => (
+                        <TouchableOpacity
+                          key={t}
+                          onPress={() => setSelectedShiftTime(t)}
+                          style={[
+                            styles.timeShiftChip,
+                            {
+                              backgroundColor: selectedShiftTime === t ? theme.primary : theme.surface,
+                              borderColor: selectedShiftTime === t ? theme.primary : theme.outline,
+                            },
+                          ]}>
+                          <Text
+                            style={[
+                              styles.timeShiftChipText,
+                              { color: selectedShiftTime === t ? '#0F172A' : theme.textPrimary },
+                            ]}>
+                            {t}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
 
                 {/* Switch Google Agenda */}
                 <View style={[styles.switchContainer, { backgroundColor: theme.surfaceElevated }]}>
@@ -619,6 +670,44 @@ const styles = StyleSheet.create({
   decisionCardDesc: {
     fontSize: 12,
     lineHeight: 17,
+  },
+  timeShiftBox: {
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 12,
+    gap: 10,
+  },
+  timeShiftHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  timeShiftTitleCol: {
+    flex: 1,
+  },
+  timeShiftTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  timeShiftSub: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  timeShiftPresetsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  timeShiftChip: {
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  timeShiftChipText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
 });
 
