@@ -2,7 +2,13 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Pressable, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { HabitItem, Category } from '@/types';
-import { MomentusColors, getContrastTextColor } from '@/constants/theme';
+import {
+  MomentusColors,
+  getContrastTextColor,
+  SpacingTokens,
+  BorderRadiusTokens,
+  ComponentHeightTokens,
+} from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 
 interface TimelineEventItemProps {
@@ -227,16 +233,16 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'stretch',
-    paddingHorizontal: 16,
+    paddingHorizontal: SpacingTokens.md,
     minHeight: 64,
   },
   containerSelected: {
     backgroundColor: 'rgba(52, 211, 153, 0.12)',
-    borderRadius: 12,
+    borderRadius: BorderRadiusTokens.control,
   },
   timeColumn: {
-    width: 52,
-    paddingTop: 14,
+    width: 56,
+    paddingTop: SpacingTokens.md,
   },
   timeText: {
     fontSize: 14,
@@ -255,27 +261,27 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(51, 65, 85, 0.6)',
   },
   topConnector: {
-    height: 18,
+    height: 16,
   },
   bottomConnector: {
     flex: 1,
-    minHeight: 28,
+    minHeight: 24,
   },
   hiddenConnector: {
     backgroundColor: 'transparent',
   },
   timelineDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 1.5,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 2,
     borderColor: MomentusColors.navyBackground,
   },
   contentColumn: {
     flex: 1,
-    paddingLeft: 12,
-    paddingTop: 10,
-    paddingBottom: 16,
+    paddingLeft: SpacingTokens.md,
+    paddingTop: SpacingTokens.sm,
+    paddingBottom: SpacingTokens.md,
     justifyContent: 'center',
   },
   titleRow: {
@@ -297,38 +303,39 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
   },
   categoryBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-    marginLeft: 8,
+    paddingHorizontal: SpacingTokens.sm,
+    paddingVertical: SpacingTokens.xs,
+    borderRadius: BorderRadiusTokens.sm,
+    marginLeft: SpacingTokens.sm,
   },
   categoryBadgeText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
   },
   timeRangeText: {
     fontSize: 12,
     color: MomentusColors.textSecondary,
-    marginTop: 4,
+    marginTop: SpacingTokens.xs,
   },
   checkContainer: {
-    width: 36,
+    width: ComponentHeightTokens.iconButton,
+    height: ComponentHeightTokens.iconButton,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 6,
+    alignSelf: 'center',
   },
   uncheckCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 1.5,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
     borderColor: 'rgba(148, 163, 184, 0.45)',
   },
   checkboxBox: {
-    width: 20,
-    height: 20,
-    borderRadius: 6,
-    borderWidth: 1.5,
+    width: 24,
+    height: 24,
+    borderRadius: BorderRadiusTokens.sm,
+    borderWidth: 2,
     borderColor: MomentusColors.textSecondary,
     justifyContent: 'center',
     alignItems: 'center',
@@ -339,9 +346,9 @@ const styles = StyleSheet.create({
   },
   googleIconBadge: {
     marginLeft: 6,
-    paddingHorizontal: 4,
+    paddingHorizontal: SpacingTokens.xs,
     paddingVertical: 2,
-    borderRadius: 6,
+    borderRadius: BorderRadiusTokens.xs,
     backgroundColor: 'rgba(66, 133, 244, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',

@@ -19,7 +19,9 @@ import Constants from 'expo-constants';
 import {
   MomentusColors,
   LayoutTokens,
+  SpacingTokens,
   BorderRadiusTokens,
+  ComponentHeightTokens,
   TypographyTokens,
 } from '@/constants/theme';
 import { APP_INFO } from '@/constants/appInfo';
@@ -454,14 +456,14 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
     paddingTop: LayoutTokens.pagePaddingTop,
-    marginBottom: 14,
+    marginBottom: SpacingTokens.md,
   },
   title: {
     ...TypographyTokens.screenTitle,
   },
   subtitle: {
     ...TypographyTokens.screenSubtitle,
-    marginTop: 2,
+    marginTop: SpacingTokens.xs,
   },
   scroll: {
     flex: 1,
@@ -471,15 +473,15 @@ const styles = StyleSheet.create({
     paddingBottom: LayoutTokens.pagePaddingBottom,
   },
   heroProfileCard: {
-    borderRadius: BorderRadiusTokens.card,
+    borderRadius: BorderRadiusTokens.cardHero,
     borderWidth: 1,
-    padding: 18,
-    marginBottom: 20,
+    padding: SpacingTokens.lg,
+    marginBottom: SpacingTokens.lg,
   },
   heroTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: SpacingTokens.md,
   },
   heroIdentityCol: {
     flex: 1,
@@ -491,17 +493,17 @@ const styles = StyleSheet.create({
   userEmail: {
     fontSize: 12,
     marginTop: 2,
-    marginBottom: 4,
+    marginBottom: SpacingTokens.xs,
   },
   cloudStatusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: SpacingTokens.xs,
   },
   cloudStatusDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   cloudStatusText: {
     fontSize: 11,
@@ -510,13 +512,13 @@ const styles = StyleSheet.create({
   honorTitleBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
+    gap: SpacingTokens.xs,
+    paddingHorizontal: SpacingTokens.sm,
+    paddingVertical: SpacingTokens.xs,
+    borderRadius: BorderRadiusTokens.sm,
     borderWidth: 1,
     alignSelf: 'flex-start',
-    marginTop: 12,
+    marginTop: SpacingTokens.md,
   },
   honorTitleText: {
     fontSize: 12,
@@ -526,8 +528,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderTopWidth: 1,
-    marginTop: 14,
-    paddingTop: 12,
+    marginTop: SpacingTokens.md,
+    paddingTop: SpacingTokens.md,
   },
   kpiBox: {
     flex: 1,
@@ -536,7 +538,7 @@ const styles = StyleSheet.create({
   kpiIconRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: SpacingTokens.sm,
   },
   kpiValue: {
     fontSize: 14,
@@ -552,13 +554,13 @@ const styles = StyleSheet.create({
     height: 24,
   },
   levelProgressContainer: {
-    marginTop: 14,
+    marginTop: SpacingTokens.md,
   },
   levelProgressHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 5,
+    marginBottom: SpacingTokens.xs,
   },
   levelProgressTitle: {
     fontSize: 11,
@@ -570,46 +572,47 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   levelProgressTrack: {
-    height: 6,
-    borderRadius: 3,
+    height: 8,
+    borderRadius: 4,
     overflow: 'hidden',
   },
   levelProgressFill: {
     height: '100%',
-    borderRadius: 3,
+    borderRadius: 4,
   },
   sectionOverline: {
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.8,
-    marginBottom: 8,
-    marginLeft: 4,
+    marginBottom: SpacingTokens.sm,
+    marginLeft: SpacingTokens.xs,
   },
   menuGroup: {
     borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
-    paddingVertical: 4,
-    marginBottom: 20,
+    paddingVertical: 0,
+    marginBottom: SpacingTokens.lg,
     overflow: 'hidden',
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    minHeight: ComponentHeightTokens.buttonHero,
+    paddingVertical: SpacingTokens.md,
+    paddingHorizontal: SpacingTokens.md,
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   menuItemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: SpacingTokens.md,
     flex: 1,
   },
   iconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: BorderRadiusTokens.control,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -623,7 +626,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: StyleSheet.hairlineWidth,
-    marginLeft: 68,
+    marginLeft: 72,
   },
   logoutBtn: {
     flexDirection: 'row',
@@ -632,10 +635,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(239, 68, 68, 0.1)',
     borderWidth: 1,
     borderColor: 'rgba(239, 68, 68, 0.3)',
-    height: 50,
+    height: ComponentHeightTokens.buttonHero,
     borderRadius: BorderRadiusTokens.button,
-    gap: 8,
-    marginTop: 4,
+    gap: SpacingTokens.sm,
+    marginTop: SpacingTokens.xs,
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   logoutText: {
@@ -646,18 +649,18 @@ const styles = StyleSheet.create({
   brandFooterContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 24,
-    marginBottom: 8,
+    marginTop: SpacingTokens.xl,
+    marginBottom: SpacingTokens.md,
   },
   brandFooterLogo: {
-    width: 170,
-    height: 30,
+    width: 160,
+    height: 32,
     opacity: 0.9,
   },
   brandCreditsText: {
     fontSize: 12,
     fontWeight: '600',
-    marginTop: 8,
+    marginTop: SpacingTokens.sm,
     textAlign: 'center',
   },
   brandCopyrightText: {
@@ -668,7 +671,7 @@ const styles = StyleSheet.create({
   brandEmailText: {
     fontSize: 12,
     fontWeight: '700',
-    marginTop: 4,
+    marginTop: SpacingTokens.xs,
     textAlign: 'center',
   },
 });

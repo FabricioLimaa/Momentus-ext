@@ -102,50 +102,86 @@ export const MaxContentWidth = 800;
 export const LayoutTokens = {
   /** Largura máxima padrão para telas de conteúdo (Home, Agenda, Stats, Menu, etc.) */
   maxContentWidth: 680,
-  /** Largura máxima para fluxos focados / leitura imersiva (Modo Foco) */
-  maxFocusWidth: 540,
-  /** Largura máxima para autenticação e formulários estreitos (Login, Cadastro, Recuperar Senha) */
+  /** Largura máxima para fluxos focados / leitura imersiva (Modo Foco) - 68 * 8 */
+  maxFocusWidth: 544,
+  /** Largura máxima para autenticação e formulários estreitos (Login, Cadastro, Recuperar Senha) - 55 * 8 */
   maxAuthWidth: 440,
-  /** Largura máxima para diálogos flutuantes centrais (Modais informativos e de confirmação) */
-  maxDialogWidth: 420,
-  /** Largura máxima para formulários modais e bottom sheets no desktop */
+  /** Largura máxima para diálogos flutuantes centrais (Modais informativos e de confirmação) - 52 * 8 */
+  maxDialogWidth: 416,
+  /** Largura máxima para formulários modais e bottom sheets no desktop - 65 * 8 */
   maxModalSheetWidth: 520,
-  /** Padding horizontal padrão do aplicativo em smartphones */
-  pagePaddingHorizontal: 20,
-  /** Padding vertical padrão de topo do conteúdo */
+  /** Padding horizontal padrão do aplicativo em smartphones (Grid 8pt: 2 * 8) */
+  pagePaddingHorizontal: 16,
+  /** Padding vertical padrão de topo do conteúdo (Grid 8pt: 2 * 8) */
   pagePaddingTop: 16,
-  /** Espaçamento de rodapé para garantir que o FAB ou barra inferior não cubram conteúdo */
-  pagePaddingBottom: Platform.select({ ios: 100, android: 96, default: 80 }) ?? 80,
+  /** Espaçamento de rodapé para garantir que o FAB ou barra inferior não cubram conteúdo (Multiplos de 8) */
+  pagePaddingBottom: Platform.select({ ios: 104, android: 96, default: 80 }) ?? 80,
 } as const;
 
+/**
+ * Escala Canônica de Espaçamentos - Grade de 8 Pontos (8pt Grid System)
+ * Proporção e contraste baseados nas leis da Gestalt de Proximidade
+ */
 export const SpacingTokens = {
+  /** 4px: Meio passo óptico para micro-alinhamentos (ícone + texto, badges, chips) */
   xs: 4,
+  /** 8px: Relação íntima entre elementos correlacionados (label e input, título e subtítulo) */
   sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
-  xxl: 24,
+  /** 16px: Distância padrão entre cards irmãos e padding interno padrão */
+  md: 16,
+  /** 24px: Separação entre grupos funcionais, padding de containers maiores e modais */
+  lg: 24,
+  /** 32px: Distância entre blocos maiores e seções de página */
+  xl: 32,
+  /** 40px: Respiro amplo entre grandes grupos */
+  xxl: 40,
+  /** 48px: Separação entre grandes áreas funcionais, touch target mínimo de acessibilidade */
+  '2xl': 48,
+  /** 64px: Respiro visual profundo e padding de final de página */
+  '3xl': 64,
+  /** 32px: Espaçamento canônico entre seções */
   section: 32,
 } as const;
 
+/**
+ * Escala de Raios de Borda Harmônicos com o Grid de 8 Pontos
+ */
 export const BorderRadiusTokens = {
-  xs: 6,
-  sm: 10,
+  xs: 4,
+  sm: 8,
   control: 12,
   input: 16,
   button: 16,
-  card: 20,
-  modal: 28,
+  card: 16,
+  cardHero: 24,
+  modal: 24,
+  modalLarge: 32,
   pill: 9999,
 } as const;
 
+/**
+ * Alturas de Componentes Canônicas (Múltiplos de 8)
+ * Atende 100% dos requisitos de ergonomia e acessibilidade (Apple HIG / Google Material)
+ */
 export const ComponentHeightTokens = {
-  buttonHero: 52,
+  /** 56px: Botões de Ação Primária / Hero CTA (7 * 8) */
+  buttonHero: 56,
+  /** 48px: Botões secundários e modais (6 * 8) */
   buttonModal: 48,
-  input: 52,
-  iconButton: 44,
-  chip: 38,
-  fab: 58,
+  /** 40px: Botões compactos de ação rápida (5 * 8) */
+  buttonCompact: 40,
+  /** 48px: Altura padrão de inputs compactos (6 * 8) */
+  input: 48,
+  /** 56px: Altura de inputs proeminentes (Auth / Login) (7 * 8) */
+  inputHero: 56,
+  /** 48px: Contêiner de toque mínimo para botões de ícone (WCAG 48x48) */
+  iconButton: 48,
+  /** 32px: Chips e pílulas compactas (4 * 8) */
+  chip: 32,
+  /** 40px: Chips e pílulas regulares (5 * 8) */
+  chipLarge: 40,
+  /** 56px: Botão de Ação Flutuante (FAB) (7 * 8) */
+  fab: 56,
 } as const;
 
 export const TypographyTokens = {

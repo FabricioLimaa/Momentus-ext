@@ -26,6 +26,7 @@ import {
 import {
   MomentusColors,
   LayoutTokens,
+  SpacingTokens,
   BorderRadiusTokens,
   ComponentHeightTokens,
   TypographyTokens,
@@ -37,8 +38,6 @@ export default function CategoriesScreen() {
 
   // Estados dos Diálogos
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterPill, setFilterPill] = useState<'TODAS' | 'COM_METAS' | 'MAIS_USADAS'>('TODAS');
   const [expandedCategoryHabitsId, setExpandedCategoryHabitsId] = useState<string | null>(null);
 
   const WELCOME_PRESETS = [
@@ -169,30 +168,6 @@ export default function CategoriesScreen() {
     triggerHaptic('impact');
   };
 
-  // Filtro e ordenação das categorias
-  const filteredCategories = useMemo(() => {
-    let result = [...categories];
-
-    // Busca por texto
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      result = result.filter((c) => (c.name || '').toLowerCase().includes(q));
-    }
-
-    // Filtros por pílulas
-    if (filterPill === 'COM_METAS') {
-      result = result.filter((c) => (c.metaMinutosSemanal || 0) > 0);
-    } else if (filterPill === 'MAIS_USADAS') {
-      result.sort((a, b) => {
-        const countA = habits.filter((h) => h.categoryId === a.id).length;
-        const countB = habits.filter((h) => h.categoryId === b.id).length;
-        return countB - countA;
-      });
-    }
-
-    return result;
-  }, [categories, searchQuery, filterPill, habits]);
-
   const handleSaveCategory = () => {
     const trimmedName = formName.trim();
     if (!trimmedName) {
@@ -286,58 +261,6 @@ export default function CategoriesScreen() {
             Crie suas categorias do seu jeito
           </Text>
 
-                    {/* Campo de Busca Rápida */}
-          <View style={[styles.searchContainer, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
-            <Ionicons name="search" size={18} color={theme.textSecondary} style={{ marginRight: 8 }} />
-            <TextInput
-              style={[styles.searchInput, { color: theme.textPrimary }]}
-              placeholder="Buscar categoria..."
-              placeholderTextColor={theme.textSecondary}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name="close-circle" size={18} color={theme.textSecondary} />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Filtros em Pílulas */}
-          <View style={styles.filterPillsRow}>
-            {(['TODAS', 'COM_METAS', 'MAIS_USADAS'] as const).map((pill) => {
-              const isActive = filterPill === pill;
-              const labels = {
-                TODAS: 'Todas',
-                COM_METAS: 'Com Metas 🎯',
-                MAIS_USADAS: 'Mais Usadas 🔥',
-              };
-              return (
-                <TouchableOpacity
-                  key={pill}
-                  onPress={() => {
-                    triggerHaptic('selection');
-                    setFilterPill(pill);
-                  }}
-                  style={[
-                    styles.filterPill,
-                    {
-                      backgroundColor: isActive ? theme.primary : theme.surface,
-                      borderColor: isActive ? theme.primary : theme.outline,
-                    },
-                  ]}>
-                  <Text
-                    style={[
-                      styles.filterPillText,
-                      { color: isActive ? '#0F172A' : theme.textSecondary },
-                    ]}>
-                    {labels[pill]}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
           {/* Carrossel de Boas-Vindas quando houver apenas a padrão */}
           {categories.length <= 2 && (
             <View style={styles.welcomePresetsContainer}>
@@ -372,7 +295,7 @@ export default function CategoriesScreen() {
 
           {/* Lista de Categorias */}
           <View style={styles.categoryList}>
-            {filteredCategories.map((cat) => {
+            {categories.map((cat) => {
               const stickerIcon = getStickerIconName(cat.stickerId);
               const iconToDisplay = stickerIcon || cat.icon || null;
               const metaMinutos = cat.metaMinutosSemanal || 0;
@@ -1143,35 +1066,6 @@ export default function CategoriesScreen() {
 }
 
 const styles = StyleSheet.create({
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 44,
-    marginBottom: 12,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    height: '100%',
-  },
-  filterPillsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
-  },
-  filterPill: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-  },
-  filterPillText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
   welcomePresetsContainer: {
     marginBottom: 16,
   },
@@ -1287,10 +1181,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    height: ComponentHeightTokens.buttonHero,
+    gap: SpacingTokens.sm,
+    height: ComponentHeightTokens.buttonModal, // 48px
     borderRadius: BorderRadiusTokens.button,
-    marginBottom: 24,
+    marginBottom: SpacingTokens.lg,
     ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
   },
   newCategoryBtnText: {
@@ -1299,12 +1193,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   categoryList: {
-    gap: 12,
+    gap: SpacingTokens.md, // 16px
   },
   categoryCard: {
-    borderRadius: 20,
+    borderRadius: BorderRadiusTokens.card, // 16px
     borderWidth: 1,
-    padding: 16,
+    padding: SpacingTokens.md, // 16px
   },
   cardMainRow: {
     flexDirection: 'row',
@@ -1314,13 +1208,13 @@ const styles = StyleSheet.create({
   cardLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: SpacingTokens.md, // 16px
     flex: 1,
   },
   colorCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1370,8 +1264,8 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   metaRow: {
-    marginTop: 10,
-    paddingTop: 10,
+    marginTop: SpacingTokens.md, // 16px
+    paddingTop: SpacingTokens.md, // 16px
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'rgba(148, 163, 184, 0.2)',
     gap: 8,
@@ -1407,14 +1301,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   metaProgressBarTrack: {
-    height: 6,
-    borderRadius: 3,
+    height: 8,
+    borderRadius: 4,
     overflow: 'hidden',
     width: '100%',
   },
   metaProgressBarFill: {
     height: '100%',
-    borderRadius: 3,
+    borderRadius: 4,
   },
   metaText: {
     fontSize: 13,
@@ -1425,29 +1319,29 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.65)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    padding: SpacingTokens.md,
   },
   modalCard: {
     width: '100%',
     maxWidth: LayoutTokens.maxModalSheetWidth,
     maxHeight: '90%',
-    borderRadius: BorderRadiusTokens.modal,
+    borderRadius: BorderRadiusTokens.modal, // 24px
     borderWidth: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 8,
+    paddingHorizontal: SpacingTokens.lg, // 24px
+    paddingTop: SpacingTokens.lg, // 24px
+    paddingBottom: SpacingTokens.sm, // 8px
   },
   modalScrollContent: {
-    paddingBottom: 24,
+    paddingBottom: SpacingTokens.lg,
   },
   closeBtn: {
     ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
   },
   metaCardContainer: {
-    borderRadius: 16,
+    borderRadius: BorderRadiusTokens.card, // 16px
     borderWidth: 1,
-    padding: 14,
-    marginTop: 18,
+    padding: SpacingTokens.md, // 16px
+    marginTop: SpacingTokens.md, // 16px
     marginBottom: 4,
     gap: 8,
   },
@@ -1582,9 +1476,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   colorPaletteItem: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,

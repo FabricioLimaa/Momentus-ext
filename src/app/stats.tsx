@@ -14,7 +14,9 @@ import {
   MomentusColors,
   getContrastTextColor,
   LayoutTokens,
+  SpacingTokens,
   BorderRadiusTokens,
+  ComponentHeightTokens,
   TypographyTokens,
 } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
@@ -1025,7 +1027,7 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
     paddingTop: LayoutTokens.pagePaddingTop,
-    marginBottom: 16,
+    marginBottom: SpacingTokens.md,
   },
   title: {
     ...TypographyTokens.screenTitle,
@@ -1034,7 +1036,7 @@ const styles = StyleSheet.create({
   subtitle: {
     ...TypographyTokens.screenSubtitle,
     color: MomentusColors.textSecondary,
-    marginTop: 2,
+    marginTop: SpacingTokens.xs,
   },
   scroll: {
     flex: 1,
@@ -1050,13 +1052,14 @@ const styles = StyleSheet.create({
     padding: 4,
     borderWidth: 1,
     borderColor: MomentusColors.navyOutline,
-    marginBottom: 20,
+    marginBottom: SpacingTokens.lg,
   },
   filterBtn: {
     flex: 1,
-    paddingVertical: 8,
+    height: ComponentHeightTokens.chipLarge,
     borderRadius: BorderRadiusTokens.sm,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   filterBtnActive: {
     backgroundColor: MomentusColors.emeraldNeon,
@@ -1074,25 +1077,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     letterSpacing: 0.5,
-    marginBottom: 12,
-    marginTop: 4,
+    marginBottom: SpacingTokens.md,
+    marginTop: SpacingTokens.xs,
   },
   insightsRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
+    gap: SpacingTokens.md,
+    marginBottom: SpacingTokens.md,
   },
   insightCard: {
     flex: 1,
-    borderRadius: 20,
+    borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
-    padding: 16,
+    padding: SpacingTokens.md,
   },
   insightHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 8,
+    gap: SpacingTokens.xs,
+    marginBottom: SpacingTokens.sm,
   },
   insightLabel: {
     fontSize: 12,
@@ -1114,14 +1117,14 @@ const styles = StyleSheet.create({
   chartCard: {
     borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
-    padding: 18,
-    marginBottom: 20,
+    padding: SpacingTokens.lg,
+    marginBottom: SpacingTokens.lg,
   },
   chartHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: SpacingTokens.md,
   },
   chartTitle: {
     fontSize: 14,
@@ -1134,16 +1137,16 @@ const styles = StyleSheet.create({
   barsContainerScroll: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    height: 140,
-    paddingTop: 10,
+    height: 144,
+    paddingTop: SpacingTokens.sm,
     paddingHorizontal: 4,
   },
   barsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-    height: 140,
-    paddingTop: 10,
+    height: 144,
+    paddingTop: SpacingTokens.sm,
   },
   barCol: {
     alignItems: 'center',
@@ -1154,19 +1157,19 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: MomentusColors.textSecondary,
-    height: 14,
+    height: 16,
   },
   barTrack: {
-    width: 14,
+    width: 16,
     height: 96,
     backgroundColor: 'rgba(51, 65, 85, 0.4)',
-    borderRadius: 7,
+    borderRadius: 8,
     justifyContent: 'flex-end',
     overflow: 'hidden',
   },
   barFill: {
     width: '100%',
-    borderRadius: 7,
+    borderRadius: 8,
   },
   barDayText: {
     color: MomentusColors.textSecondary,
@@ -1174,12 +1177,12 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   emptyChartNotice: {
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: BorderRadiusTokens.card,
+    padding: SpacingTokens.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    marginVertical: 12,
+    gap: SpacingTokens.sm,
+    marginVertical: SpacingTokens.md,
   },
   emptyChartNoticeTitle: {
     fontSize: 14,
@@ -1190,19 +1193,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     lineHeight: 18,
-    paddingHorizontal: 12,
+    paddingHorizontal: SpacingTokens.md,
   },
   categoriesProgressCard: {
     borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
-    padding: 18,
-    gap: 16,
+    padding: SpacingTokens.lg,
+    gap: SpacingTokens.md,
   },
   emptyCatContainer: {
-    paddingVertical: 18,
+    paddingVertical: SpacingTokens.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: SpacingTokens.sm,
   },
   emptyCatText: {
     fontSize: 13,
@@ -1219,7 +1222,7 @@ const styles = StyleSheet.create({
   catNameWithDot: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: SpacingTokens.sm,
   },
   catSmallDot: {
     width: 8,
@@ -1236,14 +1239,14 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   catProgressBarTrack: {
-    height: 6,
+    height: 8,
     backgroundColor: MomentusColors.navyOutline,
-    borderRadius: 3,
+    borderRadius: 4,
     overflow: 'hidden',
   },
   catProgressBarFill: {
     height: '100%',
-    borderRadius: 3,
+    borderRadius: 4,
   },
   catMetaSubRow: {
     flexDirection: 'row',

@@ -19,7 +19,9 @@ import Constants from 'expo-constants';
 import {
   getContrastTextColor,
   LayoutTokens,
+  SpacingTokens,
   BorderRadiusTokens,
+  ComponentHeightTokens,
 } from '@/constants/theme';
 import { APP_INFO } from '@/constants/appInfo';
 import { useMomentus } from '@/context/MomentusContext';
@@ -166,7 +168,6 @@ export default function UpdateNotesScreen() {
   const router = useRouter();
   const { theme, triggerHaptic } = useMomentus();
 
-  const [activeFilter, setActiveFilter] = useState<'ALL' | UpdateTagType>('ALL');
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
   const [isCheckingVersion, setIsCheckingVersion] = useState(false);
 
@@ -308,7 +309,7 @@ export default function UpdateNotesScreen() {
                 onPress={handleCheckVersion}
                 style={[styles.verifyBtn, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}
                 activeOpacity={0.8}>
-                <Ionicons name="checkmark-circle-outline" size={15} color={theme.primary} />
+                <Ionicons name="checkmark-circle-outline" size={16} color={theme.primary} />
                 <Text style={[styles.verifyBtnText, { color: theme.textPrimary }]}>
                   {isCheckingVersion ? 'Verificando...' : 'Verificar Atualizações'}
                 </Text>
@@ -316,58 +317,9 @@ export default function UpdateNotesScreen() {
             </View>
           </View>
 
-          {/* Filtros Rápidos por Pílula */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filtersScrollContent}
-            style={styles.filtersScrollView}>
-            {[
-              { id: 'ALL' as const, label: 'Todas' },
-              { id: 'NOVO' as const, label: '✨ Recursos' },
-              { id: 'MELHORIA' as const, label: '⚡ Melhorias' },
-              { id: 'DESIGN' as const, label: '🎨 Design' },
-              { id: 'SEGURANCA' as const, label: '🔒 Segurança' },
-              { id: 'CORRECAO' as const, label: '🐛 Correções' },
-            ].map((pill) => {
-              const isSelected = activeFilter === pill.id;
-              return (
-                <TouchableOpacity
-                  key={pill.id}
-                  style={[
-                    styles.filterPill,
-                    {
-                      backgroundColor: isSelected ? `${theme.primary}25` : theme.surface,
-                      borderColor: isSelected ? theme.primary : theme.outline,
-                    },
-                  ]}
-                  onPress={() => {
-                    triggerHaptic('selection');
-                    setActiveFilter(pill.id);
-                  }}
-                  activeOpacity={0.7}>
-                  <Text
-                    style={[
-                      styles.filterPillText,
-                      { color: isSelected ? theme.primary : theme.textSecondary },
-                      isSelected && { fontWeight: '800' },
-                    ]}>
-                    {pill.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-
           {/* Linha do Tempo Histórica do Changelog */}
           <View style={styles.timelineContainer}>
             {CHANGELOG_DATA.map((release) => {
-              const filteredItems = release.items.filter(
-                (item) => activeFilter === 'ALL' || item.tag === activeFilter
-              );
-
-              if (filteredItems.length === 0) return null;
-
               return (
                 <View key={release.version} style={styles.releaseSection}>
                   {/* Cabeçalho da Versão na Timeline */}
@@ -413,7 +365,7 @@ export default function UpdateNotesScreen() {
                     />
 
                     <View style={styles.itemsListCol}>
-                      {filteredItems.map((item) => {
+                      {release.items.map((item) => {
                         const badgeStyle = getTagBadgeStyle(item.tag);
                         return (
                           <View
@@ -461,7 +413,7 @@ export default function UpdateNotesScreen() {
                                 <Text style={[styles.actionTourBtnText, { color: theme.primary }]}>
                                   {item.actionLabel || 'Experimentar Agora →'}
                                 </Text>
-                                <Ionicons name="arrow-forward" size={13} color={theme.primary} />
+                                <Ionicons name="arrow-forward" size={14} color={theme.primary} />
                               </TouchableOpacity>
                             )}
                           </View>
@@ -522,7 +474,7 @@ export default function UpdateNotesScreen() {
             </TouchableOpacity>
           </View>
 
-          <View style={{ height: 32 }} />
+          <View style={{ height: SpacingTokens.xl }} />
         </ScrollView>
 
         {/* Modal de Status de Versão Recente */}
@@ -592,12 +544,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
-    paddingVertical: 12,
+    paddingVertical: SpacingTokens.sm,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: ComponentHeightTokens.iconButton,
+    height: ComponentHeightTokens.iconButton,
+    borderRadius: ComponentHeightTokens.iconButton / 2,
     justifyContent: 'center',
     alignItems: 'center',
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
@@ -609,12 +561,12 @@ const styles = StyleSheet.create({
   topBarActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: SpacingTokens.sm,
   },
   topBarBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
+    width: ComponentHeightTokens.iconButton,
+    height: ComponentHeightTokens.iconButton,
+    borderRadius: ComponentHeightTokens.iconButton / 2,
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
@@ -625,29 +577,29 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
-    paddingTop: 8,
+    paddingTop: SpacingTokens.sm,
     paddingBottom: LayoutTokens.pagePaddingBottom,
   },
   versionBannerCard: {
-    borderRadius: BorderRadiusTokens.card,
+    borderRadius: BorderRadiusTokens.cardHero,
     borderWidth: 1.5,
-    padding: 18,
-    marginBottom: 16,
+    padding: SpacingTokens.lg,
+    marginBottom: SpacingTokens.lg,
   },
   versionBannerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: SpacingTokens.sm,
   },
   versionBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: SpacingTokens.xs,
     borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
+    paddingHorizontal: SpacingTokens.sm,
+    paddingVertical: SpacingTokens.xs,
+    borderRadius: BorderRadiusTokens.sm,
   },
   versionBadgeText: {
     fontSize: 12,
@@ -660,26 +612,26 @@ const styles = StyleSheet.create({
   bannerTitle: {
     fontSize: 20,
     fontWeight: '900',
-    marginBottom: 4,
+    marginBottom: SpacingTokens.xs,
   },
   bannerSubtitle: {
     fontSize: 13,
     lineHeight: 18,
-    marginBottom: 14,
+    marginBottom: SpacingTokens.md,
   },
   bannerVerifyRow: {
     borderTopWidth: 1,
-    paddingTop: 12,
+    paddingTop: SpacingTokens.md,
     flexDirection: 'row',
     justifyContent: 'flex-end',
   },
   verifyBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 10,
+    gap: SpacingTokens.xs,
+    height: ComponentHeightTokens.chipLarge,
+    paddingHorizontal: SpacingTokens.md,
+    borderRadius: BorderRadiusTokens.control,
     borderWidth: 1,
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
@@ -687,35 +639,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  filtersScrollView: {
-    marginBottom: 18,
-  },
-  filtersScrollContent: {
-    gap: 8,
-    paddingRight: 10,
-  },
-  filterPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    borderWidth: 1,
-    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
-  },
-  filterPillText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
   timelineContainer: {
-    marginBottom: 16,
+    marginBottom: SpacingTokens.lg,
   },
   releaseSection: {
-    marginBottom: 20,
+    marginBottom: SpacingTokens.xl,
   },
   releaseHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 12,
+    gap: SpacingTokens.md,
+    marginBottom: SpacingTokens.md,
   },
   timelineDot: {
     width: 24,
@@ -729,7 +663,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   releaseVersionTitle: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '900',
   },
   releaseCodename: {
@@ -737,7 +671,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   releaseDateSmall: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '500',
   },
   itemsWrapperWithLine: {
@@ -749,28 +683,28 @@ const styles = StyleSheet.create({
     width: 2,
     position: 'absolute',
     left: 0,
-    top: -4,
-    bottom: 8,
+    top: 0,
+    bottom: 0,
   },
   itemsListCol: {
     flex: 1,
-    paddingLeft: 20,
-    gap: 12,
+    paddingLeft: SpacingTokens.md,
+    gap: SpacingTokens.md,
   },
   updateCard: {
-    borderRadius: 16,
+    borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
-    padding: 14,
+    padding: SpacingTokens.md,
   },
   cardHeaderRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
+    gap: SpacingTokens.md,
   },
   iconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: BorderRadiusTokens.control,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -779,8 +713,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 4,
+    gap: SpacingTokens.xs,
+    marginBottom: SpacingTokens.xs,
   },
   itemTitle: {
     fontSize: 14,
@@ -788,30 +722,30 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   tagBadge: {
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 6,
+    paddingHorizontal: SpacingTokens.sm,
+    paddingVertical: SpacingTokens.xs,
+    borderRadius: BorderRadiusTokens.xs,
     borderWidth: 1,
   },
   tagBadgeText: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.3,
   },
   itemDescription: {
     fontSize: 12,
-    lineHeight: 17,
+    lineHeight: 18,
   },
   actionTourBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 7,
-    borderRadius: 10,
-    marginTop: 10,
+    gap: SpacingTokens.xs,
+    height: ComponentHeightTokens.chipLarge,
+    borderRadius: BorderRadiusTokens.control,
+    marginTop: SpacingTokens.sm,
     alignSelf: 'flex-start',
-    paddingHorizontal: 12,
+    paddingHorizontal: SpacingTokens.md,
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   actionTourBtnText: {
@@ -821,38 +755,39 @@ const styles = StyleSheet.create({
   feedbackCard: {
     borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
-    padding: 20,
+    padding: SpacingTokens.lg,
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: SpacingTokens.lg,
   },
   feedbackIconCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: ComponentHeightTokens.buttonModal,
+    height: ComponentHeightTokens.buttonModal,
+    borderRadius: ComponentHeightTokens.buttonModal / 2,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: SpacingTokens.md,
   },
   feedbackTitle: {
     fontSize: 16,
     fontWeight: '800',
     textAlign: 'center',
-    marginBottom: 6,
+    marginBottom: SpacingTokens.xs,
   },
   feedbackSubtitle: {
     fontSize: 12,
     textAlign: 'center',
-    lineHeight: 17,
-    marginBottom: 16,
+    lineHeight: 18,
+    marginBottom: SpacingTokens.md,
   },
   feedbackBtn: {
+    width: '100%',
+    height: ComponentHeightTokens.buttonModal,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 14,
+    gap: SpacingTokens.sm,
+    paddingHorizontal: SpacingTokens.md,
+    borderRadius: BorderRadiusTokens.button,
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   feedbackBtnText: {
@@ -861,8 +796,8 @@ const styles = StyleSheet.create({
   },
   footerBrand: {
     alignItems: 'center',
-    marginTop: 4,
-    marginBottom: 12,
+    marginTop: SpacingTokens.xs,
+    marginBottom: SpacingTokens.md,
   },
   footerText: {
     fontSize: 12,
@@ -875,30 +810,30 @@ const styles = StyleSheet.create({
   footerUrl: {
     fontSize: 11,
     fontWeight: '700',
-    marginTop: 4,
+    marginTop: SpacingTokens.xs,
   },
   dialogOverlay: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.75)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: SpacingTokens.lg,
   },
   dialogCard: {
     width: '100%',
     maxWidth: LayoutTokens.maxDialogWidth,
     borderRadius: BorderRadiusTokens.modal,
     borderWidth: 1,
-    padding: 24,
+    padding: SpacingTokens.lg,
     alignItems: 'center',
   },
   dialogIconBox: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: SpacingTokens['3xl'],
+    height: SpacingTokens['3xl'],
+    borderRadius: SpacingTokens['3xl'] / 2,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: SpacingTokens.md,
   },
   dialogTitle: {
     fontSize: 20,
@@ -909,13 +844,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 19,
-    marginTop: 8,
-    marginBottom: 20,
+    marginTop: SpacingTokens.sm,
+    marginBottom: SpacingTokens.lg,
   },
   dialogPrimaryBtn: {
     width: '100%',
-    paddingVertical: 14,
-    borderRadius: 16,
+    height: ComponentHeightTokens.buttonModal,
+    borderRadius: BorderRadiusTokens.button,
     alignItems: 'center',
     justifyContent: 'center',
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
@@ -926,13 +861,14 @@ const styles = StyleSheet.create({
   },
   dialogSecondaryBtn: {
     width: '100%',
-    paddingVertical: 12,
-    borderRadius: 16,
+    height: ComponentHeightTokens.buttonModal,
+    borderRadius: BorderRadiusTokens.button,
     borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: SpacingTokens.sm,
+    marginTop: SpacingTokens.sm,
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   dialogSecondaryBtnText: {
@@ -941,14 +877,14 @@ const styles = StyleSheet.create({
   },
   reportBugBtn: {
     width: '100%',
-    paddingVertical: 12,
-    borderRadius: 14,
+    height: ComponentHeightTokens.buttonModal,
+    borderRadius: BorderRadiusTokens.button,
     borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    marginTop: 8,
+    gap: SpacingTokens.xs,
+    marginTop: SpacingTokens.sm,
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   reportBugBtnText: {

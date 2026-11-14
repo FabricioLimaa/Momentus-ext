@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useMomentus } from '@/context/MomentusContext';
 import {
   getContrastTextColor,
+  SpacingTokens,
   BorderRadiusTokens,
   ComponentHeightTokens,
 } from '@/constants/theme';
@@ -391,11 +392,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   digitalDisplayCard: {
-    borderRadius: 16,
+    borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
-    padding: 10,
+    padding: SpacingTokens.md,
     alignItems: 'center',
-    gap: 4,
+    gap: SpacingTokens.xs,
   },
   digitalInput: {
     fontSize: 28,
@@ -403,11 +404,11 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
     letterSpacing: 2,
     textAlign: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: SpacingTokens.md,
+    paddingVertical: SpacingTokens.xs,
+    borderRadius: BorderRadiusTokens.control,
     borderWidth: 1,
-    width: 140,
+    width: 144,
   },
   periodHintText: {
     fontSize: 11,
@@ -415,9 +416,9 @@ const styles = StyleSheet.create({
   },
   columnsContainer: {
     flexDirection: 'row',
-    borderRadius: 16,
+    borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
-    height: 150,
+    height: 160,
     overflow: 'hidden',
   },
   columnCol: {
@@ -428,7 +429,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.8,
-    paddingVertical: 6,
+    paddingVertical: SpacingTokens.xs,
   },
   columnDivider: {
     width: 1,
@@ -439,19 +440,19 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   columnScrollContent: {
-    paddingVertical: 4,
+    paddingVertical: SpacingTokens.xs,
     alignItems: 'center',
   },
   pickerItem: {
-    width: 60,
+    width: 64,
     height: ITEM_HEIGHT,
-    borderRadius: 10,
+    borderRadius: BorderRadiusTokens.sm,
     alignItems: 'center',
     justifyContent: 'center',
     marginVertical: 1,
   },
   pickerItemSelected: {
-    borderRadius: 12,
+    borderRadius: BorderRadiusTokens.control,
   },
   pickerItemText: {
     fontSize: 16,
@@ -464,15 +465,15 @@ const styles = StyleSheet.create({
   quickChipsRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 8,
+    gap: SpacingTokens.sm,
   },
   quickChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
+    gap: SpacingTokens.xs,
+    paddingHorizontal: SpacingTokens.sm,
+    height: ComponentHeightTokens.chip,
+    borderRadius: BorderRadiusTokens.sm,
     borderWidth: 1,
   },
   quickChipText: {
@@ -483,28 +484,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    gap: 10,
-    paddingTop: 8,
+    gap: SpacingTokens.md,
+    paddingTop: SpacingTokens.md,
     borderTopWidth: 1,
   },
   cancelBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: SpacingTokens.md,
+    height: ComponentHeightTokens.buttonModal,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   cancelBtnText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
   },
   confirmBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 12,
+    gap: SpacingTokens.xs,
+    paddingHorizontal: SpacingTokens.md,
+    height: ComponentHeightTokens.buttonModal,
+    borderRadius: BorderRadiusTokens.button,
   },
   confirmBtnText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '800',
   },
 });
