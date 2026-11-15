@@ -11,7 +11,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { MomentusColors } from '@/constants/theme';
+import {
+  MomentusColors,
+  SpacingTokens,
+  BorderRadiusTokens,
+  ComponentHeightTokens,
+} from '@/constants/theme';
 
 const { width } = Dimensions.get('window');
 
@@ -130,16 +135,20 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: MomentusColors.navyBackground,
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingBottom: 32,
+    paddingHorizontal: SpacingTokens.lg,
+    paddingBottom: SpacingTokens.xl,
   },
   topBar: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    paddingTop: 12,
+    paddingTop: SpacingTokens.md,
   },
   skipButton: {
-    padding: 8,
+    minHeight: ComponentHeightTokens.buttonCompact,
+    minWidth: ComponentHeightTokens.iconButton,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: SpacingTokens.sm,
   },
   skipText: {
     color: MomentusColors.textSecondary,
@@ -148,7 +157,7 @@ const styles = StyleSheet.create({
   },
   centerContent: {
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: SpacingTokens.md,
   },
   iconCircle: {
     width: 120,
@@ -159,14 +168,14 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(52, 211, 153, 0.25)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: SpacingTokens.xxl,
   },
   slideTitle: {
     fontSize: 26,
     fontWeight: '900',
     color: MomentusColors.textPrimary,
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: SpacingTokens.sm,
   },
   slideDescription: {
     fontSize: 15,
@@ -177,34 +186,34 @@ const styles = StyleSheet.create({
   },
   bottomBar: {
     alignItems: 'center',
-    gap: 28,
+    gap: SpacingTokens.lg,
   },
   dotsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: SpacingTokens.sm,
   },
   dot: {
-    height: 8,
-    borderRadius: 4,
+    height: SpacingTokens.sm,
+    borderRadius: SpacingTokens.xs,
   },
   dotActive: {
-    width: 24,
+    width: SpacingTokens.lg,
     backgroundColor: MomentusColors.emeraldNeon,
   },
   dotInactive: {
-    width: 8,
+    width: SpacingTokens.sm,
     backgroundColor: 'rgba(52, 211, 153, 0.25)',
   },
   primaryButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: SpacingTokens.sm,
     backgroundColor: MomentusColors.emeraldNeon,
     width: '100%',
-    paddingVertical: 16,
-    borderRadius: 18,
+    height: ComponentHeightTokens.buttonHero,
+    borderRadius: BorderRadiusTokens.button,
   },
   primaryButtonText: {
     color: '#0F172A',
@@ -219,11 +228,11 @@ const styles = StyleSheet.create({
   nextButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: SpacingTokens.sm,
     backgroundColor: MomentusColors.emeraldNeon,
-    paddingHorizontal: 28,
-    paddingVertical: 14,
-    borderRadius: 16,
+    paddingHorizontal: SpacingTokens.lg,
+    height: ComponentHeightTokens.buttonModal,
+    borderRadius: BorderRadiusTokens.button,
   },
   nextButtonText: {
     color: '#0F172A',

@@ -9,7 +9,13 @@ import {
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MomentusColors, getContrastTextColor } from '@/constants/theme';
+import {
+  MomentusColors,
+  SpacingTokens,
+  BorderRadiusTokens,
+  ComponentHeightTokens,
+  getContrastTextColor,
+} from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import { formatDateToBr } from '@/constants/initialData';
 
@@ -542,9 +548,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: 'rgba(51, 65, 85, 0.3)',
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 24,
+    borderRadius: BorderRadiusTokens.card,
+    padding: SpacingTokens.md,
+    marginBottom: SpacingTokens.lg,
   },
   switchInfo: {
     flex: 1,
@@ -563,11 +569,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
-    gap: 12,
+    gap: SpacingTokens.md,
   },
   cancelButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: SpacingTokens.md,
+    paddingVertical: SpacingTokens.sm,
   },
   cancelButtonText: {
     color: MomentusColors.textSecondary,
@@ -576,9 +582,11 @@ const styles = StyleSheet.create({
   },
   confirmButton: {
     backgroundColor: MomentusColors.emeraldNeon,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 14,
+    paddingHorizontal: SpacingTokens.lg,
+    height: ComponentHeightTokens.buttonModal,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: BorderRadiusTokens.button,
   },
   confirmButtonDisabled: {
     opacity: 0.4,
@@ -590,18 +598,18 @@ const styles = StyleSheet.create({
   },
   // Decisão de Reaplicação
   decisionContent: {
-    gap: 14,
+    gap: SpacingTokens.md,
     paddingVertical: 4,
   },
   decisionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: SpacingTokens.md,
   },
   decisionIconBg: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: ComponentHeightTokens.buttonCompact,
+    height: ComponentHeightTokens.buttonCompact,
+    borderRadius: ComponentHeightTokens.buttonCompact / 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -616,16 +624,16 @@ const styles = StyleSheet.create({
   conflictDatesRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
-    marginVertical: 4,
+    gap: SpacingTokens.sm,
+    marginVertical: SpacingTokens.xs,
   },
   conflictDateBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    gap: SpacingTokens.xs,
+    paddingHorizontal: SpacingTokens.sm,
+    paddingVertical: SpacingTokens.xs,
+    borderRadius: BorderRadiusTokens.sm,
     borderWidth: 1,
   },
   conflictDateBadgeText: {
@@ -638,10 +646,10 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   decisionCardOption: {
-    padding: 14,
-    borderRadius: 16,
+    padding: SpacingTokens.md,
+    borderRadius: BorderRadiusTokens.card,
     borderWidth: 1.5,
-    gap: 6,
+    gap: SpacingTokens.sm,
   },
   decisionCardHeader: {
     flexDirection: 'row',
@@ -651,16 +659,16 @@ const styles = StyleSheet.create({
   decisionCardTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: SpacingTokens.sm,
   },
   decisionCardTitle: {
     fontSize: 14,
     fontWeight: '800',
   },
   recommendedPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
+    paddingHorizontal: SpacingTokens.sm,
+    paddingVertical: SpacingTokens.xs,
+    borderRadius: BorderRadiusTokens.sm,
   },
   recommendedPillText: {
     fontSize: 9,
@@ -672,11 +680,11 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   timeShiftBox: {
-    padding: 12,
-    borderRadius: 16,
+    padding: SpacingTokens.md,
+    borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
-    marginBottom: 12,
-    gap: 10,
+    marginBottom: SpacingTokens.md,
+    gap: SpacingTokens.sm,
   },
   timeShiftHeaderRow: {
     flexDirection: 'row',
@@ -697,12 +705,12 @@ const styles = StyleSheet.create({
   timeShiftPresetsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: SpacingTokens.sm,
   },
   timeShiftChip: {
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 8,
+    paddingVertical: SpacingTokens.xs,
+    paddingHorizontal: SpacingTokens.sm,
+    borderRadius: BorderRadiusTokens.sm,
     borderWidth: 1,
   },
   timeShiftChipText: {

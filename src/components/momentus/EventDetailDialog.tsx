@@ -2,7 +2,12 @@ import React from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { HabitItem, Category } from '@/types';
-import { MomentusColors } from '@/constants/theme';
+import {
+  MomentusColors,
+  SpacingTokens,
+  BorderRadiusTokens,
+  ComponentHeightTokens,
+} from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import { getIconForMarketItem } from './TimelineEventItem';
 import { formatDateToBr } from '@/constants/initialData';
@@ -236,15 +241,15 @@ const styles = StyleSheet.create({
   categoryChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingHorizontal: SpacingTokens.md,
+    paddingVertical: SpacingTokens.sm,
+    borderRadius: BorderRadiusTokens.sm,
   },
   categoryDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    marginRight: 8,
+    marginRight: SpacingTokens.sm,
   },
   categoryChipText: {
     fontSize: 12,
@@ -253,12 +258,12 @@ const styles = StyleSheet.create({
   templateOriginChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
+    gap: SpacingTokens.xs,
+    paddingHorizontal: SpacingTokens.sm,
+    paddingVertical: SpacingTokens.xs,
+    borderRadius: BorderRadiusTokens.sm,
     borderWidth: 1,
-    marginLeft: 8,
+    marginLeft: SpacingTokens.sm,
   },
   templateOriginChipText: {
     fontSize: 11,
@@ -267,16 +272,16 @@ const styles = StyleSheet.create({
   timeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: SpacingTokens.md,
   },
   timeIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: ComponentHeightTokens.buttonCompact,
+    height: ComponentHeightTokens.buttonCompact,
+    borderRadius: ComponentHeightTokens.buttonCompact / 2,
     backgroundColor: 'rgba(52, 211, 153, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: SpacingTokens.md,
   },
   timeText: {
     fontSize: 15,
@@ -285,9 +290,9 @@ const styles = StyleSheet.create({
   },
   descriptionBox: {
     backgroundColor: 'rgba(51, 65, 85, 0.3)',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 16,
+    borderRadius: BorderRadiusTokens.card,
+    padding: SpacingTokens.md,
+    marginBottom: SpacingTokens.md,
   },
   descriptionText: {
     fontSize: 14,

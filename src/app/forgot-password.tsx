@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   MomentusColors,
   LayoutTokens,
+  SpacingTokens,
   BorderRadiusTokens,
   ComponentHeightTokens,
   TypographyTokens,
@@ -82,7 +83,7 @@ export default function ForgotPasswordScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingBottom: insets.bottom + 24 },
+          { paddingBottom: insets.bottom + SpacingTokens.lg },
         ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled">
@@ -173,8 +174,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingBottom: 12,
+    paddingHorizontal: SpacingTokens.md,
+    paddingBottom: SpacingTokens.sm,
   },
   backButton: {
     width: ComponentHeightTokens.iconButton,
@@ -207,8 +208,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 36,
-    marginBottom: 28,
+    marginTop: SpacingTokens.xl,
+    marginBottom: SpacingTokens.lg,
   },
   title: {
     fontSize: 24,
@@ -221,12 +222,12 @@ const styles = StyleSheet.create({
     color: MomentusColors.textSecondary,
     textAlign: 'center',
     lineHeight: 22,
-    marginTop: 12,
-    marginBottom: 36,
+    marginTop: SpacingTokens.sm,
+    marginBottom: SpacingTokens.xl,
   },
   formContainer: {
     width: '100%',
-    gap: 16,
+    gap: SpacingTokens.md,
   },
   inputBlock: {
     width: '100%',
@@ -238,11 +239,11 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadiusTokens.input,
     borderWidth: 1,
     borderColor: MomentusColors.navyOutline,
-    paddingHorizontal: 16,
-    height: ComponentHeightTokens.input,
+    paddingHorizontal: SpacingTokens.md,
+    height: ComponentHeightTokens.inputHero,
   },
   inputIcon: {
-    marginRight: 12,
+    marginRight: SpacingTokens.md,
   },
   input: {
     flex: 1,
@@ -250,7 +251,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   clearIconButton: {
-    padding: 6,
+    width: ComponentHeightTokens.buttonCompact,
+    height: ComponentHeightTokens.buttonCompact,
     justifyContent: 'center',
     alignItems: 'center',
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
@@ -258,16 +260,16 @@ const styles = StyleSheet.create({
   inputErrorHint: {
     color: MomentusColors.errorRed,
     fontSize: 12,
-    marginTop: 4,
-    marginLeft: 6,
+    marginTop: SpacingTokens.xs,
+    marginLeft: SpacingTokens.sm,
     fontWeight: '500',
   },
   submitButton: {
     height: ComponentHeightTokens.buttonHero,
-    borderRadius: BorderRadiusTokens.input,
+    borderRadius: BorderRadiusTokens.button,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
+    marginTop: SpacingTokens.sm,
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   submitButtonText: {

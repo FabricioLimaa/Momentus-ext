@@ -20,7 +20,9 @@ import * as Haptics from "expo-haptics";
 import { captureRef } from "react-native-view-shot";
 import {
   MomentusColors,
+  SpacingTokens,
   BorderRadiusTokens,
+  ComponentHeightTokens,
   getContrastTextColor,
 } from "@/constants/theme";
 import { UserLevelInfo } from "@/domain/userLevel";
@@ -482,12 +484,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 12,
+    marginBottom: SpacingTokens.md,
   },
   modalTitleRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: SpacingTokens.sm,
   },
   modalTopBarTitle: {
     color: "#F8FAFC",
@@ -497,9 +499,9 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   closeBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: ComponentHeightTokens.iconButton,
+    height: ComponentHeightTokens.iconButton,
+    borderRadius: ComponentHeightTokens.iconButton / 2,
     backgroundColor: "rgba(255, 255, 255, 0.08)",
     justifyContent: "center",
     alignItems: "center",
@@ -734,16 +736,16 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   actionsContainer: {
-    marginTop: 16,
-    gap: 10,
+    marginTop: SpacingTokens.md,
+    gap: SpacingTokens.sm,
   },
   primaryShareBtn: {
-    height: 52,
+    height: ComponentHeightTokens.buttonHero,
     borderRadius: BorderRadiusTokens.button,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
+    gap: SpacingTokens.sm,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
@@ -758,7 +760,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   cancelActionBtn: {
-    height: 44,
+    height: ComponentHeightTokens.buttonModal,
     justifyContent: "center",
     alignItems: "center",
   },

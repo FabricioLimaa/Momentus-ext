@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
     flexWrap: 'nowrap',
   },
   stickerIcon: {
-    marginRight: 6,
+    marginRight: SpacingTokens.sm,
   },
   itemTitle: {
     flex: 1,
@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
     borderColor: MomentusColors.emeraldNeon,
   },
   googleIconBadge: {
-    marginLeft: 6,
+    marginLeft: SpacingTokens.sm,
     paddingHorizontal: SpacingTokens.xs,
     paddingVertical: 2,
     borderRadius: BorderRadiusTokens.xs,

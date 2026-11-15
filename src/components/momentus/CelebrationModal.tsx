@@ -9,7 +9,12 @@ import {
 } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MomentusColors } from '@/constants/theme';
+import {
+  MomentusColors,
+  SpacingTokens,
+  BorderRadiusTokens,
+  ComponentHeightTokens,
+} from '@/constants/theme';
 import { soundManager } from '@/util/soundManager';
 
 interface CelebrationModalProps {
@@ -191,11 +196,11 @@ const styles = StyleSheet.create({
   pointsBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    marginBottom: 20,
+    gap: SpacingTokens.sm,
+    paddingHorizontal: SpacingTokens.md,
+    paddingVertical: SpacingTokens.sm,
+    borderRadius: BorderRadiusTokens.control,
+    marginBottom: SpacingTokens.lg,
   },
   pointsText: {
     fontSize: 13,
@@ -203,8 +208,8 @@ const styles = StyleSheet.create({
   },
   button: {
     width: '100%',
-    height: 50,
-    borderRadius: 16,
+    height: ComponentHeightTokens.buttonModal,
+    borderRadius: BorderRadiusTokens.button,
     alignItems: 'center',
     justifyContent: 'center',
   },

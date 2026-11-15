@@ -1,7 +1,12 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MomentusColors, getContrastTextColor } from '@/constants/theme';
+import {
+  MomentusColors,
+  SpacingTokens,
+  BorderRadiusTokens,
+  getContrastTextColor,
+} from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 
 export const LevelProgressBar: React.FC = () => {
@@ -119,13 +124,13 @@ const styles = StyleSheet.create({
   coinsBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: SpacingTokens.sm,
     backgroundColor: 'rgba(251, 191, 36, 0.15)',
     borderWidth: 1,
     borderColor: 'rgba(251, 191, 36, 0.3)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingHorizontal: SpacingTokens.md,
+    paddingVertical: SpacingTokens.sm,
+    borderRadius: BorderRadiusTokens.button,
   },
   coinsText: {
     color: MomentusColors.gold,
@@ -138,7 +143,7 @@ const styles = StyleSheet.create({
   xpLabelsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: SpacingTokens.sm,
   },
   xpLabel: {
     color: MomentusColors.textSecondary,

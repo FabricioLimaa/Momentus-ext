@@ -11,7 +11,14 @@ import {
 } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { Ionicons } from '@expo/vector-icons';
-import { MomentusColors, TypographyTokens, getContrastTextColor } from '@/constants/theme';
+import {
+  MomentusColors,
+  TypographyTokens,
+  SpacingTokens,
+  BorderRadiusTokens,
+  ComponentHeightTokens,
+  getContrastTextColor,
+} from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 
 interface BiometricGuardProps {
@@ -233,14 +240,14 @@ const styles = StyleSheet.create({
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: SpacingTokens.sm,
     backgroundColor: `${MomentusColors.errorRed}15`,
     borderColor: `${MomentusColors.errorRed}40`,
     borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 20,
+    borderRadius: BorderRadiusTokens.control,
+    paddingHorizontal: SpacingTokens.md,
+    paddingVertical: SpacingTokens.sm,
+    marginBottom: SpacingTokens.lg,
   },
   errorText: {
     fontSize: 13,
@@ -251,10 +258,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
+    gap: SpacingTokens.sm,
     width: '100%',
-    paddingVertical: 16,
-    borderRadius: 16,
+    height: ComponentHeightTokens.buttonHero,
+    borderRadius: BorderRadiusTokens.button,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,

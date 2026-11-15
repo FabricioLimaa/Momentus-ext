@@ -10,7 +10,13 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MomentusColors } from '@/constants/theme';
+import {
+  MomentusColors,
+  SpacingTokens,
+  BorderRadiusTokens,
+  ComponentHeightTokens,
+  LayoutTokens,
+} from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 
 interface SettingsModalProps {
@@ -149,8 +155,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 20,
+    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
+    marginBottom: SpacingTokens.lg,
   },
   title: {
     color: MomentusColors.textPrimary,
@@ -163,42 +169,45 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   closeBtn: {
-    padding: 6,
+    width: ComponentHeightTokens.iconButton,
+    height: ComponentHeightTokens.iconButton,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   scroll: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
   },
   sectionTitle: {
     color: MomentusColors.textSecondary,
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0.8,
-    marginBottom: 8,
-    marginTop: 12,
+    marginBottom: SpacingTokens.sm,
+    marginTop: SpacingTokens.md,
   },
   card: {
     backgroundColor: MomentusColors.navySurface,
-    borderRadius: 20,
+    borderRadius: BorderRadiusTokens.modal,
     borderWidth: 1,
     borderColor: MomentusColors.navyOutline,
-    padding: 16,
-    marginBottom: 16,
+    padding: SpacingTokens.md,
+    marginBottom: SpacingTokens.md,
   },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 6,
+    paddingVertical: SpacingTokens.sm,
   },
   rowLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: SpacingTokens.md,
     flex: 1,
-    paddingRight: 10,
+    paddingRight: SpacingTokens.md,
   },
   rowTitle: {
     color: MomentusColors.textPrimary,
@@ -213,13 +222,13 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: MomentusColors.navyOutline,
-    marginVertical: 10,
+    marginVertical: SpacingTokens.sm,
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 6,
+    paddingVertical: SpacingTokens.sm,
   },
   infoLabel: {
     color: MomentusColors.textSecondary,
@@ -233,8 +242,8 @@ const styles = StyleSheet.create({
   dangerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingVertical: 6,
+    gap: SpacingTokens.sm,
+    paddingVertical: SpacingTokens.sm,
   },
   dangerText: {
     color: MomentusColors.error,
@@ -243,8 +252,8 @@ const styles = StyleSheet.create({
   },
   aboutBox: {
     alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 20,
+    marginTop: SpacingTokens.lg,
+    marginBottom: SpacingTokens.lg,
   },
   aboutTitle: {
     color: MomentusColors.textPrimary,

@@ -7,7 +7,12 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MomentusColors } from '@/constants/theme';
+import {
+  MomentusColors,
+  SpacingTokens,
+  BorderRadiusTokens,
+  ComponentHeightTokens,
+} from '@/constants/theme';
 import { AppTheme } from '@/context/MomentusContext';
 
 interface ReminderModalProps {
@@ -123,9 +128,12 @@ const styles = StyleSheet.create({
   },
   closeBtn: {
     position: 'absolute',
-    top: 16,
-    right: 16,
-    padding: 6,
+    top: SpacingTokens.md,
+    right: SpacingTokens.md,
+    width: ComponentHeightTokens.iconButton,
+    height: ComponentHeightTokens.iconButton,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   iconBox: {
     width: 64,
@@ -133,39 +141,39 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: SpacingTokens.md,
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: '900',
     textAlign: 'center',
-    marginBottom: 6,
+    marginBottom: SpacingTokens.sm,
   },
   habitTitle: {
     fontSize: 17,
     fontWeight: '800',
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: SpacingTokens.md,
   },
   description: {
     fontSize: 13,
     lineHeight: 20,
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: SpacingTokens.lg,
   },
   actionsRow: {
     flexDirection: 'row',
     width: '100%',
-    gap: 12,
+    gap: SpacingTokens.md,
   },
   snoozeBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    height: 48,
-    borderRadius: 14,
+    gap: SpacingTokens.sm,
+    height: ComponentHeightTokens.buttonModal,
+    borderRadius: BorderRadiusTokens.button,
     borderWidth: 1,
   },
   snoozeBtnText: {
@@ -177,9 +185,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    height: 48,
-    borderRadius: 14,
+    gap: SpacingTokens.sm,
+    height: ComponentHeightTokens.buttonModal,
+    borderRadius: BorderRadiusTokens.button,
   },
   completeBtnText: {
     color: '#0F172A',

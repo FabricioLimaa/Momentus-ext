@@ -339,15 +339,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.65)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: SpacingTokens.md,
   },
   dialogContainer: {
     width: '100%',
     maxWidth: 340,
     borderRadius: BorderRadiusTokens.modal,
     borderWidth: 1,
-    padding: 18,
-    gap: 12,
+    padding: SpacingTokens.lg,
+    gap: SpacingTokens.md,
     ...Platform.select({
       ios: {
         shadowColor: '#000',

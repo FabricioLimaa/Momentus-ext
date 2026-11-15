@@ -2,7 +2,13 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { HabitItem, Category } from '@/types';
-import { MomentusColors, getContrastTextColor } from '@/constants/theme';
+import {
+  MomentusColors,
+  SpacingTokens,
+  BorderRadiusTokens,
+  ComponentHeightTokens,
+  getContrastTextColor,
+} from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 
 interface HabitItemCardProps {
@@ -109,14 +115,14 @@ export const HabitItemCard: React.FC<HabitItemCardProps> = ({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: MomentusColors.navySurface,
-    borderRadius: 18,
+    borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
     borderColor: MomentusColors.navyOutline,
-    padding: 16,
-    marginBottom: 12,
+    padding: SpacingTokens.md,
+    marginBottom: SpacingTokens.md,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: SpacingTokens.md,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
@@ -132,9 +138,9 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
   checkbox: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 24,
+    height: 24,
+    borderRadius: BorderRadiusTokens.sm,
     borderWidth: 2,
     borderColor: MomentusColors.navyOutline,
     alignItems: 'center',
@@ -151,14 +157,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginBottom: SpacingTokens.xs,
   },
   title: {
     color: MomentusColors.textPrimary,
     fontSize: 15,
     fontWeight: '700',
     flex: 1,
-    marginRight: 8,
+    marginRight: SpacingTokens.sm,
   },
   titleCompleted: {
     textDecorationLine: 'line-through',
@@ -168,9 +174,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(245, 158, 11, 0.15)',
-    paddingHorizontal: 6,
+    paddingHorizontal: SpacingTokens.sm,
     paddingVertical: 2,
-    borderRadius: 8,
+    borderRadius: BorderRadiusTokens.sm,
     gap: 2,
   },
   streakText: {
@@ -181,7 +187,7 @@ const styles = StyleSheet.create({
   description: {
     color: MomentusColors.textSecondary,
     fontSize: 13,
-    marginBottom: 8,
+    marginBottom: SpacingTokens.sm,
     lineHeight: 18,
   },
   descCompleted: {
@@ -191,16 +197,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: SpacingTokens.sm,
   },
   categoryTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
+    paddingHorizontal: SpacingTokens.sm,
+    paddingVertical: SpacingTokens.xs,
+    borderRadius: BorderRadiusTokens.sm,
     borderWidth: 1,
-    gap: 5,
+    gap: SpacingTokens.xs,
   },
   categoryDot: {
     width: 6,
@@ -214,7 +220,7 @@ const styles = StyleSheet.create({
   timeTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: SpacingTokens.xs,
   },
   timeText: {
     color: MomentusColors.textSecondary,
@@ -222,7 +228,10 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   deleteButton: {
-    padding: 6,
+    width: ComponentHeightTokens.buttonCompact,
+    height: ComponentHeightTokens.buttonCompact,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

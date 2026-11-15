@@ -54,3 +54,20 @@ Em todas as telas, documentações, modais, termos, layouts e metadados do proje
   - Aplicação Web / SPA: `app.momentusapp.com.br`
 - **Single Source of Truth no Código:** `src/constants/appInfo.ts` (`APP_INFO`)
 
+## UI/UX Design System & Grade de 8 Pontos (Obrigatório)
+
+O Momentus utiliza estritamente o sistema **8pt Grid** e princípios de **Despoluição Zen** em 100% de suas telas e componentes. Ao criar ou refatorar qualquer interface:
+
+1. **Espaçamento Canônico:** Utilize apenas os tokens `SpacingTokens` e `LayoutTokens` de `@/constants/theme` (escala 4, 8, 12, 16, 24, 32, 40, 48, 64). É estritamente proibido o uso de números literais soltos ("magic numbers") em `padding`, `margin` e `gap`.
+2. **Proximidade & Gestalt (Proporção 1:3):** Espaçamentos menores dentro do mesmo bloco/grupo (4–8px entre label e input, título e descrição), espaçamentos médios entre grupos funcionais (16–24px) e respiros amplos entre seções (32–48px). A distância visual deve comunicar agrupamento sem depender de divisores arbitrários.
+3. **Superfícies & Containers:** Utilize `GlassCard` ou `BorderRadiusTokens.card` (16px) e `cardHero` (24px) com paddings padronizados (`compact`: 12/16px, `normal`: 16px, `hero`: 24px).
+4. **Ergonomia & Alturas de Ação:**
+   - Chips / Pílulas: 32px / 40px (`ComponentHeightTokens.chip` / `chipLarge`).
+   - Ações secundárias / botões compactos: 40px (`ComponentHeightTokens.buttonCompact`).
+   - Inputs e Ações padrão: 48px (`ComponentHeightTokens.input` / `buttonModal`).
+   - Destaque Hero / Login / FAB: 56px (`ComponentHeightTokens.buttonHero` / `inputHero` / `fab`).
+   - Área de toque mínima: todo elemento interativo deve ter no mínimo 48x48px (`ComponentHeightTokens.iconButton` ou `hitSlop` equivalente) conforme Apple HIG e Google Material.
+5. **Modais e Diálogos:** Padding interno de 24px (`SpacingTokens.lg`), título para descrição de 8px (`SpacingTokens.sm`), corpo para botões de 24px/32px, botões de ação com altura de 48px ou 56px.
+6. **Tipografia & Raios de Borda:** Utilize estritamente `TypographyTokens` e `BorderRadiusTokens`.
+
+

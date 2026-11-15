@@ -19,7 +19,9 @@ import {
   MomentusColors,
   getContrastTextColor,
   LayoutTokens,
+  SpacingTokens,
   BorderRadiusTokens,
+  ComponentHeightTokens,
 } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import { getStreakColor } from '@/constants/initialData';
@@ -807,7 +809,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderTopWidth: 1,
     borderTopColor: MomentusColors.navyOutline,
-    paddingTop: 14,
+    paddingTop: SpacingTokens.md,
     alignItems: 'center',
   },
   statBox: {
@@ -817,7 +819,7 @@ const styles = StyleSheet.create({
   statIconRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: SpacingTokens.xs,
   },
   statNumber: {
     color: MomentusColors.textPrimary,
@@ -842,16 +844,16 @@ const styles = StyleSheet.create({
     padding: 4,
     borderWidth: 1,
     borderColor: MomentusColors.navyOutline,
-    marginBottom: 16,
+    marginBottom: SpacingTokens.md,
   },
   tabBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
+    height: ComponentHeightTokens.chipLarge,
     borderRadius: BorderRadiusTokens.control,
-    gap: 6,
+    gap: SpacingTokens.xs,
   },
   tabBtnActive: {
     backgroundColor: MomentusColors.emeraldNeon,
@@ -873,21 +875,21 @@ const styles = StyleSheet.create({
     paddingBottom: LayoutTokens.pagePaddingBottom,
   },
   itemCard: {
-    borderRadius: 20,
+    borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
-    padding: 16,
-    marginBottom: 12,
+    padding: SpacingTokens.md,
+    marginBottom: SpacingTokens.md,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: SpacingTokens.md,
   },
   itemCardUnlocked: {
     borderColor: 'rgba(52, 211, 153, 0.4)',
   },
   iconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: ComponentHeightTokens.iconButton,
+    height: ComponentHeightTokens.iconButton,
+    borderRadius: ComponentHeightTokens.iconButton / 2,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
@@ -899,7 +901,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginBottom: SpacingTokens.xs,
   },
   itemTitle: {
     color: MomentusColors.textPrimary,
@@ -908,9 +910,9 @@ const styles = StyleSheet.create({
   },
   rarityBadge: {
     borderWidth: 1,
-    paddingHorizontal: 6,
+    paddingHorizontal: SpacingTokens.xs,
     paddingVertical: 2,
-    borderRadius: 6,
+    borderRadius: BorderRadiusTokens.xs,
   },
   rarityText: {
     fontSize: 9,
@@ -918,9 +920,9 @@ const styles = StyleSheet.create({
   },
   unlockedTag: {
     backgroundColor: 'rgba(52, 211, 153, 0.15)',
-    paddingHorizontal: 8,
+    paddingHorizontal: SpacingTokens.sm,
     paddingVertical: 2,
-    borderRadius: 8,
+    borderRadius: BorderRadiusTokens.sm,
   },
   unlockedTagText: {
     color: MomentusColors.emeraldNeon,
@@ -936,17 +938,17 @@ const styles = StyleSheet.create({
     color: MomentusColors.textSecondary,
     fontSize: 12,
     lineHeight: 16,
-    marginBottom: 8,
+    marginBottom: SpacingTokens.sm,
   },
   progressRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: SpacingTokens.sm,
   },
   progressBarTrack: {
     flex: 1,
-    height: 6,
-    borderRadius: 3,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: MomentusColors.navyOutline,
     overflow: 'hidden',
   },
@@ -963,12 +965,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 4,
+    marginTop: SpacingTokens.xs,
   },
   priceTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: SpacingTokens.xs,
   },
   priceText: {
     color: MomentusColors.gold,
@@ -977,9 +979,11 @@ const styles = StyleSheet.create({
   },
   buyBtn: {
     backgroundColor: MomentusColors.emeraldNeon,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 12,
+    paddingHorizontal: SpacingTokens.md,
+    height: ComponentHeightTokens.chip,
+    borderRadius: BorderRadiusTokens.control,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   buyBtnText: {
     color: '#0F172A',

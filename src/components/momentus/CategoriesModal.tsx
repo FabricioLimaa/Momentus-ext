@@ -11,7 +11,13 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MomentusColors, getContrastTextColor } from '@/constants/theme';
+import {
+  MomentusColors,
+  SpacingTokens,
+  BorderRadiusTokens,
+  ComponentHeightTokens,
+  getContrastTextColor,
+} from '@/constants/theme';
 import {
   EXTENDED_CATEGORY_COLORS,
   CATEGORY_ICONS,
@@ -522,29 +528,29 @@ const styles = StyleSheet.create({
     color: MomentusColors.textSecondary,
     fontSize: 13,
     fontWeight: '600',
-    marginTop: 14,
-    marginBottom: 6,
+    marginTop: SpacingTokens.md,
+    marginBottom: SpacingTokens.sm,
   },
   input: {
     backgroundColor: MomentusColors.navySurface,
     borderWidth: 1,
     borderColor: MomentusColors.navyOutline,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    borderRadius: BorderRadiusTokens.input,
+    paddingHorizontal: SpacingTokens.md,
+    height: ComponentHeightTokens.input,
     color: MomentusColors.textPrimary,
     fontSize: 15,
   },
   colorPaletteGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    marginVertical: 4,
+    gap: SpacingTokens.sm,
+    marginVertical: SpacingTokens.xs,
   },
   colorCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: ComponentHeightTokens.buttonCompact,
+    height: ComponentHeightTokens.buttonCompact,
+    borderRadius: ComponentHeightTokens.buttonCompact / 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -555,17 +561,17 @@ const styles = StyleSheet.create({
   stickersRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 4,
+    gap: SpacingTokens.sm,
+    marginTop: SpacingTokens.xs,
   },
   stickerChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: SpacingTokens.sm,
     borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
+    paddingHorizontal: SpacingTokens.md,
+    paddingVertical: SpacingTokens.sm,
+    borderRadius: BorderRadiusTokens.control,
   },
   stickerChipSelected: {
     backgroundColor: 'rgba(52, 211, 153, 0.15)',
@@ -578,8 +584,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 18,
-    marginBottom: 8,
+    marginTop: SpacingTokens.md,
+    marginBottom: SpacingTokens.sm,
   },
   metaSwitchTitle: {
     color: MomentusColors.textPrimary,
@@ -592,8 +598,8 @@ const styles = StyleSheet.create({
   },
   metaInputsRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 6,
+    gap: SpacingTokens.md,
+    marginTop: SpacingTokens.sm,
   },
   metaInputCol: {
     flex: 1,
@@ -601,19 +607,20 @@ const styles = StyleSheet.create({
   metaInputLabel: {
     color: MomentusColors.textSecondary,
     fontSize: 11,
-    marginBottom: 4,
+    marginBottom: SpacingTokens.xs,
   },
   subModalFooter: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 20,
+    gap: SpacingTokens.md,
+    marginTop: SpacingTokens.lg,
   },
   cancelSubBtn: {
     flex: 1,
     borderWidth: 1,
-    paddingVertical: 14,
-    borderRadius: 16,
+    height: ComponentHeightTokens.buttonModal,
+    borderRadius: BorderRadiusTokens.button,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   cancelSubText: {
     color: MomentusColors.textSecondary,
@@ -621,9 +628,10 @@ const styles = StyleSheet.create({
   },
   saveSubBtn: {
     flex: 1.5,
-    paddingVertical: 14,
-    borderRadius: 16,
+    height: ComponentHeightTokens.buttonModal,
+    borderRadius: BorderRadiusTokens.button,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   saveSubText: {
     color: '#0F172A',

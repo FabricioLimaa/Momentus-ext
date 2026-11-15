@@ -22,6 +22,9 @@ import Constants from 'expo-constants';
 import {
   MomentusColors,
   LayoutTokens,
+  SpacingTokens,
+  BorderRadiusTokens,
+  ComponentHeightTokens,
   TypographyTokens,
 } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
@@ -303,7 +306,7 @@ export default function IndexScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 20 },
+          { paddingTop: insets.top + SpacingTokens.lg, paddingBottom: insets.bottom + SpacingTokens.lg },
         ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled">
@@ -374,7 +377,6 @@ export default function IndexScreen() {
                 {
                   backgroundColor: theme.isDark ? '#000000' : '#0F172A',
                   borderColor: theme.outline,
-                  marginBottom: 12,
                 },
               ]}
               accessibilityRole="button"
@@ -614,8 +616,8 @@ const styles = StyleSheet.create({
   logoContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
-    marginTop: 10,
+    marginBottom: SpacingTokens.lg,
+    marginTop: SpacingTokens.sm,
   },
   logoGlow: {
     position: 'absolute',
@@ -645,16 +647,16 @@ const styles = StyleSheet.create({
   brandSubtitle: {
     fontSize: 15,
     textAlign: 'center',
-    marginTop: 6,
-    marginBottom: 44,
+    marginTop: SpacingTokens.sm,
+    marginBottom: SpacingTokens.xxl,
   },
   authActionsContainer: {
     width: '100%',
-    gap: 14,
+    gap: SpacingTokens.md,
   },
   googleButtonWrapper: {
     width: '100%',
-    borderRadius: 16,
+    borderRadius: BorderRadiusTokens.button,
     overflow: 'hidden',
     shadowColor: MomentusColors.emeraldNeon,
     shadowOffset: { width: 0, height: 4 },
@@ -667,8 +669,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 56,
-    gap: 12,
+    height: ComponentHeightTokens.buttonHero,
+    gap: SpacingTokens.md,
   },
   googleButtonText: {
     fontSize: 16,
@@ -679,10 +681,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 56,
-    borderRadius: 16,
+    height: ComponentHeightTokens.buttonHero,
+    borderRadius: BorderRadiusTokens.button,
     borderWidth: 1,
-    gap: 12,
+    gap: SpacingTokens.md,
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   emailOutlineButtonText: {
@@ -692,13 +694,13 @@ const styles = StyleSheet.create({
   iosWebNoticeBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: SpacingTokens.sm,
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 10,
+    borderRadius: BorderRadiusTokens.control,
+    paddingHorizontal: SpacingTokens.md,
+    paddingVertical: SpacingTokens.sm,
+    marginBottom: SpacingTokens.sm,
     width: '100%',
   },
   iosWebNoticeText: {
@@ -708,8 +710,8 @@ const styles = StyleSheet.create({
   },
   emailFieldsBox: {
     width: '100%',
-    marginTop: 10,
-    gap: 14,
+    marginTop: SpacingTokens.sm,
+    gap: SpacingTokens.md,
   },
   inputBlock: {
     width: '100%',
@@ -717,20 +719,21 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 16,
+    borderRadius: BorderRadiusTokens.input,
     borderWidth: 1,
-    paddingHorizontal: 16,
-    height: 56,
+    paddingHorizontal: SpacingTokens.md,
+    height: ComponentHeightTokens.inputHero,
   },
   inputIcon: {
-    marginRight: 12,
+    marginRight: SpacingTokens.md,
   },
   input: {
     flex: 1,
     fontSize: 15,
   },
   fieldActionBtn: {
-    padding: 6,
+    width: ComponentHeightTokens.buttonCompact,
+    height: ComponentHeightTokens.buttonCompact,
     justifyContent: 'center',
     alignItems: 'center',
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
@@ -738,21 +741,22 @@ const styles = StyleSheet.create({
   inputErrorHint: {
     color: MomentusColors.errorRed,
     fontSize: 12,
-    marginTop: 4,
-    marginLeft: 6,
+    marginTop: SpacingTokens.xs,
+    marginLeft: SpacingTokens.sm,
     fontWeight: '500',
   },
   optionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 4,
-    marginVertical: 4,
+    paddingHorizontal: SpacingTokens.xs,
+    marginVertical: SpacingTokens.sm,
   },
   checkboxRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: SpacingTokens.sm,
+    minHeight: ComponentHeightTokens.buttonCompact,
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   rememberMeText: {
@@ -760,6 +764,8 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   forgotPasswordBtn: {
+    minHeight: ComponentHeightTokens.buttonCompact,
+    justifyContent: 'center',
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   forgotPasswordText: {
@@ -767,11 +773,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   submitButton: {
-    height: 56,
-    borderRadius: 16,
+    height: ComponentHeightTokens.buttonHero,
+    borderRadius: BorderRadiusTokens.button,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 6,
+    marginTop: SpacingTokens.sm,
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   submitButtonText: {
@@ -780,14 +786,14 @@ const styles = StyleSheet.create({
   },
   socialProofContainer: {
     alignItems: 'center',
-    marginTop: 44,
-    marginBottom: 24,
+    marginTop: SpacingTokens.xxl,
+    marginBottom: SpacingTokens.lg,
   },
   socialProofSub: {
     fontSize: 12,
     textTransform: 'uppercase',
     letterSpacing: 1,
-    marginBottom: 4,
+    marginBottom: SpacingTokens.xs,
   },
   socialProofMain: {
     fontSize: 14,
@@ -800,12 +806,14 @@ const styles = StyleSheet.create({
   signUpRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 28,
+    marginBottom: SpacingTokens.xl,
   },
   signUpQuestion: {
     fontSize: 14,
   },
   signUpLinkBtn: {
+    minHeight: ComponentHeightTokens.buttonCompact,
+    justifyContent: 'center',
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   signUpLink: {

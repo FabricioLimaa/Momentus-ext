@@ -9,7 +9,11 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { MomentusColors } from '@/constants/theme';
+import {
+  MomentusColors,
+  SpacingTokens,
+  BorderRadiusTokens,
+} from '@/constants/theme';
 
 interface SplashScreenProps {
   syncMessage?: string;
@@ -271,17 +275,17 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     color: MomentusColors.emeraldNeon,
-    marginTop: 6,
+    marginTop: SpacingTokens.sm,
     letterSpacing: 0.5,
   },
   syncContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 24,
+    gap: SpacingTokens.sm,
+    paddingHorizontal: SpacingTokens.md,
+    paddingVertical: SpacingTokens.sm,
+    borderRadius: BorderRadiusTokens.modal,
     backgroundColor: 'rgba(16, 185, 129, 0.08)',
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.25)',

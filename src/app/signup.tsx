@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   MomentusColors,
   LayoutTokens,
+  SpacingTokens,
   BorderRadiusTokens,
   ComponentHeightTokens,
   TypographyTokens,
@@ -126,7 +127,7 @@ export default function SignUpScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingBottom: insets.bottom + 24 },
+          { paddingBottom: insets.bottom + SpacingTokens.lg },
         ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled">
@@ -364,8 +365,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingBottom: 12,
+    paddingHorizontal: SpacingTokens.md,
+    paddingBottom: SpacingTokens.sm,
   },
   backButton: {
     width: ComponentHeightTokens.iconButton,
@@ -398,8 +399,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 12,
-    marginBottom: 20,
+    marginTop: SpacingTokens.md,
+    marginBottom: SpacingTokens.lg,
     elevation: 4,
     shadowColor: MomentusColors.emeraldNeon,
     shadowOffset: { width: 0, height: 4 },
@@ -420,21 +421,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: MomentusColors.textSecondary,
     textAlign: 'center',
-    marginTop: 6,
-    marginBottom: 28,
+    marginTop: SpacingTokens.sm,
+    marginBottom: SpacingTokens.xl,
   },
   formContainer: {
     width: '100%',
-    gap: 16,
+    gap: SpacingTokens.md,
   },
   fieldBlock: {
-    gap: 6,
+    gap: SpacingTokens.sm,
   },
   fieldLabel: {
     fontSize: 13,
     fontWeight: '700',
     color: MomentusColors.textPrimary,
-    marginLeft: 4,
+    marginLeft: SpacingTokens.xs,
   },
   inputWrapper: {
     flexDirection: 'row',
@@ -443,11 +444,11 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadiusTokens.input,
     borderWidth: 1,
     borderColor: MomentusColors.navyOutline,
-    paddingHorizontal: 16,
-    height: ComponentHeightTokens.input,
+    paddingHorizontal: SpacingTokens.md,
+    height: ComponentHeightTokens.inputHero,
   },
   inputIcon: {
-    marginRight: 12,
+    marginRight: SpacingTokens.md,
   },
   input: {
     flex: 1,
@@ -455,7 +456,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   fieldActionBtn: {
-    padding: 6,
+    width: ComponentHeightTokens.buttonCompact,
+    height: ComponentHeightTokens.buttonCompact,
     justifyContent: 'center',
     alignItems: 'center',
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
@@ -463,28 +465,28 @@ const styles = StyleSheet.create({
   validationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: 6,
-    marginTop: 2,
+    marginLeft: SpacingTokens.sm,
+    marginTop: SpacingTokens.xs,
   },
   helperText: {
     fontSize: 12,
     color: MomentusColors.textSecondary,
-    marginLeft: 6,
-    marginTop: 2,
+    marginLeft: SpacingTokens.sm,
+    marginTop: SpacingTokens.xs,
   },
   errorText: {
     fontSize: 12,
     color: MomentusColors.dangerRed,
-    marginLeft: 6,
-    marginTop: 2,
+    marginLeft: SpacingTokens.sm,
+    marginTop: SpacingTokens.xs,
     fontWeight: '600',
   },
   submitButton: {
     height: ComponentHeightTokens.buttonHero,
-    borderRadius: BorderRadiusTokens.input,
+    borderRadius: BorderRadiusTokens.button,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 16,
+    marginTop: SpacingTokens.md,
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   submitButtonText: {
@@ -493,8 +495,10 @@ const styles = StyleSheet.create({
   },
   loginLinkButton: {
     alignItems: 'center',
-    marginTop: 16,
-    paddingVertical: 8,
+    justifyContent: 'center',
+    minHeight: ComponentHeightTokens.buttonCompact,
+    marginTop: SpacingTokens.md,
+    paddingVertical: SpacingTokens.sm,
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   loginLinkText: {

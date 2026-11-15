@@ -10,7 +10,12 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MomentusColors } from '@/constants/theme';
+import {
+  MomentusColors,
+  SpacingTokens,
+  BorderRadiusTokens,
+  ComponentHeightTokens,
+} from '@/constants/theme';
 
 interface WebAlertState {
   visible: boolean;
@@ -213,44 +218,44 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 400,
-    borderRadius: 24,
+    borderRadius: BorderRadiusTokens.modal,
     borderWidth: 1,
-    padding: 24,
+    padding: SpacingTokens.lg,
     alignItems: 'center',
   },
   iconCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: ComponentHeightTokens.iconButton,
+    height: ComponentHeightTokens.iconButton,
+    borderRadius: ComponentHeightTokens.iconButton / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 14,
+    marginBottom: SpacingTokens.md,
   },
   title: {
     fontSize: 19,
     fontWeight: '800',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: SpacingTokens.sm,
   },
   message: {
     fontSize: 14,
     lineHeight: 20,
     textAlign: 'center',
-    marginBottom: 22,
+    marginBottom: SpacingTokens.lg,
   },
   buttonsRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: SpacingTokens.sm,
     width: '100%',
     justifyContent: 'center',
   },
   button: {
     flex: 1,
-    height: 46,
-    borderRadius: 14,
+    height: ComponentHeightTokens.buttonModal,
+    borderRadius: BorderRadiusTokens.button,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 14,
+    paddingHorizontal: SpacingTokens.md,
   },
   buttonText: {
     fontSize: 14,
