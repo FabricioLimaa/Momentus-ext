@@ -58,16 +58,17 @@ Em todas as telas, documentações, modais, termos, layouts e metadados do proje
 
 O Momentus utiliza estritamente o sistema **8pt Grid** e princípios de **Despoluição Zen** em 100% de suas telas e componentes. Ao criar ou refatorar qualquer interface:
 
-1. **Espaçamento Canônico:** Utilize apenas os tokens `SpacingTokens` e `LayoutTokens` de `@/constants/theme` (escala 4, 8, 12, 16, 24, 32, 40, 48, 64). É estritamente proibido o uso de números literais soltos ("magic numbers") em `padding`, `margin` e `gap`.
+1. **Espaçamento Canônico:** Utilize apenas os tokens `Space` / `SpacingTokens` e `LayoutTokens` de `@/constants/theme` (escala 4, 8, 12, 16, 24, 32, 40, 48, 64). É estritamente proibido o uso de números literais soltos ("magic numbers") em `padding`, `margin` e `gap`.
 2. **Proximidade & Gestalt (Proporção 1:3):** Espaçamentos menores dentro do mesmo bloco/grupo (4–8px entre label e input, título e descrição), espaçamentos médios entre grupos funcionais (16–24px) e respiros amplos entre seções (32–48px). A distância visual deve comunicar agrupamento sem depender de divisores arbitrários.
-3. **Superfícies & Containers:** Utilize `GlassCard` ou `BorderRadiusTokens.card` (16px) e `cardHero` (24px) com paddings padronizados (`compact`: 12/16px, `normal`: 16px, `hero`: 24px).
+3. **Superfícies & Containers:** Utilize `GlassCard` com variantes canônicas (`compact`: 16px, `default`: 24px, `spacious`: 32px) ou `BorderRadiusTokens.card` (16px) e `cardHero` (24px).
 4. **Ergonomia & Alturas de Ação:**
    - Chips / Pílulas: 32px / 40px (`ComponentHeightTokens.chip` / `chipLarge`).
    - Ações secundárias / botões compactos: 40px (`ComponentHeightTokens.buttonCompact`).
    - Inputs e Ações padrão: 48px (`ComponentHeightTokens.input` / `buttonModal`).
    - Destaque Hero / Login / FAB: 56px (`ComponentHeightTokens.buttonHero` / `inputHero` / `fab`).
-   - Área de toque mínima: todo elemento interativo deve ter no mínimo 48x48px (`ComponentHeightTokens.iconButton` ou `hitSlop` equivalente) conforme Apple HIG e Google Material.
-5. **Modais e Diálogos:** Padding interno de 24px (`SpacingTokens.lg`), título para descrição de 8px (`SpacingTokens.sm`), corpo para botões de 24px/32px, botões de ação com altura de 48px ou 56px.
-6. **Tipografia & Raios de Borda:** Utilize estritamente `TypographyTokens` e `BorderRadiusTokens`.
+   - Área de toque mínima: todo elemento interativo deve ter no mínimo 48x48px (`ComponentHeightTokens.iconButton` ou `HitSlop.toTarget(visualSize)`).
+5. **Modais e Diálogos:** Utilize preferencialmente `ModalShell` (padding 24px, título↔descrição 8px, form↔ações 24/32px, botões 48px/56px).
+6. **Tipografia, Ícones & Raios:** Utilize estritamente `TypographyTokens`, `IconSize` (12, 16, 20, 24, 32, 48) e `BorderRadiusTokens`. Tamanhos de fonte inferiores a 11px são proibidos para garantir acessibilidade visual.
+7. **Auditoria Contínua:** Execute sempre `npm run lint:design` antes de concluir tarefas de interface.
 
 

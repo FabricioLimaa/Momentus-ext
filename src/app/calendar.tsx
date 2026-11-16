@@ -1738,10 +1738,10 @@ const styles = StyleSheet.create({
     borderRadius: 2.5,
   },
   pinPlusText: {
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: '900',
     marginLeft: 1,
-    lineHeight: 9,
+    lineHeight: 11,
   },
   summaryCard: {
     marginHorizontal: LayoutTokens.pagePaddingHorizontal,

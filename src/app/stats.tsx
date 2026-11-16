@@ -1326,7 +1326,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   storiesPillText: {
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: '900',
     letterSpacing: 0.5,
   },

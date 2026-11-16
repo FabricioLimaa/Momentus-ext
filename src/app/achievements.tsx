@@ -915,7 +915,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadiusTokens.xs,
   },
   rarityText: {
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: 'bold',
   },
   unlockedTag: {
@@ -1063,7 +1063,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   tierBadgeText: {
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: '800',
   },
   modalTierPill: {

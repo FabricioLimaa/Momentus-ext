@@ -1,5 +1,5 @@
 import '@/global.css';
-import { Platform } from 'react-native';
+import { Platform, useWindowDimensions } from 'react-native';
 
 export const MomentusColors = {
   navyBackground: '#0F172A',
@@ -83,18 +83,78 @@ export const Fonts = Platform.select({
   },
 });
 
-export const Spacing = {
-  half: 2,
-  one: 4,
-  two: 8,
-  three: 16,
-  four: 24,
-  five: 32,
-  six: 64,
+/**
+ * Escala Base Linear - Grade de 8 Pontos (8pt Grid System)
+ */
+export const Space = {
+  0: 0,
+  1: 4,
+  2: 8,
+  3: 12,
+  4: 16,
+  5: 24,
+  6: 32,
+  7: 40,
+  8: 48,
+  9: 64,
 } as const;
 
-export const BottomTabInset = Platform.select({ ios: 50, android: 70 }) ?? 0;
-export const MaxContentWidth = 800;
+/**
+ * Tokens Semânticos e Responsivos de Layout (Phone vs Tablet)
+ */
+export const Layout = {
+  page: { phone: Space[4], tablet: Space[5] }, // 16px -> 24px
+  cardGap: { phone: Space[4], tablet: Space[5] }, // 16px -> 24px
+  section: { phone: Space[6], tablet: Space[8] }, // 32px -> 48px
+  field: Space[2], // label <-> input = 8px
+  fieldGroup: Space[5], // entre grupos de campos = 24px
+  inline: Space[2], // ícone <-> texto / botão <-> botão = 8px
+} as const;
+
+/**
+ * Escala Canônica de Tamanhos de Ícone (Ionicons / Vetores)
+ */
+export const IconSize = {
+  xs: 12,
+  sm: 16,
+  md: 20,
+  lg: 24,
+  xl: 32,
+  hero: 48,
+  illustration: 64,
+} as const;
+
+/**
+ * Helper de Acessibilidade para Área de Toque Mínima (Apple HIG 44pt / Google Material 48dp)
+ */
+export const HitSlop = {
+  toTarget: (visualSize: number, targetSize: number = 48) => {
+    const diff = Math.max(0, Math.round((targetSize - visualSize) / 2));
+    return { top: diff, bottom: diff, left: diff, right: diff };
+  },
+  sm: { top: 8, bottom: 8, left: 8, right: 8 },
+  md: { top: 12, bottom: 12, left: 12, right: 12 },
+} as const;
+
+/**
+ * Hook responsivo para consumo dinâmico dos tokens de layout
+ */
+export function useLayoutTokens() {
+  const { width } = useWindowDimensions();
+  const isTablet = width > 680;
+  return {
+    isTablet,
+    pagePadding: isTablet ? Layout.page.tablet : Layout.page.phone,
+    cardGap: isTablet ? Layout.cardGap.tablet : Layout.cardGap.phone,
+    sectionSpacing: isTablet ? Layout.section.tablet : Layout.section.phone,
+  };
+}
+
+export const BottomTabInset = Platform.select({ ios: 104, android: 96 }) ?? 80;
+/** @deprecated Utilize LayoutTokens.maxContentWidth (680) */
+export const MaxContentWidth = 680;
+/** @deprecated Utilize SpacingTokens ou Space */
+export const Spacing = Space;
 
 /**
  * Design Tokens Oficiais do Momentus (Multiplataforma: Web, Android e iOS)

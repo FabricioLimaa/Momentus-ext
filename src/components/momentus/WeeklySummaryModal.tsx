@@ -567,7 +567,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 255, 255, 0.4)",
   },
   brandSub: {
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: "700",
     color: "#94A3B8",
     letterSpacing: 0.5,
@@ -727,12 +727,12 @@ const styles = StyleSheet.create({
   },
   footerTagline: {
     color: "#64748B",
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: "600",
   },
   footerLink: {
     color: "#94A3B8",
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: "700",
   },
   actionsContainer: {

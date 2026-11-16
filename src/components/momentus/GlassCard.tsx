@@ -8,7 +8,8 @@ interface GlassCardProps {
   style?: StyleProp<ViewStyle>;
   highlighted?: boolean;
   hero?: boolean;
-  paddingVariant?: 'none' | 'compact' | 'normal' | 'hero';
+  variant?: 'none' | 'compact' | 'default' | 'spacious';
+  paddingVariant?: 'none' | 'compact' | 'normal' | 'hero' | 'default' | 'spacious';
 }
 
 export const GlassCard: React.FC<GlassCardProps> = ({
@@ -16,21 +17,26 @@ export const GlassCard: React.FC<GlassCardProps> = ({
   style,
   highlighted,
   hero,
+  variant,
   paddingVariant = 'normal',
 }) => {
   const { theme } = useMomentus();
 
+  const activeVariant = variant || paddingVariant;
+
   const getPaddingStyle = () => {
-    switch (paddingVariant) {
+    switch (activeVariant) {
       case 'none':
         return { padding: 0 };
       case 'compact':
-        return { padding: 12 };
+        return { padding: SpacingTokens.md }; // 16px (Grid 8pt)
+      case 'spacious':
       case 'hero':
-        return { padding: SpacingTokens.lg }; // 24px
+        return { padding: SpacingTokens.xl }; // 32px (Grid 8pt)
+      case 'default':
       case 'normal':
       default:
-        return { padding: SpacingTokens.md }; // 16px
+        return { padding: SpacingTokens.lg }; // 24px (Grid 8pt)
     }
   };
 

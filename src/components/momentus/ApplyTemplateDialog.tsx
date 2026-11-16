@@ -671,7 +671,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadiusTokens.sm,
   },
   recommendedPillText: {
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: '900',
     letterSpacing: 0.5,
   },

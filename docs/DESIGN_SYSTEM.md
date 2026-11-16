@@ -6,16 +6,32 @@ Este documento define as diretrizes visuais e normativas oficiais de engenharia 
 
 ## 1. Princípios Fundamentais
 
-1. **Previsibilidade Matemática:** Não se inventa espaçamento ou dimensões no olho ou de forma arbitrária. Toda e qualquer decisão espacial deriva da escala dos **múltiplos de 8** (com meio-passo de 4px para microalinhamentos ópticos).
+1. **Previsibilidade Matemática:** Não se inventa espaçamento ou dimensões no olho ou de forma arbitrária. Toda e qualquer decisão espacial deriva da escala dos **múltiplos de 8** (`Space`: 4, 8, 12, 16, 24, 32, 40, 48, 64px).
 2. **Despoluição Zen:** O design deve respirar. Redundâncias visuais (como barras de busca em listas curtas, pílulas duplicadas de navegação e divisores desnecessários) são eliminadas para dar lugar a foco, clareza e hierarquia limpa.
 3. **Proximidade & Gestalt (Proporção 1:3):** Espaçamentos menores dentro do mesmo bloco comunicam relacionamento íntimo (ex: 4–8px entre label e input); espaçamentos médios separam grupos funcionais (16–24px); respiros amplos separam grandes seções (32–48px). A distância física organiza a tela sem depender de linhas e bordas.
-4. **Ergonomia Móvel (Polegar & Touch Targets):** Todo elemento interativo deve respeitar a área mínima de toque de **48x48px** recomendada por Apple HIG e Google Material Design (`ComponentHeightTokens.iconButton`).
+4. **Ergonomia Móvel (Polegar & Touch Targets):** Todo elemento interativo deve respeitar a área mínima de toque de **48x48px** recomendada por Apple HIG e Google Material Design (`ComponentHeightTokens.iconButton` ou `HitSlop.toTarget(visualSize)`).
+5. **Legibilidade Acessível:** Tamanhos de fonte inferiores a 11px são terminantemente proibidos no aplicativo.
 
 ---
 
-## 2. Tokens de Espaçamento Canônico (`SpacingTokens`)
+## 2. Escala Linear (`Space`) & Tokens de Espaçamento (`SpacingTokens`)
 
-Importação: `import { SpacingTokens } from '@/constants/theme';`
+Importação: `import { Space, SpacingTokens } from '@/constants/theme';`
+
+```ts
+export const Space = {
+  0: 0,
+  1: 4,
+  2: 8,
+  3: 12,
+  4: 16,
+  5: 24,
+  6: 32,
+  7: 40,
+  8: 48,
+  9: 64,
+} as const;
+```
 
 | Token | Valor (px) | Multiplicador | Uso Recomendado |
 |---|---|---|---|
@@ -33,7 +49,24 @@ Importação: `import { SpacingTokens } from '@/constants/theme';`
 
 ---
 
-## 3. Alturas Canônicas de Componentes (`ComponentHeightTokens`)
+## 3. Tokens Semânticos e Responsivos (`Layout` & `useLayoutTokens`)
+
+Importação: `import { Layout, useLayoutTokens } from '@/constants/theme';`
+
+```ts
+export const Layout = {
+  page:     { phone: Space[4], tablet: Space[5] }, // 16px → 24px
+  cardGap:  { phone: Space[4], tablet: Space[5] }, // 16px → 24px
+  section:  { phone: Space[6], tablet: Space[8] }, // 32px → 48px
+  field:    Space[2], // label ↔ input = 8px
+  fieldGroup: Space[5], // entre campos = 24px
+  inline:   Space[2], // ícone ↔ texto / botão ↔ botão = 8px
+} as const;
+```
+
+---
+
+## 4. Alturas Canônicas de Componentes (`ComponentHeightTokens`)
 
 Importação: `import { ComponentHeightTokens } from '@/constants/theme';`
 
@@ -51,51 +84,88 @@ Importação: `import { ComponentHeightTokens } from '@/constants/theme';`
 
 ---
 
-## 4. Raios de Borda Harmônicos (`BorderRadiusTokens`)
+## 5. Tamanhos Canônicos de Ícones (`IconSize`)
 
-Importação: `import { BorderRadiusTokens } from '@/constants/theme';`
+Importação: `import { IconSize } from '@/constants/theme';`
 
-| Token | Raio (px) | Elemento |
+| Token | Tamanho (px) | Uso |
 |---|---|---|
-| `xs` | **4px** | Micro-detalhes, pequenas tags, barras de progresso finas. |
-| `sm` | **8px** | Badges, pílulas pequenas, tags de categorias. |
-| `control` | **12px** | Chips médios, caixas informativas internas. |
-| `input` | **16px** | Inputs de texto e campos de formulário. |
-| `button` | **16px** | Botões primários, secundários e hero. |
-| `card` | **16px** | Cards padrão da interface e listas (`GlassCard`). |
-| `cardHero` | **24px** | Cartões de destaque (Streak, Perfil, Estatísticas Hero). |
-| `modal` | **24px** | Modais flutuantes, diálogos de confirmação e alertas. |
-| `modalLarge` | **32px** | Bottom sheets de tela cheia no tablet e desktop. |
-| `pill` | **9999px** | Formato de cápsula / pílula perfeita. |
+| `xs` | **12px** | Micro-indicadores e setas internas de badges. |
+| `sm` | **16px** | Ícones de suporte em inputs e legendas. |
+| `md` | **20px** | Padrão da interface (botões, listas, cards). |
+| `lg` | **24px** | Ações de destaque e navegação principal. |
+| `xl` | **32px** | Cabeçalhos e seções de configurações. |
+| `hero` | **48px** | Ícones de destaque hero em modais e cards vazios. |
+| `illustration`| **64px** | Ilustrações principais de onboarding e celebração. |
 
 ---
 
-## 5. Larguras e Limites de Layout (`LayoutTokens`)
+## 6. Helper de Área de Toque (`HitSlop`)
 
-Importação: `import { LayoutTokens } from '@/constants/theme';`
+Importação: `import { HitSlop } from '@/constants/theme';`
 
-- `maxContentWidth`: **680px** (Largura máxima padrão de telas de conteúdo no desktop).
-- `maxFocusWidth`: **544px** (Largura máxima para leitura e Modo Foco imersivo).
-- `maxAuthWidth`: **440px** (Largura máxima para login, cadastro e recuperação de senha).
-- `maxDialogWidth`: **416px** (Largura máxima de diálogos flutuantes centrais).
-- `pagePaddingHorizontal`: **16px** (Padding horizontal móvel padrão).
-- `pagePaddingTop`: **16px** (Padding vertical de topo padrão).
+Garante que botões com altura visual inferior a 48px atinjam os 48x48px táteis recomendados por Apple e Google:
 
----
-
-## 6. Modais e Diálogos Zen
-
-1. **Padding Interno:** Estritamente **24px** (`SpacingTokens.lg`).
-2. **Proporção Vertical:**
-   - Ícone ou TopBar para Título: **16px** (`SpacingTokens.md`).
-   - Título para Descrição: **8px** (`SpacingTokens.sm`).
-   - Descrição para Conteúdo / Form: **24px** (`SpacingTokens.lg`).
-   - Conteúdo para Ações: **24px** ou **32px** (`SpacingTokens.lg` / `xl`).
-3. **Botões de Ação:** Altura de **48px** (`buttonModal`) ou **56px** (`buttonHero`) com gap de **8px** ou **16px**.
+```tsx
+<TouchableOpacity
+  style={{ width: 32, height: 32 }}
+  hitSlop={HitSlop.toTarget(32)}>
+  <Ionicons name="close" size={IconSize.md} />
+</TouchableOpacity>
+```
 
 ---
 
-## 7. Ferramenta de Auditoria Automatizada
+## 7. Variantes de Card (`GlassCard`)
+
+Importação: `import { GlassCard } from '@/components/momentus/GlassCard';`
+
+| Variante | Padding | Onde Usar |
+|---|---|---|
+| `compact` | **16px** (`SpacingTokens.md`) | Cards densos de lista, itens de hábitos, KPIs do `stats`. |
+| `default` | **24px** (`SpacingTokens.lg`) | Cards padrão, acordeões do `settings`, cards do `templates`. |
+| `spacious` | **32px** (`SpacingTokens.xl`) | Card Hero de streak, hero de perfil do `more`, cards de celebração. |
+| `none` | **0px** | Quando o conteúdo interno comanda seus próprios paddings customizados. |
+
+Exemplo:
+```tsx
+<GlassCard variant="compact">
+  <Text>KPI Compacto</Text>
+</GlassCard>
+```
+
+---
+
+## 8. Casca Padrão de Modais (`ModalShell`)
+
+Importação: `import { ModalShell } from '@/components/momentus/ModalShell';`
+
+Aplica automaticamente as relações espaciais de modais Zen:
+- Padding do modal: **24px**
+- Título ↔ Descrição: **8px**
+- Cabeçalho ↔ Conteúdo: **24px**
+- Conteúdo ↔ Ações: **32px**
+- Botões de Ação: **48px / 56px** com gap de **8px / 16px**
+
+```tsx
+<ModalShell
+  visible={isOpen}
+  onClose={() => setIsOpen(false)}
+  title="Título do Diálogo"
+  description="Subtítulo informativo"
+  icon="sparkles"
+  actions={
+    <TouchableOpacity style={styles.confirmBtn}>
+      <Text>Confirmar</Text>
+    </TouchableOpacity>
+  }>
+  <Text>Conteúdo interno...</Text>
+</ModalShell>
+```
+
+---
+
+## 9. Ferramenta de Auditoria Automatizada
 
 O projeto conta com um script nativo de verificação estática que inspeciona todos os arquivos `.tsx` e `.ts` em busca de números soltos fora do grid:
 
