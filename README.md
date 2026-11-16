@@ -40,7 +40,8 @@ Versão multiplataforma oficial do **Momentus** desenvolvida em **React Native c
 * **Framework:** [Expo SDK 57](https://expo.dev) + React Native 0.86
 * **Linguagem:** 100% TypeScript
 * **Roteamento:** Expo Router (File-based navigation com Bottom Tabs nativas)
-* **Design & Estilo:** Paleta oficial Momentus (*Deep Navy* `#0F172A`, *Surface* `#1E293B`, *Emerald Neon* `#34D399`)
+* **Design & Estilo:** Paleta oficial Momentus (*Deep Navy* `#0F172A`, *Surface* `#1E293B`, *Emerald Neon* `#34D399`) + [Design System 8pt & Despoluição Zen](docs/DESIGN_SYSTEM.md)
+* **Design System & Auditoria:** Grade de 8 pontos padronizada (`npm run lint:design`)
 * **Persistência:** `@react-native-async-storage/async-storage` (Salva hábitos, nível, XP, moedas e conquistas automaticamente no dispositivo)
 * **Sensações Táteis:** `expo-haptics`
 * **Ícones:** `@expo/vector-icons` (Ionicons)
