@@ -16,11 +16,11 @@ interface AdaptiveOrientationWrapperProps {
  */
 export function AdaptiveOrientationWrapper({
   children,
-  maxWidth = LayoutTokens.maxContentWidth,
+  maxWidth = LayoutTokens.maxDesktopContentWidth,
 }: AdaptiveOrientationWrapperProps) {
   const { width } = useWindowDimensions();
   const { theme } = useMomentus();
-  const isLargeScreen = width > maxWidth;
+  const isWidescreen = width > maxWidth;
 
   return (
     <View
@@ -31,14 +31,9 @@ export function AdaptiveOrientationWrapper({
       <View
         style={[
           styles.innerContainer,
-          isLargeScreen && {
+          isWidescreen && {
             maxWidth,
             alignSelf: 'center',
-            shadowColor: '#000000',
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.35,
-            shadowRadius: 16,
-            elevation: 10,
           },
         ]}>
         {children}

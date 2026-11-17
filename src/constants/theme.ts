@@ -137,6 +137,47 @@ export const HitSlop = {
 } as const;
 
 /**
+ * Breakpoints Canônicos de Responsividade Multiplataforma
+ * - Phone: < 768px (Mobile 100% idêntico)
+ * - Tablet: 768px a 1023px (iPads, Tablets Android)
+ * - Desktop: >= 1024px (Laptops, Monitores Widescreen)
+ * - Wide: >= 1280px (Telas amplas)
+ */
+export const Breakpoints = {
+  phone: 0,
+  tablet: 768,
+  desktop: 1024,
+  wide: 1280,
+} as const;
+
+/**
+ * Hook responsivo unificado para detecção dinâmica de formato de tela (Mobile, Tablet, Desktop)
+ */
+export function useResponsiveLayout() {
+  const { width, height } = useWindowDimensions();
+  const isPhone = width < Breakpoints.tablet;
+  const isTablet = width >= Breakpoints.tablet && width < Breakpoints.desktop;
+  const isDesktop = width >= Breakpoints.desktop;
+  const isLargeScreen = width >= Breakpoints.tablet;
+
+  return {
+    width,
+    height,
+    isPhone,
+    isTablet,
+    isDesktop,
+    isLargeScreen,
+    contentMaxWidth: isPhone
+      ? '100%'
+      : isTablet
+      ? LayoutTokens.maxTabletContentWidth
+      : LayoutTokens.maxDesktopContentWidth,
+    pagePaddingHorizontal: isPhone ? 16 : isTablet ? 24 : 32,
+    pagePaddingTop: isPhone ? 16 : 24,
+  };
+}
+
+/**
  * Hook responsivo para consumo dinâmico dos tokens de layout
  */
 export function useLayoutTokens() {
@@ -160,8 +201,16 @@ export const Spacing = Space;
  * Design Tokens Oficiais do Momentus (Multiplataforma: Web, Android e iOS)
  */
 export const LayoutTokens = {
-  /** Largura máxima padrão para telas de conteúdo (Home, Agenda, Stats, Menu, etc.) */
+  /** Largura máxima padrão para telas de conteúdo em celulares (680px) */
   maxContentWidth: 680,
+  /** Largura máxima expandida para visualização em tablets (840px = 105 * 8) */
+  maxTabletContentWidth: 840,
+  /** Largura máxima ampla para visualização em desktops widescreen (1360px = 170 * 8) */
+  maxDesktopContentWidth: 1360,
+  /** Largura padrão da Sidebar de Navegação em desktops (264px = 33 * 8) */
+  sidebarWidth: 264,
+  /** Largura da Sidebar compacta em tablets (72px = 9 * 8) */
+  sidebarCompactWidth: 72,
   /** Largura máxima para fluxos focados / leitura imersiva (Modo Foco) - 68 * 8 */
   maxFocusWidth: 544,
   /** Largura máxima para autenticação e formulários estreitos (Login, Cadastro, Recuperar Senha) - 55 * 8 */
