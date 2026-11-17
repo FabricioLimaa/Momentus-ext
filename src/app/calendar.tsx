@@ -23,6 +23,7 @@ import {
   BorderRadiusTokens,
   ComponentHeightTokens,
   TypographyTokens,
+  useResponsiveLayout,
 } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import { TimelineEventItem } from '@/components/momentus/TimelineEventItem';
@@ -147,6 +148,8 @@ export default function CalendarScreen() {
     syncGoogleCalendarToHabitsAction,
     triggerHaptic,
   } = useMomentus();
+
+  const { isLargeScreen } = useResponsiveLayout();
 
   const primaryColor = settings.primaryColorHex || theme.primary;
   const todayStr = getTodayDateString();
@@ -627,13 +630,651 @@ export default function CalendarScreen() {
 
   const isCurrentWeekShowingToday = currentWeekDays.some((d) => d.dateStr === todayStr);
 
+  const renderCalendarPicker = () =>
+    isMonthView ? (
+      <View
+        {...panResponder.panHandlers}
+        style={[
+          styles.monthCard,
+          isLargeScreen && styles.monthCardDesktop,
+          { backgroundColor: theme.surface, borderColor: theme.outline },
+        ]}>
+        {/* Barra de Navegação do Mês */}
+        <View style={styles.calendarNavRow}>
+          <TouchableOpacity
+            onPress={() => {
+              triggerHaptic?.('selection');
+              prevMonth();
+            }}
+            style={styles.navBtn}
+            activeOpacity={0.7}>
+            <Ionicons name="chevron-back" size={18} color={theme.textPrimary} />
+          </TouchableOpacity>
+          <Text style={[styles.navTitle, { color: theme.textPrimary }]}>
+            {MONTH_NAMES[month]} {year}
+          </Text>
+          <View style={styles.navRightGroup}>
+            <TouchableOpacity
+              onPress={goToToday}
+              style={[styles.todayBadgeBtn, { borderColor: theme.outline }]}
+              activeOpacity={0.7}>
+              <Text style={[styles.todayBadgeText, { color: primaryColor }]}>Hoje</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                triggerHaptic?.('selection');
+                nextMonth();
+              }}
+              style={styles.navBtn}
+              activeOpacity={0.7}>
+              <Ionicons name="chevron-forward" size={18} color={theme.textPrimary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Cabeçalho dos Dias da Semana (DOM a SÁB) */}
+        <View style={styles.weekdaysHeader}>
+          {WEEKDAYS.map((w, idx) => (
+            <Text
+              key={idx}
+              style={[
+                styles.weekdayHeaderText,
+                { color: idx === 0 || idx === 6 ? primaryColor : theme.textSecondary },
+              ]}>
+              {w}
+            </Text>
+          ))}
+        </View>
+
+        {/* Grid dos Dias do Mês com Dias Fantasmas */}
+        <View style={styles.daysGrid}>
+          {calendarDays.map((item) => {
+            const isSelected = selectedDate === item.dateStr;
+            const isToday = todayStr === item.dateStr;
+            const hasMatch = matchingDatesSet.has(item.dateStr);
+            const isSearchActive = Boolean(normalizedSearchTerm);
+            const { pins, hasMore, isAllCompleted } = getDayPinsInfo(item.dateStr);
+            const contrastSelected = getContrastTextColor(primaryColor);
+
+            return (
+              <TouchableOpacity
+                key={item.dateStr}
+                onPress={() => {
+                  triggerHaptic?.('selection');
+                  setSelectedDate(item.dateStr);
+                  if (!item.isCurrentMonth) {
+                    setCurrentYearMonth({ year: item.year, month: item.month });
+                    const [y, m, d] = item.dateStr.split('-').map(Number);
+                    setWeekAnchorDate(new Date(y, m - 1, d));
+                  }
+                }}
+                style={[
+                  styles.dayGridCell,
+                  !item.isCurrentMonth && { opacity: 0.35 },
+                  isSelected && { backgroundColor: primaryColor },
+                  isToday && !isSelected && { borderColor: primaryColor, borderWidth: 1.5 },
+                  isSearchActive && hasMatch && !isSelected && {
+                    backgroundColor: `${primaryColor}20`,
+                    borderColor: primaryColor,
+                    borderWidth: 1.5,
+                  },
+                  isSearchActive && !hasMatch && !isSelected && {
+                    opacity: 0.2,
+                  },
+                ]}
+                activeOpacity={0.7}>
+                <Text
+                  style={[
+                    styles.dayGridText,
+                    {
+                      color: isSelected
+                        ? contrastSelected
+                        : item.isCurrentMonth
+                        ? theme.textPrimary
+                        : theme.textSecondary,
+                    },
+                    isSelected && { fontWeight: '800' },
+                    isToday && !isSelected && { color: primaryColor, fontWeight: '700' },
+                    isSearchActive && hasMatch && !isSelected && {
+                      color: primaryColor,
+                      fontWeight: '800',
+                    },
+                  ]}>
+                  {item.dayNumber}
+                </Text>
+
+                {/* Pins de Categoria e Sinalizador + */}
+                <EventPins
+                  pins={pins}
+                  hasMore={hasMore}
+                  isSelected={isSelected}
+                  primaryColor={primaryColor}
+                  isAllCompleted={isAllCompleted}
+                />
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+    ) : (
+      <View
+        {...panResponder.panHandlers}
+        style={[
+          styles.weekCard,
+          isLargeScreen && styles.weekCardDesktop,
+          { backgroundColor: theme.surface, borderColor: theme.outline },
+        ]}>
+        {/* Barra de Navegação da Semana */}
+        <View style={styles.calendarNavRow}>
+          <TouchableOpacity
+            onPress={() => {
+              triggerHaptic?.('selection');
+              prevWeek();
+            }}
+            style={styles.navBtn}
+            activeOpacity={0.7}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Ionicons name="chevron-back" size={20} color={theme.textPrimary} />
+          </TouchableOpacity>
+          <Text
+            style={[styles.navTitle, { color: theme.textPrimary }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit>
+            {weekTitle}
+          </Text>
+          <View style={styles.navRightGroup}>
+            {!isCurrentWeekShowingToday && (
+              <TouchableOpacity
+                onPress={goToToday}
+                style={[styles.todayBadgeBtn, { borderColor: theme.outline }]}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Text style={[styles.todayBadgeText, { color: primaryColor }]}>Hoje</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              onPress={() => {
+                triggerHaptic?.('selection');
+                nextWeek();
+              }}
+              style={styles.navBtn}
+              activeOpacity={0.7}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <Ionicons name="chevron-forward" size={20} color={theme.textPrimary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Os 7 Dias da Semana (DOM até SÁB) */}
+        <View style={styles.weekDaysRow}>
+          {currentWeekDays.map((item) => {
+            const isSelected = selectedDate === item.dateStr;
+            const isToday = todayStr === item.dateStr;
+            const hasMatch = matchingDatesSet.has(item.dateStr);
+            const isSearchActive = Boolean(normalizedSearchTerm);
+            const { pins, hasMore, isAllCompleted } = getDayPinsInfo(item.dateStr);
+            const contrastSelected = getContrastTextColor(primaryColor);
+
+            return (
+              <TouchableOpacity
+                key={item.dateStr}
+                onPress={() => {
+                  triggerHaptic?.('selection');
+                  setSelectedDate(item.dateStr);
+                }}
+                style={[
+                  styles.weekDayBox,
+                  { borderColor: theme.outline },
+                  isSelected && {
+                    backgroundColor: primaryColor,
+                    borderColor: primaryColor,
+                  },
+                  isToday && !isSelected && {
+                    borderColor: primaryColor,
+                    borderWidth: 1.5,
+                  },
+                  isSearchActive && hasMatch && !isSelected && {
+                    backgroundColor: `${primaryColor}20`,
+                    borderColor: primaryColor,
+                    borderWidth: 1.5,
+                  },
+                  isSearchActive && !hasMatch && !isSelected && {
+                    opacity: 0.3,
+                  },
+                ]}
+                activeOpacity={0.7}>
+                <Text
+                  style={[
+                    styles.weekDayName,
+                    { color: theme.textSecondary },
+                    isSelected && { color: contrastSelected, fontWeight: '800' },
+                    isToday && !isSelected && { color: primaryColor, fontWeight: '700' },
+                    isSearchActive && hasMatch && !isSelected && {
+                      color: primaryColor,
+                      fontWeight: '800',
+                    },
+                  ]}>
+                  {item.dayName}
+                </Text>
+                <Text
+                  style={[
+                    styles.weekDayNumber,
+                    { color: theme.textPrimary },
+                    isSelected && { color: contrastSelected, fontWeight: '900' },
+                    isToday && !isSelected && { color: primaryColor, fontWeight: '700' },
+                    isSearchActive && hasMatch && !isSelected && {
+                      color: primaryColor,
+                      fontWeight: '900',
+                    },
+                  ]}>
+                  {item.dayNumber}
+                </Text>
+
+                {/* Pins de Categoria e Sinalizador + */}
+                <EventPins
+                  pins={pins}
+                  hasMore={hasMore}
+                  isSelected={isSelected}
+                  primaryColor={primaryColor}
+                  isAllCompleted={isAllCompleted}
+                />
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+    );
+
+  const renderDateSummary = () => {
+    const isSearchActive = Boolean(normalizedSearchTerm);
+    const activeList = isSearchActive ? displayHabits : habitsForDate;
+    const displayCompleted = activeList.filter((h) => h.completed).length;
+    const progressPercent =
+      activeList.length > 0 ? Math.round((displayCompleted / activeList.length) * 100) : 0;
+    const allCompleted = activeList.length > 0 && displayCompleted === activeList.length;
+
+    return (
+      <View
+        style={[
+          styles.summaryCard,
+          isLargeScreen && styles.summaryCardDesktop,
+          { backgroundColor: theme.surface, borderColor: theme.outline },
+        ]}>
+        <View style={styles.summaryTopRow}>
+          <View style={styles.summaryLeft}>
+            <View style={[styles.summaryIconBox, { backgroundColor: `${primaryColor}20` }]}>
+              <Ionicons name={isSearchActive ? 'search' : 'calendar'} size={18} color={primaryColor} />
+            </View>
+            <View style={styles.summaryTextGroup}>
+              <Text style={[styles.summaryDateText, { color: theme.textPrimary }]}>
+                {formatHumanCalendarDate(selectedDate, selectedDate === todayStr)}
+              </Text>
+              <Text style={[styles.summaryHabitsCount, { color: theme.textSecondary }]}>
+                {isSearchActive
+                  ? activeList.length === 0
+                    ? 'Nenhuma rotina com o termo nesta data'
+                    : `${activeList.length} ${
+                        activeList.length === 1 ? 'rotina encontrada' : 'rotinas encontradas'
+                      } (${displayCompleted} concluída${displayCompleted === 1 ? '' : 's'})`
+                  : habitsForDate.length === 0
+                  ? 'Nenhuma atividade agendada'
+                  : `${completedForDate} de ${totalForDate} concluídas`}
+              </Text>
+            </View>
+          </View>
+
+          {activeList.length > 0 && (
+            <View
+              style={[
+                styles.progressBadge,
+                {
+                  backgroundColor: allCompleted
+                    ? `${MomentusColors.emeraldGreen}20`
+                    : `${primaryColor}15`,
+                  borderColor: allCompleted
+                    ? MomentusColors.emeraldGreen
+                    : `${primaryColor}40`,
+                },
+              ]}>
+              <Text
+                style={[
+                  styles.progressBadgeText,
+                  {
+                    color: allCompleted ? MomentusColors.emeraldGreen : primaryColor,
+                  },
+                ]}>
+                {allCompleted ? '100% Concluído 🎉' : `${progressPercent}%`}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Barra de Progresso do Dia */}
+        {activeList.length > 0 && (
+          <View
+            style={[
+              styles.progressBarTrack,
+              { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
+            ]}>
+            <View
+              style={[
+                styles.progressBarFill,
+                {
+                  width: `${progressPercent}%`,
+                  backgroundColor: allCompleted ? MomentusColors.emeraldGreen : primaryColor,
+                },
+              ]}
+            />
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  const renderFilterChips = () => {
+    if (totalForDate === 0 || normalizedSearchTerm) return null;
+
+    return (
+      <View style={[styles.filterChipsRow, isLargeScreen && styles.filterChipsRowDesktop]}>
+        <TouchableOpacity
+          style={[
+            styles.filterChip,
+            filterStatus === 'ALL'
+              ? { backgroundColor: primaryColor, borderColor: primaryColor }
+              : { backgroundColor: theme.surface, borderColor: theme.outline },
+          ]}
+          onPress={() => {
+            triggerHaptic?.('selection');
+            setFilterStatus('ALL');
+          }}
+          activeOpacity={0.8}>
+          <Text
+            style={[
+              styles.filterChipText,
+              {
+                color:
+                  filterStatus === 'ALL'
+                    ? getContrastTextColor(primaryColor)
+                    : theme.textSecondary,
+              },
+            ]}>
+            Todas ({totalForDate})
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.filterChip,
+            filterStatus === 'PENDING'
+              ? { backgroundColor: primaryColor, borderColor: primaryColor }
+              : { backgroundColor: theme.surface, borderColor: theme.outline },
+          ]}
+          onPress={() => {
+            triggerHaptic?.('selection');
+            setFilterStatus('PENDING');
+          }}
+          activeOpacity={0.8}>
+          <Text
+            style={[
+              styles.filterChipText,
+              {
+                color:
+                  filterStatus === 'PENDING'
+                    ? getContrastTextColor(primaryColor)
+                    : theme.textSecondary,
+              },
+            ]}>
+            Pendentes ({pendingForDate})
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.filterChip,
+            filterStatus === 'COMPLETED'
+              ? { backgroundColor: primaryColor, borderColor: primaryColor }
+              : { backgroundColor: theme.surface, borderColor: theme.outline },
+          ]}
+          onPress={() => {
+            triggerHaptic?.('selection');
+            setFilterStatus('COMPLETED');
+          }}
+          activeOpacity={0.8}>
+          <Text
+            style={[
+              styles.filterChipText,
+              {
+                color:
+                  filterStatus === 'COMPLETED'
+                    ? getContrastTextColor(primaryColor)
+                    : theme.textSecondary,
+              },
+            ]}>
+            Concluídas ({completedForDate})
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const renderTimelineEvents = () => (
+    <ScrollView
+      style={styles.habitsScroll}
+      contentContainerStyle={[
+        styles.habitsContent,
+        isLargeScreen && styles.habitsContentDesktop,
+      ]}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={primaryColor}
+          colors={[primaryColor]}
+        />
+      }>
+      {totalForDate === 0 && !normalizedSearchTerm ? (
+        /* Empty State Proativo do Dia */
+        <View
+          style={[
+            styles.emptyContainer,
+            { backgroundColor: theme.surface, borderColor: theme.outline },
+          ]}>
+          <Ionicons
+            name="calendar-outline"
+            size={42}
+            color={theme.textSecondary}
+          />
+          <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
+            Nenhum evento neste dia
+          </Text>
+          <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
+            Aproveite o tempo livre, crie novas metas ou replique rotinas habituais.
+          </Text>
+
+          {/* Botões de Ação Rápida */}
+          <View style={styles.emptyActionsRow}>
+            <TouchableOpacity
+              style={[styles.emptyActionBtnPrimary, { backgroundColor: primaryColor }]}
+              activeOpacity={0.85}
+              onPress={() => {
+                setHabitToEdit(null);
+                setModalVisible(true);
+              }}>
+              <Ionicons name="add" size={18} color={getContrastTextColor(primaryColor)} />
+              <Text
+                style={[
+                  styles.emptyActionBtnPrimaryText,
+                  { color: getContrastTextColor(primaryColor) },
+                ]}>
+                Nova Rotina
+              </Text>
+            </TouchableOpacity>
+
+            {yesterdayHabits.length > 0 && (
+              <TouchableOpacity
+                style={[
+                  styles.emptyActionBtnSecondary,
+                  { borderColor: theme.outline, backgroundColor: theme.surfaceElevated },
+                ]}
+                activeOpacity={0.85}
+                onPress={handleCopyYesterdayHabits}>
+                <Ionicons name="copy-outline" size={16} color={theme.textPrimary} />
+                <Text style={[styles.emptyActionBtnSecondaryText, { color: theme.textPrimary }]}>
+                  Copiar de Ontem ({yesterdayHabits.length})
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={[
+                styles.emptyActionBtnSecondary,
+                { borderColor: theme.outline, backgroundColor: theme.surfaceElevated },
+              ]}
+              activeOpacity={0.85}
+              onPress={() => router.push('/templates' as any)}>
+              <Ionicons name="layers-outline" size={16} color={theme.textPrimary} />
+              <Text style={[styles.emptyActionBtnSecondaryText, { color: theme.textPrimary }]}>
+                Usar Template
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : displayHabits.length === 0 ? (
+        /* Empty State de Busca ou de Filtro */
+        normalizedSearchTerm ? (
+          <View style={styles.emptyView}>
+            <Ionicons
+              name="search-outline"
+              size={42}
+              color={MomentusColors.textSecondary}
+            />
+            <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
+              Nenhuma rotina encontrada
+            </Text>
+            <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
+              Não há rotinas com &quot;{searchQuery}&quot; em{' '}
+              {formatHumanCalendarDate(selectedDate, selectedDate === todayStr)}.
+            </Text>
+            <TouchableOpacity
+              onPress={() => setSearchQuery('')}
+              style={[styles.emptyActionBtn, { borderColor: primaryColor }]}
+              accessibilityRole="button"
+              accessibilityLabel="Limpar busca"
+              activeOpacity={0.8}>
+              <Ionicons name="refresh" size={18} color={primaryColor} />
+              <Text style={[styles.emptyActionText, { color: primaryColor }]}>
+                Limpar filtro de busca
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View
+            style={[
+              styles.emptyFilterContainer,
+              { backgroundColor: theme.surface, borderColor: theme.outline },
+            ]}>
+            <Ionicons
+              name={
+                filterStatus === 'PENDING'
+                  ? 'checkmark-done-circle-outline'
+                  : 'hourglass-outline'
+              }
+              size={40}
+              color={
+                filterStatus === 'PENDING'
+                  ? MomentusColors.emeraldGreen
+                  : theme.textSecondary
+              }
+            />
+            <Text style={[styles.emptyFilterTitle, { color: theme.textPrimary }]}>
+              {filterStatus === 'PENDING'
+                ? 'Tudo concluído por aqui! 🎉'
+                : 'Nenhuma rotina concluída ainda'}
+            </Text>
+            <TouchableOpacity
+              style={[styles.resetFilterBtn, { borderColor: primaryColor }]}
+              onPress={() => {
+                triggerHaptic?.('selection');
+                setFilterStatus('ALL');
+              }}
+              activeOpacity={0.8}>
+              <Text style={[styles.resetFilterBtnText, { color: primaryColor }]}>
+                Ver todas as rotinas
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )
+      ) : (
+        <View
+          style={[
+            styles.timelineList,
+            {
+              backgroundColor: theme.surface,
+              borderColor: theme.outline,
+            },
+          ]}>
+          {displayHabits.map((habit, index) => {
+            const category = categories.find((c) => c.id === habit.categoryId) || {
+              id: 'cat-outros',
+              name: 'Outros',
+              color: primaryColor,
+            };
+
+            return (
+              <TimelineEventItem
+                key={habit.id}
+                item={habit}
+                category={category}
+                isChecked={habit.completed}
+                isFirst={index === 0}
+                isLast={index === displayHabits.length - 1}
+                isSelectionMode={isSelectionMode}
+                isSelected={selectedHabitIds.includes(habit.id)}
+                onCheckedChange={() => {
+                  triggerHaptic?.('selection');
+                  toggleHabit(habit.id);
+                }}
+                onClick={() => {
+                  if (isSelectionMode) {
+                    handleToggleSelectHabit(habit.id);
+                  } else {
+                    setSelectedDetailHabit(habit);
+                  }
+                }}
+                onLongClick={() => {
+                  if (!isSelectionMode) {
+                    triggerHaptic?.('impact');
+                    setIsSelectionMode(true);
+                    setSelectedHabitIds([habit.id]);
+                  }
+                }}
+              />
+            );
+          })}
+        </View>
+      )}
+
+      <View style={{ height: 90 }} />
+    </ScrollView>
+  );
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <StatusBar
         barStyle={theme.isDark ? 'light-content' : 'dark-content'}
         backgroundColor={theme.background}
       />
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <View
+        style={[
+          styles.container,
+          {
+            backgroundColor: theme.background,
+            maxWidth: isLargeScreen
+              ? LayoutTokens.maxDesktopContentWidth
+              : LayoutTokens.maxContentWidth,
+          },
+        ]}>
         {/* TopBar no Modo de Seleção Múltipla */}
         {isSelectionMode ? (
           <View
@@ -682,7 +1323,7 @@ export default function CalendarScreen() {
           </View>
         ) : (
           /* Header Principal Normal */
-          <View style={styles.header}>
+          <View style={[styles.header, isLargeScreen && styles.headerDesktop]}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.title, { color: theme.textPrimary }]}>Agenda & Rotinas</Text>
               <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
@@ -743,7 +1384,7 @@ export default function CalendarScreen() {
 
         {/* Barra de Busca Retrátil */}
         {isSearchOpen && (
-          <View style={styles.searchBarWrapper}>
+          <View style={[styles.searchBarWrapper, isLargeScreen && styles.searchBarWrapperDesktop]}>
             <View
               style={[
                 styles.searchBarContainer,
@@ -810,625 +1451,29 @@ export default function CalendarScreen() {
           </View>
         )}
 
-        {/* Visualização de Mês ou Semana com Suporte a Swipe */}
-        {isMonthView ? (
-          <View
-            {...panResponder.panHandlers}
-            style={[
-              styles.monthCard,
-              { backgroundColor: theme.surface, borderColor: theme.outline },
-            ]}>
-            {/* Barra de Navegação do Mês */}
-            <View style={styles.calendarNavRow}>
-              <TouchableOpacity
-                onPress={() => {
-                  triggerHaptic?.('selection');
-                  prevMonth();
-                }}
-                style={styles.navBtn}
-                activeOpacity={0.7}>
-                <Ionicons name="chevron-back" size={18} color={theme.textPrimary} />
-              </TouchableOpacity>
-              <Text style={[styles.navTitle, { color: theme.textPrimary }]}>
-                {MONTH_NAMES[month]} {year}
-              </Text>
-              <View style={styles.navRightGroup}>
-                <TouchableOpacity
-                  onPress={goToToday}
-                  style={[styles.todayBadgeBtn, { borderColor: theme.outline }]}
-                  activeOpacity={0.7}>
-                  <Text style={[styles.todayBadgeText, { color: primaryColor }]}>Hoje</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => {
-                    triggerHaptic?.('selection');
-                    nextMonth();
-                  }}
-                  style={styles.navBtn}
-                  activeOpacity={0.7}>
-                  <Ionicons name="chevron-forward" size={18} color={theme.textPrimary} />
-                </TouchableOpacity>
-              </View>
+        {/* Conteúdo Principal Adaptativo: Split View em Telas Grandes, Coluna Única em Celular */}
+        {isLargeScreen ? (
+          <View style={styles.desktopSplitLayout}>
+            {/* Coluna Esquerda: Seletor de Mês ou Semana */}
+            <View style={styles.desktopCalendarCol}>
+              {renderCalendarPicker()}
             </View>
 
-            {/* Cabeçalho dos Dias da Semana (DOM a SÁB) */}
-            <View style={styles.weekdaysHeader}>
-              {WEEKDAYS.map((w, idx) => (
-                <Text
-                  key={idx}
-                  style={[
-                    styles.weekdayHeaderText,
-                    { color: idx === 0 || idx === 6 ? primaryColor : theme.textSecondary },
-                  ]}>
-                  {w}
-                </Text>
-              ))}
-            </View>
-
-            {/* Grid dos Dias do Mês com Dias Fantasmas */}
-            <View style={styles.daysGrid}>
-              {calendarDays.map((item) => {
-                const isSelected = selectedDate === item.dateStr;
-                const isToday = todayStr === item.dateStr;
-                const hasMatch = matchingDatesSet.has(item.dateStr);
-                const isSearchActive = Boolean(normalizedSearchTerm);
-                const { pins, hasMore, isAllCompleted } = getDayPinsInfo(item.dateStr);
-                const contrastSelected = getContrastTextColor(primaryColor);
-
-                return (
-                  <TouchableOpacity
-                    key={item.dateStr}
-                    onPress={() => {
-                      triggerHaptic?.('selection');
-                      setSelectedDate(item.dateStr);
-                      if (!item.isCurrentMonth) {
-                        setCurrentYearMonth({ year: item.year, month: item.month });
-                        const [y, m, d] = item.dateStr.split('-').map(Number);
-                        setWeekAnchorDate(new Date(y, m - 1, d));
-                      }
-                    }}
-                    style={[
-                      styles.dayGridCell,
-                      !item.isCurrentMonth && { opacity: 0.35 },
-                      isSelected && { backgroundColor: primaryColor },
-                      isToday && !isSelected && { borderColor: primaryColor, borderWidth: 1.5 },
-                      isSearchActive && hasMatch && !isSelected && {
-                        backgroundColor: `${primaryColor}20`,
-                        borderColor: primaryColor,
-                        borderWidth: 1.5,
-                      },
-                      isSearchActive && !hasMatch && !isSelected && {
-                        opacity: 0.2,
-                      },
-                    ]}
-                    activeOpacity={0.7}>
-                    <Text
-                      style={[
-                        styles.dayGridText,
-                        {
-                          color: isSelected
-                            ? contrastSelected
-                            : item.isCurrentMonth
-                            ? theme.textPrimary
-                            : theme.textSecondary,
-                        },
-                        isSelected && { fontWeight: '800' },
-                        isToday && !isSelected && { color: primaryColor, fontWeight: '700' },
-                        isSearchActive && hasMatch && !isSelected && {
-                          color: primaryColor,
-                          fontWeight: '800',
-                        },
-                      ]}>
-                      {item.dayNumber}
-                    </Text>
-
-                    {/* Pins de Categoria e Sinalizador + */}
-                    <EventPins
-                      pins={pins}
-                      hasMore={hasMore}
-                      isSelected={isSelected}
-                      primaryColor={primaryColor}
-                      isAllCompleted={isAllCompleted}
-                    />
-                  </TouchableOpacity>
-                );
-              })}
+            {/* Coluna Direita: Resumo do Dia, Filtros e Timeline de Rotinas */}
+            <View style={styles.desktopEventsCol}>
+              {renderDateSummary()}
+              {renderFilterChips()}
+              {renderTimelineEvents()}
             </View>
           </View>
         ) : (
-          <View
-            {...panResponder.panHandlers}
-            style={[
-              styles.weekCard,
-              { backgroundColor: theme.surface, borderColor: theme.outline },
-            ]}>
-            {/* Barra de Navegação da Semana */}
-            <View style={styles.calendarNavRow}>
-              <TouchableOpacity
-                onPress={() => {
-                  triggerHaptic?.('selection');
-                  prevWeek();
-                }}
-                style={styles.navBtn}
-                activeOpacity={0.7}
-                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-                <Ionicons name="chevron-back" size={20} color={theme.textPrimary} />
-              </TouchableOpacity>
-              <Text
-                style={[styles.navTitle, { color: theme.textPrimary }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit>
-                {weekTitle}
-              </Text>
-              <View style={styles.navRightGroup}>
-                {!isCurrentWeekShowingToday && (
-                  <TouchableOpacity
-                    onPress={goToToday}
-                    style={[styles.todayBadgeBtn, { borderColor: theme.outline }]}
-                    activeOpacity={0.7}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Text style={[styles.todayBadgeText, { color: primaryColor }]}>Hoje</Text>
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  onPress={() => {
-                    triggerHaptic?.('selection');
-                    nextWeek();
-                  }}
-                  style={styles.navBtn}
-                  activeOpacity={0.7}
-                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-                  <Ionicons name="chevron-forward" size={20} color={theme.textPrimary} />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Os 7 Dias da Semana (DOM até SÁB) */}
-            <View style={styles.weekDaysRow}>
-              {currentWeekDays.map((item) => {
-                const isSelected = selectedDate === item.dateStr;
-                const isToday = todayStr === item.dateStr;
-                const hasMatch = matchingDatesSet.has(item.dateStr);
-                const isSearchActive = Boolean(normalizedSearchTerm);
-                const { pins, hasMore, isAllCompleted } = getDayPinsInfo(item.dateStr);
-                const contrastSelected = getContrastTextColor(primaryColor);
-
-                return (
-                  <TouchableOpacity
-                    key={item.dateStr}
-                    onPress={() => {
-                      triggerHaptic?.('selection');
-                      setSelectedDate(item.dateStr);
-                    }}
-                    style={[
-                      styles.weekDayBox,
-                      { borderColor: theme.outline },
-                      isSelected && {
-                        backgroundColor: primaryColor,
-                        borderColor: primaryColor,
-                      },
-                      isToday && !isSelected && {
-                        borderColor: primaryColor,
-                        borderWidth: 1.5,
-                      },
-                      isSearchActive && hasMatch && !isSelected && {
-                        backgroundColor: `${primaryColor}20`,
-                        borderColor: primaryColor,
-                        borderWidth: 1.5,
-                      },
-                      isSearchActive && !hasMatch && !isSelected && {
-                        opacity: 0.3,
-                      },
-                    ]}
-                    activeOpacity={0.7}>
-                    <Text
-                      style={[
-                        styles.weekDayName,
-                        { color: theme.textSecondary },
-                        isSelected && { color: contrastSelected, fontWeight: '800' },
-                        isToday && !isSelected && { color: primaryColor, fontWeight: '700' },
-                        isSearchActive && hasMatch && !isSelected && {
-                          color: primaryColor,
-                          fontWeight: '800',
-                        },
-                      ]}>
-                      {item.dayName}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.weekDayNumber,
-                        { color: theme.textPrimary },
-                        isSelected && { color: contrastSelected, fontWeight: '900' },
-                        isToday && !isSelected && { color: primaryColor, fontWeight: '700' },
-                        isSearchActive && hasMatch && !isSelected && {
-                          color: primaryColor,
-                          fontWeight: '900',
-                        },
-                      ]}>
-                      {item.dayNumber}
-                    </Text>
-
-                    {/* Pins de Categoria e Sinalizador + */}
-                    <EventPins
-                      pins={pins}
-                      hasMore={hasMore}
-                      isSelected={isSelected}
-                      primaryColor={primaryColor}
-                      isAllCompleted={isAllCompleted}
-                    />
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
+          <>
+            {renderCalendarPicker()}
+            {renderDateSummary()}
+            {renderFilterChips()}
+            {renderTimelineEvents()}
+          </>
         )}
-
-        {/* Resumo Humanizado do Dia Selecionado com Barra de Progresso */}
-        {(() => {
-          const isSearchActive = Boolean(normalizedSearchTerm);
-          const activeList = isSearchActive ? displayHabits : habitsForDate;
-          const displayCompleted = activeList.filter((h) => h.completed).length;
-          const progressPercent =
-            activeList.length > 0 ? Math.round((displayCompleted / activeList.length) * 100) : 0;
-          const allCompleted = activeList.length > 0 && displayCompleted === activeList.length;
-
-          return (
-            <View
-              style={[
-                styles.summaryCard,
-                { backgroundColor: theme.surface, borderColor: theme.outline },
-              ]}>
-              <View style={styles.summaryTopRow}>
-                <View style={styles.summaryLeft}>
-                  <View style={[styles.summaryIconBox, { backgroundColor: `${primaryColor}20` }]}>
-                    <Ionicons name={isSearchActive ? 'search' : 'calendar'} size={18} color={primaryColor} />
-                  </View>
-                  <View style={styles.summaryTextGroup}>
-                    <Text style={[styles.summaryDateText, { color: theme.textPrimary }]}>
-                      {formatHumanCalendarDate(selectedDate, selectedDate === todayStr)}
-                    </Text>
-                    <Text style={[styles.summaryHabitsCount, { color: theme.textSecondary }]}>
-                      {isSearchActive
-                        ? activeList.length === 0
-                          ? 'Nenhuma rotina com o termo nesta data'
-                          : `${activeList.length} ${
-                              activeList.length === 1 ? 'rotina encontrada' : 'rotinas encontradas'
-                            } (${displayCompleted} concluída${displayCompleted === 1 ? '' : 's'})`
-                        : habitsForDate.length === 0
-                        ? 'Nenhuma atividade agendada'
-                        : `${completedForDate} de ${totalForDate} concluídas`}
-                    </Text>
-                  </View>
-                </View>
-
-                {activeList.length > 0 && (
-                  <View
-                    style={[
-                      styles.progressBadge,
-                      {
-                        backgroundColor: allCompleted
-                          ? `${MomentusColors.emeraldGreen}20`
-                          : `${primaryColor}15`,
-                        borderColor: allCompleted
-                          ? MomentusColors.emeraldGreen
-                          : `${primaryColor}40`,
-                      },
-                    ]}>
-                    <Text
-                      style={[
-                        styles.progressBadgeText,
-                        {
-                          color: allCompleted ? MomentusColors.emeraldGreen : primaryColor,
-                        },
-                      ]}>
-                      {allCompleted ? '100% Concluído 🎉' : `${progressPercent}%`}
-                    </Text>
-                  </View>
-                )}
-              </View>
-
-              {/* Barra de Progresso do Dia */}
-              {activeList.length > 0 && (
-                <View
-                  style={[
-                    styles.progressBarTrack,
-                    { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
-                  ]}>
-                  <View
-                    style={[
-                      styles.progressBarFill,
-                      {
-                        width: `${progressPercent}%`,
-                        backgroundColor: allCompleted ? MomentusColors.emeraldGreen : primaryColor,
-                      },
-                    ]}
-                  />
-                </View>
-              )}
-            </View>
-          );
-        })()}
-
-        {/* Chips de Filtro Rápido (Todas, Pendentes, Concluídas) - Idêntico à Home */}
-        {totalForDate > 0 && !normalizedSearchTerm && (
-          <View style={styles.filterChipsRow}>
-            <TouchableOpacity
-              style={[
-                styles.filterChip,
-                filterStatus === 'ALL'
-                  ? { backgroundColor: primaryColor, borderColor: primaryColor }
-                  : { backgroundColor: theme.surface, borderColor: theme.outline },
-              ]}
-              onPress={() => {
-                triggerHaptic?.('selection');
-                setFilterStatus('ALL');
-              }}
-              activeOpacity={0.8}>
-              <Text
-                style={[
-                  styles.filterChipText,
-                  {
-                    color:
-                      filterStatus === 'ALL'
-                        ? getContrastTextColor(primaryColor)
-                        : theme.textSecondary,
-                  },
-                ]}>
-                Todas ({totalForDate})
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.filterChip,
-                filterStatus === 'PENDING'
-                  ? { backgroundColor: primaryColor, borderColor: primaryColor }
-                  : { backgroundColor: theme.surface, borderColor: theme.outline },
-              ]}
-              onPress={() => {
-                triggerHaptic?.('selection');
-                setFilterStatus('PENDING');
-              }}
-              activeOpacity={0.8}>
-              <Text
-                style={[
-                  styles.filterChipText,
-                  {
-                    color:
-                      filterStatus === 'PENDING'
-                        ? getContrastTextColor(primaryColor)
-                        : theme.textSecondary,
-                  },
-                ]}>
-                Pendentes ({pendingForDate})
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.filterChip,
-                filterStatus === 'COMPLETED'
-                  ? { backgroundColor: primaryColor, borderColor: primaryColor }
-                  : { backgroundColor: theme.surface, borderColor: theme.outline },
-              ]}
-              onPress={() => {
-                triggerHaptic?.('selection');
-                setFilterStatus('COMPLETED');
-              }}
-              activeOpacity={0.8}>
-              <Text
-                style={[
-                  styles.filterChipText,
-                  {
-                    color:
-                      filterStatus === 'COMPLETED'
-                        ? getContrastTextColor(primaryColor)
-                        : theme.textSecondary,
-                  },
-                ]}>
-                Concluídas ({completedForDate})
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Timeline Vertical das Rotinas do Dia com Pull-to-Refresh */}
-        <ScrollView
-          style={styles.habitsScroll}
-          contentContainerStyle={styles.habitsContent}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={primaryColor}
-              colors={[primaryColor]}
-            />
-          }>
-          {totalForDate === 0 && !normalizedSearchTerm ? (
-            /* Empty State Proativo do Dia */
-            <View
-              style={[
-                styles.emptyContainer,
-                { backgroundColor: theme.surface, borderColor: theme.outline },
-              ]}>
-              <Ionicons
-                name="calendar-outline"
-                size={42}
-                color={theme.textSecondary}
-              />
-              <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
-                Nenhum evento neste dia
-              </Text>
-              <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-                Aproveite o tempo livre, crie novas metas ou replique rotinas habituais.
-              </Text>
-
-              {/* Botões de Ação Rápida */}
-              <View style={styles.emptyActionsRow}>
-                <TouchableOpacity
-                  style={[styles.emptyActionBtnPrimary, { backgroundColor: primaryColor }]}
-                  activeOpacity={0.85}
-                  onPress={() => {
-                    setHabitToEdit(null);
-                    setModalVisible(true);
-                  }}>
-                  <Ionicons name="add" size={18} color={getContrastTextColor(primaryColor)} />
-                  <Text
-                    style={[
-                      styles.emptyActionBtnPrimaryText,
-                      { color: getContrastTextColor(primaryColor) },
-                    ]}>
-                    Nova Rotina
-                  </Text>
-                </TouchableOpacity>
-
-                {yesterdayHabits.length > 0 && (
-                  <TouchableOpacity
-                    style={[
-                      styles.emptyActionBtnSecondary,
-                      { borderColor: theme.outline, backgroundColor: theme.surfaceElevated },
-                    ]}
-                    activeOpacity={0.85}
-                    onPress={handleCopyYesterdayHabits}>
-                    <Ionicons name="copy-outline" size={16} color={theme.textPrimary} />
-                    <Text style={[styles.emptyActionBtnSecondaryText, { color: theme.textPrimary }]}>
-                      Copiar de Ontem ({yesterdayHabits.length})
-                    </Text>
-                  </TouchableOpacity>
-                )}
-
-                <TouchableOpacity
-                  style={[
-                    styles.emptyActionBtnSecondary,
-                    { borderColor: theme.outline, backgroundColor: theme.surfaceElevated },
-                  ]}
-                  activeOpacity={0.85}
-                  onPress={() => router.push('/templates' as any)}>
-                  <Ionicons name="layers-outline" size={16} color={theme.textPrimary} />
-                  <Text style={[styles.emptyActionBtnSecondaryText, { color: theme.textPrimary }]}>
-                    Usar Template
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : displayHabits.length === 0 ? (
-            /* Empty State de Busca ou de Filtro */
-            normalizedSearchTerm ? (
-              <View style={styles.emptyView}>
-                <Ionicons
-                  name="search-outline"
-                  size={42}
-                  color={MomentusColors.textSecondary}
-                />
-                <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
-                  Nenhuma rotina encontrada
-                </Text>
-                <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-                  Não há rotinas com &quot;{searchQuery}&quot; em{' '}
-                  {formatHumanCalendarDate(selectedDate, selectedDate === todayStr)}.
-                </Text>
-                <TouchableOpacity
-                  onPress={() => setSearchQuery('')}
-                  style={[styles.emptyActionBtn, { borderColor: primaryColor }]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Limpar busca"
-                  activeOpacity={0.8}>
-                  <Ionicons name="refresh" size={18} color={primaryColor} />
-                  <Text style={[styles.emptyActionText, { color: primaryColor }]}>
-                    Limpar filtro de busca
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View
-                style={[
-                  styles.emptyFilterContainer,
-                  { backgroundColor: theme.surface, borderColor: theme.outline },
-                ]}>
-                <Ionicons
-                  name={
-                    filterStatus === 'PENDING'
-                      ? 'checkmark-done-circle-outline'
-                      : 'hourglass-outline'
-                  }
-                  size={40}
-                  color={
-                    filterStatus === 'PENDING'
-                      ? MomentusColors.emeraldGreen
-                      : theme.textSecondary
-                  }
-                />
-                <Text style={[styles.emptyFilterTitle, { color: theme.textPrimary }]}>
-                  {filterStatus === 'PENDING'
-                    ? 'Tudo concluído por aqui! 🎉'
-                    : 'Nenhuma rotina concluída ainda'}
-                </Text>
-                <TouchableOpacity
-                  style={[styles.resetFilterBtn, { borderColor: primaryColor }]}
-                  onPress={() => {
-                    triggerHaptic?.('selection');
-                    setFilterStatus('ALL');
-                  }}
-                  activeOpacity={0.8}>
-                  <Text style={[styles.resetFilterBtnText, { color: primaryColor }]}>
-                    Ver todas as rotinas
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )
-          ) : (
-            <View
-              style={[
-                styles.timelineList,
-                {
-                  backgroundColor: theme.surface,
-                  borderColor: theme.outline,
-                },
-              ]}>
-              {displayHabits.map((habit, index) => {
-                const category = categories.find((c) => c.id === habit.categoryId) || {
-                  id: 'cat-outros',
-                  name: 'Outros',
-                  color: primaryColor,
-                };
-
-                return (
-                  <TimelineEventItem
-                    key={habit.id}
-                    item={habit}
-                    category={category}
-                    isChecked={habit.completed}
-                    isFirst={index === 0}
-                    isLast={index === displayHabits.length - 1}
-                    isSelectionMode={isSelectionMode}
-                    isSelected={selectedHabitIds.includes(habit.id)}
-                    onCheckedChange={() => {
-                      triggerHaptic?.('selection');
-                      toggleHabit(habit.id);
-                    }}
-                    onClick={() => {
-                      if (isSelectionMode) {
-                        handleToggleSelectHabit(habit.id);
-                      } else {
-                        setSelectedDetailHabit(habit);
-                      }
-                    }}
-                    onLongClick={() => {
-                      if (!isSelectionMode) {
-                        triggerHaptic?.('impact');
-                        setIsSelectionMode(true);
-                        setSelectedHabitIds([habit.id]);
-                      }
-                    }}
-                  />
-                );
-              })}
-            </View>
-          )}
-
-          <View style={{ height: 90 }} />
-        </ScrollView>
 
         {/* Floating Action Button (+) - Oculto durante modo de seleção */}
         {!isSelectionMode && (
@@ -1966,5 +2011,45 @@ const styles = StyleSheet.create({
     ...Platform.select({
       web: { cursor: 'pointer' },
     }),
+  },
+  headerDesktop: {
+    paddingHorizontal: SpacingTokens.xl,
+  },
+  searchBarWrapperDesktop: {
+    paddingHorizontal: SpacingTokens.xl,
+  },
+  desktopSplitLayout: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: SpacingTokens.xl,
+    paddingHorizontal: SpacingTokens.xl,
+    paddingBottom: SpacingTokens.xl,
+    alignItems: 'flex-start',
+  },
+  desktopCalendarCol: {
+    flex: 1.1,
+    minWidth: 360,
+  },
+  desktopEventsCol: {
+    flex: 1.4,
+    minWidth: 0,
+    height: '100%',
+  },
+  monthCardDesktop: {
+    marginHorizontal: 0,
+    marginBottom: 0,
+  },
+  weekCardDesktop: {
+    marginHorizontal: 0,
+    marginBottom: 0,
+  },
+  summaryCardDesktop: {
+    marginHorizontal: 0,
+  },
+  filterChipsRowDesktop: {
+    paddingHorizontal: 0,
+  },
+  habitsContentDesktop: {
+    paddingHorizontal: 0,
   },
 });

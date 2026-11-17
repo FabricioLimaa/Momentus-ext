@@ -19,6 +19,7 @@ import {
   BorderRadiusTokens,
   ComponentHeightTokens,
   TypographyTokens,
+  useResponsiveLayout,
 } from "@/constants/theme";
 import { useMomentus } from "@/context/MomentusContext";
 import { HabitItem } from "@/types";
@@ -51,6 +52,8 @@ export default function HomeScreen() {
     deleteHabit,
     deleteMultipleHabits,
   } = useMomentus();
+
+  const { isLargeScreen } = useResponsiveLayout();
 
   // Estados de modais
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
@@ -181,6 +184,351 @@ export default function HomeScreen() {
     );
   };
 
+  const renderStreakCard = () => (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={() => router.push("/achievements" as any)}
+      style={styles.streakCardContainer}
+    >
+      <GlassCard
+        style={[
+          styles.streakGlassCard,
+          {
+            backgroundColor: theme.glassCard,
+            borderColor: theme.glassBorder,
+          },
+        ]}
+      >
+        <View style={styles.streakCardRow}>
+          <View style={styles.streakInfoCol}>
+            <Text
+              style={[styles.streakLabel, { color: theme.textSecondary }]}
+            >
+              Sequência Atual
+            </Text>
+            <View style={styles.streakNumberRow}>
+              <Ionicons
+                name="flame"
+                size={28}
+                color={getStreakColor(userProfile.currentStreak)}
+              />
+              <Text
+                style={[
+                  styles.streakNumberText,
+                  { color: theme.textPrimary },
+                ]}
+              >
+                {userProfile.currentStreak} dias
+              </Text>
+            </View>
+
+            {/* Pílulas de Gamificação (XP e Minutos Focados) */}
+            <View style={styles.gamificationRow}>
+              <View
+                style={[
+                  styles.gamificationChip,
+                  { backgroundColor: `${userLevel.rankColor}15`, borderColor: `${userLevel.rankColor}40` },
+                ]}
+              >
+                <Ionicons name="trophy-outline" size={12} color={userLevel.rankColor} />
+                <Text style={[styles.gamificationChipText, { color: userLevel.rankColor }]}>
+                  Nv. {userLevel.level} • {userProfile.totalPoints || 0} XP
+                </Text>
+              </View>
+
+              <View
+                style={[
+                  styles.gamificationChip,
+                  { backgroundColor: `${MomentusColors.cyan}15`, borderColor: `${MomentusColors.cyan}40` },
+                ]}
+              >
+                <Ionicons name="timer-outline" size={12} color={MomentusColors.cyan} />
+                <Text style={[styles.gamificationChipText, { color: MomentusColors.cyan }]}>
+                  {userProfile.focusMinutesToday || 0}m foco
+                </Text>
+              </View>
+            </View>
+
+            <Text
+              style={[
+                styles.motivationalText,
+                { color: theme.textSecondary },
+              ]}
+            >
+              {motivationalText}
+            </Text>
+          </View>
+
+          {/* Progresso circular funcional */}
+          <View style={styles.circularProgressContainer}>
+            <CircularProgressRing
+              progress={progress}
+              size={78}
+              strokeWidth={8}
+              color={theme.primary}
+            />
+          </View>
+        </View>
+      </GlassCard>
+    </TouchableOpacity>
+  );
+
+  const renderFocusShortcutCard = () => (
+    <GlassCard
+      style={[
+        styles.focusShortcutCard,
+        {
+          backgroundColor: theme.glassCard,
+          borderColor: theme.glassBorder,
+        },
+      ]}
+    >
+      <View style={styles.focusShortcutHeader}>
+        <View
+          style={[
+            styles.focusShortcutIconBox,
+            { backgroundColor: `${theme.primary}20` },
+          ]}
+        >
+          <Ionicons name="timer-outline" size={24} color={theme.primary} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.focusShortcutTitle, { color: theme.textPrimary }]}>
+            Sessão de Foco
+          </Text>
+          <Text style={[styles.focusShortcutSubtitle, { color: theme.textSecondary }]}>
+            Timer Pomodoro com paisagens sonoras
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.focusShortcutFooter}>
+        <TouchableOpacity
+          style={[styles.focusShortcutButton, { backgroundColor: theme.primary }]}
+          activeOpacity={0.85}
+          onPress={() => router.push("/focus" as any)}
+        >
+          <Ionicons name="play" size={16} color="#0F172A" />
+          <Text style={styles.focusShortcutButtonText}>Iniciar Foco</Text>
+        </TouchableOpacity>
+      </View>
+    </GlassCard>
+  );
+
+  const renderSectionHeader = () => (
+    <View style={styles.sectionHeader}>
+      <View>
+        <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
+          Seu dia
+        </Text>
+        <Text style={[styles.sectionCountText, { color: theme.textSecondary }]}>
+          {completionsToday}/{totalToday} concluída{totalToday === 1 ? "" : "s"}
+        </Text>
+      </View>
+
+      {/* Chips de Filtro Rápido */}
+      {totalToday > 0 && (
+        <View style={styles.filterChipsRow}>
+          <TouchableOpacity
+            style={[
+              styles.filterChip,
+              filterStatus === "ALL"
+                ? { backgroundColor: theme.primary, borderColor: theme.primary }
+                : { backgroundColor: theme.surface, borderColor: theme.outline },
+            ]}
+            onPress={() => setFilterStatus("ALL")}
+            activeOpacity={0.8}
+          >
+            <Text
+              style={[
+                styles.filterChipText,
+                { color: filterStatus === "ALL" ? "#0F172A" : theme.textSecondary },
+              ]}
+            >
+              Todas ({totalToday})
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.filterChip,
+              filterStatus === "PENDING"
+                ? { backgroundColor: theme.primary, borderColor: theme.primary }
+                : { backgroundColor: theme.surface, borderColor: theme.outline },
+            ]}
+            onPress={() => setFilterStatus("PENDING")}
+            activeOpacity={0.8}
+          >
+            <Text
+              style={[
+                styles.filterChipText,
+                { color: filterStatus === "PENDING" ? "#0F172A" : theme.textSecondary },
+              ]}
+            >
+              Pendentes ({pendingToday})
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.filterChip,
+              filterStatus === "COMPLETED"
+                ? { backgroundColor: theme.primary, borderColor: theme.primary }
+                : { backgroundColor: theme.surface, borderColor: theme.outline },
+            ]}
+            onPress={() => setFilterStatus("COMPLETED")}
+            activeOpacity={0.8}
+          >
+            <Text
+              style={[
+                styles.filterChipText,
+                { color: filterStatus === "COMPLETED" ? "#0F172A" : theme.textSecondary },
+              ]}
+            >
+              Concluídas ({completionsToday})
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+
+  const renderTimelineOrEmpty = () => {
+    if (totalToday === 0) {
+      return (
+        <View
+          style={[
+            styles.emptyContainer,
+            { backgroundColor: theme.surface, borderColor: theme.outline },
+          ]}
+        >
+          <Ionicons
+            name="calendar-outline"
+            size={44}
+            color={theme.textSecondary}
+          />
+          <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
+            Nada agendado para hoje
+          </Text>
+          <Text
+            style={[styles.emptySubtitle, { color: theme.textSecondary }]}
+          >
+            Crie uma rotina personalizada ou aplique um modelo pronto com um clique.
+          </Text>
+
+          {/* Botões de Ação Direta no Card Vazio */}
+          <View style={styles.emptyActionsRow}>
+            <TouchableOpacity
+              style={[styles.emptyActionBtnPrimary, { backgroundColor: theme.primary }]}
+              activeOpacity={0.85}
+              onPress={() => {
+                setHabitToEdit(null);
+                setIsAddModalVisible(true);
+              }}
+            >
+              <Ionicons name="add" size={18} color="#0F172A" />
+              <Text style={styles.emptyActionBtnPrimaryText}>Nova Rotina</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.emptyActionBtnSecondary,
+                { borderColor: theme.outline, backgroundColor: theme.surfaceElevated },
+              ]}
+              activeOpacity={0.85}
+              onPress={() => router.push("/templates" as any)}
+            >
+              <Ionicons name="layers-outline" size={17} color={theme.textPrimary} />
+              <Text style={[styles.emptyActionBtnSecondaryText, { color: theme.textPrimary }]}>
+                Usar Template
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+
+    if (filteredHabits.length === 0) {
+      return (
+        <View
+          style={[
+            styles.emptyFilterContainer,
+            { backgroundColor: theme.surface, borderColor: theme.outline },
+          ]}
+        >
+          <Ionicons
+            name={filterStatus === "PENDING" ? "checkmark-done-circle-outline" : "hourglass-outline"}
+            size={36}
+            color={theme.primary}
+          />
+          <Text style={[styles.emptyFilterTitle, { color: theme.textPrimary }]}>
+            {filterStatus === "PENDING"
+              ? "Todas as rotinas foram concluídas! 🎉"
+              : "Nenhuma rotina concluída até o momento."}
+          </Text>
+          <TouchableOpacity
+            onPress={() => setFilterStatus("ALL")}
+            style={[styles.resetFilterBtn, { borderColor: theme.outline }]}
+          >
+            <Text style={[styles.resetFilterBtnText, { color: theme.primary }]}>
+              Ver Todas as Rotinas
+            </Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return (
+      <View
+        style={[
+          styles.timelineList,
+          { backgroundColor: theme.surface, borderColor: theme.outline },
+        ]}
+      >
+        {filteredHabits.map((habit, index) => {
+          const category = categories.find(
+            (c) => c.id === habit.categoryId,
+          ) || {
+            id: "default",
+            name: "Geral",
+            color: theme.primary,
+          };
+
+          const isSelected = selectedHabitIds.includes(habit.id);
+
+          return (
+            <TimelineEventItem
+              key={habit.id}
+              item={habit}
+              category={category}
+              isChecked={habit.completed}
+              isFirst={index === 0}
+              isLast={index === filteredHabits.length - 1}
+              isSelected={isSelected}
+              isSelectionMode={isSelectionMode}
+              onCheckedChange={() => toggleHabit(habit.id)}
+              onClick={() => {
+                if (isSelectionMode) {
+                  handleToggleSelectHabit(habit.id);
+                } else {
+                  setSelectedDetailHabit(habit);
+                }
+              }}
+              onLongClick={() => {
+                if (!isSelectionMode) {
+                  setIsSelectionMode(true);
+                  setSelectedHabitIds([habit.id]);
+                } else {
+                  handleToggleSelectHabit(habit.id);
+                }
+              }}
+            />
+          );
+        })}
+      </View>
+    );
+  };
+
   if (!isLoaded) {
     return <SplashScreen syncMessage="Preparando seu espaço..." />;
   }
@@ -194,7 +542,17 @@ export default function HomeScreen() {
         barStyle={theme.isDark ? "light-content" : "dark-content"}
         backgroundColor={theme.background}
       />
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <View
+        style={[
+          styles.container,
+          {
+            backgroundColor: theme.background,
+            maxWidth: isLargeScreen
+              ? LayoutTokens.maxDesktopContentWidth
+              : LayoutTokens.maxContentWidth,
+          },
+        ]}
+      >
         {/* TopBar no modo de seleção múltipla */}
         {isSelectionMode ? (
           <View
@@ -257,7 +615,11 @@ export default function HomeScreen() {
 
         <ScrollView
           style={styles.scrollView}
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: 110 }]}
+          contentContainerStyle={[
+            styles.scrollContent,
+            isLargeScreen && styles.scrollContentDesktop,
+            { paddingBottom: 110 },
+          ]}
           showsVerticalScrollIndicator={false}
         >
           {/* 1. Header de Saudação & Identidade Visual Oficial da Marca */}
@@ -337,296 +699,27 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {/* 2. Card de Streak & Progresso Circular (GlassCard Limpo e Enriquecido) */}
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => router.push("/achievements" as any)}
-            style={styles.streakCardContainer}
-          >
-            <GlassCard
-              style={[
-                styles.streakGlassCard,
-                {
-                  backgroundColor: theme.glassCard,
-                  borderColor: theme.glassBorder,
-                },
-              ]}
-            >
-              <View style={styles.streakCardRow}>
-                <View style={styles.streakInfoCol}>
-                  <Text
-                    style={[styles.streakLabel, { color: theme.textSecondary }]}
-                  >
-                    Sequência Atual
-                  </Text>
-                  <View style={styles.streakNumberRow}>
-                    <Ionicons
-                      name="flame"
-                      size={28}
-                      color={getStreakColor(userProfile.currentStreak)}
-                    />
-                    <Text
-                      style={[
-                        styles.streakNumberText,
-                        { color: theme.textPrimary },
-                      ]}
-                    >
-                      {userProfile.currentStreak} dias
-                    </Text>
-                  </View>
-
-                  {/* Pílulas de Gamificação (XP e Minutos Focados) */}
-                  <View style={styles.gamificationRow}>
-                    <View
-                      style={[
-                        styles.gamificationChip,
-                        { backgroundColor: `${userLevel.rankColor}15`, borderColor: `${userLevel.rankColor}40` },
-                      ]}
-                    >
-                      <Ionicons name="trophy-outline" size={12} color={userLevel.rankColor} />
-                      <Text style={[styles.gamificationChipText, { color: userLevel.rankColor }]}>
-                        Nv. {userLevel.level} • {userProfile.totalPoints || 0} XP
-                      </Text>
-                    </View>
-
-                    <View
-                      style={[
-                        styles.gamificationChip,
-                        { backgroundColor: `${MomentusColors.cyan}15`, borderColor: `${MomentusColors.cyan}40` },
-                      ]}
-                    >
-                      <Ionicons name="timer-outline" size={12} color={MomentusColors.cyan} />
-                      <Text style={[styles.gamificationChipText, { color: MomentusColors.cyan }]}>
-                        {userProfile.focusMinutesToday || 0}m foco
-                      </Text>
-                    </View>
-                  </View>
-
-                  <Text
-                    style={[
-                      styles.motivationalText,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {motivationalText}
-                  </Text>
-                </View>
-
-                {/* Progresso circular funcional */}
-                <View style={styles.circularProgressContainer}>
-                  <CircularProgressRing
-                    progress={progress}
-                    size={78}
-                    strokeWidth={8}
-                    color={theme.primary}
-                  />
-                </View>
+          {/* Conteúdo Principal Adaptativo: 2 Colunas em Telas Grandes, Coluna Única em Celular */}
+          {isLargeScreen ? (
+            <View style={styles.desktopColumnsRow}>
+              {/* Coluna Esquerda: Timeline e Ações do Dia */}
+              <View style={styles.desktopLeftCol}>
+                {renderSectionHeader()}
+                {renderTimelineOrEmpty()}
               </View>
-            </GlassCard>
-          </TouchableOpacity>
 
-          {/* 3. Seção "Seu dia" com Filtros Rápidos (Todas, Pendentes, Concluídas) */}
-          <View style={styles.sectionHeader}>
-            <View>
-              <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
-                Seu dia
-              </Text>
-              <Text style={[styles.sectionCountText, { color: theme.textSecondary }]}>
-                {completionsToday}/{totalToday} concluída{totalToday === 1 ? "" : "s"}
-              </Text>
-            </View>
-
-            {/* Chips de Filtro Rápido */}
-            {totalToday > 0 && (
-              <View style={styles.filterChipsRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.filterChip,
-                    filterStatus === "ALL"
-                      ? { backgroundColor: theme.primary, borderColor: theme.primary }
-                      : { backgroundColor: theme.surface, borderColor: theme.outline },
-                  ]}
-                  onPress={() => setFilterStatus("ALL")}
-                  activeOpacity={0.8}
-                >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      { color: filterStatus === "ALL" ? "#0F172A" : theme.textSecondary },
-                    ]}
-                  >
-                    Todas ({totalToday})
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.filterChip,
-                    filterStatus === "PENDING"
-                      ? { backgroundColor: theme.primary, borderColor: theme.primary }
-                      : { backgroundColor: theme.surface, borderColor: theme.outline },
-                  ]}
-                  onPress={() => setFilterStatus("PENDING")}
-                  activeOpacity={0.8}
-                >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      { color: filterStatus === "PENDING" ? "#0F172A" : theme.textSecondary },
-                    ]}
-                  >
-                    Pendentes ({pendingToday})
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.filterChip,
-                    filterStatus === "COMPLETED"
-                      ? { backgroundColor: theme.primary, borderColor: theme.primary }
-                      : { backgroundColor: theme.surface, borderColor: theme.outline },
-                  ]}
-                  onPress={() => setFilterStatus("COMPLETED")}
-                  activeOpacity={0.8}
-                >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      { color: filterStatus === "COMPLETED" ? "#0F172A" : theme.textSecondary },
-                    ]}
-                  >
-                    Concluídas ({completionsToday})
-                  </Text>
-                </TouchableOpacity>
+              {/* Coluna Direita: Gamificação, Sequência e Atalho Foco */}
+              <View style={styles.desktopRightCol}>
+                {renderStreakCard()}
+                {renderFocusShortcutCard()}
               </View>
-            )}
-          </View>
-
-          {/* 4. Lista de Rotinas na Timeline ou Empty State Proativo */}
-          {totalToday === 0 ? (
-            <View
-              style={[
-                styles.emptyContainer,
-                { backgroundColor: theme.surface, borderColor: theme.outline },
-              ]}
-            >
-              <Ionicons
-                name="calendar-outline"
-                size={44}
-                color={theme.textSecondary}
-              />
-              <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
-                Nada agendado para hoje
-              </Text>
-              <Text
-                style={[styles.emptySubtitle, { color: theme.textSecondary }]}
-              >
-                Crie uma rotina personalizada ou aplique um modelo pronto com um clique.
-              </Text>
-
-              {/* Botões de Ação Direta no Card Vazio */}
-              <View style={styles.emptyActionsRow}>
-                <TouchableOpacity
-                  style={[styles.emptyActionBtnPrimary, { backgroundColor: theme.primary }]}
-                  activeOpacity={0.85}
-                  onPress={() => {
-                    setHabitToEdit(null);
-                    setIsAddModalVisible(true);
-                  }}
-                >
-                  <Ionicons name="add" size={18} color="#0F172A" />
-                  <Text style={styles.emptyActionBtnPrimaryText}>Nova Rotina</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.emptyActionBtnSecondary,
-                    { borderColor: theme.outline, backgroundColor: theme.surfaceElevated },
-                  ]}
-                  activeOpacity={0.85}
-                  onPress={() => router.push("/templates" as any)}
-                >
-                  <Ionicons name="layers-outline" size={17} color={theme.textPrimary} />
-                  <Text style={[styles.emptyActionBtnSecondaryText, { color: theme.textPrimary }]}>
-                    Usar Template
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : filteredHabits.length === 0 ? (
-            <View
-              style={[
-                styles.emptyFilterContainer,
-                { backgroundColor: theme.surface, borderColor: theme.outline },
-              ]}
-            >
-              <Ionicons
-                name={filterStatus === "PENDING" ? "checkmark-done-circle-outline" : "hourglass-outline"}
-                size={36}
-                color={theme.primary}
-              />
-              <Text style={[styles.emptyFilterTitle, { color: theme.textPrimary }]}>
-                {filterStatus === "PENDING"
-                  ? "Todas as rotinas foram concluídas! 🎉"
-                  : "Nenhuma rotina concluída até o momento."}
-              </Text>
-              <TouchableOpacity
-                onPress={() => setFilterStatus("ALL")}
-                style={[styles.resetFilterBtn, { borderColor: theme.outline }]}
-              >
-                <Text style={[styles.resetFilterBtnText, { color: theme.primary }]}>
-                  Ver Todas as Rotinas
-                </Text>
-              </TouchableOpacity>
             </View>
           ) : (
-            <View
-              style={[
-                styles.timelineList,
-                { backgroundColor: theme.surface, borderColor: theme.outline },
-              ]}
-            >
-              {filteredHabits.map((habit, index) => {
-                const category = categories.find(
-                  (c) => c.id === habit.categoryId,
-                ) || {
-                  id: "default",
-                  name: "Geral",
-                  color: theme.primary,
-                };
-
-                const isSelected = selectedHabitIds.includes(habit.id);
-
-                return (
-                  <TimelineEventItem
-                    key={habit.id}
-                    item={habit}
-                    category={category}
-                    isChecked={habit.completed}
-                    isFirst={index === 0}
-                    isLast={index === filteredHabits.length - 1}
-                    isSelected={isSelected}
-                    isSelectionMode={isSelectionMode}
-                    onCheckedChange={() => toggleHabit(habit.id)}
-                    onClick={() => {
-                      if (isSelectionMode) {
-                        handleToggleSelectHabit(habit.id);
-                      } else {
-                        setSelectedDetailHabit(habit);
-                      }
-                    }}
-                    onLongClick={() => {
-                      if (!isSelectionMode) {
-                        setIsSelectionMode(true);
-                        setSelectedHabitIds([habit.id]);
-                      } else {
-                        handleToggleSelectHabit(habit.id);
-                      }
-                    }}
-                  />
-                );
-              })}
-            </View>
+            <>
+              {renderStreakCard()}
+              {renderSectionHeader()}
+              {renderTimelineOrEmpty()}
+            </>
           )}
 
           <View style={{ height: 90 }} />
@@ -1043,5 +1136,67 @@ const styles = StyleSheet.create({
     elevation: 6,
     zIndex: 99,
     ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
+  },
+  scrollContentDesktop: {
+    paddingHorizontal: SpacingTokens.xl,
+    paddingTop: SpacingTokens.xl,
+  },
+  desktopColumnsRow: {
+    flexDirection: 'row',
+    gap: SpacingTokens.xl,
+    alignItems: 'flex-start',
+  },
+  desktopLeftCol: {
+    flex: 1.4,
+    minWidth: 0,
+  },
+  desktopRightCol: {
+    flex: 1,
+    minWidth: 320,
+    gap: SpacingTokens.lg,
+  },
+  focusShortcutCard: {
+    padding: SpacingTokens.lg,
+    borderRadius: BorderRadiusTokens.card,
+  },
+  focusShortcutHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SpacingTokens.md,
+    marginBottom: SpacingTokens.md,
+  },
+  focusShortcutIconBox: {
+    width: ComponentHeightTokens.iconButton,
+    height: ComponentHeightTokens.iconButton,
+    borderRadius: ComponentHeightTokens.iconButton / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  focusShortcutTitle: {
+    ...TypographyTokens.cardTitle,
+    fontSize: 16,
+  },
+  focusShortcutSubtitle: {
+    ...TypographyTokens.screenSubtitle,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  focusShortcutFooter: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  focusShortcutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SpacingTokens.xs,
+    height: ComponentHeightTokens.buttonCompact,
+    paddingHorizontal: SpacingTokens.lg,
+    borderRadius: BorderRadiusTokens.control,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
+  },
+  focusShortcutButtonText: {
+    color: '#0F172A',
+    fontSize: 13,
+    fontWeight: '800',
   },
 });

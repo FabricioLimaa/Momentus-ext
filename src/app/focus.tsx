@@ -20,9 +20,11 @@ import { Ionicons } from '@expo/vector-icons';
 import {
   MomentusColors,
   getContrastTextColor,
+  LayoutTokens,
   SpacingTokens,
   BorderRadiusTokens,
   ComponentHeightTokens,
+  useResponsiveLayout,
 } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import { getTodayDateString } from '@/constants/initialData';
@@ -53,6 +55,8 @@ export default function FocusScreen() {
     showCelebration,
     triggerHaptic,
   } = useMomentus();
+
+  const { isLargeScreen } = useResponsiveLayout();
 
   // Configuração de durações (em minutos)
   const [focusDurationMinutes, setFocusDurationMinutes] = useState(25);
@@ -897,7 +901,10 @@ export default function FocusScreen() {
       />
       <ScrollView
         style={[styles.scrollView, { backgroundColor: theme.background }]}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          isLargeScreen && styles.scrollContentDesktop,
+        ]}
         showsVerticalScrollIndicator={false}
         bounces={false}
         keyboardShouldPersistTaps="handled">
@@ -2323,6 +2330,12 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'center',
     justifyContent: 'space-between',
+  },
+  scrollContentDesktop: {
+    maxWidth: LayoutTokens.maxTabletContentWidth,
+    paddingHorizontal: SpacingTokens.xxl,
+    paddingTop: SpacingTokens.xl,
+    paddingBottom: SpacingTokens.xl,
   },
   topBlock: {
     gap: 6,
