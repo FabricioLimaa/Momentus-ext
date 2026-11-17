@@ -22,6 +22,7 @@ import {
   SpacingTokens,
   BorderRadiusTokens,
   ComponentHeightTokens,
+  useResponsiveLayout,
 } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import { getStreakColor } from '@/constants/initialData';
@@ -116,6 +117,7 @@ export const getIconForAchievement = (id: string): keyof typeof Ionicons.glyphMa
 };
 
 export default function AchievementsScreen() {
+  const { isLargeScreen } = useResponsiveLayout();
   const {
     achievements,
     marketItems,
@@ -196,17 +198,13 @@ export default function AchievementsScreen() {
       : (authUser?.displayName?.trim() || userProfile.name || 'Usuário');
   const displayPhoto = userProfile.photoUrl || authUser?.photoURL || null;
 
-  return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
-      <StatusBar
-        barStyle={theme.isDark ? 'light-content' : 'dark-content'}
-        backgroundColor={theme.background}
-      />
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
+  const renderProfileCard = () => (
+    <>
         {/* User Profile Card */}
         <View
           style={[
             styles.profileCard,
+            isLargeScreen && styles.desktopProfileCard,
             { backgroundColor: theme.surface, borderColor: theme.outline },
           ]}>
           <View style={styles.profileTopRow}>
@@ -320,11 +318,16 @@ export default function AchievementsScreen() {
             </Text>
           </View>
         </View>
+    </>
+  );
 
+  const renderTabsAndFilters = () => (
+    <>
         {/* Tab Switcher: Conquistas / Loja */}
         <View
           style={[
             styles.tabSwitcher,
+            isLargeScreen && styles.desktopTabSwitcher,
             { backgroundColor: theme.surface, borderColor: theme.outline },
           ]}>
           <TouchableOpacity
@@ -374,7 +377,7 @@ export default function AchievementsScreen() {
 
         {/* Pílulas de Filtragem Rápida (Apenas na aba de medalhas) */}
         {activeTab === 'achievements' && (
-          <View style={styles.filterPillsRow}>
+          <View style={[styles.filterPillsRow, isLargeScreen && styles.desktopFilterPillsRow]}>
             {[
               { id: 'all', label: 'Todas' },
               { id: 'unlocked', label: `Desbloqueadas (${unlockedCount})` },
@@ -410,13 +413,12 @@ export default function AchievementsScreen() {
             })}
           </View>
         )}
+    </>
+  );
 
-        {/* Conteúdo das Abas */}
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}>
-          {activeTab === 'achievements' ? (
+  const renderItemsList = () => (
+    <View style={isLargeScreen ? styles.desktopGrid : undefined}>
+      {activeTab === 'achievements' ? (
             /* Lista de Medalhas Filtrada e Ordenada */
             achievements
               .filter((ach) => {
@@ -448,6 +450,7 @@ export default function AchievementsScreen() {
                     }}
                     style={[
                       styles.itemCard,
+                      isLargeScreen && styles.desktopGridItem,
                       { backgroundColor: theme.surface, borderColor: theme.outline },
                       ach.unlocked && { borderColor: `${tier.borderColor}60` },
                     ]}
@@ -516,7 +519,7 @@ export default function AchievementsScreen() {
               const rarityColor = getRarityColor(item.rarity);
 
               return (
-                <View key={item.id} style={[styles.itemCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+                <View key={item.id} style={[styles.itemCard, isLargeScreen && styles.desktopGridItem, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
                   <View
                     style={[
                       styles.iconCircle,
@@ -567,9 +570,54 @@ export default function AchievementsScreen() {
               );
             })
           )}
+    </View>
+  );
 
-          <View style={{ height: 40 }} />
-        </ScrollView>
+  return (
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+      <StatusBar
+        barStyle={theme.isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={theme.background}
+      />
+      <View
+        style={[
+          styles.container,
+          {
+            backgroundColor: theme.background,
+            maxWidth: isLargeScreen
+              ? LayoutTokens.maxDesktopContentWidth
+              : LayoutTokens.maxContentWidth,
+          },
+        ]}>
+        {isLargeScreen ? (
+          <View style={styles.desktopLayout}>
+            <View style={styles.desktopLeftCol}>
+              {renderProfileCard()}
+            </View>
+            <View style={styles.desktopRightCol}>
+              {renderTabsAndFilters()}
+              <ScrollView
+                style={styles.scroll}
+                contentContainerStyle={styles.scrollContentDesktop}
+                showsVerticalScrollIndicator={false}>
+                {renderItemsList()}
+                <View style={{ height: 40 }} />
+              </ScrollView>
+            </View>
+          </View>
+        ) : (
+          <>
+            {renderProfileCard()}
+            {renderTabsAndFilters()}
+            <ScrollView
+              style={styles.scroll}
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={false}>
+              {renderItemsList()}
+              <View style={{ height: 40 }} />
+            </ScrollView>
+          </>
+        )}
 
         {/* Diálogo de Detalhes da Conquista */}
         <Modal
@@ -873,6 +921,48 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
     paddingBottom: LayoutTokens.pagePaddingBottom,
+  },
+  scrollContentDesktop: {
+    paddingHorizontal: 0,
+    paddingBottom: LayoutTokens.pagePaddingBottom,
+  },
+  desktopLayout: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: SpacingTokens.xl,
+    paddingHorizontal: SpacingTokens.xl,
+    paddingTop: SpacingTokens.xl,
+    alignItems: 'flex-start',
+  },
+  desktopLeftCol: {
+    width: 360,
+    maxWidth: '35%',
+  },
+  desktopRightCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  desktopProfileCard: {
+    marginHorizontal: 0,
+    marginTop: 0,
+    marginBottom: 0,
+  },
+  desktopTabSwitcher: {
+    marginHorizontal: 0,
+  },
+  desktopFilterPillsRow: {
+    marginHorizontal: 0,
+  },
+  desktopGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SpacingTokens.md,
+  },
+  desktopGridItem: {
+    flexBasis: '48.5%',
+    flexGrow: 1,
+    minWidth: 280,
+    marginBottom: 0,
   },
   itemCard: {
     borderRadius: BorderRadiusTokens.card,

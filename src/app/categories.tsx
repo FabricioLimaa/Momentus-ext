@@ -30,10 +30,12 @@ import {
   BorderRadiusTokens,
   ComponentHeightTokens,
   TypographyTokens,
+  useResponsiveLayout,
 } from '@/constants/theme';
 
 export default function CategoriesScreen() {
   const insets = useSafeAreaInsets();
+  const { isLargeScreen } = useResponsiveLayout();
   const { categories, habits, marketItems, upsertCategory, deleteCategory, theme, triggerHaptic } = useMomentus();
 
   // Estados dos Diálogos
@@ -236,7 +238,16 @@ export default function CategoriesScreen() {
         barStyle={theme.isDark ? 'light-content' : 'dark-content'}
         backgroundColor={theme.background}
       />
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <View
+        style={[
+          styles.container,
+          {
+            backgroundColor: theme.background,
+            maxWidth: isLargeScreen
+              ? LayoutTokens.maxDesktopContentWidth
+              : LayoutTokens.maxContentWidth,
+          },
+        ]}>
         {/* Top Header */}
         <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
           <TouchableOpacity
@@ -294,7 +305,7 @@ export default function CategoriesScreen() {
           </TouchableOpacity>
 
           {/* Lista de Categorias */}
-          <View style={styles.categoryList}>
+          <View style={[styles.categoryList, isLargeScreen && styles.desktopCategoryGrid]}>
             {categories.map((cat) => {
               const stickerIcon = getStickerIconName(cat.stickerId);
               const iconToDisplay = stickerIcon || cat.icon || null;
@@ -309,6 +320,7 @@ export default function CategoriesScreen() {
                   key={cat.id}
                   style={[
                     styles.categoryCard,
+                    isLargeScreen && styles.desktopCategoryCard,
                     { backgroundColor: theme.surface, borderColor: theme.outline },
                   ]}>
                   <View style={styles.cardMainRow}>
@@ -1194,6 +1206,17 @@ const styles = StyleSheet.create({
   },
   categoryList: {
     gap: SpacingTokens.md, // 16px
+  },
+  desktopCategoryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SpacingTokens.md,
+  },
+  desktopCategoryCard: {
+    flexBasis: '48.5%',
+    flexGrow: 1,
+    minWidth: 320,
+    marginBottom: 0,
   },
   categoryCard: {
     borderRadius: BorderRadiusTokens.card, // 16px

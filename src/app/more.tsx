@@ -23,6 +23,7 @@ import {
   BorderRadiusTokens,
   ComponentHeightTokens,
   TypographyTokens,
+  useResponsiveLayout,
 } from '@/constants/theme';
 import { APP_INFO } from '@/constants/appInfo';
 import { useMomentus } from '@/context/MomentusContext';
@@ -31,6 +32,7 @@ import { auth as firebaseAuth } from '@/config/firebase';
 
 export default function MoreScreen() {
   const router = useRouter();
+  const { isLargeScreen } = useResponsiveLayout();
   const { userProfile, userLevel, logout, theme, triggerHaptic } = useMomentus();
 
   const authUser = firebaseAuth.currentUser;
@@ -89,7 +91,16 @@ export default function MoreScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} backgroundColor={theme.background} />
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <View
+        style={[
+          styles.container,
+          {
+            backgroundColor: theme.background,
+            maxWidth: isLargeScreen
+              ? LayoutTokens.maxTabletContentWidth
+              : LayoutTokens.maxContentWidth,
+          },
+        ]}>
         {/* Header */}
         <View style={styles.header}>
           <Text style={[styles.title, { color: theme.textPrimary }]}>Menu & Perfil</Text>

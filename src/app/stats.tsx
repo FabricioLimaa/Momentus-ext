@@ -18,6 +18,7 @@ import {
   BorderRadiusTokens,
   ComponentHeightTokens,
   TypographyTokens,
+  useResponsiveLayout,
 } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import { WeeklySummaryModal } from '@/components/momentus/WeeklySummaryModal';
@@ -26,6 +27,7 @@ import { CircularProgressRing } from '@/components/momentus/CircularProgressRing
 type StatsFilter = 'WEEK' | 'MONTH' | 'YEAR';
 
 export default function StatsScreen() {
+  const { isLargeScreen } = useResponsiveLayout();
   const { habits, categories, theme, userProfile, userLevel, focusHistoryMap, triggerHaptic } = useMomentus();
   const [filter, setFilter] = useState<StatsFilter>('WEEK');
   const [selectedBarIndex, setSelectedBarIndex] = useState<number | null>(null);
@@ -427,14 +429,544 @@ export default function StatsScreen() {
     return stats.chartBars[selectedBarIndex];
   }, [selectedBarIndex, stats.chartBars]);
 
+  const renderHeroAndStreakCards = () => (
+    <>
+      {/* CARD HERO: Anel Neon de Aproveitamento Geral */}
+      <View style={[styles.heroCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+        <View style={styles.heroLeftCol}>
+          <CircularProgressRing
+            progress={stats.overallCompletionRate / 100}
+            size={96}
+            strokeWidth={9}
+            color={stats.feedbackColor}
+          />
+        </View>
+        <View style={styles.heroRightCol}>
+          <View
+            style={[
+              styles.feedbackBadge,
+              {
+                backgroundColor: `${stats.feedbackColor}18`,
+                borderColor: `${stats.feedbackColor}40`,
+              },
+            ]}>
+            <Text style={[styles.feedbackBadgeText, { color: stats.feedbackColor }]}>
+              {stats.feedbackTitle}
+            </Text>
+          </View>
+          <Text style={[styles.heroStatsMain, { color: theme.textPrimary }]}>
+            {stats.currentCount}{' '}
+            <Text style={{ fontSize: 13, fontWeight: '600', color: theme.textSecondary }}>
+              de {stats.totalPeriodHabits} rotinas concluídas
+            </Text>
+          </Text>
+          <Text style={[styles.heroFeedbackSub, { color: theme.textSecondary }]}>
+            {stats.feedbackSubtitle}
+          </Text>
+        </View>
+      </View>
+
+      {/* CARD DE SEQUÊNCIAS (Streak Atual vs Recorde Histórico) */}
+      <View style={[styles.streakBlockCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+        <View style={styles.streakCol}>
+          <View style={styles.streakColHeader}>
+            <Ionicons name="flame" size={20} color="#FF5722" />
+            <Text style={[styles.streakColLabel, { color: theme.textSecondary }]}>Sequência Atual</Text>
+          </View>
+          <Text style={[styles.streakColValue, { color: theme.textPrimary }]}>
+            {stats.currentStreak} <Text style={styles.streakColUnit}>dias</Text>
+          </Text>
+          <Text style={[styles.streakColSub, { color: theme.textSecondary }]}>
+            {stats.currentStreak > 0 ? 'Ritmo diário ativo 🔥' : 'Inicie hoje!'}
+          </Text>
+        </View>
+
+        <View style={[styles.streakDivider, { backgroundColor: theme.outline }]} />
+
+        <View style={styles.streakCol}>
+          <View style={styles.streakColHeader}>
+            <Ionicons name="trophy" size={20} color={MomentusColors.gold} />
+            <Text style={[styles.streakColLabel, { color: theme.textSecondary }]}>Recorde Histórico</Text>
+          </View>
+          <Text style={[styles.streakColValue, { color: theme.textPrimary }]}>
+            {stats.bestStreak} <Text style={styles.streakColUnit}>dias</Text>
+          </Text>
+          <Text style={[styles.streakColSub, { color: theme.textSecondary }]}>
+            {stats.currentStreak >= stats.bestStreak && stats.currentStreak > 0
+              ? 'Recorde superado hoje! 🎉'
+              : 'Meta pessoal máxima'}
+          </Text>
+        </View>
+      </View>
+    </>
+  );
+
+  const renderInsightsCards = () => (
+    <>
+      {/* Cards de Métricas Principais */}
+      <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
+        Insights de {filter === 'WEEK' ? 'Semana' : filter === 'MONTH' ? 'Mês' : 'Ano'}
+      </Text>
+
+      <View style={styles.insightsRow}>
+        {/* Card 1: Evolução / Melhoria */}
+        <View
+          style={[
+            styles.insightCard,
+            { backgroundColor: theme.surface, borderColor: theme.outline },
+          ]}>
+          <View style={styles.insightHeader}>
+            <Ionicons
+              name={stats.improvement >= 0 ? 'trending-up' : 'trending-down'}
+              size={20}
+              color={stats.improvement >= 0 ? theme.primary : MomentusColors.errorRed}
+            />
+            <Text style={[styles.insightLabel, { color: theme.textSecondary }]}>Evolução</Text>
+          </View>
+          <Text
+            style={[
+              styles.insightValue,
+              { color: theme.textPrimary },
+              stats.improvement < 0 && { color: MomentusColors.errorRed },
+            ]}>
+            {stats.improvement > 0 ? `+${stats.improvement}%` : `${stats.improvement}%`}
+          </Text>
+          <Text style={[styles.insightSub, { color: theme.textSecondary }]}>Vs. período anterior</Text>
+        </View>
+
+        {/* Card 2: Horário Ápice */}
+        <View
+          style={[
+            styles.insightCard,
+            { backgroundColor: theme.surface, borderColor: theme.outline },
+          ]}>
+          <View style={styles.insightHeader}>
+            <Ionicons name="time" size={20} color={MomentusColors.cyan} />
+            <Text style={[styles.insightLabel, { color: theme.textSecondary }]}>Horário Ápice</Text>
+          </View>
+          <Text style={[styles.insightValue, { color: theme.textPrimary }]}>{stats.bestHour}</Text>
+          <Text style={[styles.insightSub, { color: theme.textSecondary }]}>Maior produtividade</Text>
+        </View>
+      </View>
+
+      <View style={styles.insightsRow}>
+        {/* Card 3: Total Concluído */}
+        <View
+          style={[
+            styles.insightCard,
+            { backgroundColor: theme.surface, borderColor: theme.outline },
+          ]}>
+          <View style={styles.insightHeader}>
+            <Ionicons name="checkmark-done-circle" size={20} color={theme.primary} />
+            <Text style={[styles.insightLabel, { color: theme.textSecondary }]}>Concluídos</Text>
+          </View>
+          <Text style={[styles.insightValue, { color: theme.textPrimary }]}>{stats.currentCount}</Text>
+          <Text style={[styles.insightSub, { color: theme.textSecondary }]}>Neste período</Text>
+        </View>
+
+        {/* Card 4: Categoria Top */}
+        <View
+          style={[
+            styles.insightCard,
+            { backgroundColor: theme.surface, borderColor: theme.outline },
+          ]}>
+          <View style={styles.insightHeader}>
+            <Ionicons name="star" size={20} color={MomentusColors.gold} />
+            <Text style={[styles.insightLabel, { color: theme.textSecondary }]}>Destaque</Text>
+          </View>
+          <Text numberOfLines={1} style={[styles.insightValueSmall, { color: theme.textPrimary }]}>
+            {stats.bestCategory}
+          </Text>
+          <Text style={[styles.insightSub, { color: theme.textSecondary }]}>Maior consistência</Text>
+        </View>
+      </View>
+
+      <View style={styles.insightsRow}>
+        {/* Card 5: Dias Perfeitos (100% de Conclusão) */}
+        <View
+          style={[
+            styles.insightCard,
+            { backgroundColor: theme.surface, borderColor: theme.outline },
+          ]}>
+          <View style={styles.insightHeader}>
+            <Ionicons name="trophy" size={20} color={MomentusColors.gold} />
+            <Text style={[styles.insightLabel, { color: theme.textSecondary }]}>Dias Perfeitos</Text>
+          </View>
+          <Text style={[styles.insightValue, { color: theme.textPrimary }]}>
+            {stats.perfectDaysCount}
+            <Text style={{ fontSize: 15, fontWeight: '700', color: theme.textSecondary }}>
+              {' '}/ {stats.totalDaysWithHabits}
+            </Text>
+          </Text>
+          <Text style={[styles.insightSub, { color: theme.textSecondary }]}>100% de hábitos feitos</Text>
+        </View>
+
+        {/* Card 6: Tempo Total Focado */}
+        <View
+          style={[
+            styles.insightCard,
+            { backgroundColor: theme.surface, borderColor: theme.outline },
+          ]}>
+          <View style={styles.insightHeader}>
+            <Ionicons name="timer-outline" size={20} color={MomentusColors.cyan} />
+            <Text style={[styles.insightLabel, { color: theme.textSecondary }]}>Tempo Focado</Text>
+          </View>
+          <Text numberOfLines={1} style={[styles.insightValue, { color: theme.textPrimary }]}>
+            {stats.focusFormatted}
+          </Text>
+          <Text style={[styles.insightSub, { color: theme.textSecondary }]}>
+            {filter === 'WEEK' ? 'Nesta semana' : filter === 'MONTH' ? 'Neste mês' : 'Neste ano'}
+          </Text>
+        </View>
+      </View>
+    </>
+  );
+
+  const renderChartsAndHeatmap = () => (
+    <>
+      {/* Gráfico de Barras com Toque Interativo */}
+      <View style={styles.sectionHeaderRow}>
+        <Text style={[styles.sectionTitle, { color: theme.textPrimary, marginBottom: 0 }]}>
+          {filter === 'WEEK' ? 'Conclusões da Semana' : 'Distribuição por Categoria'}
+        </Text>
+        {selectedBarItem && (
+          <TouchableOpacity
+            onPress={() => setSelectedBarIndex(null)}
+            style={styles.clearSelectionBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={[styles.clearSelectionText, { color: theme.primary }]}>Limpar seleção</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <View style={[styles.chartCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+        <View style={styles.chartHeader}>
+          <Text style={[styles.chartTitle, { color: theme.textPrimary }]}>
+            {filter === 'WEEK' ? 'Hábitos Finalizados' : 'Hábitos por Categoria'}
+          </Text>
+          <Text style={[styles.chartAverage, { color: theme.primary }]}>
+            {stats.currentCount > 0 ? `Média: ${stats.dailyAverage} / dia` : 'Sem registros'}
+          </Text>
+        </View>
+
+        {stats.currentCount === 0 ? (
+          <View style={[styles.emptyChartNotice, { backgroundColor: theme.surfaceElevated }]}>
+            <Ionicons name="bar-chart-outline" size={32} color={theme.textSecondary} />
+            <Text style={[styles.emptyChartNoticeTitle, { color: theme.textPrimary }]}>
+              Nenhum hábito concluído neste período
+            </Text>
+            <Text style={[styles.emptyChartNoticeSub, { color: theme.textSecondary }]}>
+              Complete suas rotinas do dia para desbloquear seus gráficos de performance!
+            </Text>
+          </View>
+        ) : (
+          <>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={[
+                styles.barsContainerScroll,
+                {
+                  minWidth: '100%',
+                  justifyContent: stats.chartBars.length > 7 ? 'flex-start' : 'space-around',
+                },
+              ]}>
+              {stats.chartBars.map((item, index) => {
+                const heightPercent = Math.max(8, Math.round((item.count / stats.maxBarCount) * 100));
+                const isPeak = item.count === stats.maxBarCount && item.count > 0;
+                const isSelected = selectedBarIndex === index;
+                const barColor = item.color
+                  ? item.color
+                  : isSelected || isPeak
+                  ? theme.primary
+                  : theme.outline;
+
+                return (
+                  <TouchableOpacity
+                    key={index}
+                    onPress={() => {
+                      setSelectedBarIndex(index);
+                      triggerHaptic('selection');
+                    }}
+                    activeOpacity={0.7}
+                    style={[
+                      styles.barCol,
+                      stats.chartBars.length > 7 && { width: 52, flex: undefined },
+                    ]}>
+                    <Text
+                      style={[
+                        styles.barCountLabel,
+                        {
+                          color: isSelected ? theme.primary : theme.textSecondary,
+                          fontWeight: isSelected ? '800' : '600',
+                        },
+                      ]}>
+                      {item.count > 0 ? item.count : ''}
+                    </Text>
+                    <View
+                      style={[
+                        styles.barTrack,
+                        {
+                          backgroundColor: theme.surfaceElevated,
+                          borderWidth: isSelected ? 1.5 : 0,
+                          borderColor: theme.primary,
+                        },
+                      ]}>
+                      <View
+                        style={[
+                          styles.barFill,
+                          {
+                            height: `${heightPercent}%`,
+                            backgroundColor: barColor,
+                            opacity: selectedBarIndex !== null && !isSelected ? 0.4 : 1,
+                          },
+                        ]}
+                      />
+                    </View>
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.barDayText,
+                        (isSelected || (isPeak && !item.color)) && { color: theme.primary, fontWeight: '800' },
+                        item.color && !isSelected && { color: theme.textSecondary, fontWeight: isPeak ? '800' : '600' },
+                      ]}>
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            {/* Mini-Card Interativo de Detalhes da Barra Selecionada */}
+            {selectedBarItem && (
+              <View style={[styles.selectedBarCard, { backgroundColor: theme.surfaceElevated, borderColor: `${theme.primary}50` }]}>
+                <View style={styles.selectedBarHeader}>
+                  <View style={styles.selectedBarTitleRow}>
+                    <View style={[styles.selectedBarDot, { backgroundColor: selectedBarItem.color || theme.primary }]} />
+                    <Text style={[styles.selectedBarTitle, { color: theme.textPrimary }]}>
+                      {selectedBarItem.fullLabel}
+                    </Text>
+                  </View>
+                  <Text style={[styles.selectedBarBadge, { color: theme.primary }]}>
+                    {selectedBarItem.total > 0
+                      ? `${Math.round((selectedBarItem.count / selectedBarItem.total) * 100)}% concluído`
+                      : `${selectedBarItem.count} feito`}
+                  </Text>
+                </View>
+                <View style={styles.selectedBarDetailsRow}>
+                  <Text style={[styles.selectedBarSub, { color: theme.textSecondary }]}>
+                    {selectedBarItem.count} de {selectedBarItem.total} rotinas cumpridas
+                  </Text>
+                  {typeof selectedBarItem.focusMins === 'number' && selectedBarItem.focusMins > 0 && (
+                    <Text style={[styles.selectedBarFocusSub, { color: MomentusColors.cyan }]}>
+                      ⏱ {selectedBarItem.focusMins} min de foco
+                    </Text>
+                  )}
+                </View>
+              </View>
+            )}
+          </>
+        )}
+      </View>
+
+      {/* Mini-Heatmap dos Últimos 30 Dias (quando filter === 'MONTH') */}
+      {filter === 'MONTH' && stats.monthHeatmapDays.length > 0 && (
+        <View style={[styles.heatmapCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+          <View style={styles.heatmapHeader}>
+            <View style={styles.heatmapHeaderTitleRow}>
+              <Ionicons name="calendar-outline" size={18} color={theme.primary} />
+              <Text style={[styles.chartTitle, { color: theme.textPrimary }]}>
+                Frequência dos Últimos 30 Dias
+              </Text>
+            </View>
+            <Text style={[styles.heatmapSubtitle, { color: theme.textSecondary }]}>
+              Mapa de calor de consistência diária
+            </Text>
+          </View>
+
+          <View style={styles.heatmapGrid}>
+            {stats.monthHeatmapDays.map((d, idx) => {
+              let cellColor = theme.isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.05)';
+              if (d.rate === 100 && d.count > 0) {
+                cellColor = theme.primary;
+              } else if (d.rate >= 60) {
+                cellColor = `${theme.primary}B0`;
+              } else if (d.rate > 0) {
+                cellColor = `${theme.primary}60`;
+              }
+
+              return (
+                <View
+                  key={idx}
+                  style={[
+                    styles.heatmapCell,
+                    {
+                      backgroundColor: cellColor,
+                    },
+                  ]}>
+                  <Text
+                    style={[
+                      styles.heatmapCellDay,
+                      {
+                        color: d.rate >= 60 ? getContrastTextColor(theme.primary) : theme.textSecondary,
+                        fontWeight: d.rate >= 60 ? '800' : '500',
+                      },
+                    ]}>
+                    {d.dayNum}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+
+          <View style={styles.heatmapLegendRow}>
+            <Text style={[styles.heatmapLegendLabel, { color: theme.textSecondary }]}>Sem hábitos</Text>
+            <View style={styles.heatmapLegendBoxes}>
+              <View style={[styles.legendBox, { backgroundColor: theme.isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.05)' }]} />
+              <View style={[styles.legendBox, { backgroundColor: `${theme.primary}60` }]} />
+              <View style={[styles.legendBox, { backgroundColor: `${theme.primary}B0` }]} />
+              <View style={[styles.legendBox, { backgroundColor: theme.primary }]} />
+            </View>
+            <Text style={[styles.heatmapLegendLabel, { color: theme.textSecondary }]}>100% feito</Text>
+          </View>
+        </View>
+      )}
+    </>
+  );
+
+  const renderShareBannerAndCategoryRates = () => (
+    <>
+      {/* Banner de Compartilhamento Stories 9:16 */}
+      <TouchableOpacity
+        style={[
+          styles.shareBanner,
+          {
+            backgroundColor: theme.surface,
+            borderColor: `${theme.primary}40`,
+          },
+        ]}
+        onPress={() => setIsStoriesModalOpen(true)}
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel="Abrir resumo em Stories 9:16">
+        <View style={styles.shareBannerLeft}>
+          <View style={[styles.shareIconBox, { backgroundColor: `${theme.primary}18` }]}>
+            <Ionicons name="sparkles" size={20} color={theme.primary} />
+          </View>
+          <View style={styles.shareBannerTextCol}>
+            <View style={styles.shareBannerTitleRow}>
+              <Text style={[styles.shareBannerTitle, { color: theme.textPrimary }]}>
+                Resumo Visual da Semana
+              </Text>
+              <View
+                style={[
+                  styles.storiesPill,
+                  {
+                    backgroundColor: `${MomentusColors.gold}20`,
+                    borderColor: `${MomentusColors.gold}50`,
+                  },
+                ]}>
+                <Text style={[styles.storiesPillText, { color: MomentusColors.gold }]}>
+                  STORIES 9:16
+                </Text>
+              </View>
+            </View>
+            <Text style={[styles.shareBannerSub, { color: theme.textSecondary }]}>
+              Compartilhe sua evolução no Instagram e WhatsApp
+            </Text>
+          </View>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
+      </TouchableOpacity>
+
+      {/* Taxas por Categoria */}
+      <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Metas por Categoria</Text>
+      <View style={[styles.categoriesProgressCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+        {stats.categoryRates.filter((cat) => cat.total > 0).length === 0 ? (
+          <View style={styles.emptyCatContainer}>
+            <Ionicons name="folder-open-outline" size={28} color={theme.textSecondary} />
+            <Text style={[styles.emptyCatText, { color: theme.textSecondary }]}>
+              Nenhuma categoria com hábitos agendados neste período.
+            </Text>
+          </View>
+        ) : (
+          stats.categoryRates
+            .filter((cat) => cat.total > 0)
+            .map((cat) => (
+              <View key={cat.id} style={styles.catProgressItem}>
+                <View style={styles.catProgressHeader}>
+                  <View style={styles.catNameWithDot}>
+                    <View style={[styles.catSmallDot, { backgroundColor: cat.color }]} />
+                    <Text style={[styles.catProgressTitle, { color: theme.textPrimary }]}>{cat.name}</Text>
+                  </View>
+                  <Text style={[styles.catProgressPercent, { color: cat.color }]}>
+                    {cat.rate}% ({cat.completed}/{cat.total})
+                  </Text>
+                </View>
+
+                <View style={[styles.catProgressBarTrack, { backgroundColor: theme.surfaceElevated }]}>
+                  <View
+                    style={[
+                      styles.catProgressBarFill,
+                      { width: `${cat.rate}%`, backgroundColor: cat.color },
+                    ]}
+                  />
+                </View>
+
+                {/* Meta Semanal de Tempo se Configurada */}
+                {cat.metaMinutosSemanal && cat.metaMinutosSemanal > 0 && (
+                  <View style={styles.catMetaSubRow}>
+                    <View style={styles.catMetaSubLeft}>
+                      <Ionicons
+                        name={cat.completedMins >= cat.metaMinutosSemanal ? 'trophy' : 'flag-outline'}
+                        size={12}
+                        color={cat.completedMins >= cat.metaMinutosSemanal ? MomentusColors.gold : (cat.color || theme.primary)}
+                      />
+                      <Text style={[styles.catMetaSubText, { color: theme.textSecondary }]}>
+                        Meta Semanal:{' '}
+                        <Text style={{ fontWeight: '700', color: theme.textPrimary }}>
+                          {Math.floor(cat.completedMins / 60)}h {cat.completedMins % 60}m / {Math.floor(cat.metaMinutosSemanal / 60)}h{cat.metaMinutosSemanal % 60 > 0 ? ` ${cat.metaMinutosSemanal % 60}m` : ''}
+                        </Text>
+                      </Text>
+                    </View>
+                    <Text
+                      style={[
+                        styles.catMetaSubPercent,
+                        {
+                          color:
+                            cat.completedMins >= cat.metaMinutosSemanal
+                              ? MomentusColors.gold
+                              : (cat.color || theme.primary),
+                        },
+                      ]}>
+                      {cat.goalProgressRate}% {cat.completedMins >= cat.metaMinutosSemanal ? '🏆' : ''}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            ))
+        )}
+      </View>
+    </>
+  );
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <StatusBar
         barStyle={theme.isDark ? 'light-content' : 'dark-content'}
         backgroundColor={theme.background}
       />
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
-        <View style={styles.header}>
+      <View
+        style={[
+          styles.container,
+          {
+            backgroundColor: theme.background,
+            maxWidth: isLargeScreen
+              ? LayoutTokens.maxDesktopContentWidth
+              : LayoutTokens.maxContentWidth,
+          },
+        ]}>
+        <View style={[styles.header, isLargeScreen && styles.headerDesktop]}>
           <View style={styles.headerTitleRow}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.title, { color: theme.textPrimary }]}>Análise de Performance</Text>
@@ -454,7 +986,7 @@ export default function StatsScreen() {
 
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, isLargeScreen && styles.scrollContentDesktop]}
           showsVerticalScrollIndicator={false}>
           {/* Seletor de Período */}
           <View
@@ -491,510 +1023,25 @@ export default function StatsScreen() {
             })}
           </View>
 
-          {/* CARD HERO: Anel Neon de Aproveitamento Geral */}
-          <View style={[styles.heroCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
-            <View style={styles.heroLeftCol}>
-              <CircularProgressRing
-                progress={stats.overallCompletionRate / 100}
-                size={96}
-                strokeWidth={9}
-                color={stats.feedbackColor}
-              />
-            </View>
-            <View style={styles.heroRightCol}>
-              <View
-                style={[
-                  styles.feedbackBadge,
-                  {
-                    backgroundColor: `${stats.feedbackColor}18`,
-                    borderColor: `${stats.feedbackColor}40`,
-                  },
-                ]}>
-                <Text style={[styles.feedbackBadgeText, { color: stats.feedbackColor }]}>
-                  {stats.feedbackTitle}
-                </Text>
+          {isLargeScreen ? (
+            <View style={styles.desktopAnalyticsLayout}>
+              <View style={styles.desktopAnalyticsLeftCol}>
+                {renderHeroAndStreakCards()}
+                {renderInsightsCards()}
               </View>
-              <Text style={[styles.heroStatsMain, { color: theme.textPrimary }]}>
-                {stats.currentCount}{' '}
-                <Text style={{ fontSize: 13, fontWeight: '600', color: theme.textSecondary }}>
-                  de {stats.totalPeriodHabits} rotinas concluídas
-                </Text>
-              </Text>
-              <Text style={[styles.heroFeedbackSub, { color: theme.textSecondary }]}>
-                {stats.feedbackSubtitle}
-              </Text>
-            </View>
-          </View>
-
-          {/* CARD DE SEQUÊNCIAS (Streak Atual vs Recorde Histórico) */}
-          <View style={[styles.streakBlockCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
-            <View style={styles.streakCol}>
-              <View style={styles.streakColHeader}>
-                <Ionicons name="flame" size={20} color="#FF5722" />
-                <Text style={[styles.streakColLabel, { color: theme.textSecondary }]}>Sequência Atual</Text>
-              </View>
-              <Text style={[styles.streakColValue, { color: theme.textPrimary }]}>
-                {stats.currentStreak} <Text style={styles.streakColUnit}>dias</Text>
-              </Text>
-              <Text style={[styles.streakColSub, { color: theme.textSecondary }]}>
-                {stats.currentStreak > 0 ? 'Ritmo diário ativo 🔥' : 'Inicie hoje!'}
-              </Text>
-            </View>
-
-            <View style={[styles.streakDivider, { backgroundColor: theme.outline }]} />
-
-            <View style={styles.streakCol}>
-              <View style={styles.streakColHeader}>
-                <Ionicons name="trophy" size={20} color={MomentusColors.gold} />
-                <Text style={[styles.streakColLabel, { color: theme.textSecondary }]}>Recorde Histórico</Text>
-              </View>
-              <Text style={[styles.streakColValue, { color: theme.textPrimary }]}>
-                {stats.bestStreak} <Text style={styles.streakColUnit}>dias</Text>
-              </Text>
-              <Text style={[styles.streakColSub, { color: theme.textSecondary }]}>
-                {stats.currentStreak >= stats.bestStreak && stats.currentStreak > 0
-                  ? 'Recorde superado hoje! 🎉'
-                  : 'Meta pessoal máxima'}
-              </Text>
-            </View>
-          </View>
-
-          {/* Cards de Métricas Principais */}
-          <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
-            Insights de {filter === 'WEEK' ? 'Semana' : filter === 'MONTH' ? 'Mês' : 'Ano'}
-          </Text>
-
-          <View style={styles.insightsRow}>
-            {/* Card 1: Evolução / Melhoria */}
-            <View
-              style={[
-                styles.insightCard,
-                { backgroundColor: theme.surface, borderColor: theme.outline },
-              ]}>
-              <View style={styles.insightHeader}>
-                <Ionicons
-                  name={stats.improvement >= 0 ? 'trending-up' : 'trending-down'}
-                  size={20}
-                  color={stats.improvement >= 0 ? theme.primary : MomentusColors.errorRed}
-                />
-                <Text style={[styles.insightLabel, { color: theme.textSecondary }]}>Evolução</Text>
-              </View>
-              <Text
-                style={[
-                  styles.insightValue,
-                  { color: theme.textPrimary },
-                  stats.improvement < 0 && { color: MomentusColors.errorRed },
-                ]}>
-                {stats.improvement > 0 ? `+${stats.improvement}%` : `${stats.improvement}%`}
-              </Text>
-              <Text style={[styles.insightSub, { color: theme.textSecondary }]}>Vs. período anterior</Text>
-            </View>
-
-            {/* Card 2: Horário Ápice */}
-            <View
-              style={[
-                styles.insightCard,
-                { backgroundColor: theme.surface, borderColor: theme.outline },
-              ]}>
-              <View style={styles.insightHeader}>
-                <Ionicons name="time" size={20} color={MomentusColors.cyan} />
-                <Text style={[styles.insightLabel, { color: theme.textSecondary }]}>Horário Ápice</Text>
-              </View>
-              <Text style={[styles.insightValue, { color: theme.textPrimary }]}>{stats.bestHour}</Text>
-              <Text style={[styles.insightSub, { color: theme.textSecondary }]}>Maior produtividade</Text>
-            </View>
-          </View>
-
-          <View style={styles.insightsRow}>
-            {/* Card 3: Total Concluído */}
-            <View
-              style={[
-                styles.insightCard,
-                { backgroundColor: theme.surface, borderColor: theme.outline },
-              ]}>
-              <View style={styles.insightHeader}>
-                <Ionicons name="checkmark-done-circle" size={20} color={theme.primary} />
-                <Text style={[styles.insightLabel, { color: theme.textSecondary }]}>Concluídos</Text>
-              </View>
-              <Text style={[styles.insightValue, { color: theme.textPrimary }]}>{stats.currentCount}</Text>
-              <Text style={[styles.insightSub, { color: theme.textSecondary }]}>Neste período</Text>
-            </View>
-
-            {/* Card 4: Categoria Top */}
-            <View
-              style={[
-                styles.insightCard,
-                { backgroundColor: theme.surface, borderColor: theme.outline },
-              ]}>
-              <View style={styles.insightHeader}>
-                <Ionicons name="star" size={20} color={MomentusColors.gold} />
-                <Text style={[styles.insightLabel, { color: theme.textSecondary }]}>Destaque</Text>
-              </View>
-              <Text numberOfLines={1} style={[styles.insightValueSmall, { color: theme.textPrimary }]}>
-                {stats.bestCategory}
-              </Text>
-              <Text style={[styles.insightSub, { color: theme.textSecondary }]}>Maior consistência</Text>
-            </View>
-          </View>
-
-          <View style={styles.insightsRow}>
-            {/* Card 5: Dias Perfeitos (100% de Conclusão) */}
-            <View
-              style={[
-                styles.insightCard,
-                { backgroundColor: theme.surface, borderColor: theme.outline },
-              ]}>
-              <View style={styles.insightHeader}>
-                <Ionicons name="trophy" size={20} color={MomentusColors.gold} />
-                <Text style={[styles.insightLabel, { color: theme.textSecondary }]}>Dias Perfeitos</Text>
-              </View>
-              <Text style={[styles.insightValue, { color: theme.textPrimary }]}>
-                {stats.perfectDaysCount}
-                <Text style={{ fontSize: 15, fontWeight: '700', color: theme.textSecondary }}>
-                  {' '}/ {stats.totalDaysWithHabits}
-                </Text>
-              </Text>
-              <Text style={[styles.insightSub, { color: theme.textSecondary }]}>100% de hábitos feitos</Text>
-            </View>
-
-            {/* Card 6: Tempo Total Focado */}
-            <View
-              style={[
-                styles.insightCard,
-                { backgroundColor: theme.surface, borderColor: theme.outline },
-              ]}>
-              <View style={styles.insightHeader}>
-                <Ionicons name="timer-outline" size={20} color={MomentusColors.cyan} />
-                <Text style={[styles.insightLabel, { color: theme.textSecondary }]}>Tempo Focado</Text>
-              </View>
-              <Text numberOfLines={1} style={[styles.insightValue, { color: theme.textPrimary }]}>
-                {stats.focusFormatted}
-              </Text>
-              <Text style={[styles.insightSub, { color: theme.textSecondary }]}>
-                {filter === 'WEEK' ? 'Nesta semana' : filter === 'MONTH' ? 'Neste mês' : 'Neste ano'}
-              </Text>
-            </View>
-          </View>
-
-          {/* Gráfico de Barras com Toque Interativo */}
-          <View style={styles.sectionHeaderRow}>
-            <Text style={[styles.sectionTitle, { color: theme.textPrimary, marginBottom: 0 }]}>
-              {filter === 'WEEK' ? 'Conclusões da Semana' : 'Distribuição por Categoria'}
-            </Text>
-            {selectedBarItem && (
-              <TouchableOpacity
-                onPress={() => setSelectedBarIndex(null)}
-                style={styles.clearSelectionBtn}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Text style={[styles.clearSelectionText, { color: theme.primary }]}>Limpar seleção</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          <View style={[styles.chartCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
-            <View style={styles.chartHeader}>
-              <Text style={[styles.chartTitle, { color: theme.textPrimary }]}>
-                {filter === 'WEEK' ? 'Hábitos Finalizados' : 'Hábitos por Categoria'}
-              </Text>
-              <Text style={[styles.chartAverage, { color: theme.primary }]}>
-                {stats.currentCount > 0 ? `Média: ${stats.dailyAverage} / dia` : 'Sem registros'}
-              </Text>
-            </View>
-
-            {stats.currentCount === 0 ? (
-              <View style={[styles.emptyChartNotice, { backgroundColor: theme.surfaceElevated }]}>
-                <Ionicons name="bar-chart-outline" size={32} color={theme.textSecondary} />
-                <Text style={[styles.emptyChartNoticeTitle, { color: theme.textPrimary }]}>
-                  Nenhum hábito concluído neste período
-                </Text>
-                <Text style={[styles.emptyChartNoticeSub, { color: theme.textSecondary }]}>
-                  Complete suas rotinas do dia para desbloquear seus gráficos de performance!
-                </Text>
-              </View>
-            ) : (
-              <>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={[
-                    styles.barsContainerScroll,
-                    {
-                      minWidth: '100%',
-                      justifyContent: stats.chartBars.length > 7 ? 'flex-start' : 'space-around',
-                    },
-                  ]}>
-                  {stats.chartBars.map((item, index) => {
-                    const heightPercent = Math.max(8, Math.round((item.count / stats.maxBarCount) * 100));
-                    const isPeak = item.count === stats.maxBarCount && item.count > 0;
-                    const isSelected = selectedBarIndex === index;
-                    const barColor = item.color
-                      ? item.color
-                      : isSelected || isPeak
-                      ? theme.primary
-                      : theme.outline;
-
-                    return (
-                      <TouchableOpacity
-                        key={index}
-                        onPress={() => {
-                          setSelectedBarIndex(index);
-                          triggerHaptic('selection');
-                        }}
-                        activeOpacity={0.7}
-                        style={[
-                          styles.barCol,
-                          stats.chartBars.length > 7 && { width: 52, flex: undefined },
-                        ]}>
-                        <Text
-                          style={[
-                            styles.barCountLabel,
-                            {
-                              color: isSelected ? theme.primary : theme.textSecondary,
-                              fontWeight: isSelected ? '800' : '600',
-                            },
-                          ]}>
-                          {item.count > 0 ? item.count : ''}
-                        </Text>
-                        <View
-                          style={[
-                            styles.barTrack,
-                            {
-                              backgroundColor: theme.surfaceElevated,
-                              borderWidth: isSelected ? 1.5 : 0,
-                              borderColor: theme.primary,
-                            },
-                          ]}>
-                          <View
-                            style={[
-                              styles.barFill,
-                              {
-                                height: `${heightPercent}%`,
-                                backgroundColor: barColor,
-                                opacity: selectedBarIndex !== null && !isSelected ? 0.4 : 1,
-                              },
-                            ]}
-                          />
-                        </View>
-                        <Text
-                          numberOfLines={1}
-                          style={[
-                            styles.barDayText,
-                            (isSelected || (isPeak && !item.color)) && { color: theme.primary, fontWeight: '800' },
-                            item.color && !isSelected && { color: theme.textSecondary, fontWeight: isPeak ? '800' : '600' },
-                          ]}>
-                          {item.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-
-                {/* Mini-Card Interativo de Detalhes da Barra Selecionada */}
-                {selectedBarItem && (
-                  <View style={[styles.selectedBarCard, { backgroundColor: theme.surfaceElevated, borderColor: `${theme.primary}50` }]}>
-                    <View style={styles.selectedBarHeader}>
-                      <View style={styles.selectedBarTitleRow}>
-                        <View style={[styles.selectedBarDot, { backgroundColor: selectedBarItem.color || theme.primary }]} />
-                        <Text style={[styles.selectedBarTitle, { color: theme.textPrimary }]}>
-                          {selectedBarItem.fullLabel}
-                        </Text>
-                      </View>
-                      <Text style={[styles.selectedBarBadge, { color: theme.primary }]}>
-                        {selectedBarItem.total > 0
-                          ? `${Math.round((selectedBarItem.count / selectedBarItem.total) * 100)}% concluído`
-                          : `${selectedBarItem.count} feito`}
-                      </Text>
-                    </View>
-                    <View style={styles.selectedBarDetailsRow}>
-                      <Text style={[styles.selectedBarSub, { color: theme.textSecondary }]}>
-                        {selectedBarItem.count} de {selectedBarItem.total} rotinas cumpridas
-                      </Text>
-                      {typeof selectedBarItem.focusMins === 'number' && selectedBarItem.focusMins > 0 && (
-                        <Text style={[styles.selectedBarFocusSub, { color: MomentusColors.cyan }]}>
-                          ⏱ {selectedBarItem.focusMins} min de foco
-                        </Text>
-                      )}
-                    </View>
-                  </View>
-                )}
-              </>
-            )}
-          </View>
-
-          {/* Mini-Heatmap dos Últimos 30 Dias (quando filter === 'MONTH') */}
-          {filter === 'MONTH' && stats.monthHeatmapDays.length > 0 && (
-            <View style={[styles.heatmapCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
-              <View style={styles.heatmapHeader}>
-                <View style={styles.heatmapHeaderTitleRow}>
-                  <Ionicons name="calendar-outline" size={18} color={theme.primary} />
-                  <Text style={[styles.chartTitle, { color: theme.textPrimary }]}>
-                    Frequência dos Últimos 30 Dias
-                  </Text>
-                </View>
-                <Text style={[styles.heatmapSubtitle, { color: theme.textSecondary }]}>
-                  Mapa de calor de consistência diária
-                </Text>
-              </View>
-
-              <View style={styles.heatmapGrid}>
-                {stats.monthHeatmapDays.map((d, idx) => {
-                  let cellColor = theme.isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.05)';
-                  if (d.rate === 100 && d.count > 0) {
-                    cellColor = theme.primary;
-                  } else if (d.rate >= 60) {
-                    cellColor = `${theme.primary}B0`;
-                  } else if (d.rate > 0) {
-                    cellColor = `${theme.primary}60`;
-                  }
-
-                  return (
-                    <View
-                      key={idx}
-                      style={[
-                        styles.heatmapCell,
-                        {
-                          backgroundColor: cellColor,
-                        },
-                      ]}>
-                      <Text
-                        style={[
-                          styles.heatmapCellDay,
-                          {
-                            color: d.rate >= 60 ? getContrastTextColor(theme.primary) : theme.textSecondary,
-                            fontWeight: d.rate >= 60 ? '800' : '500',
-                          },
-                        ]}>
-                        {d.dayNum}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </View>
-
-              <View style={styles.heatmapLegendRow}>
-                <Text style={[styles.heatmapLegendLabel, { color: theme.textSecondary }]}>Sem hábitos</Text>
-                <View style={styles.heatmapLegendBoxes}>
-                  <View style={[styles.legendBox, { backgroundColor: theme.isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.05)' }]} />
-                  <View style={[styles.legendBox, { backgroundColor: `${theme.primary}60` }]} />
-                  <View style={[styles.legendBox, { backgroundColor: `${theme.primary}B0` }]} />
-                  <View style={[styles.legendBox, { backgroundColor: theme.primary }]} />
-                </View>
-                <Text style={[styles.heatmapLegendLabel, { color: theme.textSecondary }]}>100% feito</Text>
+              <View style={styles.desktopAnalyticsRightCol}>
+                {renderChartsAndHeatmap()}
+                {renderShareBannerAndCategoryRates()}
               </View>
             </View>
+          ) : (
+            <>
+              {renderHeroAndStreakCards()}
+              {renderInsightsCards()}
+              {renderChartsAndHeatmap()}
+              {renderShareBannerAndCategoryRates()}
+            </>
           )}
-
-          {/* Banner de Compartilhamento Stories 9:16 */}
-          <TouchableOpacity
-            style={[
-              styles.shareBanner,
-              {
-                backgroundColor: theme.surface,
-                borderColor: `${theme.primary}40`,
-              },
-            ]}
-            onPress={() => setIsStoriesModalOpen(true)}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel="Abrir resumo em Stories 9:16">
-            <View style={styles.shareBannerLeft}>
-              <View style={[styles.shareIconBox, { backgroundColor: `${theme.primary}18` }]}>
-                <Ionicons name="sparkles" size={20} color={theme.primary} />
-              </View>
-              <View style={styles.shareBannerTextCol}>
-                <View style={styles.shareBannerTitleRow}>
-                  <Text style={[styles.shareBannerTitle, { color: theme.textPrimary }]}>
-                    Resumo Visual da Semana
-                  </Text>
-                  <View
-                    style={[
-                      styles.storiesPill,
-                      {
-                        backgroundColor: `${MomentusColors.gold}20`,
-                        borderColor: `${MomentusColors.gold}50`,
-                      },
-                    ]}>
-                    <Text style={[styles.storiesPillText, { color: MomentusColors.gold }]}>
-                      STORIES 9:16
-                    </Text>
-                  </View>
-                </View>
-                <Text style={[styles.shareBannerSub, { color: theme.textSecondary }]}>
-                  Compartilhe sua evolução no Instagram e WhatsApp
-                </Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
-          </TouchableOpacity>
-
-          {/* Taxas por Categoria */}
-          <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Metas por Categoria</Text>
-          <View style={[styles.categoriesProgressCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
-            {stats.categoryRates.filter((cat) => cat.total > 0).length === 0 ? (
-              <View style={styles.emptyCatContainer}>
-                <Ionicons name="folder-open-outline" size={28} color={theme.textSecondary} />
-                <Text style={[styles.emptyCatText, { color: theme.textSecondary }]}>
-                  Nenhuma categoria com hábitos agendados neste período.
-                </Text>
-              </View>
-            ) : (
-              stats.categoryRates
-                .filter((cat) => cat.total > 0)
-                .map((cat) => (
-                  <View key={cat.id} style={styles.catProgressItem}>
-                    <View style={styles.catProgressHeader}>
-                      <View style={styles.catNameWithDot}>
-                        <View style={[styles.catSmallDot, { backgroundColor: cat.color }]} />
-                        <Text style={[styles.catProgressTitle, { color: theme.textPrimary }]}>{cat.name}</Text>
-                      </View>
-                      <Text style={[styles.catProgressPercent, { color: cat.color }]}>
-                        {cat.rate}% ({cat.completed}/{cat.total})
-                      </Text>
-                    </View>
-
-                    <View style={[styles.catProgressBarTrack, { backgroundColor: theme.surfaceElevated }]}>
-                      <View
-                        style={[
-                          styles.catProgressBarFill,
-                          { width: `${cat.rate}%`, backgroundColor: cat.color },
-                        ]}
-                      />
-                    </View>
-
-                    {/* Meta Semanal de Tempo se Configurada */}
-                    {cat.metaMinutosSemanal && cat.metaMinutosSemanal > 0 && (
-                      <View style={styles.catMetaSubRow}>
-                        <View style={styles.catMetaSubLeft}>
-                          <Ionicons
-                            name={cat.completedMins >= cat.metaMinutosSemanal ? 'trophy' : 'flag-outline'}
-                            size={12}
-                            color={cat.completedMins >= cat.metaMinutosSemanal ? MomentusColors.gold : (cat.color || theme.primary)}
-                          />
-                          <Text style={[styles.catMetaSubText, { color: theme.textSecondary }]}>
-                            Meta Semanal:{' '}
-                            <Text style={{ fontWeight: '700', color: theme.textPrimary }}>
-                              {Math.floor(cat.completedMins / 60)}h {cat.completedMins % 60}m / {Math.floor(cat.metaMinutosSemanal / 60)}h{cat.metaMinutosSemanal % 60 > 0 ? ` ${cat.metaMinutosSemanal % 60}m` : ''}
-                            </Text>
-                          </Text>
-                        </View>
-                        <Text
-                          style={[
-                            styles.catMetaSubPercent,
-                            {
-                              color:
-                                cat.completedMins >= cat.metaMinutosSemanal
-                                  ? MomentusColors.gold
-                                  : (cat.color || theme.primary),
-                            },
-                          ]}>
-                          {cat.goalProgressRate}% {cat.completedMins >= cat.metaMinutosSemanal ? '🏆' : ''}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                ))
-            )}
-          </View>
 
           <View style={{ height: 40 }} />
         </ScrollView>
@@ -1029,6 +1076,9 @@ const styles = StyleSheet.create({
     paddingTop: LayoutTokens.pagePaddingTop,
     marginBottom: SpacingTokens.md,
   },
+  headerDesktop: {
+    paddingHorizontal: SpacingTokens.xl,
+  },
   title: {
     ...TypographyTokens.screenTitle,
     color: MomentusColors.textPrimary,
@@ -1044,6 +1094,22 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
     paddingBottom: LayoutTokens.pagePaddingBottom,
+  },
+  scrollContentDesktop: {
+    paddingHorizontal: SpacingTokens.xl,
+  },
+  desktopAnalyticsLayout: {
+    flexDirection: 'row',
+    gap: SpacingTokens.xl,
+    alignItems: 'flex-start',
+  },
+  desktopAnalyticsLeftCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  desktopAnalyticsRightCol: {
+    flex: 1.1,
+    minWidth: 0,
   },
   filterRow: {
     flexDirection: 'row',

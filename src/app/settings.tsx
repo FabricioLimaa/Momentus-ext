@@ -25,6 +25,7 @@ import {
   SpacingTokens,
   BorderRadiusTokens,
   ComponentHeightTokens,
+  useResponsiveLayout,
 } from '@/constants/theme';
 import { APP_INFO } from '@/constants/appInfo';
 import { useMomentus } from '@/context/MomentusContext';
@@ -62,6 +63,7 @@ export const MOMENTUS_THEME_COLORS = [
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const { isLargeScreen } = useResponsiveLayout();
   const {
     settings,
     updateSettings,
@@ -450,7 +452,16 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} backgroundColor={theme.background} />
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <View
+        style={[
+          styles.container,
+          {
+            backgroundColor: theme.background,
+            maxWidth: isLargeScreen
+              ? LayoutTokens.maxTabletContentWidth
+              : LayoutTokens.maxContentWidth,
+          },
+        ]}>
         {/* TopBar com Selo Minimalista de Autosave */}
         <View style={styles.topBar}>
           <TouchableOpacity

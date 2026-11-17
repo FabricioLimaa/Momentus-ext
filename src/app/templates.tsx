@@ -23,6 +23,7 @@ import {
   BorderRadiusTokens,
   ComponentHeightTokens,
   TypographyTokens,
+  useResponsiveLayout,
 } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import { ApplyTemplateDialog } from '@/components/momentus/ApplyTemplateDialog';
@@ -46,6 +47,7 @@ interface EventFormState {
 
 export default function TemplatesScreen() {
   const router = useRouter();
+  const { isLargeScreen } = useResponsiveLayout();
   const {
     templates,
     categories,
@@ -559,7 +561,16 @@ export default function TemplatesScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} backgroundColor={theme.background} />
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <View
+        style={[
+          styles.container,
+          {
+            backgroundColor: theme.background,
+            maxWidth: isLargeScreen
+              ? LayoutTokens.maxDesktopContentWidth
+              : LayoutTokens.maxContentWidth,
+          },
+        ]}>
         {/* TopBar */}
         <View style={[styles.topBar, { borderBottomColor: theme.outline }]}>
           <TouchableOpacity
@@ -665,32 +676,34 @@ export default function TemplatesScreen() {
               </TouchableOpacity>
             </View>
           ) : (
-            templates.map((template) => {
-              const complexity = getComplexity(template.items.length);
-              const sortedEvents = [...template.items].sort((a, b) => a.timeStart.localeCompare(b.timeStart));
+            <View style={isLargeScreen ? styles.desktopTemplateGrid : undefined}>
+              {templates.map((template) => {
+                const complexity = getComplexity(template.items.length);
+                const sortedEvents = [...template.items].sort((a, b) => a.timeStart.localeCompare(b.timeStart));
 
-              const totalDurationMinutes = template.items.reduce((acc, it) => {
-                const start = parseTimeToMinutes(it.timeStart);
-                const end = parseTimeToMinutes(it.timeEnd || it.timeStart);
-                const diff = end - start;
-                return acc + (diff > 0 ? diff : 0);
-              }, 0);
-              const formattedTotalDuration = (() => {
-                if (totalDurationMinutes <= 0) return `${template.items.length * 30}m total`;
-                const h = Math.floor(totalDurationMinutes / 60);
-                const m = totalDurationMinutes % 60;
-                if (h > 0 && m > 0) return `${h}h ${m}m total`;
-                if (h > 0) return `${h}h total`;
-                return `${m}m total`;
-              })();
+                const totalDurationMinutes = template.items.reduce((acc, it) => {
+                  const start = parseTimeToMinutes(it.timeStart);
+                  const end = parseTimeToMinutes(it.timeEnd || it.timeStart);
+                  const diff = end - start;
+                  return acc + (diff > 0 ? diff : 0);
+                }, 0);
+                const formattedTotalDuration = (() => {
+                  if (totalDurationMinutes <= 0) return `${template.items.length * 30}m total`;
+                  const h = Math.floor(totalDurationMinutes / 60);
+                  const m = totalDurationMinutes % 60;
+                  if (h > 0 && m > 0) return `${h}h ${m}m total`;
+                  if (h > 0) return `${h}h total`;
+                  return `${m}m total`;
+                })();
 
-              return (
-                <View
-                  key={template.id}
-                  style={[
-                    styles.templateCard,
-                    { backgroundColor: theme.surface, borderColor: theme.outline },
-                  ]}>
+                return (
+                  <View
+                    key={template.id}
+                    style={[
+                      styles.templateCard,
+                      isLargeScreen && styles.desktopTemplateCard,
+                      { backgroundColor: theme.surface, borderColor: theme.outline },
+                    ]}>
                   {/* Cabeçalho do Card */}
                   <View style={styles.cardHeader}>
                     <View style={styles.cardHeaderInfo}>
@@ -814,9 +827,10 @@ export default function TemplatesScreen() {
                   </TouchableOpacity>
                 </View>
               );
-            })
-          )}
-        </ScrollView>
+            })}
+          </View>
+        )}
+      </ScrollView>
 
             {/* FAB (+) para Criar Novo Template */}
             <TouchableOpacity
@@ -1640,6 +1654,17 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     fontWeight: '800',
     fontSize: 15,
+  },
+  desktopTemplateGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SpacingTokens.md,
+  },
+  desktopTemplateCard: {
+    flexBasis: '48.5%',
+    flexGrow: 1,
+    minWidth: 320,
+    marginBottom: 0,
   },
   templateCard: {
     borderRadius: BorderRadiusTokens.card,
