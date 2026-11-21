@@ -54,6 +54,26 @@ Em todas as telas, documentações, modais, termos, layouts e metadados do proje
   - Aplicação Web / SPA: `app.momentus.app.br`
 - **Single Source of Truth no Código:** `src/constants/appInfo.ts` (`APP_INFO`)
 
+## Arquitetura Multi-Repositório & Hospedagem (Vercel & DNS)
+
+O ecossistema web do Momentus é estruturado em **2 repositórios independentes na Vercel**:
+
+1. **Repositório 1: Site de Apresentação (Landing Page Institucional)**
+   - **Domínios no projeto Vercel:** `momentus.app.br` e `www.momentus.app.br`
+   - **Objetivo:** Vitrine de apresentação, conversão, marketing e links institucionais.
+   - **Integração:** Botão de login / "Acessar App" direciona para `https://app.momentus.app.br/`.
+   - **Contato:** Exibe `contato@momentus.app.br`.
+
+2. **Repositório 2: App Web / SPA (Este Repositório `Momentus-ext`)**
+   - **Domínio no projeto Vercel:** `app.momentus.app.br` (exclusivo para este projeto).
+   - **Objetivo:** Aplicação completa em React Native / Expo Web, rotas autenticadas, dados sincronizados com Firebase e modo offline.
+   - **Integração:** Rodapés, termos e créditos referenciam o site institucional `https://www.momentus.app.br/` via `APP_INFO.website`.
+
+3. **Infraestrutura de DNS & E-mail:**
+   - **Provedor de Domínio:** Registro.br (delegado para servidores Vercel: `ns1.vercel-dns.com` e `ns2.vercel-dns.com`).
+   - **E-mails Profissionais:** Zoho Mail (registros MX, TXT/SPF e DMARC configurados diretamente na zona DNS global da conta Vercel).
+   - **Autenticação:** Firebase Auth possui `momentus.app.br` e `app.momentus.app.br` na lista de Authorized Domains.
+
 ## UI/UX Design System & Grade de 8 Pontos (Obrigatório)
 
 O Momentus utiliza estritamente o sistema **8pt Grid** e princípios de **Despoluição Zen** em 100% de suas telas e componentes. Ao criar ou refatorar qualquer interface:
