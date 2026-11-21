@@ -46,12 +46,12 @@ Em todas as telas, documentações, modais, termos, layouts e metadados do proje
 
 - **Nome do App:** Momentus
 - **Desenvolvido por:** Fabricio Lima
-- **E-mail Oficial:** contato@momentusapp.com.br
-- **Site Oficial:** https://www.momentusapp.com.br/
-- **Acesso Web:** https://app.momentusapp.com.br/
+- **E-mail Oficial:** contato@momentus.app.br
+- **Site Oficial:** https://www.momentus.app.br/
+- **Acesso Web:** https://app.momentus.app.br/
 - **Domínios Oficiais:**
-  - Principal / Landing: `www.momentusapp.com.br` / `momentusapp.com.br`
-  - Aplicação Web / SPA: `app.momentusapp.com.br`
+  - Principal / Landing: `www.momentus.app.br` / `momentus.app.br`
+  - Aplicação Web / SPA: `app.momentus.app.br`
 - **Single Source of Truth no Código:** `src/constants/appInfo.ts` (`APP_INFO`)
 
 ## UI/UX Design System & Grade de 8 Pontos (Obrigatório)

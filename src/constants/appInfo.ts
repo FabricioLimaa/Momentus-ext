@@ -6,16 +6,16 @@
 export const APP_INFO = {
   name: 'Momentus',
   developer: 'Fabricio Lima',
-  email: 'contato@momentusapp.com.br',
-  website: 'https://www.momentusapp.com.br/',
-  webAccess: 'https://app.momentusapp.com.br/',
+  email: 'contato@momentus.app.br',
+  website: 'https://www.momentus.app.br/',
+  webAccess: 'https://app.momentus.app.br/',
   domains: {
-    official: 'www.momentusapp.com.br',
-    webApp: 'app.momentusapp.com.br',
-    naked: 'momentusapp.com.br',
+    official: 'www.momentus.app.br',
+    webApp: 'app.momentus.app.br',
+    naked: 'momentus.app.br',
   },
   copyright: '© 2025-2026 Fabricio Lima. Todos os direitos reservados.',
-  dpoContact: 'contato@momentusapp.com.br',
+  dpoContact: 'contato@momentus.app.br',
   tagline: 'Viva o presente, planeje o futuro.',
 } as const;
 

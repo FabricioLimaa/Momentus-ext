@@ -28,6 +28,7 @@ import {
 import { UserLevelInfo } from "@/domain/userLevel";
 import { UserProfile } from "@/types";
 import { AvatarWithFrame } from "@/components/momentus/AvatarWithFrame";
+import { APP_INFO } from "@/constants/appInfo";
 
 export interface WeeklySummaryStats {
   perfectDaysCount: number;
@@ -406,7 +407,7 @@ export const WeeklySummaryModal: React.FC<WeeklySummaryModalProps> = ({
                   <Text style={styles.footerTagline}>
                     Organize sua rotina. Vença o dia.
                   </Text>
-                  <Text style={styles.footerLink}>app.momentusapp.com.br</Text>
+                  <Text style={styles.footerLink}>{APP_INFO.domains.webApp}</Text>
                 </View>
               </LinearGradient>
             </View>
