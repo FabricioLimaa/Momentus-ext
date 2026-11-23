@@ -93,7 +93,47 @@
       "expo-apple-authentication",
       "expo-audio",
       "expo-asset",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-widgets",
+        {
+          "bundleIdentifier": "br.com.fabriciolima.momentus.widgets",
+          "groupIdentifier": "group.br.com.fabriciolima.momentus",
+          "widgets": [
+            {
+              "name": "MomentusWidget",
+              "displayName": "Momentus",
+              "description": "Acompanhe suas próximas rotinas, seu streak diário e dê check rápido direto da tela inicial.",
+              "ios": {
+                "supportedFamilies": [
+                  "systemSmall",
+                  "systemMedium",
+                  "systemLarge"
+                ],
+                "contentMarginsDisabled": false
+              }
+            }
+          ]
+        }
+      ],
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "MomentusWidget",
+              "label": "Momentus • Rotinas & Streak",
+              "description": "Acompanhe suas próximas rotinas, seu streak diário e dê check rápido direto da tela inicial.",
+              "minWidth": "250dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 2,
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000
+            }
+          ]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

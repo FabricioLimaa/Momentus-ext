@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useMemo, useRef, useCallback } from 'react';
-import { useColorScheme, Alert, Platform } from 'react-native';
+import { useColorScheme, Alert, Platform, AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import {
@@ -44,6 +44,11 @@ import {
   snoozeHabitNotification,
   subscribeToHabitNotificationResponses,
 } from '@/services/notificationService';
+import {
+  syncHomeScreenWidgets,
+  subscribeToWidgetInteractions,
+  reconcilePendingWidgetToggles,
+} from '@/services/widgetService';
 import {
   syncHabitToDeviceCalendar,
   deleteHabitFromDeviceCalendar,
@@ -2130,6 +2135,55 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       },
     });
   }, [habits]);
+
+  // Sincroniza estado diário (próximas rotinas, streak e progresso) com Widgets Nativos (Android & iOS)
+  useEffect(() => {
+    if (!isLoaded || Platform.OS === 'web') return;
+    const timer = setTimeout(() => {
+      syncHomeScreenWidgets(
+        habits,
+        categories,
+        userProfile.currentStreak,
+        theme.primary,
+        theme.isDark
+      ).catch(() => {});
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [
+    isLoaded,
+    habits,
+    categories,
+    userProfile.currentStreak,
+    theme.primary,
+    theme.isDark,
+  ]);
+
+  // Escuta interações ao vivo do WidgetKit iOS e reconcilia check-offs feitos offline (Android & iOS)
+  useEffect(() => {
+    if (!isLoaded || Platform.OS === 'web') return;
+
+    reconcilePendingWidgetToggles((habitId) => {
+      toggleHabitRef.current(habitId);
+    }).catch(() => {});
+
+    const unsubscribeWidget = subscribeToWidgetInteractions((habitId) => {
+      toggleHabitRef.current(habitId);
+    });
+
+    const appStateSub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        reconcilePendingWidgetToggles((habitId) => {
+          toggleHabitRef.current(habitId);
+        }).catch(() => {});
+      }
+    });
+
+    return () => {
+      unsubscribeWidget();
+      appStateSub.remove();
+    };
+  }, [isLoaded]);
 
   return (
     <MomentusContext.Provider

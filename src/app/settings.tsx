@@ -31,6 +31,7 @@ import { APP_INFO } from '@/constants/appInfo';
 import { useMomentus } from '@/context/MomentusContext';
 import { MomentusLog } from '@/util/logger';
 import { requestNotificationPermissions } from '@/services/notificationService';
+import { requestPinAndroidWidget } from '@/services/widgetService';
 
 // Helper de timeout seguro para proteger chamadas assíncronas contra travamentos de rede
 const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number, timeoutErrorMsg: string): Promise<T> => {
@@ -161,6 +162,27 @@ export default function SettingsScreen() {
     setHapticsEnabled(val);
     updateSettings({ hapticsEnabled: val });
     if (val) triggerHaptic('impact');
+  };
+
+  const handleAddHomeScreenWidget = async () => {
+    triggerHaptic('selection');
+    if (Platform.OS === 'android') {
+      const pinned = await requestPinAndroidWidget();
+      if (!pinned) {
+        Alert.alert(
+          'Adicionar Widget na Tela Inicial',
+          'Mantenha o dedo pressionado em um espaço vazio da tela inicial do seu Android, toque em "Widgets" e procure por "Momentus • Rotinas & Streak".'
+        );
+      }
+      return;
+    }
+
+    if (Platform.OS === 'ios') {
+      Alert.alert(
+        'Adicionar Widget na Tela de Início',
+        'Mantenha o dedo pressionado na Tela de Início do iPhone, toque em "Editar" (+) no canto superior esquerdo e busque por "Momentus" para escolher o tamanho Pequeno, Médio ou Grande.'
+      );
+    }
   };
 
   const handleToggleSync = (val: boolean) => {
@@ -604,6 +626,29 @@ export default function SettingsScreen() {
                     </TouchableOpacity>
                   ))}
                 </View>
+
+                {/* Widget Nativo de Tela Inicial (Android & iOS) */}
+                {Platform.OS !== 'web' && (
+                  <View style={[styles.widgetSetupCard, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}>
+                    <View style={styles.widgetSetupTextCol}>
+                      <Text style={[styles.widgetSetupTitle, { color: theme.textPrimary }]}>
+                        Widget na Tela Inicial
+                      </Text>
+                      <Text style={[styles.widgetSetupDesc, { color: theme.textSecondary }]}>
+                        Veja suas próximas rotinas, streak diário e dê check rápido sem abrir o app.
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.widgetSetupBtn, { backgroundColor: `${primaryColorHex}20`, borderColor: primaryColorHex }]}
+                      onPress={handleAddHomeScreenWidget}
+                      activeOpacity={0.75}>
+                      <Ionicons name="grid-outline" size={16} color={primaryColorHex} />
+                      <Text style={[styles.widgetSetupBtnText, { color: primaryColorHex }]}>
+                        {Platform.OS === 'android' ? 'Adicionar Widget' : 'Como Adicionar'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             )}
           </View>
@@ -1407,6 +1452,38 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  },
+  widgetSetupCard: {
+    marginTop: SpacingTokens.md,
+    padding: SpacingTokens.md,
+    borderRadius: BorderRadiusTokens.card,
+    borderWidth: 1,
+    gap: SpacingTokens.sm,
+  },
+  widgetSetupTextCol: {
+    gap: SpacingTokens.xs,
+  },
+  widgetSetupTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  widgetSetupDesc: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  widgetSetupBtn: {
+    minHeight: ComponentHeightTokens.buttonCompact,
+    borderRadius: BorderRadiusTokens.control,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SpacingTokens.sm,
+    paddingHorizontal: SpacingTokens.md,
+  },
+  widgetSetupBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
   fontSizeBtnText: {
     fontSize: 12,
