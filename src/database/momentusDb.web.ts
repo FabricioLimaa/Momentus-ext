@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { DatabaseSecurityInfo } from '@/services/encryptionService';
 import {
   Category,
   HabitItem,
@@ -23,6 +24,14 @@ const PREFIX_KV = '@momentus_kv_';
 
 export async function getDatabase(): Promise<null> {
   return null;
+}
+
+export function getDatabaseSecurityInfo(): DatabaseSecurityInfo {
+  return {
+    mode: 'web-tls',
+    cipherVersion: null,
+    hardwareKeyProtected: false,
+  };
 }
 
 export async function getAllCategories(): Promise<Category[]> {
