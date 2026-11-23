@@ -87,13 +87,24 @@
           "calendarPermission": "O Momentus sincroniza suas tarefas diretamente na agenda do dispositivo."
         }
       ],
-      "expo-sqlite",
+      [
+        "expo-sqlite",
+        {
+          "useSQLCipher": true
+        }
+      ],
       "expo-sharing",
       "@react-native-google-signin/google-signin",
       "expo-apple-authentication",
       "expo-audio",
       "expo-asset",
-      "expo-secure-store",
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": true,
+          "faceIDPermission": "O Momentus utiliza o Face ID para proteger sua sessão e chaves criptográficas locais."
+        }
+      ],
       [
         "expo-widgets",
         {

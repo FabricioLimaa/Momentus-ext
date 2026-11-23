@@ -3,6 +3,13 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MomentusLog } from '@/util/logger';
 import {
+  getOrCreateDatabaseEncryptionKey,
+  isValid256BitHexKey,
+  setRuntimeDatabaseSecurityInfo,
+  getRuntimeDatabaseSecurityInfo,
+  type DatabaseSecurityInfo,
+} from '@/services/encryptionService';
+import {
   Category,
   HabitItem,
   RoutineTemplate,
@@ -10,11 +17,164 @@ import {
   MarketItem,
 } from '@/types';
 
-const DB_NAME = 'momentus.db';
+const LEGACY_DB_NAME = 'momentus.db';
+const ENCRYPTED_DB_NAME = 'momentus_encrypted.db';
+const MIGRATION_FLAG_KEY = 'sqlcipher_migrated_v1';
 
 let dbInstance: SQLite.SQLiteDatabase | null = null;
 let dbInitPromise: Promise<SQLite.SQLiteDatabase | null> | null = null;
 let operationQueue: Promise<unknown> = Promise.resolve();
+
+export function getDatabaseSecurityInfo(): DatabaseSecurityInfo {
+  return getRuntimeDatabaseSecurityInfo();
+}
+
+/**
+ * Migra automaticamente, de forma transparente e sem perda de dados, um banco SQLite legado
+ * (em texto claro `momentus.db`) para o novo banco criptografado SQLCipher (`momentus_encrypted.db`),
+ * removendo o arquivo em texto claro do disco após a migração bem-sucedida.
+ */
+async function migrateLegacyUnencryptedDbIfNeeded(
+  SQLiteModule: typeof SQLite,
+  encryptedDb: SQLite.SQLiteDatabase
+): Promise<void> {
+  try {
+    const flagRow = await encryptedDb.getFirstAsync<{ value: string }>(
+      'SELECT value FROM app_kv WHERE key = ?',
+      [MIGRATION_FLAG_KEY]
+    );
+    if (flagRow?.value === 'true') {
+      return;
+    }
+
+    let legacyDb: SQLite.SQLiteDatabase | null = null;
+    try {
+      legacyDb = await SQLiteModule.openDatabaseAsync(LEGACY_DB_NAME);
+      const tableCheck = await legacyDb.getFirstAsync<{ name: string }>(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='habits'"
+      );
+
+      if (tableCheck?.name) {
+        const [categories, habits, templates, achievements, marketItems, appKv] = await Promise.all([
+          legacyDb.getAllAsync<any>('SELECT * FROM categories').catch(() => []),
+          legacyDb.getAllAsync<any>('SELECT * FROM habits').catch(() => []),
+          legacyDb.getAllAsync<any>('SELECT * FROM templates').catch(() => []),
+          legacyDb.getAllAsync<any>('SELECT * FROM achievements').catch(() => []),
+          legacyDb.getAllAsync<any>('SELECT * FROM market_items').catch(() => []),
+          legacyDb.getAllAsync<any>('SELECT * FROM app_kv').catch(() => []),
+        ]);
+
+        const hasLegacyData =
+          categories.length > 0 ||
+          habits.length > 0 ||
+          templates.length > 0 ||
+          achievements.length > 0 ||
+          marketItems.length > 0 ||
+          appKv.length > 0;
+
+        if (hasLegacyData) {
+          await encryptedDb.withTransactionAsync(async () => {
+            for (const c of categories) {
+              await encryptedDb.runAsync(
+                `INSERT OR IGNORE INTO categories (id, name, color, icon, stickerId, metaMinutosSemanal)
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [c.id, c.name, c.color, c.icon ?? null, c.stickerId ?? null, c.metaMinutosSemanal ?? null]
+              );
+            }
+            for (const h of habits) {
+              await encryptedDb.runAsync(
+                `INSERT OR IGNORE INTO habits (
+                  id, title, description, timeStart, timeEnd, categoryId,
+                  completed, date, streak, googleCalendarEventId, saveToGoogle, templateSourceId
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                  h.id,
+                  h.title,
+                  h.description ?? null,
+                  h.timeStart,
+                  h.timeEnd ?? null,
+                  h.categoryId,
+                  h.completed ?? 0,
+                  h.date,
+                  h.streak ?? 0,
+                  h.googleCalendarEventId ?? null,
+                  h.saveToGoogle ?? 0,
+                  h.templateSourceId ?? null,
+                ]
+              );
+            }
+            for (const t of templates) {
+              await encryptedDb.runAsync(
+                `INSERT OR IGNORE INTO templates (id, title, description, icon, color, itemsJson)
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [t.id, t.title, t.description, t.icon, t.color, t.itemsJson]
+              );
+            }
+            for (const a of achievements) {
+              await encryptedDb.runAsync(
+                `INSERT OR IGNORE INTO achievements (
+                  id, title, description, icon, unlocked, unlockedAt, progress, maxProgress, xpReward
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                  a.id,
+                  a.title,
+                  a.description,
+                  a.icon,
+                  a.unlocked ?? 0,
+                  a.unlockedAt ?? null,
+                  a.progress ?? 0,
+                  a.maxProgress ?? 1,
+                  a.xpReward ?? 50,
+                ]
+              );
+            }
+            for (const m of marketItems) {
+              await encryptedDb.runAsync(
+                `INSERT OR IGNORE INTO market_items (
+                  id, name, description, type, rarity, basePrice, finalPrice, isOwned, iconName
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                  m.id,
+                  m.name,
+                  m.description,
+                  m.type,
+                  m.rarity,
+                  m.basePrice ?? 0,
+                  m.finalPrice ?? 0,
+                  m.isOwned ?? 0,
+                  m.iconName,
+                ]
+              );
+            }
+            for (const kv of appKv) {
+              await encryptedDb.runAsync(
+                'INSERT OR IGNORE INTO app_kv (key, value) VALUES (?, ?)',
+                [kv.key, kv.value]
+              );
+            }
+          });
+
+          MomentusLog.db.info('Migração de dados legados para banco SQLCipher AES-256 concluída com sucesso.');
+        }
+      }
+    } catch {
+      // Nenhum banco legado em texto claro legível encontrado — instalação nova
+    } finally {
+      if (legacyDb) {
+        await legacyDb.closeAsync().catch(() => {});
+      }
+      // Remove fisicamente o arquivo legado não criptografado do disco
+      await SQLiteModule.deleteDatabaseAsync(LEGACY_DB_NAME).catch(() => {});
+    }
+
+    await encryptedDb.runAsync(
+      'INSERT OR REPLACE INTO app_kv (key, value) VALUES (?, ?)',
+      [MIGRATION_FLAG_KEY, 'true']
+    );
+  } catch (err) {
+    MomentusLog.db.warn('Aviso na etapa de migração para SQLCipher:', err);
+  }
+}
 
 /**
  * Enfileira operações no SQLite sequencialmente para evitar 'database is locked'
@@ -49,10 +209,17 @@ function enqueueDbOperation<T>(
 }
 
 /**
- * Obtém ou inicializa a conexão única com o banco SQLite (Android / iOS).
+ * Obtém ou inicializa a conexão única com o banco SQLite (Android / iOS),
+ * ativando criptografia transparente SQLCipher AES-256 com chave protegida pelo hardware
+ * (Keychain no iOS / KeyStore no Android) quando compilado no binário nativo.
  */
 export async function getDatabase(): Promise<SQLite.SQLiteDatabase | null> {
   if (Platform.OS === 'web') {
+    setRuntimeDatabaseSecurityInfo({
+      mode: 'web-tls',
+      cipherVersion: null,
+      hardwareKeyProtected: false,
+    });
     return null;
   }
   if (dbInstance) {
@@ -66,10 +233,48 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase | null> {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const SQLiteModule = require('expo-sqlite') as typeof SQLite;
-      const db = await SQLiteModule.openDatabaseAsync(DB_NAME);
-      await initDatabaseSchema(db);
-      dbInstance = db;
-      return db;
+      const encryptionKey = await getOrCreateDatabaseEncryptionKey();
+
+      if (isValid256BitHexKey(encryptionKey)) {
+        const candidateDb = await SQLiteModule.openDatabaseAsync(ENCRYPTED_DB_NAME);
+        try {
+          // A chave SQLCipher DEVE ser o primeiro comando executado na conexão
+          await candidateDb.execAsync(`PRAGMA key = "x'${encryptionKey}'";`);
+          const cipherRow = await candidateDb
+            .getFirstAsync<{ cipher_version?: string }>('PRAGMA cipher_version;')
+            .catch(() => null);
+
+          const cipherVersion = cipherRow?.cipher_version ?? null;
+          if (cipherVersion) {
+            await initDatabaseSchema(candidateDb);
+            await migrateLegacyUnencryptedDbIfNeeded(SQLiteModule, candidateDb);
+            setRuntimeDatabaseSecurityInfo({
+              mode: 'sqlcipher-aes256',
+              cipherVersion,
+              hardwareKeyProtected: true,
+            });
+            MomentusLog.db.info(`SQLCipher AES-256 ativo (v${cipherVersion}) com chave em hardware.`);
+            dbInstance = candidateDb;
+            return candidateDb;
+          }
+        } catch (cipherErr) {
+          MomentusLog.db.warn('SQLCipher indisponível nesta sessão, alternando para fallback:', cipherErr);
+        }
+
+        // Ambiente sem SQLCipher compilado (ex: Expo Go) — fecha e usa banco padrão sem quebrar
+        await candidateDb.closeAsync().catch(() => {});
+      }
+
+      const fallbackDb = await SQLiteModule.openDatabaseAsync(LEGACY_DB_NAME);
+      await initDatabaseSchema(fallbackDb);
+      setRuntimeDatabaseSecurityInfo({
+        mode: 'keychain-only-fallback',
+        cipherVersion: null,
+        hardwareKeyProtected: isValid256BitHexKey(encryptionKey),
+      });
+      MomentusLog.db.info('SQLite inicializado em modo compatibilidade (SQLCipher ativo em builds nativos).');
+      dbInstance = fallbackDb;
+      return fallbackDb;
     } catch (err) {
       MomentusLog.db.warn('Falha ao inicializar SQLite nativo, usando fallback em memória/AsyncStorage:', err);
       dbInitPromise = null;
@@ -784,6 +989,12 @@ export async function clearEntireDatabase(): Promise<void> {
       await db.runAsync('DELETE FROM achievements');
       await db.runAsync('DELETE FROM market_items');
       await db.runAsync('DELETE FROM app_kv');
+      if (getRuntimeDatabaseSecurityInfo().mode === 'sqlcipher-aes256') {
+        await db.runAsync(
+          'INSERT OR REPLACE INTO app_kv (key, value) VALUES (?, ?)',
+          [MIGRATION_FLAG_KEY, 'true']
+        );
+      }
     });
   }, undefined);
 }

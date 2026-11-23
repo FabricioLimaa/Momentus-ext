@@ -32,6 +32,7 @@ import { useMomentus } from '@/context/MomentusContext';
 import { MomentusLog } from '@/util/logger';
 import { requestNotificationPermissions } from '@/services/notificationService';
 import { requestPinAndroidWidget } from '@/services/widgetService';
+import { getDatabaseSecurityInfo } from '@/database/momentusDb';
 
 // Helper de timeout seguro para proteger chamadas assíncronas contra travamentos de rede
 const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number, timeoutErrorMsg: string): Promise<T> => {
@@ -967,13 +968,36 @@ export default function SettingsScreen() {
                   />
                 </View>
 
-                {/* Card Explicativo de Segurança Local */}
-                <View style={[styles.securityInfoBox, { backgroundColor: theme.surfaceElevated }]}>
-                  <Ionicons name="lock-closed" size={16} color={primaryColorHex} />
-                  <Text style={[styles.securityInfoText, { color: theme.textSecondary }]}>
-                    Seus dados pessoais, rotinas e anotações são armazenados localmente com criptografia e sincronizados apenas sob sua autorização.
-                  </Text>
-                </View>
+                {/* Card Explicativo de Segurança Local & Criptografia em Repouso */}
+                {(() => {
+                  const secInfo = getDatabaseSecurityInfo();
+                  const statusTitle =
+                    secInfo.mode === 'sqlcipher-aes256'
+                      ? `Criptografia SQLCipher AES-256 Ativa${secInfo.cipherVersion ? ` (v${secInfo.cipherVersion})` : ''}`
+                      : secInfo.mode === 'web-tls'
+                        ? 'Armazenamento Isolado Web (HTTPS / TLS)'
+                        : 'Cofre de Sessão em Hardware Ativo';
+                  const statusDesc =
+                    secInfo.mode === 'sqlcipher-aes256'
+                      ? 'Seu banco SQLite local e tokens de sessão estão blindados em repouso com chave de 256 bits protegida no Keychain / KeyStore do aparelho.'
+                      : secInfo.mode === 'web-tls'
+                        ? 'Sessão protegida pelo isolamento de origem do navegador e sincronizada via conexão criptografada HTTPS.'
+                        : 'Chaves de sessão protegidas no Keychain / KeyStore. A criptografia completa SQLCipher AES-256 é ativada automaticamente em builds nativos.';
+
+                  return (
+                    <View style={[styles.securityInfoBox, { backgroundColor: theme.surfaceElevated }]}>
+                      <Ionicons name="lock-closed" size={16} color={primaryColorHex} />
+                      <View style={styles.securityInfoContent}>
+                        <Text style={[styles.securityInfoTitle, { color: theme.textPrimary }]}>
+                          {statusTitle}
+                        </Text>
+                        <Text style={[styles.securityInfoText, { color: theme.textSecondary }]}>
+                          {statusDesc}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })()}
               </View>
             )}
           </View>
@@ -1514,16 +1538,24 @@ const styles = StyleSheet.create({
   },
   securityInfoBox: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    padding: 10,
-    borderRadius: 10,
-    marginTop: 14,
+    alignItems: 'flex-start',
+    gap: SpacingTokens.sm,
+    padding: SpacingTokens.md,
+    borderRadius: BorderRadiusTokens.control,
+    marginTop: SpacingTokens.md,
+  },
+  securityInfoContent: {
+    flex: 1,
+    gap: SpacingTokens.xs,
+  },
+  securityInfoTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 16,
   },
   securityInfoText: {
     fontSize: 11,
-    flex: 1,
-    lineHeight: 15,
+    lineHeight: 16,
   },
   pillsRow: {
     flexDirection: 'row',

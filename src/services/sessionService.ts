@@ -2,6 +2,10 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth as firebaseAuth } from '@/config/firebase';
 import { MomentusLog } from '@/util/logger';
+import {
+  getSecureStoreModule,
+  getHardenedSecureStoreOptions,
+} from '@/services/encryptionService';
 
 export interface SavedSessionData {
   uid: string;
@@ -15,78 +19,82 @@ export interface SavedSessionData {
 const SECURE_KEY_TOKEN = 'momentus_session_token';
 const SECURE_KEY_USER = 'momentus_session_user';
 
-type SecureStoreModule = typeof import('expo-secure-store');
-let cachedSecureStore: SecureStoreModule | null | undefined = undefined;
-
-function getSecureStore(): SecureStoreModule | null {
-  if (cachedSecureStore !== undefined) {
-    return cachedSecureStore;
-  }
-  if (Platform.OS === 'web') {
-    cachedSecureStore = null;
-    return null;
-  }
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const mod = require('expo-secure-store') as SecureStoreModule;
-    cachedSecureStore = mod;
-    return mod;
-  } catch (err) {
-    MomentusLog.auth.warn('expo-secure-store não disponível no ambiente atual, usando fallback:', err);
-    cachedSecureStore = null;
-    return null;
-  }
-}
-
 /**
- * Salva a sessão do usuário de forma criptografada (SecureStore no Mobile / localStorage estrito no Web).
+ * Salva a sessão do usuário de forma estritamente protegida:
+ * - Mobile (iOS Keychain / Android KeyStore): usa `expo-secure-store` com serviço isolado e
+ *   `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY`, separando o JWT do perfil e NUNCA gravando credenciais
+ *   em texto claro no `AsyncStorage`.
+ * - Web: armazena isoladamente no `localStorage` do domínio HTTPS.
  */
 export async function saveSecureSession(data: SavedSessionData): Promise<void> {
-  const payload = JSON.stringify({
-    ...data,
+  const { token, ...userWithoutToken } = data;
+  const userPayload = JSON.stringify({
+    ...userWithoutToken,
     lastActive: Date.now(),
   });
 
   try {
-    const SecureStore = getSecureStore();
+    const SecureStore = getSecureStoreModule();
     if (SecureStore) {
-      if (data.token) {
-        await SecureStore.setItemAsync(SECURE_KEY_TOKEN, data.token).catch(() => {});
+      const options = getHardenedSecureStoreOptions();
+      if (token) {
+        await SecureStore.setItemAsync(SECURE_KEY_TOKEN, token, options).catch(() => {});
       }
-      await SecureStore.setItemAsync(SECURE_KEY_USER, payload).catch(() => {});
+      await SecureStore.setItemAsync(SECURE_KEY_USER, userPayload, options).catch(() => {});
+      // Garante remoção de qualquer resquício legado em texto claro no AsyncStorage
+      await AsyncStorage.removeItem(SECURE_KEY_USER).catch(() => {});
     } else if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
-      if (data.token) {
-        window.localStorage.setItem(SECURE_KEY_TOKEN, data.token);
+      if (token) {
+        window.localStorage.setItem(SECURE_KEY_TOKEN, token);
       }
-      window.localStorage.setItem(SECURE_KEY_USER, payload);
+      window.localStorage.setItem(SECURE_KEY_USER, userPayload);
+    } else {
+      // Fallback extremo apenas se o ambiente nativo não possuir SecureStore
+      await AsyncStorage.setItem(SECURE_KEY_USER, userPayload).catch(() => {});
     }
-    // Fallback de contingência no AsyncStorage
-    await AsyncStorage.setItem(SECURE_KEY_USER, payload).catch(() => {});
-    MomentusLog.auth.info('Sessão segura persistida com sucesso para:', data.email || data.uid);
+    MomentusLog.auth.info('Sessão segura persistida no cofre protegido para:', data.email || data.uid);
   } catch (err) {
     MomentusLog.auth.warn('Falha ao gravar sessão segura:', err);
   }
 }
 
 /**
- * Recupera a sessão persistida no primeiro milissegundo de inicialização
- * para hidratação síncrona/instantânea de perfil (prevenindo telas em branco ou logout provisório).
+ * Recupera a sessão persistida no cofre de hardware no primeiro milissegundo de inicialização.
+ * Inclui migração transparente única caso existam credenciais de versões anteriores fora do cofre endurecido.
  */
 export async function getSecureSession(): Promise<SavedSessionData | null> {
   try {
-    const SecureStore = getSecureStore();
+    const SecureStore = getSecureStoreModule();
     let rawUser: string | null = null;
     let rawToken: string | null = null;
+    let needsHardenedMigration = false;
 
     if (SecureStore) {
-      rawUser = await SecureStore.getItemAsync(SECURE_KEY_USER).catch(() => null);
-      rawToken = await SecureStore.getItemAsync(SECURE_KEY_TOKEN).catch(() => null);
+      const options = getHardenedSecureStoreOptions();
+      rawUser = await SecureStore.getItemAsync(SECURE_KEY_USER, options).catch(() => null);
+      rawToken = await SecureStore.getItemAsync(SECURE_KEY_TOKEN, options).catch(() => null);
+
+      // Migração transparente de instalações anteriores (sem keychainService customizado ou legado AsyncStorage)
+      if (!rawUser) {
+        const legacySecureUser = await SecureStore.getItemAsync(SECURE_KEY_USER).catch(() => null);
+        const legacySecureToken = await SecureStore.getItemAsync(SECURE_KEY_TOKEN).catch(() => null);
+        if (legacySecureUser) {
+          rawUser = legacySecureUser;
+          rawToken = rawToken || legacySecureToken;
+          needsHardenedMigration = true;
+        }
+      }
+      if (!rawUser) {
+        const legacyPlainUser = await AsyncStorage.getItem(SECURE_KEY_USER).catch(() => null);
+        if (legacyPlainUser) {
+          rawUser = legacyPlainUser;
+          needsHardenedMigration = true;
+        }
+      }
     } else if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
       rawUser = window.localStorage.getItem(SECURE_KEY_USER);
       rawToken = window.localStorage.getItem(SECURE_KEY_TOKEN);
-    }
-
-    if (!rawUser) {
+    } else {
       rawUser = await AsyncStorage.getItem(SECURE_KEY_USER).catch(() => null);
     }
 
@@ -95,6 +103,15 @@ export async function getSecureSession(): Promise<SavedSessionData | null> {
       if (rawToken && !parsed.token) {
         parsed.token = rawToken;
       }
+
+      if (needsHardenedMigration && SecureStore) {
+        await saveSecureSession(parsed);
+        await SecureStore.deleteItemAsync(SECURE_KEY_USER).catch(() => {});
+        await SecureStore.deleteItemAsync(SECURE_KEY_TOKEN).catch(() => {});
+        await AsyncStorage.removeItem(SECURE_KEY_USER).catch(() => {});
+        MomentusLog.auth.info('Sessão legada migrada para cofre protegido de hardware.');
+      }
+
       return parsed;
     }
     return null;
@@ -105,14 +122,19 @@ export async function getSecureSession(): Promise<SavedSessionData | null> {
 }
 
 /**
- * Remove completamente as credenciais salvas no logout explícito do usuário.
+ * Remove completamente as credenciais salvas no logout explícito do usuário (cofre atual e legados).
  */
 export async function clearSecureSession(): Promise<void> {
   try {
-    const SecureStore = getSecureStore();
+    const SecureStore = getSecureStoreModule();
     if (SecureStore) {
-      await SecureStore.deleteItemAsync(SECURE_KEY_TOKEN).catch(() => {});
-      await SecureStore.deleteItemAsync(SECURE_KEY_USER).catch(() => {});
+      const options = getHardenedSecureStoreOptions();
+      await Promise.all([
+        SecureStore.deleteItemAsync(SECURE_KEY_TOKEN, options).catch(() => {}),
+        SecureStore.deleteItemAsync(SECURE_KEY_USER, options).catch(() => {}),
+        SecureStore.deleteItemAsync(SECURE_KEY_TOKEN).catch(() => {}),
+        SecureStore.deleteItemAsync(SECURE_KEY_USER).catch(() => {}),
+      ]);
     }
     if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
       window.localStorage.removeItem(SECURE_KEY_TOKEN);
@@ -162,7 +184,6 @@ export async function refreshUserSessionToken(forceRefresh = true): Promise<stri
 export function setupSilentTokenRefresh(
   onTokenRefreshed?: (newToken: string) => void
 ): () => void {
-  // 45 minutos em milissegundos
   const REFRESH_INTERVAL_MS = 45 * 60 * 1000;
 
   const timer = setInterval(async () => {
@@ -178,4 +199,3 @@ export function setupSilentTokenRefresh(
     clearInterval(timer);
   };
 }
-
