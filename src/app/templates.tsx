@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -23,6 +23,7 @@ import {
   BorderRadiusTokens,
   ComponentHeightTokens,
   TypographyTokens,
+  IconSize,
   useResponsiveLayout,
 } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
@@ -33,6 +34,13 @@ import {
   COMMUNITY_TRACKS,
   CommunityTemplate,
 } from '@/constants/communityTemplates';
+import {
+  getBaselineCommunityAdoptionMap,
+  fetchCommunityAdoptionMetrics,
+  incrementCommunityTemplateUsage,
+  isPopularCommunityTemplate,
+  formatCommunityUsageCount,
+} from '@/services/communityMetricsService';
 import { getTodayDateString } from '@/constants/initialData';
 import { APP_INFO } from '@/constants/appInfo';
 
@@ -65,6 +73,39 @@ export default function TemplatesScreen() {
   const [communityTagFilter, setCommunityTagFilter] = useState<string>('Todas');
   const [communitySearchQuery, setCommunitySearchQuery] = useState<string>('');
   const [selectedCommunityTemplate, setSelectedCommunityTemplate] = useState<CommunityTemplate | null>(null);
+  const [communityUsageMap, setCommunityUsageMap] = useState<Record<string, number>>(
+    () => getBaselineCommunityAdoptionMap()
+  );
+
+  useEffect(() => {
+    let mounted = true;
+    fetchCommunityAdoptionMetrics()
+      .then((metrics) => {
+        if (mounted) {
+          setCommunityUsageMap(metrics);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const recordTemplateAdoption = (templateId: string) => {
+    const current = communityUsageMap[templateId] ?? 0;
+    setCommunityUsageMap((prev) => ({
+      ...prev,
+      [templateId]: (prev[templateId] ?? current) + 1,
+    }));
+    incrementCommunityTemplateUsage(templateId, current)
+      .then((persistedCount) => {
+        setCommunityUsageMap((prev) => ({
+          ...prev,
+          [templateId]: Math.max(prev[templateId] ?? 0, persistedCount),
+        }));
+      })
+      .catch(() => {});
+  };
 
   // Estado de acordeão dos templates salvos (Tap-to-expand)
   const [expandedTemplateIds, setExpandedTemplateIds] = useState<Record<string, boolean>>({});
@@ -495,6 +536,7 @@ export default function TemplatesScreen() {
       });
     });
     triggerHaptic('success');
+    recordTemplateAdoption(template.id);
     if (selectedCommunityTemplate) {
       setSelectedCommunityTemplate(null);
     }
@@ -529,6 +571,7 @@ export default function TemplatesScreen() {
     });
 
     triggerHaptic('success');
+    recordTemplateAdoption(template.id);
     if (selectedCommunityTemplate) {
       setSelectedCommunityTemplate(null);
     }
@@ -933,6 +976,8 @@ export default function TemplatesScreen() {
                     contentContainerStyle={styles.carouselContainer}>
                     {track.templates.map((tmpl) => {
                       const totalMinutes = tmpl.items.reduce((acc, it) => acc + (it.durationMinutes || 0), 0);
+                      const usageCount = communityUsageMap[tmpl.id] ?? tmpl.vezesUsado;
+                      const isPopular = isPopularCommunityTemplate(usageCount);
 
                       return (
                         <View
@@ -947,9 +992,13 @@ export default function TemplatesScreen() {
                               setSelectedCommunityTemplate(tmpl);
                               triggerHaptic('impact');
                             }}>
-                            {/* Linha Superior: Badge & Tempo */}
+                            {/* Linha Superior: Badge Popular (50+ usos) ou Editorial & Tempo */}
                             <View style={styles.commCardTopRow}>
-                              {tmpl.badge ? (
+                              {isPopular ? (
+                                <View style={styles.commPopularBadge}>
+                                  <Text style={styles.commPopularBadgeText}>Popular 🔥</Text>
+                                </View>
+                              ) : tmpl.badge ? (
                                 <View style={[styles.commBadge, { backgroundColor: `${tmpl.color}20`, borderColor: `${tmpl.color}40` }]}>
                                   <Text style={[styles.commBadgeText, { color: tmpl.color }]}>
                                     {tmpl.badge}
@@ -958,7 +1007,7 @@ export default function TemplatesScreen() {
                               ) : <View />}
 
                               <View style={[styles.commTimePill, { backgroundColor: `${theme.textSecondary}15` }]}>
-                                <Ionicons name="time-outline" size={11} color={theme.textSecondary} />
+                                <Ionicons name="time-outline" size={IconSize.xs} color={theme.textSecondary} />
                                 <Text style={[styles.commTimePillText, { color: theme.textSecondary }]}>
                                   {totalMinutes}m • {tmpl.items.length} hábitos
                                 </Text>
@@ -995,6 +1044,19 @@ export default function TemplatesScreen() {
                                   + {tmpl.items.length - 2} etapas na rotina...
                                 </Text>
                               )}
+                            </View>
+
+                            {/* Métrica Silenciosa de Adoção (vezesUsado) */}
+                            <View style={styles.commAdoptionRow}>
+                              <Ionicons name="people-outline" size={IconSize.xs} color={theme.textSecondary} />
+                              <Text style={[styles.commAdoptionText, { color: theme.textSecondary }]}>
+                                {formatCommunityUsageCount(usageCount)}
+                              </Text>
+                              {isPopular && tmpl.badge ? (
+                                <Text style={[styles.commAdoptionDivider, { color: theme.textSecondary }]} numberOfLines={1}>
+                                  • {tmpl.badge}
+                                </Text>
+                              ) : null}
                             </View>
                           </TouchableOpacity>
 
@@ -1495,6 +1557,31 @@ export default function TemplatesScreen() {
             </Text>
 
             <View style={styles.commModalTagsRow}>
+              {selectedCommunityTemplate && (() => {
+                const modalUsage =
+                  communityUsageMap[selectedCommunityTemplate.id] ??
+                  selectedCommunityTemplate.vezesUsado;
+                const modalPopular = isPopularCommunityTemplate(modalUsage);
+                return (
+                  <>
+                    {modalPopular && (
+                      <View style={styles.commPopularBadge}>
+                        <Text style={styles.commPopularBadgeText}>Popular 🔥</Text>
+                      </View>
+                    )}
+                    <View
+                      style={[
+                        styles.commModalUsagePill,
+                        { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
+                      ]}>
+                      <Ionicons name="people-outline" size={IconSize.xs} color={theme.textSecondary} />
+                      <Text style={[styles.commModalUsageText, { color: theme.textSecondary }]}>
+                        {formatCommunityUsageCount(modalUsage)}
+                      </Text>
+                    </View>
+                  </>
+                );
+              })()}
               {selectedCommunityTemplate?.tags.map((tg) => (
                 <View key={tg} style={[styles.commModalTag, { backgroundColor: `${theme.primary}15` }]}>
                   <Text style={[styles.commModalTagText, { color: theme.primary }]}>#{tg}</Text>
@@ -2329,25 +2416,66 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   commBadge: {
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: SpacingTokens.sm,
+    paddingVertical: SpacingTokens.xs,
+    borderRadius: BorderRadiusTokens.sm,
     borderWidth: 1,
   },
   commBadgeText: {
     fontSize: 11,
     fontWeight: '800',
   },
+  commPopularBadge: {
+    paddingHorizontal: SpacingTokens.sm,
+    paddingVertical: SpacingTokens.xs,
+    borderRadius: BorderRadiusTokens.sm,
+    borderWidth: 1,
+    backgroundColor: 'rgba(245, 158, 11, 0.16)',
+    borderColor: 'rgba(245, 158, 11, 0.45)',
+  },
+  commPopularBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#F59E0B',
+  },
   commTimePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    gap: SpacingTokens.xs,
+    paddingHorizontal: SpacingTokens.sm,
+    paddingVertical: SpacingTokens.xs,
+    borderRadius: BorderRadiusTokens.sm,
   },
   commTimePillText: {
-    fontSize: 10,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  commAdoptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SpacingTokens.xs,
+    marginBottom: SpacingTokens.md,
+  },
+  commAdoptionText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  commAdoptionDivider: {
+    fontSize: 11,
+    fontWeight: '600',
+    flexShrink: 1,
+  },
+  commModalUsagePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SpacingTokens.xs,
+    paddingHorizontal: SpacingTokens.sm,
+    paddingVertical: SpacingTokens.xs,
+    borderRadius: BorderRadiusTokens.sm,
+    borderWidth: 1,
+  },
+  commModalUsageText: {
+    fontSize: 11,
     fontWeight: '700',
   },
   commCardMain: {

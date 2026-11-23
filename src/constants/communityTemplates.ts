@@ -8,6 +8,8 @@ export interface CommunityTemplateItem {
   categoryHint: string;
 }
 
+export const POPULAR_TEMPLATE_THRESHOLD = 50;
+
 export interface CommunityTemplate {
   id: string;
   title: string;
@@ -15,6 +17,8 @@ export interface CommunityTemplate {
   icon: string;
   color: string;
   badge?: string;
+  /** Contagem base consolidada de adoções/clones pela comunidade */
+  vezesUsado: number;
   trackId: string;
   trackTitle: string;
   tags: string[];
@@ -44,7 +48,8 @@ export const COMMUNITY_TRACKS: CommunityTrack[] = [
         description: 'Sequência clássica inspirada nos maiores realizadores para despertar corpo e mente.',
         icon: 'cafe-outline',
         color: '#F59E0B',
-        badge: 'Mais Popular 🔥',
+        badge: 'Clássico ☀️',
+        vezesUsado: 142,
         trackId: 'morning_performance',
         trackTitle: 'Rotinas Matinais de Alta Performance',
         tags: ['Manhã', 'Equilíbrio', 'Energia'],
@@ -94,6 +99,7 @@ export const COMMUNITY_TRACKS: CommunityTrack[] = [
         icon: 'flash-outline',
         color: '#10B981',
         badge: 'Rápido ⚡',
+        vezesUsado: 64,
         trackId: 'morning_performance',
         trackTitle: 'Rotinas Matinais de Alta Performance',
         tags: ['Manhã', 'Rápido', 'Energia'],
@@ -143,6 +149,7 @@ export const COMMUNITY_TRACKS: CommunityTrack[] = [
         icon: 'book-outline',
         color: '#3B82F6',
         badge: 'Recomendado ⭐',
+        vezesUsado: 118,
         trackId: 'deep_work_study',
         trackTitle: 'Estudos & Concursos (Deep Work)',
         tags: ['Estudos', 'Foco', 'Concursos'],
@@ -192,6 +199,7 @@ export const COMMUNITY_TRACKS: CommunityTrack[] = [
         icon: 'trophy-outline',
         color: '#6366F1',
         badge: 'Desafio 🎯',
+        vezesUsado: 42,
         trackId: 'deep_work_study',
         trackTitle: 'Estudos & Concursos (Deep Work)',
         tags: ['Estudos', 'Simulado', 'Concursos'],
@@ -241,6 +249,7 @@ export const COMMUNITY_TRACKS: CommunityTrack[] = [
         icon: 'barbell-outline',
         color: '#10B981',
         badge: 'Essencial 💪',
+        vezesUsado: 87,
         trackId: 'health_wellness',
         trackTitle: 'Saúde, Movimento & Bem-Estar',
         tags: ['Saúde', 'Treino', 'Corpo'],
@@ -290,6 +299,7 @@ export const COMMUNITY_TRACKS: CommunityTrack[] = [
         icon: 'walk-outline',
         color: '#06B6D4',
         badge: 'Ergonomia 🧘',
+        vezesUsado: 38,
         trackId: 'health_wellness',
         trackTitle: 'Saúde, Movimento & Bem-Estar',
         tags: ['Saúde', 'Trabalho', 'Postura'],
@@ -330,6 +340,7 @@ export const COMMUNITY_TRACKS: CommunityTrack[] = [
         icon: 'bed-outline',
         color: '#8B5CF6',
         badge: 'Sono Reparador 🌙',
+        vezesUsado: 95,
         trackId: 'evening_sleep',
         trackTitle: 'Higiene do Sono & Desaceleração',
         tags: ['Noite', 'Sono', 'Desaceleração'],
@@ -379,6 +390,7 @@ export const COMMUNITY_TRACKS: CommunityTrack[] = [
         icon: 'checkbox-outline',
         color: '#64748B',
         badge: 'Anti-Ansiedade 🛡️',
+        vezesUsado: 46,
         trackId: 'evening_sleep',
         trackTitle: 'Higiene do Sono & Desaceleração',
         tags: ['Noite', 'Organização', 'Planejamento'],
@@ -419,6 +431,7 @@ export const COMMUNITY_TRACKS: CommunityTrack[] = [
         icon: 'rocket-outline',
         color: '#06B6D4',
         badge: 'Alto Impacto 🚀',
+        vezesUsado: 73,
         trackId: 'work_productivity',
         trackTitle: 'Produtividade & Trabalho Ágil',
         tags: ['Trabalho', 'Produtividade', 'Foco'],
