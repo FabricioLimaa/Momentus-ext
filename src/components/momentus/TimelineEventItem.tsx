@@ -8,6 +8,7 @@ import {
   SpacingTokens,
   BorderRadiusTokens,
   ComponentHeightTokens,
+  IconSize,
 } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 
@@ -60,11 +61,16 @@ export const TimelineEventItem: React.FC<TimelineEventItemProps> = ({
   const categoryColor = category?.color || theme.primary;
   const stickerIcon = getIconForMarketItem(category?.stickerId);
 
-  // Verifica se o evento está em andamento agora
-  const isOngoing = useMemo(() => {
+  // Verifica se o evento está em andamento agora ou se já encerrou no passado
+  const { isOngoing, isPast } = useMemo(() => {
     try {
       const now = new Date();
       const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+      const todayYear = now.getFullYear();
+      const todayMonth = String(now.getMonth() + 1).padStart(2, '0');
+      const todayDay = String(now.getDate()).padStart(2, '0');
+      const todayStr = `${todayYear}-${todayMonth}-${todayDay}`;
 
       const [startH, startM] = item.timeStart.split(':').map(Number);
       const startMinutes = startH * 60 + startM;
@@ -75,11 +81,20 @@ export const TimelineEventItem: React.FC<TimelineEventItemProps> = ({
         endMinutes = endH * 60 + endM;
       }
 
-      return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+      const itemDate = item.date || todayStr;
+      const isDateToday = itemDate === todayStr;
+      const isDateBeforeToday = itemDate < todayStr;
+
+      const ongoing = isDateToday && currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+      const past = isDateBeforeToday || (isDateToday && currentMinutes > endMinutes);
+
+      return { isOngoing: ongoing, isPast: past };
     } catch {
-      return false;
+      return { isOngoing: false, isPast: false };
     }
-  }, [item.timeStart, item.timeEnd]);
+  }, [item.timeStart, item.timeEnd, item.date]);
+
+  const isPastPending = isPast && !isChecked;
 
   const displayEndTime = useMemo(() => {
     if (item.timeEnd) return item.timeEnd;
@@ -107,12 +122,13 @@ export const TimelineEventItem: React.FC<TimelineEventItemProps> = ({
         : {})}
       style={[
         styles.container,
-        isSelected && { backgroundColor: `${theme.primary}20`, borderRadius: 12 },
+        isSelected && { backgroundColor: `${theme.primary}20`, borderRadius: BorderRadiusTokens.card },
+        isPastPending && !isSelected && styles.containerPastPending,
         isOngoing && !isChecked && !isSelected && {
-          backgroundColor: `${theme.primary}12`,
-          borderColor: `${theme.primary}35`,
-          borderWidth: 1,
-          borderRadius: 12,
+          backgroundColor: `${theme.primary}15`,
+          borderColor: theme.primary,
+          borderWidth: 1.5,
+          borderRadius: BorderRadiusTokens.card,
         },
         Platform.OS === 'web' && ({ cursor: 'pointer' } as any),
       ]}>
@@ -122,6 +138,7 @@ export const TimelineEventItem: React.FC<TimelineEventItemProps> = ({
           style={[
             styles.timeText,
             { color: isOngoing ? theme.primary : theme.textSecondary },
+            isOngoing && styles.timeTextOngoingBold,
           ]}>
           {item.timeStart}
         </Text>
@@ -141,6 +158,12 @@ export const TimelineEventItem: React.FC<TimelineEventItemProps> = ({
           style={[
             styles.timelineDot,
             { backgroundColor: categoryColor, borderColor: theme.surface },
+            isOngoing && !isChecked && {
+              borderColor: theme.primary,
+              borderWidth: 3,
+              transform: [{ scale: 1.25 }],
+            },
+            isPastPending && styles.timelineDotPastPending,
           ]}
         />
         <View
@@ -176,6 +199,45 @@ export const TimelineEventItem: React.FC<TimelineEventItemProps> = ({
             ]}>
             {item.title}
           </Text>
+
+          {/* Badge "Agora" para evento em andamento */}
+          {isOngoing && !isChecked && (
+            <View
+              style={[
+                styles.ongoingBadge,
+                {
+                  backgroundColor: `${theme.primary}20`,
+                  borderColor: theme.primary,
+                },
+              ]}>
+              <View style={[styles.ongoingPulseDot, { backgroundColor: theme.primary }]} />
+              <Text style={[styles.ongoingBadgeText, { color: theme.primary }]}>
+                Agora
+              </Text>
+            </View>
+          )}
+
+          {/* Badge "Pendente" para eventos passados não concluídos */}
+          {isPastPending && (
+            <View
+              style={[
+                styles.pastPendingBadge,
+                {
+                  backgroundColor: theme.isDark ? 'rgba(239, 68, 68, 0.12)' : 'rgba(239, 68, 68, 0.08)',
+                  borderColor: theme.isDark ? 'rgba(239, 68, 68, 0.35)' : 'rgba(239, 68, 68, 0.25)',
+                },
+              ]}>
+              <Ionicons
+                name="time-outline"
+                size={IconSize.xs}
+                color={MomentusColors.errorRed}
+                style={styles.pastPendingIcon}
+              />
+              <Text style={[styles.pastPendingText, { color: MomentusColors.errorRed }]}>
+                Pendente
+              </Text>
+            </View>
+          )}
 
           {/* Chip de Categoria */}
           <View style={[styles.categoryBadge, { backgroundColor: `${categoryColor}20` }]}>
@@ -236,6 +298,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: SpacingTokens.md,
     minHeight: 64,
   },
+  containerPastPending: {
+    opacity: 0.65,
+  },
   containerSelected: {
     backgroundColor: 'rgba(52, 211, 153, 0.12)',
     borderRadius: BorderRadiusTokens.control,
@@ -251,6 +316,9 @@ const styles = StyleSheet.create({
   },
   timeTextOngoing: {
     color: MomentusColors.emeraldNeon,
+  },
+  timeTextOngoingBold: {
+    fontWeight: '800',
   },
   timelineColumn: {
     width: 24,
@@ -276,6 +344,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 2,
     borderColor: MomentusColors.navyBackground,
+  },
+  timelineDotPastPending: {
+    opacity: 0.6,
   },
   contentColumn: {
     flex: 1,
@@ -352,6 +423,41 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(66, 133, 244, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  ongoingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SpacingTokens.xs,
+    paddingVertical: 2,
+    borderRadius: BorderRadiusTokens.xs,
+    borderWidth: 1,
+    marginLeft: SpacingTokens.xs,
+  },
+  ongoingPulseDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: SpacingTokens.xs,
+  },
+  ongoingBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  pastPendingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SpacingTokens.xs,
+    paddingVertical: 2,
+    borderRadius: BorderRadiusTokens.xs,
+    borderWidth: 1,
+    marginLeft: SpacingTokens.xs,
+  },
+  pastPendingIcon: {
+    marginRight: 2,
+  },
+  pastPendingText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
 });
 
