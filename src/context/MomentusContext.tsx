@@ -1044,7 +1044,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const addHabit = (habitData: Omit<HabitItem, 'id' | 'completed' | 'streak'>) => {
     const newHabit: HabitItem = {
       ...habitData,
-      id: `h-${Date.now()}`,
+      id: `h-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       completed: false,
       streak: 0,
     };

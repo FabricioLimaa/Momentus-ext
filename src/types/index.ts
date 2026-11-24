@@ -118,6 +118,7 @@ export interface AppSettings {
   termsAccepted?: boolean;
   termsAcceptedVersion?: number;
   termsAcceptedAt?: string | null;
+  hasCompletedOnboarding?: boolean;
   notificationsEnabled?: boolean;
   reminderAdvanceMinutes?: number;
   morningBriefingEnabled?: boolean;

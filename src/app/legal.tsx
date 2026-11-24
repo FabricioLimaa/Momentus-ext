@@ -35,6 +35,8 @@ export default function LegalScreen() {
   const { mandatory } = useLocalSearchParams<{ mandatory?: string }>();
   const {
     theme,
+    settings,
+    habits,
     acceptTermsAction,
     declineTermsAction,
     isTermsAccepted,
@@ -95,6 +97,8 @@ export default function LegalScreen() {
     try {
       await acceptTermsAction();
       const isPt = language === 'pt';
+      const shouldShowOnboarding = !settings.hasCompletedOnboarding && habits.length === 0;
+      const nextRoute = shouldShowOnboarding ? '/onboarding' : '/home';
       Alert.alert(
         isPt ? 'Termos Aceitos! ✅' : 'Terms Accepted! ✅',
         isPt
@@ -103,7 +107,7 @@ export default function LegalScreen() {
         [
           {
             text: isPt ? 'Continuar' : 'Continue',
-            onPress: () => router.replace('/home'),
+            onPress: () => router.replace(nextRoute as any),
           },
         ]
       );

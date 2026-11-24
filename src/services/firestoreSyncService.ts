@@ -30,8 +30,6 @@ const EVENTS_COLLECTION = "eventos";
 const CATEGORIES_COLLECTION = "categories";
 export const LEGACY_MOCK_HABIT_IDS = new Set(["h-1", "h-2", "h-3", "h-4"]);
 export const LEGACY_MOCK_HABIT_TITLES = new Set([
-  "beber 2l de água",
-  "beber 2l de agua",
   "leitura 20 minutos",
   "treino ou caminhada",
   "meditação mindfulness",
