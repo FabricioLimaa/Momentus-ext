@@ -28,6 +28,7 @@ import { useMomentus } from '@/context/MomentusContext';
 import { getStreakColor } from '@/constants/initialData';
 import { Achievement, MarketItem } from '@/types';
 import { AvatarWithFrame, AVATAR_FRAMES, AvatarFrameType } from '@/components/momentus/AvatarWithFrame';
+import { XpEvolutionChartCard } from '@/components/momentus/XpEvolutionChartCard';
 
 export type AchievementTier = 'bronze' | 'silver' | 'gold' | 'diamond';
 
@@ -119,6 +120,8 @@ export const getIconForAchievement = (id: string): keyof typeof Ionicons.glyphMa
 export default function AchievementsScreen() {
   const { isLargeScreen } = useResponsiveLayout();
   const {
+    habits,
+    focusHistoryMap,
     achievements,
     marketItems,
     userProfile,
@@ -573,6 +576,17 @@ export default function AchievementsScreen() {
     </View>
   );
 
+  const renderXpEvolutionCard = () => (
+    <XpEvolutionChartCard
+      habits={habits}
+      focusHistoryMap={focusHistoryMap}
+      achievements={achievements}
+      totalPoints={userProfile.totalPoints}
+      theme={theme}
+      onSelectPoint={() => triggerHaptic('selection')}
+    />
+  );
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <StatusBar
@@ -591,9 +605,13 @@ export default function AchievementsScreen() {
         ]}>
         {isLargeScreen ? (
           <View style={styles.desktopLayout}>
-            <View style={styles.desktopLeftCol}>
+            <ScrollView
+              style={styles.desktopLeftCol}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.desktopLeftScrollContent}>
               {renderProfileCard()}
-            </View>
+              {renderXpEvolutionCard()}
+            </ScrollView>
             <View style={styles.desktopRightCol}>
               {renderTabsAndFilters()}
               <ScrollView
@@ -613,6 +631,7 @@ export default function AchievementsScreen() {
               style={styles.scroll}
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}>
+              {activeTab === 'achievements' && renderXpEvolutionCard()}
               {renderItemsList()}
               <View style={{ height: 40 }} />
             </ScrollView>
@@ -1293,5 +1312,8 @@ const styles = StyleSheet.create({
   frameOptionDesc: {
     fontSize: 11,
     lineHeight: 15,
+  },
+  desktopLeftScrollContent: {
+    paddingBottom: SpacingTokens.xl,
   },
 });
