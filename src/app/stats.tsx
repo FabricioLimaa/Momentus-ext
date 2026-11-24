@@ -18,11 +18,13 @@ import {
   BorderRadiusTokens,
   ComponentHeightTokens,
   TypographyTokens,
+  IconSize,
   useResponsiveLayout,
 } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import { WeeklySummaryModal } from '@/components/momentus/WeeklySummaryModal';
 import { CircularProgressRing } from '@/components/momentus/CircularProgressRing';
+import { computeProductivityInsight } from '@/domain/productivityInsights';
 
 type StatsFilter = 'WEEK' | 'MONTH' | 'YEAR';
 
@@ -429,6 +431,12 @@ export default function StatsScreen() {
     return stats.chartBars[selectedBarIndex];
   }, [selectedBarIndex, stats.chartBars]);
 
+  // Dedução algorítmica local dos picos de produtividade e foco (P6)
+  const productivityInsight = useMemo(
+    () => computeProductivityInsight(habits, focusHistoryMap, filterDays),
+    [habits, focusHistoryMap, filterDays]
+  );
+
   const renderHeroAndStreakCards = () => (
     <>
       {/* CARD HERO: Anel Neon de Aproveitamento Geral */}
@@ -497,6 +505,81 @@ export default function StatsScreen() {
               : 'Meta pessoal máxima'}
           </Text>
         </View>
+      </View>
+
+      {/* CARD ZEN DE INSIGHT INTELIGENTE: Picos de Produtividade & Foco (P6) */}
+      <View
+        style={[
+          styles.zenInsightCard,
+          {
+            backgroundColor: `${theme.primary}10`,
+            borderColor: `${theme.primary}35`,
+          },
+        ]}>
+        <View style={styles.zenInsightTopRow}>
+          <View style={styles.zenInsightTitleGroup}>
+            <View style={[styles.zenInsightIconBox, { backgroundColor: `${theme.primary}20` }]}>
+              <Ionicons name="bulb-outline" size={IconSize.sm} color={theme.primary} />
+            </View>
+            <Text style={[styles.zenInsightHeaderLabel, { color: theme.primary }]}>
+              Insight de Produtividade
+            </Text>
+          </View>
+
+          <View style={[styles.zenInsightPeriodPill, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+            <Text style={[styles.zenInsightPeriodText, { color: theme.textSecondary }]}>
+              {productivityInsight.usedFullHistoryFallback
+                ? 'Histórico'
+                : filter === 'WEEK'
+                  ? 'Semana'
+                  : filter === 'MONTH'
+                    ? 'Mês'
+                    : 'Ano'}
+            </Text>
+          </View>
+        </View>
+
+        <Text style={[styles.zenInsightHeadline, { color: theme.textPrimary }]}>
+          💡 {productivityInsight.headline}
+        </Text>
+
+        <Text style={[styles.zenInsightSubtext, { color: theme.textSecondary }]}>
+          {productivityInsight.subtext}
+        </Text>
+
+        {productivityInsight.hasEnoughData && (
+          <View style={styles.zenInsightPillsRow}>
+            {productivityInsight.peakWeekdayShort && (
+              <View style={[styles.zenInsightMetaPill, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+                <Ionicons name="calendar-outline" size={IconSize.xs} color={theme.primary} />
+                <Text style={[styles.zenInsightMetaText, { color: theme.textPrimary }]}>
+                  {productivityInsight.peakWeekdayShort}
+                </Text>
+              </View>
+            )}
+
+            {productivityInsight.peakWindowLabel && (
+              <View style={[styles.zenInsightMetaPill, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+                <Ionicons name="time-outline" size={IconSize.xs} color={MomentusColors.cyan} />
+                <Text style={[styles.zenInsightMetaText, { color: theme.textPrimary }]}>
+                  {productivityInsight.peakWindowLabel}
+                </Text>
+              </View>
+            )}
+
+            {productivityInsight.peakShiftLabel && (
+              <View style={[styles.zenInsightMetaPill, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+                <Ionicons name="sunny-outline" size={IconSize.xs} color={MomentusColors.gold} />
+                <Text style={[styles.zenInsightMetaText, { color: theme.textPrimary }]}>
+                  {productivityInsight.peakShiftLabel}
+                  {productivityInsight.peakShiftPercentage !== null
+                    ? ` • ${productivityInsight.peakShiftPercentage}%`
+                    : ''}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
       </View>
     </>
   );
@@ -1607,5 +1690,75 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 3,
+  },
+  zenInsightCard: {
+    borderRadius: BorderRadiusTokens.card,
+    borderWidth: 1,
+    padding: SpacingTokens.md,
+    marginBottom: SpacingTokens.md,
+    gap: SpacingTokens.sm,
+  },
+  zenInsightTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: SpacingTokens.sm,
+  },
+  zenInsightTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SpacingTokens.sm,
+    flex: 1,
+  },
+  zenInsightIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: BorderRadiusTokens.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  zenInsightHeaderLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  zenInsightPeriodPill: {
+    paddingHorizontal: SpacingTokens.sm,
+    paddingVertical: SpacingTokens.xs,
+    borderRadius: BorderRadiusTokens.sm,
+    borderWidth: 1,
+  },
+  zenInsightPeriodText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  zenInsightHeadline: {
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 20,
+  },
+  zenInsightSubtext: {
+    fontSize: 12,
+    fontWeight: '500',
+    lineHeight: 18,
+  },
+  zenInsightPillsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SpacingTokens.sm,
+    marginTop: SpacingTokens.xs,
+  },
+  zenInsightMetaPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SpacingTokens.xs,
+    paddingHorizontal: SpacingTokens.sm,
+    paddingVertical: SpacingTokens.xs,
+    borderRadius: BorderRadiusTokens.sm,
+    borderWidth: 1,
+  },
+  zenInsightMetaText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
 });
