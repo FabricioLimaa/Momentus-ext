@@ -5,12 +5,20 @@ import { MomentusLog } from '@/util/logger';
 
 export const CHANNEL_INICIO = 'CHANNEL_INICIO';
 export const CHANNEL_TERMINO = 'CHANNEL_TERMINO';
+export const CHANNEL_FOCUS_LIVE = 'CHANNEL_FOCUS_LIVE';
 
 export const CATEGORY_HABIT_START = 'CATEGORY_HABIT_START';
 export const CATEGORY_HABIT_END = 'CATEGORY_HABIT_END';
+export const CATEGORY_FOCUS_LIVE_RUNNING = 'CATEGORY_FOCUS_LIVE_RUNNING';
+export const CATEGORY_FOCUS_LIVE_PAUSED = 'CATEGORY_FOCUS_LIVE_PAUSED';
 
 export const ACTION_MARK_COMPLETED = 'ACTION_MARK_COMPLETED';
 export const ACTION_SNOOZE_15 = 'ACTION_SNOOZE_15';
+export const ACTION_FOCUS_PAUSE = 'ACTION_FOCUS_PAUSE';
+export const ACTION_FOCUS_RESUME = 'ACTION_FOCUS_RESUME';
+export const ACTION_FOCUS_SKIP = 'ACTION_FOCUS_SKIP';
+
+export const MOMENTUS_FOCUS_LIVE_NOTIF_ID = 'momentus_focus_live_active';
 
 type LocalNotificationsApi = {
   setNotificationHandler: typeof NotificationsTypes.setNotificationHandler;
@@ -22,9 +30,11 @@ type LocalNotificationsApi = {
   getAllScheduledNotificationsAsync: typeof NotificationsTypes.getAllScheduledNotificationsAsync;
   cancelScheduledNotificationAsync: typeof NotificationsTypes.cancelScheduledNotificationAsync;
   cancelAllScheduledNotificationsAsync: typeof NotificationsTypes.cancelAllScheduledNotificationsAsync;
+  dismissNotificationAsync: typeof NotificationsTypes.dismissNotificationAsync;
   addNotificationResponseReceivedListener: typeof NotificationsTypes.addNotificationResponseReceivedListener;
   DEFAULT_ACTION_IDENTIFIER: string;
   AndroidImportance: typeof NotificationsTypes.AndroidImportance;
+  AndroidNotificationPriority: typeof NotificationsTypes.AndroidNotificationPriority;
   IosAuthorizationStatus: typeof NotificationsTypes.IosAuthorizationStatus;
   SchedulableTriggerInputTypes: typeof NotificationsTypes.SchedulableTriggerInputTypes;
 };
@@ -66,13 +76,15 @@ function getNotifications(): LocalNotificationsApi | null {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { cancelAllScheduledNotificationsAsync } = require('expo-notifications/build/cancelAllScheduledNotificationsAsync');
     // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { dismissNotificationAsync } = require('expo-notifications/build/dismissNotificationAsync');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { addNotificationResponseReceivedListener, DEFAULT_ACTION_IDENTIFIER } = require('expo-notifications/build/NotificationsEmitter');
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { AndroidImportance } = require('expo-notifications/build/NotificationChannelManager.types');
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { IosAuthorizationStatus } = require('expo-notifications/build/NotificationPermissions.types');
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { SchedulableTriggerInputTypes } = require('expo-notifications/build/Notifications.types');
+    const { SchedulableTriggerInputTypes, AndroidNotificationPriority } = require('expo-notifications/build/Notifications.types');
 
     cachedNotifications = {
       setNotificationHandler,
@@ -84,10 +96,12 @@ function getNotifications(): LocalNotificationsApi | null {
       getAllScheduledNotificationsAsync,
       cancelScheduledNotificationAsync,
       cancelAllScheduledNotificationsAsync,
+      dismissNotificationAsync,
       addNotificationResponseReceivedListener,
       DEFAULT_ACTION_IDENTIFIER:
         DEFAULT_ACTION_IDENTIFIER || 'expo.modules.notifications.actions.DEFAULT',
       AndroidImportance,
+      AndroidNotificationPriority,
       IosAuthorizationStatus,
       SchedulableTriggerInputTypes,
     };
@@ -197,6 +211,40 @@ export async function setupNotificationChannels(): Promise<void> {
         },
       },
     ]);
+
+    await Notifications.setNotificationCategoryAsync(CATEGORY_FOCUS_LIVE_RUNNING, [
+      {
+        identifier: ACTION_FOCUS_PAUSE,
+        buttonTitle: 'Pausar ⏸',
+        options: {
+          opensAppToForeground: false,
+        },
+      },
+      {
+        identifier: ACTION_FOCUS_SKIP,
+        buttonTitle: 'Pular ⏭',
+        options: {
+          opensAppToForeground: false,
+        },
+      },
+    ]);
+
+    await Notifications.setNotificationCategoryAsync(CATEGORY_FOCUS_LIVE_PAUSED, [
+      {
+        identifier: ACTION_FOCUS_RESUME,
+        buttonTitle: 'Retomar ▶',
+        options: {
+          opensAppToForeground: false,
+        },
+      },
+      {
+        identifier: ACTION_FOCUS_SKIP,
+        buttonTitle: 'Pular ⏭',
+        options: {
+          opensAppToForeground: false,
+        },
+      },
+    ]);
   } catch (err) {
     MomentusLog.notif.warn('Erro ao configurar categorias interativas de notificação:', err);
   }
@@ -224,6 +272,16 @@ export async function setupNotificationChannels(): Promise<void> {
       sound: 'default',
       enableLights: true,
       enableVibrate: true,
+    });
+
+    await Notifications.setNotificationChannelAsync(CHANNEL_FOCUS_LIVE, {
+      name: 'Modo Foco Ativo (Persistente)',
+      description: 'Notificação persistente de alta prioridade com controles do Pomodoro',
+      importance: Notifications.AndroidImportance.HIGH,
+      lightColor: '#34D399',
+      sound: null,
+      enableLights: false,
+      enableVibrate: false,
     });
   } catch (error) {
     MomentusLog.notif.warn('Erro ao configurar canais de notificação:', error);
@@ -507,5 +565,102 @@ export async function cancelFocusNotification(notificationId?: string | null): P
     }
   } catch (error) {
     MomentusLog.notif.warn('Erro ao cancelar notificação de foco:', error);
+  }
+}
+
+/**
+ * Exibe ou atualiza a notificação persistente de alta prioridade do Modo Foco no Android
+ * com controles interativos (Pausar/Retomar e Pular).
+ */
+export async function presentPersistentFocusNotification(params: {
+  title: string;
+  body: string;
+  isRunning: boolean;
+  mode: 'FOCUS' | 'SHORT_BREAK' | 'LONG_BREAK';
+}): Promise<void> {
+  if (Platform.OS !== 'android') return;
+  const Notifications = getNotifications();
+  if (!Notifications) return;
+
+  try {
+    await setupNotificationChannels();
+    await Notifications.scheduleNotificationAsync({
+      identifier: MOMENTUS_FOCUS_LIVE_NOTIF_ID,
+      content: {
+        title: params.title,
+        body: params.body,
+        sticky: true,
+        autoDismiss: false,
+        sound: false,
+        priority: Notifications.AndroidNotificationPriority.HIGH,
+        categoryIdentifier: params.isRunning
+          ? CATEGORY_FOCUS_LIVE_RUNNING
+          : CATEGORY_FOCUS_LIVE_PAUSED,
+        data: {
+          type: 'FOCUS_LIVE_PERSISTENT',
+          mode: params.mode,
+          isRunning: params.isRunning,
+        },
+        ...(Platform.OS === 'android' ? { channelId: CHANNEL_FOCUS_LIVE } : {}),
+      },
+      trigger: null,
+    });
+  } catch (error) {
+    MomentusLog.notif.warn('Erro ao exibir notificação persistente de foco:', error);
+  }
+}
+
+/**
+ * Remove a notificação persistente de foco da barra do Android.
+ */
+export async function dismissPersistentFocusNotification(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+  const Notifications = getNotifications();
+  if (!Notifications) return;
+
+  try {
+    await Notifications.dismissNotificationAsync(MOMENTUS_FOCUS_LIVE_NOTIF_ID);
+  } catch {}
+  try {
+    await Notifications.cancelScheduledNotificationAsync(MOMENTUS_FOCUS_LIVE_NOTIF_ID);
+  } catch {}
+}
+
+/**
+ * Escuta ações dos botões de reprodução (Pausar, Retomar, Pular) na notificação persistente do Android.
+ */
+export function subscribeToFocusLiveNotificationActions(handlers: {
+  onPause: () => void;
+  onResume: () => void;
+  onSkip: () => void;
+}): () => void {
+  if (Platform.OS !== 'android') return () => {};
+  const Notifications = getNotifications();
+  if (!Notifications?.addNotificationResponseReceivedListener) {
+    return () => {};
+  }
+
+  try {
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const actionId = response.actionIdentifier;
+      const data = response.notification.request.content.data as { type?: string } | undefined;
+      if (data?.type !== 'FOCUS_LIVE_PERSISTENT') return;
+
+      if (actionId === ACTION_FOCUS_PAUSE) {
+        handlers.onPause();
+      } else if (actionId === ACTION_FOCUS_RESUME) {
+        handlers.onResume();
+      } else if (actionId === ACTION_FOCUS_SKIP) {
+        handlers.onSkip();
+      }
+    });
+
+    return () => {
+      try {
+        subscription.remove();
+      } catch {}
+    };
+  } catch {
+    return () => {};
   }
 }

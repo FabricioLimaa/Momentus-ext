@@ -38,6 +38,11 @@ import {
   scheduleFocusNotification,
   cancelFocusNotification,
 } from '@/services/notificationService';
+import {
+  syncFocusLiveActivity,
+  endFocusLiveActivity,
+  subscribeToFocusLiveActions,
+} from '@/services/focusLiveService';
 import { useLocalSearchParams } from 'expo-router';
 import { ZenBreathModal } from '@/components/momentus/ZenBreathModal';
 
@@ -129,6 +134,10 @@ export default function FocusScreen() {
   const timeLeftRef = useRef(timeLeft);
   const notificationIdRef = useRef<string | null>(null);
   const lastTickSecondRef = useRef<number>(-1);
+  const hasActiveLiveSessionRef = useRef<boolean>(false);
+  const isRunningRef = useRef<boolean>(isRunning);
+  const toggleTimerRef = useRef<() => void>(() => {});
+  const executeSkipRef = useRef<() => void>(() => {});
 
   // Animações: Breathing Pulse e Modo Zen (foco sem distrações)
   const [breathingAnim] = useState(() => new Animated.Value(1));
@@ -319,6 +328,21 @@ export default function FocusScreen() {
         notificationIdRef.current = id || null;
       });
 
+      hasActiveLiveSessionRef.current = true;
+      syncFocusLiveActivity(
+        {
+          mode: targetMode,
+          habitTitle: linkedHabit?.title,
+          isRunning: true,
+          remainingSeconds: targetSecs,
+          totalSeconds: targetSecs,
+          endTimestampMs: targetEndTime,
+          accentColor: getModeColor(targetMode),
+          isOled: theme.isOled,
+        },
+        { forceAndroidRefresh: true }
+      ).catch(() => {});
+
       setAppKv('active_focus_timer', {
         endTime: targetEndTime,
         mode: targetMode,
@@ -326,7 +350,7 @@ export default function FocusScreen() {
         totalSeconds: targetSecs,
       }).catch(() => {});
     },
-    [habits, selectedHabitId, soundscape]
+    [habits, selectedHabitId, soundscape, getModeColor, theme.isOled]
   );
 
   const switchMode = useCallback(
@@ -337,6 +361,8 @@ export default function FocusScreen() {
       soundManager.pauseSoundscape();
       cancelFocusNotification(notificationIdRef.current);
       notificationIdRef.current = null;
+      hasActiveLiveSessionRef.current = false;
+      endFocusLiveActivity().catch(() => {});
       setAppKv('active_focus_timer', null).catch(() => {});
       setMode(newMode);
       const secs = getDurationForMode(newMode);
@@ -353,6 +379,8 @@ export default function FocusScreen() {
     soundManager.pauseSoundscape();
     cancelFocusNotification(notificationIdRef.current);
     notificationIdRef.current = null;
+    hasActiveLiveSessionRef.current = false;
+    endFocusLiveActivity().catch(() => {});
     setAppKv('active_focus_timer', null).catch(() => {});
 
     if (mode === 'FOCUS') {
@@ -529,6 +557,21 @@ export default function FocusScreen() {
         notificationIdRef.current = id || null;
       });
 
+      hasActiveLiveSessionRef.current = true;
+      syncFocusLiveActivity(
+        {
+          mode,
+          habitTitle: linkedHabit?.title,
+          isRunning: true,
+          remainingSeconds: timeLeft,
+          totalSeconds,
+          endTimestampMs: targetEndTime,
+          accentColor: activeColor,
+          isOled: theme.isOled,
+        },
+        { forceAndroidRefresh: true }
+      ).catch(() => {});
+
       // Persiste sessão ativa no SQLite
       setAppKv('active_focus_timer', {
         endTime: targetEndTime,
@@ -544,6 +587,23 @@ export default function FocusScreen() {
       cancelFocusNotification(notificationIdRef.current);
       notificationIdRef.current = null;
       setAppKv('active_focus_timer', null).catch(() => {});
+
+      const linkedHabit = habits.find((h) => h.id === selectedHabitId);
+      if (hasActiveLiveSessionRef.current) {
+        syncFocusLiveActivity(
+          {
+            mode,
+            habitTitle: linkedHabit?.title,
+            isRunning: false,
+            remainingSeconds: timeLeft,
+            totalSeconds,
+            endTimestampMs: null,
+            accentColor: activeColor,
+            isOled: theme.isOled,
+          },
+          { forceAndroidRefresh: true }
+        ).catch(() => {});
+      }
     }
   };
 
@@ -557,6 +617,8 @@ export default function FocusScreen() {
     soundManager.pauseSoundscape();
     cancelFocusNotification(notificationIdRef.current);
     notificationIdRef.current = null;
+    hasActiveLiveSessionRef.current = false;
+    endFocusLiveActivity().catch(() => {});
     setAppKv('active_focus_timer', null).catch(() => {});
     const secs = getDurationForMode(mode);
     setTimeLeft(secs);
@@ -589,6 +651,50 @@ export default function FocusScreen() {
     }
     triggerHaptic('impact');
   }, [completedSessions, mode, switchMode, triggerHaptic]);
+
+  // Mantém refs atualizadas para controles remotos da Live Activity (iOS) e Notificação Persistente (Android)
+  useEffect(() => {
+    isRunningRef.current = isRunning;
+    toggleTimerRef.current = toggleTimer;
+    executeSkipRef.current = executeSkip;
+  });
+
+  // Escuta botões Pausar / Retomar / Pular direto da Dynamic Island, Tela de Bloqueio (iOS) ou Notificação (Android)
+  useEffect(() => {
+    return subscribeToFocusLiveActions({
+      onPause: () => {
+        if (isRunningRef.current) {
+          toggleTimerRef.current();
+        }
+      },
+      onResume: () => {
+        if (!isRunningRef.current) {
+          toggleTimerRef.current();
+        }
+      },
+      onSkip: () => {
+        executeSkipRef.current();
+      },
+    });
+  }, []);
+
+  // Mantém contagem da notificação persistente (Android) e título da aba (Web) atualizados enquanto roda
+  useEffect(() => {
+    if (!isRunning || !hasActiveLiveSessionRef.current) return;
+    if (Platform.OS === 'ios') return; // iOS atualiza contagem nativamente via timerInterval na Live Activity
+
+    const linkedHabit = habits.find((h) => h.id === selectedHabitId);
+    syncFocusLiveActivity({
+      mode,
+      habitTitle: linkedHabit?.title,
+      isRunning: true,
+      remainingSeconds: timeLeft,
+      totalSeconds,
+      endTimestampMs: endTimeRef.current,
+      accentColor: activeColor,
+      isOled: theme.isOled,
+    }).catch(() => {});
+  }, [isRunning, timeLeft, totalSeconds, mode, selectedHabitId, habits, activeColor, theme.isOled]);
 
   // Pilar 5: Proteção Contra Cancelamento Acidental (>60s decorridos ou em andamento)
   const requestReset = () => {

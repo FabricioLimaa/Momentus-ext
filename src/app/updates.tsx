@@ -53,8 +53,17 @@ export const CHANGELOG_DATA: VersionRelease[] = [
     codename: 'Experiência Sensorial, Foco & Privacidade',
     date: 'Novembro de 2026',
     isCurrent: true,
-    highlights: 'Quick Voice Capture por voz, Zen Breath 4-7-8, Tema Midnight OLED (#000000), micro-animações hápticas, Insights inteligentes, Widgets nativos e criptografia AES-256.',
+    highlights: 'Live Activities & Dynamic Island, Quick Voice Capture, Zen Breath 4-7-8, Tema Midnight OLED (#000000), micro-animações hápticas, Insights inteligentes e AES-256.',
     items: [
+      {
+        id: 'feat-live-activities',
+        icon: 'phone-portrait-outline',
+        tag: 'NOVO',
+        title: 'Live Activities, Dynamic Island & Foco Persistente',
+        description: 'Acompanhe a contagem do Pomodoro direto na Dynamic Island e tela de bloqueio do iPhone ou na notificação persistente do Android com controles de pausar e pular.',
+        actionRoute: '/focus',
+        actionLabel: 'Testar no Foco →',
+      },
       {
         id: 'feat-voice-capture',
         icon: 'mic-outline',
@@ -213,6 +222,7 @@ export default function UpdateNotesScreen() {
     const shareMessage = [
       `✨ Confira as novidades do ${APP_INFO.name} (Versão 2.1.0)!`,
       '',
+      '• 📲 Live Activities, Dynamic Island (iOS) e Foco Persistente (Android)',
       '• 🎙️ Quick Voice Capture: crie rotinas em 1 toque por voz',
       '• 🧘 Zen Breath: respiração guiada 4-7-8 nas pausas do Pomodoro',
       '• 🌙 Tema Midnight OLED (#000000) com cartões cinza-vidro',

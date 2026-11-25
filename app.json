@@ -110,6 +110,7 @@
         {
           "bundleIdentifier": "br.com.fabriciolima.momentus.widgets",
           "groupIdentifier": "group.br.com.fabriciolima.momentus",
+          "frequentUpdates": true,
           "widgets": [
             {
               "name": "MomentusWidget",
