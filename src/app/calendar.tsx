@@ -11,6 +11,7 @@ import {
   TextInput,
   PanResponder,
   RefreshControl,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -630,6 +631,35 @@ export default function CalendarScreen() {
 
   const isCurrentWeekShowingToday = currentWeekDays.some((d) => d.dateStr === todayStr);
 
+  // Animação Spring fluida na barra de progresso diário da Agenda
+  const activeSummaryList = normalizedSearchTerm ? displayHabits : habitsForDate;
+  const activeSummaryCompleted = activeSummaryList.filter((h) => h.completed).length;
+  const activeSummaryPercent =
+    activeSummaryList.length > 0
+      ? Math.round((activeSummaryCompleted / activeSummaryList.length) * 100)
+      : 0;
+  const [dayProgressAnim] = useState(() => new Animated.Value(activeSummaryPercent));
+
+  useEffect(() => {
+    Animated.spring(dayProgressAnim, {
+      toValue: activeSummaryPercent,
+      stiffness: 120,
+      damping: 15,
+      mass: 0.85,
+      useNativeDriver: false,
+    }).start();
+  }, [activeSummaryPercent, dayProgressAnim]);
+
+  const animatedDayProgressWidth = useMemo(
+    () =>
+      dayProgressAnim.interpolate({
+        inputRange: [0, 100],
+        outputRange: ['0%', '100%'],
+        extrapolate: 'clamp',
+      }),
+    [dayProgressAnim]
+  );
+
   const renderCalendarPicker = () =>
     isMonthView ? (
       <View
@@ -949,18 +979,18 @@ export default function CalendarScreen() {
           )}
         </View>
 
-        {/* Barra de Progresso do Dia */}
+        {/* Barra de Progresso do Dia (com física fluida Spring) */}
         {activeList.length > 0 && (
           <View
             style={[
               styles.progressBarTrack,
               { backgroundColor: theme.surfaceElevated, borderColor: theme.outline },
             ]}>
-            <View
+            <Animated.View
               style={[
                 styles.progressBarFill,
                 {
-                  width: `${progressPercent}%`,
+                  width: animatedDayProgressWidth,
                   backgroundColor: allCompleted ? MomentusColors.emeraldGreen : primaryColor,
                 },
               ]}
@@ -1232,7 +1262,6 @@ export default function CalendarScreen() {
                 isSelectionMode={isSelectionMode}
                 isSelected={selectedHabitIds.includes(habit.id)}
                 onCheckedChange={() => {
-                  triggerHaptic?.('selection');
                   toggleHabit(habit.id);
                 }}
                 onClick={() => {

@@ -174,7 +174,7 @@ interface MomentusContextData {
   // Focus Actions
   addFocusMinutes: (minutes: number) => void;
   // Haptics Action
-  triggerHaptic: (type: 'impact' | 'success' | 'selection') => void;
+  triggerHaptic: (type: 'light' | 'impact' | 'success' | 'selection') => void;
   // Settings Actions
   updateSettings: (newSettings: Partial<AppSettings>) => void;
   updateUserProfile: (profileUpdates: Partial<UserProfile>) => void;
@@ -711,17 +711,27 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, [settings.fontSizeMultiplier]);
 
-  const triggerHaptic = (type: 'impact' | 'success' | 'selection') => {
+  const triggerHaptic = (type: 'light' | 'impact' | 'success' | 'selection') => {
     if (!settings.hapticsEnabled) return;
     try {
       if (Platform.OS === 'web') {
         if (typeof navigator !== 'undefined' && navigator.vibrate) {
-          navigator.vibrate(type === 'selection' ? 8 : type === 'impact' ? 20 : [30, 40, 30]);
+          const pattern =
+            type === 'selection'
+              ? 6
+              : type === 'light'
+                ? 12
+                : type === 'impact'
+                  ? 20
+                  : [25, 35, 25];
+          navigator.vibrate(pattern);
         }
         return;
       }
       if (type === 'selection') {
         Haptics.selectionAsync().catch(() => {});
+      } else if (type === 'light') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       } else if (type === 'impact') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
       } else {
@@ -885,10 +895,10 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (habit.id === id) {
           if (nextCompleted) {
             soundManager.playSuccessSound();
-            triggerHaptic('success');
+            triggerHaptic('light');
             cancelHabitNotifications(habit.id).catch(() => {});
           } else {
-            triggerHaptic('impact');
+            triggerHaptic('selection');
             scheduleHabitNotifications({ ...habit, completed: false }).catch(() => {});
           }
           return {
@@ -974,6 +984,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
 
     if (isDayFullyComplete) {
+      setTimeout(() => triggerHaptic('success'), 140);
       const combinedPoints = (isFirstTimeDayValidated ? 25 : 0) + (isFirstTimeRoutineValidated ? 20 : 0);
       if (isFirstTimeDayValidated) {
         showCelebration(
