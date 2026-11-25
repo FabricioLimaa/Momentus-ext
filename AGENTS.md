@@ -91,4 +91,21 @@ O Momentus utiliza estritamente o sistema **8pt Grid** e princípios de **Despol
 6. **Tipografia, Ícones & Raios:** Utilize estritamente `TypographyTokens`, `IconSize` (12, 16, 20, 24, 32, 48) e `BorderRadiusTokens`. Tamanhos de fonte inferiores a 11px são proibidos para garantir acessibilidade visual.
 7. **Auditoria Contínua:** Execute sempre `npm run lint:design` antes de concluir tarefas de interface.
 
+## Atualização Contínua da Tela de Novidades (`src/app/updates.tsx`) (Obrigatório)
+
+Sempre que implementar uma nova funcionalidade, melhoria visual/UX, recurso de segurança ou correção relevante visível ao usuário:
+
+1. **Atualize `CHANGELOG_DATA`** na versão atual (`isCurrent: true`) em `src/app/updates.tsx`, adicionando ou refinando o `UpdateItem` correspondente com `id` único, `icon` (Ionicons), `tag` adequada (`NOVO` | `MELHORIA` | `DESIGN` | `SEGURANCA` | `CORRECAO`), `title`, `description` concisa e `actionRoute` / `actionLabel` quando aplicável.
+2. **Mantenha `highlights` e `handleShareUpdates`** coerentes com os principais destaques atuais da versão.
+3. **Preserve o estilo Zen:** descrições diretas e claras, sem inflar a tela com entradas técnicas internas (refatorações puras de código, lint ou ajustes de CI não entram na tela de novidades).
+
+## Fluxo Git: Commit Descritivo & Push Automático (Obrigatório)
+
+Ao concluir qualquer tarefa que modifique código, configuração ou assets do projeto:
+
+1. **Validação prévia obrigatória:** Execute sempre `npx tsc --noEmit`, `npx expo lint` (e `npm run lint:design` quando houver mudanças de UI) antes de commitar.
+2. **Commit descritivo:** Faça `git add` apenas dos arquivos relacionados à entrega e crie um commit em estilo Conventional Commits com **título objetivo + corpo detalhado em tópicos** resumindo todas as modificações feitas por módulo/arquivo.
+3. **Push automático:** Logo após o commit bem-sucedido, execute `git push origin main` (ou na branch ativa) sem aguardar solicitação extra, informando o hash do commit publicado na resposta final.
+4. **Exceção de segurança:** Nunca faça push se houver falha de build/typecheck/lint, conflito de merge ou arquivos sensíveis (`.env`, chaves privadas) no stage.
+
 
