@@ -39,6 +39,7 @@ import {
   cancelFocusNotification,
 } from '@/services/notificationService';
 import { useLocalSearchParams } from 'expo-router';
+import { ZenBreathModal } from '@/components/momentus/ZenBreathModal';
 
 type FocusMode = 'FOCUS' | 'SHORT_BREAK' | 'LONG_BREAK';
 type FocusSettingsTab = 'FOCUS' | 'SHORT_BREAK' | 'LONG_BREAK';
@@ -114,6 +115,9 @@ export default function FocusScreen() {
   // Modo Imersivo / Deep Focus (Tela Cheia / Relógio de Mesa)
   const [isDeepFocus, setIsDeepFocus] = useState(false);
   const [deepControlsVisible, setDeepControlsVisible] = useState(true);
+
+  // Zen Breath: Pausa Consciente & Respiração 4-7-8 em tela cheia
+  const [showZenBreath, setShowZenBreath] = useState(false);
 
   // Tempo restante em segundos
   const [timeLeft, setTimeLeft] = useState(25 * 60);
@@ -387,6 +391,7 @@ export default function FocusScreen() {
         }, 800);
       }
     } else {
+      setShowZenBreath(false);
       Alert.alert('Pausa Finalizada! ⚡', 'Hora de retomar o foco total.');
       switchMode('FOCUS');
 
@@ -1308,6 +1313,41 @@ export default function FocusScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* Zen Breath: convite sutil de Pausa Consciente (Respiração 4-7-8) exclusivo durante pausas */}
+          {mode !== 'FOCUS' && (
+            <TouchableOpacity
+              style={[
+                styles.zenBreathCard,
+                {
+                  backgroundColor: `${activeColor}14`,
+                  borderColor: `${activeColor}45`,
+                },
+              ]}
+              onPress={() => {
+                triggerHaptic('light');
+                if (!isRunning) {
+                  startTimerDirectly(mode, timeLeft);
+                }
+                setShowZenBreath(true);
+              }}
+              activeOpacity={0.82}
+              accessibilityRole="button"
+              accessibilityLabel="Abrir Pausa Consciente Zen Breath com respiração guiada 4-7-8">
+              <View style={[styles.zenBreathIconBox, { backgroundColor: `${activeColor}24` }]}>
+                <Ionicons name="leaf-outline" size={18} color={activeColor} />
+              </View>
+              <View style={styles.zenBreathTextCol}>
+                <Text style={[styles.zenBreathTitle, { color: theme.textPrimary }]}>
+                  Pausa Consciente • Zen Breath
+                </Text>
+                <Text style={[styles.zenBreathSubtitle, { color: theme.textSecondary }]}>
+                  Respiração guiada 4-7-8 com esfera neon em tela cheia
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={activeColor} />
+            </TouchableOpacity>
+          )}
+
           {/* Sessão Stats Resumo Leve em Linha Única (Modo Zen esmaece suavemente durante o foco) */}
           <Animated.View style={{ opacity: zenAnim }}>
             <View style={[styles.statsSummaryRow, isCompact && { paddingVertical: 2, marginTop: 2 }]}>
@@ -2031,6 +2071,25 @@ export default function FocusScreen() {
 
                 {/* Ações do Topo */}
                 <View style={styles.deepHeaderActions}>
+                  {mode !== 'FOCUS' && (
+                    <TouchableOpacity
+                      style={[
+                        styles.deepIconBtn,
+                        {
+                          backgroundColor: `${activeColor}26`,
+                          borderColor: activeColor,
+                        },
+                      ]}
+                      onPress={() => {
+                        triggerHaptic('light');
+                        setIsDeepFocus(false);
+                        setShowZenBreath(true);
+                      }}
+                      accessibilityLabel="Abrir Pausa Consciente Zen Breath 4-7-8">
+                      <Ionicons name="leaf-outline" size={18} color={activeColor} />
+                    </TouchableOpacity>
+                  )}
+
                   <TouchableOpacity
                     style={[
                       styles.deepIconBtn,
@@ -2193,6 +2252,16 @@ export default function FocusScreen() {
             )}
           </View>
         </Modal>
+
+        {/* Zen Breath: Pausa Consciente & Respiração Guiada 4-7-8 */}
+        <ZenBreathModal
+          visible={showZenBreath}
+          breakLabel={mode === 'LONG_BREAK' ? 'Pausa Longa' : 'Pausa Curta'}
+          breakTimeFormatted={timeFormatted}
+          isBreakRunning={isRunning}
+          onToggleBreakTimer={toggleTimer}
+          onClose={() => setShowZenBreath(false)}
+        />
 
         {/* Pilar 5: Modal de Proteção Contra Cancelamento Acidental */}
         <Modal
@@ -3197,6 +3266,39 @@ const styles = StyleSheet.create({
   goalOptionUnit: {
     fontSize: 11,
     fontWeight: '600',
+    marginTop: 2,
+  },
+  /* Bloco B.3: Card Zen Breath (Pausa Consciente 4-7-8) */
+  zenBreathCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SpacingTokens.sm,
+    paddingHorizontal: SpacingTokens.md,
+    paddingVertical: SpacingTokens.sm,
+    borderRadius: BorderRadiusTokens.card,
+    borderWidth: 1,
+    marginTop: SpacingTokens.sm,
+    minHeight: ComponentHeightTokens.buttonHero,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
+  },
+  zenBreathIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  zenBreathTextCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  zenBreathTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  zenBreathSubtitle: {
+    fontSize: 11,
+    fontWeight: '500',
     marginTop: 2,
   },
 });
