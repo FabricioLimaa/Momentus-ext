@@ -69,7 +69,7 @@ function TabsNavigator() {
   const showDesktopSidebar = isLargeScreen && !isAuthScreen;
 
   return (
-    <View style={styles.shellContainer}>
+    <View style={[styles.shellContainer, { backgroundColor: theme.background }]}>
       <StatusBar style={theme.isDark ? 'light' : 'dark'} />
       <View
         style={[
@@ -92,7 +92,7 @@ function TabsNavigator() {
               tabBarStyle: isAuthScreen || isLargeScreen
                 ? { display: 'none' }
                 : {
-                    backgroundColor: theme.surface,
+                    backgroundColor: theme.isOled ? MomentusColors.oledBackground : theme.surface,
                     borderTopColor: theme.outline,
                     borderTopWidth: 1,
                     height: Platform.OS === 'ios' ? 88 : Platform.OS === 'web' ? 76 : 68,

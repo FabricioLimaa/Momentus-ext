@@ -106,11 +106,13 @@ export interface UserProfile {
   selectedAvatarFrame?: 'frame_emerald' | 'frame_cyan' | 'frame_gold' | null;
 }
 
+export type ThemeMode = 'system' | 'dark' | 'oled' | 'light';
+
 export interface AppSettings {
   soundEnabled: boolean;
   hapticsEnabled: boolean;
   biometricLock: boolean;
-  themeMode: 'system' | 'dark' | 'light';
+  themeMode: ThemeMode;
   fontSizeMultiplier: number;
   primaryColorHex: string;
   googleCalendarSyncEnabled: boolean;

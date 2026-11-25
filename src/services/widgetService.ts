@@ -66,7 +66,8 @@ export function buildWidgetSnapshot(
   currentStreak: number,
   primaryColor: string,
   isDark: boolean,
-  now: Date = new Date()
+  now: Date = new Date(),
+  isOled: boolean = false
 ): MomentusWidgetSnapshot {
   const todayStr = getTodayDateString();
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
@@ -132,6 +133,7 @@ export function buildWidgetSnapshot(
     progress,
     primaryColor: primaryColor || MomentusColors.emeraldNeon,
     isDark,
+    isOled,
     tasks: enriched.slice(0, 4).map((e) => e.task),
     toggledHabitIds: [],
   };
@@ -146,7 +148,8 @@ export function buildIosWidgetTimeline(
   categories: Category[],
   currentStreak: number,
   primaryColor: string,
-  isDark: boolean
+  isDark: boolean,
+  isOled: boolean = false
 ): Array<{ date: Date; props: MomentusWidgetSnapshot }> {
   const now = new Date();
   const todayStr = getTodayDateString();
@@ -173,7 +176,7 @@ export function buildIosWidgetTimeline(
   const entries: Array<{ date: Date; props: MomentusWidgetSnapshot }> = [
     {
       date: now,
-      props: buildWidgetSnapshot(habits, categories, currentStreak, primaryColor, isDark, now),
+      props: buildWidgetSnapshot(habits, categories, currentStreak, primaryColor, isDark, now, isOled),
     },
   ];
 
@@ -188,7 +191,8 @@ export function buildIosWidgetTimeline(
         currentStreak,
         primaryColor,
         isDark,
-        entryDate
+        entryDate,
+        isOled
       ),
     });
   }
@@ -205,7 +209,8 @@ export async function syncHomeScreenWidgets(
   categories: Category[],
   currentStreak: number,
   primaryColor: string,
-  isDark: boolean
+  isDark: boolean,
+  isOled: boolean = false
 ): Promise<void> {
   if (Platform.OS === 'web') {
     return;
@@ -216,7 +221,9 @@ export async function syncHomeScreenWidgets(
     categories,
     currentStreak,
     primaryColor,
-    isDark
+    isDark,
+    new Date(),
+    isOled
   );
 
   // 1. Persiste o snapshot compartilhado (usado pelo worker headless do Android)
@@ -264,7 +271,8 @@ export async function syncHomeScreenWidgets(
         categories,
         currentStreak,
         primaryColor,
-        isDark
+        isDark,
+        isOled
       );
       iosWidget.updateTimeline(timeline);
     } catch {

@@ -46,8 +46,8 @@ export const GlassCard: React.FC<GlassCardProps> = ({
         styles.card,
         {
           borderRadius: hero ? BorderRadiusTokens.cardHero : BorderRadiusTokens.card,
-          backgroundColor: theme.surface,
-          borderColor: theme.outline,
+          backgroundColor: theme.isOled ? theme.glassCard : theme.surface,
+          borderColor: theme.isOled ? theme.glassBorder : theme.outline,
         },
         getPaddingStyle(),
         highlighted && {

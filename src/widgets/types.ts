@@ -19,6 +19,7 @@ export interface MomentusWidgetSnapshot {
   progress: number;
   primaryColor: string;
   isDark: boolean;
+  isOled?: boolean;
   tasks: MomentusWidgetTask[];
   /**
    * IDs de hábitos marcados/desmarcados diretamente pelo widget enquanto o app

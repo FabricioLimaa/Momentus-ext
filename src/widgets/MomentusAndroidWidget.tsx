@@ -156,7 +156,8 @@ export function MomentusAndroidWidget({
   snapshot,
   widgetHeight = 160,
 }: MomentusAndroidWidgetProps) {
-  const isDark = snapshot.isDark !== false;
+  const isOled = snapshot.isOled === true;
+  const isDark = isOled || snapshot.isDark !== false;
   const primary = toHexColor(snapshot.primaryColor, '#34D399');
 
   const colors: {
@@ -170,31 +171,44 @@ export function MomentusAndroidWidget({
     borderSubtle: ColorProp;
     streakBg: ColorProp;
     trackBg: ColorProp;
-  } = isDark
+  } = isOled
     ? {
-        bg: '#0F172A',
-        cardBg: '#1E293B',
-        ongoingBg: '#132A2E',
+        bg: '#000000',
+        cardBg: '#0B0B0F',
+        ongoingBg: '#091F1A',
         primary,
-        textPrimary: '#F8FAFC',
-        textSecondary: '#94A3B8',
-        textMuted: '#64748B',
-        borderSubtle: '#334155',
-        streakBg: '#1E293B',
-        trackBg: '#334155',
+        textPrimary: '#FFFFFF',
+        textSecondary: '#9CA3AF',
+        textMuted: '#6B7280',
+        borderSubtle: '#1F2028',
+        streakBg: '#0B0B0F',
+        trackBg: '#1F2028',
       }
-    : {
-        bg: '#F8FAFC',
-        cardBg: '#FFFFFF',
-        ongoingBg: '#ECFDF5',
-        primary,
-        textPrimary: '#0F172A',
-        textSecondary: '#475569',
-        textMuted: '#94A3B8',
-        borderSubtle: '#E2E8F0',
-        streakBg: '#FFFFFF',
-        trackBg: '#E2E8F0',
-      };
+    : isDark
+      ? {
+          bg: '#0F172A',
+          cardBg: '#1E293B',
+          ongoingBg: '#132A2E',
+          primary,
+          textPrimary: '#F8FAFC',
+          textSecondary: '#94A3B8',
+          textMuted: '#64748B',
+          borderSubtle: '#334155',
+          streakBg: '#1E293B',
+          trackBg: '#334155',
+        }
+      : {
+          bg: '#F8FAFC',
+          cardBg: '#FFFFFF',
+          ongoingBg: '#ECFDF5',
+          primary,
+          textPrimary: '#0F172A',
+          textSecondary: '#475569',
+          textMuted: '#94A3B8',
+          borderSubtle: '#E2E8F0',
+          streakBg: '#FFFFFF',
+          trackBg: '#E2E8F0',
+        };
 
   const maxTasks = widgetHeight < 140 ? 1 : widgetHeight > 220 ? 3 : 2;
   const visibleTasks = snapshot.tasks.slice(0, maxTasks);

@@ -37,14 +37,15 @@ const MomentusIosWidgetLayout = (
 ) => {
   'widget';
 
+  const isOled = props.isOled === true;
   const isDark =
-    typeof props.isDark === 'boolean' ? props.isDark : environment.colorScheme === 'dark';
+    isOled || (typeof props.isDark === 'boolean' ? props.isDark : environment.colorScheme === 'dark');
   const primary = props.primaryColor || '#34D399';
-  const bg = isDark ? '#0F172A' : '#F8FAFC';
-  const cardBg = isDark ? '#1E293B' : '#FFFFFF';
-  const ongoingBg = isDark ? '#132A2E' : '#ECFDF5';
-  const textPrimary = isDark ? '#F8FAFC' : '#0F172A';
-  const textSecondary = isDark ? '#94A3B8' : '#475569';
+  const bg = isOled ? '#000000' : isDark ? '#0F172A' : '#F8FAFC';
+  const cardBg = isOled ? '#0B0B0F' : isDark ? '#1E293B' : '#FFFFFF';
+  const ongoingBg = isOled ? '#091F1A' : isDark ? '#132A2E' : '#ECFDF5';
+  const textPrimary = isOled ? '#FFFFFF' : isDark ? '#F8FAFC' : '#0F172A';
+  const textSecondary = isOled ? '#9CA3AF' : isDark ? '#94A3B8' : '#475569';
   const streakAmber = '#F59E0B';
 
   const tasks: MomentusWidgetTask[] = Array.isArray(props.tasks) ? props.tasks : [];

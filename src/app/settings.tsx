@@ -27,6 +27,7 @@ import {
   ComponentHeightTokens,
   useResponsiveLayout,
 } from '@/constants/theme';
+import { ThemeMode } from '@/types';
 import { APP_INFO } from '@/constants/appInfo';
 import { useMomentus } from '@/context/MomentusContext';
 import { MomentusLog } from '@/util/logger';
@@ -135,10 +136,10 @@ export default function SettingsScreen() {
   }, [settings]);
 
   // Ações de atualização com persistência imediata (Autosave 100% reativo)
-  const handleSelectTheme = (mode: 'system' | 'dark' | 'light') => {
+  const handleSelectTheme = (mode: ThemeMode) => {
     setThemeMode(mode);
     updateSettings({ themeMode: mode });
-    triggerHaptic('impact');
+    triggerHaptic('light');
   };
 
   const handleSelectColor = (color: string) => {
@@ -518,7 +519,15 @@ export default function SettingsScreen() {
               <View style={styles.accordionTitleCol}>
                 <Text style={[styles.accordionTitle, { color: theme.textPrimary }]}>Aparência & Interface</Text>
                 <Text style={[styles.accordionSubtitle, { color: theme.textSecondary }]} numberOfLines={1}>
-                  Tema {themeMode === 'system' ? 'Sistema' : themeMode === 'dark' ? 'Escuro' : 'Claro'} • {activeColorName} • {Math.round(fontSizeMultiplier * 100)}%
+                  Tema{' '}
+                  {themeMode === 'system'
+                    ? 'Sistema'
+                    : themeMode === 'oled'
+                      ? 'Midnight OLED'
+                      : themeMode === 'dark'
+                        ? 'Deep Navy'
+                        : 'Claro'}{' '}
+                  • {activeColorName} • {Math.round(fontSizeMultiplier * 100)}%
                 </Text>
               </View>
               <Ionicons
@@ -534,40 +543,118 @@ export default function SettingsScreen() {
 
                 {/* Modo do Tema */}
                 <Text style={[styles.innerSectionLabel, { color: theme.textPrimary }]}>Modo do Tema</Text>
-                <View style={[styles.themeSelectorRow, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}>
-                  {[
-                    { mode: 'system' as const, label: 'Sistema', icon: 'phone-portrait-outline' as const },
-                    { mode: 'dark' as const, label: 'Escuro', icon: 'moon-outline' as const },
-                    { mode: 'light' as const, label: 'Claro', icon: 'sunny-outline' as const },
-                  ].map((item) => {
+                <View style={styles.themeGrid}>
+                  {(
+                    [
+                      {
+                        mode: 'system' as ThemeMode,
+                        label: 'Sistema',
+                        caption: 'Automático',
+                        icon: 'phone-portrait-outline' as const,
+                        swatchBg: theme.isDark ? MomentusColors.navyBackground : '#F8FAFC',
+                        swatchBorder: theme.outline,
+                      },
+                      {
+                        mode: 'dark' as ThemeMode,
+                        label: 'Deep Navy',
+                        caption: 'Escuro padrão',
+                        icon: 'moon-outline' as const,
+                        swatchBg: MomentusColors.navyBackground,
+                        swatchBorder: MomentusColors.navyOutline,
+                      },
+                      {
+                        mode: 'oled' as ThemeMode,
+                        label: 'Midnight OLED',
+                        caption: 'Preto #000',
+                        icon: 'contrast-outline' as const,
+                        swatchBg: MomentusColors.oledBackground,
+                        swatchBorder: 'rgba(255, 255, 255, 0.25)',
+                      },
+                      {
+                        mode: 'light' as ThemeMode,
+                        label: 'Claro',
+                        caption: 'Diurno limpo',
+                        icon: 'sunny-outline' as const,
+                        swatchBg: '#F8FAFC',
+                        swatchBorder: '#CBD5E1',
+                      },
+                    ]
+                  ).map((item) => {
                     const isActive = themeMode === item.mode;
-                    const activeContrast = getContrastTextColor(primaryColorHex);
                     return (
                       <TouchableOpacity
                         key={item.mode}
                         onPress={() => handleSelectTheme(item.mode)}
+                        accessibilityRole="radio"
+                        accessibilityState={{ checked: isActive }}
+                        accessibilityLabel={`Selecionar tema ${item.label}`}
                         style={[
-                          styles.themeBtn,
-                          isActive && { backgroundColor: primaryColorHex },
+                          styles.themeOptionCard,
+                          {
+                            backgroundColor: isActive
+                              ? `${primaryColorHex}14`
+                              : theme.surfaceElevated,
+                            borderColor: isActive ? primaryColorHex : theme.outline,
+                          },
                         ]}
-                        activeOpacity={0.7}>
-                        <Ionicons
-                          name={item.icon}
-                          size={15}
-                          color={isActive ? activeContrast : theme.textSecondary}
-                        />
-                        <Text
+                        activeOpacity={0.75}>
+                        <View
                           style={[
-                            styles.themeBtnText,
-                            { color: isActive ? activeContrast : theme.textSecondary },
-                            isActive && styles.themeBtnTextActive,
+                            styles.themeSwatch,
+                            {
+                              backgroundColor: item.swatchBg,
+                              borderColor: isActive ? primaryColorHex : item.swatchBorder,
+                            },
                           ]}>
-                          {item.label}
-                        </Text>
+                          {item.mode === 'oled' ? (
+                            <View style={[styles.themeSwatchAccentDot, { backgroundColor: primaryColorHex }]} />
+                          ) : (
+                            <Ionicons
+                              name={item.icon}
+                              size={12}
+                              color={item.mode === 'light' ? '#0F172A' : primaryColorHex}
+                            />
+                          )}
+                        </View>
+                        <View style={styles.themeOptionTextCol}>
+                          <Text
+                            numberOfLines={1}
+                            style={[
+                              styles.themeBtnText,
+                              { color: isActive ? primaryColorHex : theme.textPrimary },
+                              isActive && styles.themeBtnTextActive,
+                            ]}>
+                            {item.label}
+                          </Text>
+                          <Text
+                            numberOfLines={1}
+                            style={[styles.themeOptionCaption, { color: theme.textSecondary }]}>
+                            {item.caption}
+                          </Text>
+                        </View>
+                        {isActive && (
+                          <Ionicons name="checkmark-circle" size={16} color={primaryColorHex} />
+                        )}
                       </TouchableOpacity>
                     );
                   })}
                 </View>
+
+                {themeMode === 'oled' && (
+                  <View
+                    style={[
+                      styles.oledHintPill,
+                      {
+                        backgroundColor: `${primaryColorHex}12`,
+                        borderColor: `${primaryColorHex}35`,
+                      },
+                    ]}>
+                    <Ionicons name="sparkles-outline" size={14} color={primaryColorHex} />
+                    <Text style={[styles.oledHintText, { color: theme.textSecondary }]}>
+                      Preto absoluto (#000000) ativo — contraste infinito e economia de bateria em telas OLED/AMOLED.
+                    </Text>
+                  </View>
+                )}
 
                 {/* Cor Principal */}
                 <View style={styles.colorHeaderRow}>
@@ -1398,7 +1485,7 @@ const styles = StyleSheet.create({
   themeSelectorRow: {
     flexDirection: 'row',
     borderRadius: BorderRadiusTokens.input,
-    padding: 4,
+    padding: SpacingTokens.xs,
     borderWidth: 1,
     marginBottom: SpacingTokens.md,
   },
@@ -1412,9 +1499,66 @@ const styles = StyleSheet.create({
     gap: SpacingTokens.xs,
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
+  themeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SpacingTokens.sm,
+    marginBottom: SpacingTokens.md,
+  },
+  themeOptionCard: {
+    width: '48.5%',
+    flexGrow: 1,
+    minHeight: ComponentHeightTokens.buttonHero,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SpacingTokens.sm,
+    paddingVertical: SpacingTokens.sm,
+    borderRadius: BorderRadiusTokens.card,
+    borderWidth: 1.5,
+    gap: SpacingTokens.sm,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  },
+  themeSwatch: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  themeSwatchAccentDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  themeOptionTextCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  themeOptionCaption: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  oledHintPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SpacingTokens.sm,
+    paddingHorizontal: SpacingTokens.md,
+    paddingVertical: SpacingTokens.sm,
+    borderRadius: BorderRadiusTokens.control,
+    borderWidth: 1,
+    marginBottom: SpacingTokens.md,
+  },
+  oledHintText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '500',
+  },
   themeBtnText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   themeBtnTextActive: {
     fontWeight: '800',

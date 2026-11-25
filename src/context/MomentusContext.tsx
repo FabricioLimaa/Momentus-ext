@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useMemo, useRef,
 import { useColorScheme, Alert, Platform, AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
+import * as SystemUI from 'expo-system-ui';
 import {
   HabitItem,
   Category,
@@ -106,6 +107,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 
 export interface AppTheme {
   isDark: boolean;
+  isOled: boolean;
   background: string;
   surface: string;
   surfaceElevated: string;
@@ -214,20 +216,42 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [focusHistoryMap, setFocusHistoryMap] = useState<Record<string, number>>({});
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Dynamic Theme (Light, Dark, System)
+  // Dynamic Theme (Light, Deep Navy Dark, Midnight OLED, System)
   const systemColorScheme = useColorScheme();
+  const isOled = useMemo(() => {
+    return (settings.themeMode || 'dark').toLowerCase() === 'oled';
+  }, [settings.themeMode]);
+
   const isDark = useMemo(() => {
     const mode = (settings.themeMode || 'dark').toLowerCase();
-    if (mode === 'dark') return true;
+    if (mode === 'dark' || mode === 'oled') return true;
     if (mode === 'light') return false;
     return systemColorScheme !== 'light';
   }, [settings.themeMode, systemColorScheme]);
 
   const primaryColor = settings.primaryColorHex || MomentusColors.emeraldNeon;
 
-  const theme: AppTheme = useMemo(
-    () => ({
+  const theme: AppTheme = useMemo(() => {
+    if (isOled) {
+      return {
+        isDark: true,
+        isOled: true,
+        background: MomentusColors.oledBackground,
+        surface: MomentusColors.oledSurface,
+        surfaceElevated: MomentusColors.oledCardElevated,
+        card: MomentusColors.oledCard,
+        outline: MomentusColors.oledOutline,
+        textPrimary: MomentusColors.oledTextPrimary,
+        textSecondary: MomentusColors.oledTextSecondary,
+        primary: primaryColor,
+        glassCard: MomentusColors.oledGlassCard,
+        glassBorder: MomentusColors.oledGlassBorder,
+      };
+    }
+
+    return {
       isDark,
+      isOled: false,
       background: isDark ? MomentusColors.navyBackground : '#F8FAFC',
       surface: isDark ? MomentusColors.navySurface : '#FFFFFF',
       surfaceElevated: isDark ? MomentusColors.navyCardElevated : '#F1F5F9',
@@ -238,9 +262,24 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       primary: primaryColor,
       glassCard: isDark ? 'rgba(30, 41, 59, 0.75)' : 'rgba(255, 255, 255, 0.90)',
       glassBorder: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
-    }),
-    [isDark, primaryColor]
-  );
+    };
+  }, [isDark, isOled, primaryColor]);
+
+  // Sincroniza cor de fundo raiz do sistema (evita bordas/flashes navy no modo Midnight OLED #000000)
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      if (typeof document !== 'undefined') {
+        if (document.documentElement) {
+          document.documentElement.style.backgroundColor = theme.background;
+        }
+        if (document.body) {
+          document.body.style.backgroundColor = theme.background;
+        }
+      }
+      return;
+    }
+    SystemUI.setBackgroundColorAsync(theme.background).catch(() => {});
+  }, [theme.background]);
 
   // Celebration state
   const [celebration, setCelebration] = useState<{
@@ -2156,7 +2195,8 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         categories,
         userProfile.currentStreak,
         theme.primary,
-        theme.isDark
+        theme.isDark,
+        theme.isOled
       ).catch(() => {});
     }, 300);
 
@@ -2168,6 +2208,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     userProfile.currentStreak,
     theme.primary,
     theme.isDark,
+    theme.isOled,
   ]);
 
   // Escuta interações ao vivo do WidgetKit iOS e reconcilia check-offs feitos offline (Android & iOS)
