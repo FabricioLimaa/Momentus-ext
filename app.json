@@ -144,6 +144,13 @@
             }
           ]
         }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "O Momentus utiliza o microfone para criar rotinas em 1 toque por comando de voz.",
+          "speechRecognitionPermission": "O Momentus utiliza o reconhecimento de voz para preencher automaticamente data, horário e categoria das suas rotinas."
+        }
       ]
     ],
     "experiments": {

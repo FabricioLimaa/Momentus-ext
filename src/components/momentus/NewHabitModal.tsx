@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -10,6 +10,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   Switch,
+  Animated,
+  Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -19,11 +21,14 @@ import {
   SpacingTokens,
   BorderRadiusTokens,
   ComponentHeightTokens,
+  IconSize,
 } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
-import { getTodayDateString } from '@/constants/initialData';
+import { getTodayDateString, formatDateToBr } from '@/constants/initialData';
 import { HabitItem } from '@/types';
 import { TimePickerModal } from './TimePickerModal';
+import { parseVoiceHabitCommand } from '@/domain/voiceHabitParser';
+import { startVoiceCapture, VoiceCaptureSession } from '@/services/voiceCaptureService';
 
 interface NewHabitModalProps {
   visible: boolean;
@@ -32,18 +37,28 @@ interface NewHabitModalProps {
   initialDate?: string;
 }
 
+function getRelativeDateString(offsetDays: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export const NewHabitModal: React.FC<NewHabitModalProps> = ({
   visible,
   onClose,
   habitToEdit,
   initialDate,
 }) => {
-  const { categories, addHabit, updateHabit, selectedDate, theme, settings } = useMomentus();
+  const { categories, addHabit, updateHabit, selectedDate, theme, settings, triggerHaptic } = useMomentus();
   const isEditMode = !!habitToEdit;
 
   const defaultGoogleSync = settings.googleCalendarSyncEnabled ?? true;
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [targetDate, setTargetDate] = useState<string>(initialDate || selectedDate || getTodayDateString());
   const [timeStart, setTimeStart] = useState('08:00');
   const [timeEnd, setTimeEnd] = useState('09:00');
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
@@ -52,10 +67,67 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
 
-  React.useEffect(() => {
+  // Estados do Quick Voice Capture (Criação por Voz em 1 Toque)
+  const [isListening, setIsListening] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState('');
+  const [voiceFeedback, setVoiceFeedback] = useState<string | null>(null);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [showSmartCommandFallback, setShowSmartCommandFallback] = useState(false);
+  const [smartCommandText, setSmartCommandText] = useState('');
+  const voiceSessionRef = useRef<VoiceCaptureSession | null>(null);
+
+  const useNative = Platform.OS !== 'web';
+  const [micPulse] = useState(() => new Animated.Value(1));
+
+  const todayIso = useMemo(() => getTodayDateString(), []);
+  const tomorrowIso = useMemo(() => getRelativeDateString(1), []);
+
+  // Animação sutil no botão do microfone enquanto escuta
+  useEffect(() => {
+    if (isListening) {
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(micPulse, {
+            toValue: 1.14,
+            duration: 550,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: useNative,
+          }),
+          Animated.timing(micPulse, {
+            toValue: 1,
+            duration: 550,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: useNative,
+          }),
+        ])
+      );
+      loop.start();
+      return () => loop.stop();
+    } else {
+      micPulse.setValue(1);
+    }
+  }, [isListening, micPulse, useNative]);
+
+  // Encerra captura de voz ao fechar o modal
+  useEffect(() => {
+    if (!visible && voiceSessionRef.current) {
+      voiceSessionRef.current.abort();
+      voiceSessionRef.current = null;
+      setIsListening(false);
+    }
+  }, [visible]);
+
+  useEffect(() => {
+    setVoiceTranscript('');
+    setVoiceFeedback(null);
+    setVoiceError(null);
+    setShowSmartCommandFallback(false);
+    setSmartCommandText('');
+
     if (habitToEdit) {
       setTitle(habitToEdit.title);
       setDescription(habitToEdit.description || '');
+      setTargetDate(habitToEdit.date || getTodayDateString());
       setTimeStart(habitToEdit.timeStart);
       setTimeEnd(habitToEdit.timeEnd || '09:00');
       setSelectedCategoryId(habitToEdit.categoryId);
@@ -63,6 +135,7 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
     } else {
       setTitle('');
       setDescription('');
+      setTargetDate(initialDate || selectedDate || getTodayDateString());
       const now = new Date();
       const h = String(now.getHours()).padStart(2, '0');
       const nextH = String((now.getHours() + 1) % 24).padStart(2, '0');
@@ -72,7 +145,91 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
       setSelectedCategoryId(defaultCat?.id || 'cat-outros');
       setSaveToGoogle(settings.googleCalendarSyncEnabled ?? true);
     }
-  }, [habitToEdit, visible, categories, settings.googleCalendarSyncEnabled]);
+  }, [habitToEdit, visible, categories, settings.googleCalendarSyncEnabled, initialDate, selectedDate]);
+
+  const applyParsedVoicePhrase = (phrase: string) => {
+    const parsed = parseVoiceHabitCommand(phrase, categories);
+    if (!parsed.title) return;
+
+    setTitle(parsed.title);
+    if (parsed.date) setTargetDate(parsed.date);
+    if (parsed.timeStart) setTimeStart(parsed.timeStart);
+    if (parsed.timeEnd) setTimeEnd(parsed.timeEnd);
+    if (parsed.categoryId) setSelectedCategoryId(parsed.categoryId);
+
+    const summaryParts: string[] = [];
+    if (parsed.dateLabel) summaryParts.push(parsed.dateLabel);
+    if (parsed.timeStart) {
+      summaryParts.push(parsed.timeEnd ? `${parsed.timeStart}–${parsed.timeEnd}` : parsed.timeStart);
+    }
+    if (parsed.categoryName) summaryParts.push(parsed.categoryName);
+
+    setVoiceError(null);
+    setVoiceFeedback(
+      summaryParts.length > 0
+        ? `Preenchido: ${summaryParts.join(' • ')}`
+        : `Título capturado: "${parsed.title}"`
+    );
+    triggerHaptic('success');
+  };
+
+  const handleToggleVoiceCapture = async () => {
+    if (isListening) {
+      triggerHaptic('selection');
+      voiceSessionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    setVoiceError(null);
+    setVoiceFeedback(null);
+    setVoiceTranscript('');
+    triggerHaptic('light');
+
+    const outcome = await startVoiceCapture(
+      {
+        onStart: () => {
+          setIsListening(true);
+        },
+        onPartialResult: (partial) => {
+          setVoiceTranscript(partial);
+        },
+        onFinalResult: (finalText) => {
+          setVoiceTranscript(finalText);
+          applyParsedVoicePhrase(finalText);
+        },
+        onError: (_code, msg) => {
+          setVoiceError(msg);
+          setIsListening(false);
+        },
+        onEnd: () => {
+          setIsListening(false);
+          voiceSessionRef.current = null;
+        },
+      },
+      categories.map((c) => c.name)
+    );
+
+    if (outcome.started && outcome.session) {
+      voiceSessionRef.current = outcome.session;
+      setIsListening(true);
+      setShowSmartCommandFallback(false);
+    } else if (outcome.requiresFallback) {
+      // Fallback elegante (ex.: Expo Go ou navegador sem Web Speech API): ditado pelo teclado + NLP
+      setShowSmartCommandFallback(true);
+      setVoiceError(null);
+    } else if (outcome.errorMessage) {
+      setVoiceError(outcome.errorMessage);
+    }
+  };
+
+  const handleApplySmartFallback = () => {
+    const trimmed = smartCommandText.trim();
+    if (!trimmed) return;
+    applyParsedVoicePhrase(trimmed);
+    setShowSmartCommandFallback(false);
+    setSmartCommandText('');
+  };
 
   const parseTimeToMinutes = (t: string) => {
     if (!t) return 0;
@@ -102,14 +259,23 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
     return title.trim().length > 0 && !!selectedCategoryId && !isTimeInvalid;
   }, [title, selectedCategoryId, isTimeInvalid]);
 
+  const isCustomDate = targetDate !== todayIso && targetDate !== tomorrowIso;
+
   const handleSave = () => {
     if (!isFormValid) return;
+
+    if (voiceSessionRef.current) {
+      voiceSessionRef.current.abort();
+      voiceSessionRef.current = null;
+      setIsListening(false);
+    }
 
     if (isEditMode && habitToEdit) {
       updateHabit({
         ...habitToEdit,
         title: title.trim(),
         description: description.trim() || undefined,
+        date: targetDate || habitToEdit.date,
         timeStart: timeStart.trim() || '08:00',
         timeEnd: timeEnd.trim() || undefined,
         categoryId: selectedCategoryId,
@@ -122,7 +288,7 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
         timeStart: timeStart.trim() || '08:00',
         timeEnd: timeEnd.trim() || undefined,
         categoryId: selectedCategoryId,
-        date: initialDate || selectedDate || getTodayDateString(),
+        date: targetDate || initialDate || selectedDate || getTodayDateString(),
         saveToGoogle,
       });
     }
@@ -138,26 +304,229 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
         <View style={[styles.sheetContainer, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
           <View style={styles.header}>
             <Text style={[styles.title, { color: theme.textPrimary }]}>{isEditMode ? 'Editar Rotina' : 'Nova Rotina'}</Text>
-            <TouchableOpacity
-              onPress={onClose}
-              style={styles.closeBtn}
-              accessibilityRole="button"
-              accessibilityLabel="Fechar modal">
-              <Ionicons name="close" size={22} color={theme.textSecondary} />
-            </TouchableOpacity>
+
+            <View style={styles.headerActions}>
+              {/* Ícone discreto de microfone: Quick Voice Capture */}
+              <Animated.View style={{ transform: [{ scale: micPulse }] }}>
+                <TouchableOpacity
+                  onPress={handleToggleVoiceCapture}
+                  style={[
+                    styles.micBtn,
+                    {
+                      backgroundColor: isListening
+                        ? `${MomentusColors.errorRed}20`
+                        : `${theme.primary}15`,
+                      borderColor: isListening ? MomentusColors.errorRed : `${theme.primary}45`,
+                    },
+                  ]}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    isListening
+                      ? 'Parar captura de voz'
+                      : 'Criar rotina por voz (Quick Voice Capture)'
+                  }>
+                  <Ionicons
+                    name={isListening ? 'stop' : 'mic-outline'}
+                    size={IconSize.md}
+                    color={isListening ? MomentusColors.errorRed : theme.primary}
+                  />
+                </TouchableOpacity>
+              </Animated.View>
+
+              <TouchableOpacity
+                onPress={onClose}
+                style={styles.closeBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Fechar modal">
+                <Ionicons name="close" size={22} color={theme.textSecondary} />
+              </TouchableOpacity>
+            </View>
           </View>
 
-          <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.body} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            {/* Banner dinâmico enquanto escuta voz */}
+            {isListening && (
+              <View
+                style={[
+                  styles.voiceBanner,
+                  {
+                    backgroundColor: `${theme.primary}14`,
+                    borderColor: `${theme.primary}50`,
+                  },
+                ]}>
+                <View style={styles.voiceBannerHeader}>
+                  <View style={[styles.voiceLiveDot, { backgroundColor: MomentusColors.errorRed }]} />
+                  <Text style={[styles.voiceBannerTitle, { color: theme.primary }]}>
+                    Ouvindo... fale sua rotina
+                  </Text>
+                </View>
+                <Text style={[styles.voiceTranscriptText, { color: theme.textPrimary }]}>
+                  {voiceTranscript
+                    ? `"${voiceTranscript}"`
+                    : 'Ex.: "Academia amanhã às 18h categoria Saúde"'}
+                </Text>
+              </View>
+            )}
+
+            {/* Fallback inteligente (Expo Go / navegador sem Speech API): usa ditado do teclado + NLP */}
+            {showSmartCommandFallback && !isListening && (
+              <View
+                style={[
+                  styles.voiceBanner,
+                  {
+                    backgroundColor: theme.surfaceElevated,
+                    borderColor: `${theme.primary}45`,
+                  },
+                ]}>
+                <Text style={[styles.voiceBannerTitle, { color: theme.primary }]}>
+                  Captura Inteligente (use o microfone do teclado ou digite)
+                </Text>
+                <View style={styles.smartFallbackRow}>
+                  <TextInput
+                    style={[
+                      styles.smartFallbackInput,
+                      {
+                        backgroundColor: theme.surface,
+                        borderColor: theme.outline,
+                        color: theme.textPrimary,
+                      },
+                    ]}
+                    placeholder="Ex: Academia amanhã às 18h categoria Saúde"
+                    placeholderTextColor={MomentusColors.textMuted}
+                    value={smartCommandText}
+                    onChangeText={setSmartCommandText}
+                    onSubmitEditing={handleApplySmartFallback}
+                    returnKeyType="done"
+                    autoFocus
+                  />
+                  <TouchableOpacity
+                    onPress={handleApplySmartFallback}
+                    disabled={!smartCommandText.trim()}
+                    style={[
+                      styles.smartApplyBtn,
+                      { backgroundColor: theme.primary },
+                      !smartCommandText.trim() && styles.disabledBtn,
+                    ]}
+                    activeOpacity={0.8}>
+                    <Ionicons
+                      name="sparkles"
+                      size={IconSize.sm}
+                      color={getContrastTextColor(theme.primary)}
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {/* Feedback sutil após preenchimento automático por voz */}
+            {voiceFeedback && !isListening && (
+              <View
+                style={[
+                  styles.voiceFeedbackPill,
+                  {
+                    backgroundColor: `${theme.primary}15`,
+                    borderColor: `${theme.primary}40`,
+                  },
+                ]}>
+                <Ionicons name="checkmark-circle" size={IconSize.sm} color={theme.primary} />
+                <Text style={[styles.voiceFeedbackText, { color: theme.textPrimary }]}>
+                  {voiceFeedback}
+                </Text>
+              </View>
+            )}
+
+            {voiceError && !isListening && (
+              <View style={styles.errorBanner}>
+                <Ionicons name="alert-circle-outline" size={IconSize.sm} color={MomentusColors.errorRed} />
+                <Text style={styles.errorBannerText}>{voiceError}</Text>
+              </View>
+            )}
+
             {/* Title */}
             <Text style={[styles.label, { color: theme.textPrimary }]}>Nome da rotina *</Text>
             <TextInput
               style={[styles.input, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, color: theme.textPrimary }]}
-              placeholder="Ex: Estudo de Redes"
+              placeholder="Ex: Estudo de Redes ou toque no microfone"
               placeholderTextColor={MomentusColors.textMuted}
               value={title}
               onChangeText={setTitle}
               maxLength={80}
             />
+
+            {/* Data da Rotina (atualizada instantaneamente por voz ou toque rápido) */}
+            <Text style={[styles.label, { color: theme.textPrimary }]}>Data</Text>
+            <View style={styles.dateChipsRow}>
+              <TouchableOpacity
+                onPress={() => {
+                  triggerHaptic('selection');
+                  setTargetDate(todayIso);
+                }}
+                style={[
+                  styles.dateChip,
+                  {
+                    backgroundColor: targetDate === todayIso ? `${theme.primary}20` : theme.surfaceElevated,
+                    borderColor: targetDate === todayIso ? theme.primary : theme.outline,
+                  },
+                ]}
+                activeOpacity={0.75}>
+                <Ionicons
+                  name="today-outline"
+                  size={IconSize.xs}
+                  color={targetDate === todayIso ? theme.primary : theme.textSecondary}
+                />
+                <Text
+                  style={[
+                    styles.dateChipText,
+                    { color: targetDate === todayIso ? theme.primary : theme.textSecondary },
+                  ]}>
+                  Hoje
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => {
+                  triggerHaptic('selection');
+                  setTargetDate(tomorrowIso);
+                }}
+                style={[
+                  styles.dateChip,
+                  {
+                    backgroundColor: targetDate === tomorrowIso ? `${theme.primary}20` : theme.surfaceElevated,
+                    borderColor: targetDate === tomorrowIso ? theme.primary : theme.outline,
+                  },
+                ]}
+                activeOpacity={0.75}>
+                <Ionicons
+                  name="sunny-outline"
+                  size={IconSize.xs}
+                  color={targetDate === tomorrowIso ? theme.primary : theme.textSecondary}
+                />
+                <Text
+                  style={[
+                    styles.dateChipText,
+                    { color: targetDate === tomorrowIso ? theme.primary : theme.textSecondary },
+                  ]}>
+                  Amanhã
+                </Text>
+              </TouchableOpacity>
+
+              {isCustomDate && (
+                <View
+                  style={[
+                    styles.dateChip,
+                    {
+                      backgroundColor: `${theme.primary}20`,
+                      borderColor: theme.primary,
+                    },
+                  ]}>
+                  <Ionicons name="calendar-outline" size={IconSize.xs} color={theme.primary} />
+                  <Text style={[styles.dateChipText, { color: theme.primary }]}>
+                    {formatDateToBr(targetDate)}
+                  </Text>
+                </View>
+              )}
+            </View>
 
             {/* Seletor Integrado de Faixa de Horário (Time Range Chip) */}
             <Text style={[styles.label, { color: theme.textPrimary }]}>Horário da Rotina</Text>
@@ -365,7 +734,7 @@ const styles = StyleSheet.create({
     borderColor: MomentusColors.navyOutline,
     paddingTop: 20,
     paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
-    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    paddingBottom: Platform.OS === 'ios' ? 32 : 24,
     width: '100%',
     maxWidth: LayoutTokens.maxModalSheetWidth,
     maxHeight: '85%',
@@ -375,7 +744,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: SpacingTokens.md,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SpacingTokens.xs,
+  },
+  micBtn: {
+    width: ComponentHeightTokens.buttonCompact,
+    height: ComponentHeightTokens.buttonCompact,
+    borderRadius: ComponentHeightTokens.buttonCompact / 2,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
   },
   title: {
     color: MomentusColors.textPrimary,
@@ -389,7 +772,88 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   body: {
-    marginBottom: 16,
+    marginBottom: SpacingTokens.md,
+  },
+  voiceBanner: {
+    borderWidth: 1,
+    borderRadius: BorderRadiusTokens.card,
+    padding: SpacingTokens.md,
+    gap: SpacingTokens.sm,
+    marginBottom: SpacingTokens.sm,
+  },
+  voiceBannerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SpacingTokens.sm,
+  },
+  voiceLiveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  voiceBannerTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  voiceTranscriptText: {
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 20,
+  },
+  smartFallbackRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SpacingTokens.sm,
+  },
+  smartFallbackInput: {
+    flex: 1,
+    height: ComponentHeightTokens.buttonCompact,
+    borderWidth: 1,
+    borderRadius: BorderRadiusTokens.control,
+    paddingHorizontal: SpacingTokens.md,
+    fontSize: 13,
+  },
+  smartApplyBtn: {
+    width: ComponentHeightTokens.buttonCompact,
+    height: ComponentHeightTokens.buttonCompact,
+    borderRadius: BorderRadiusTokens.control,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
+  },
+  voiceFeedbackPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SpacingTokens.sm,
+    paddingHorizontal: SpacingTokens.md,
+    paddingVertical: SpacingTokens.sm,
+    borderRadius: BorderRadiusTokens.control,
+    borderWidth: 1,
+    marginBottom: SpacingTokens.sm,
+  },
+  voiceFeedbackText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  dateChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SpacingTokens.sm,
+  },
+  dateChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SpacingTokens.xs,
+    height: ComponentHeightTokens.chip,
+    paddingHorizontal: SpacingTokens.md,
+    borderRadius: BorderRadiusTokens.control,
+    borderWidth: 1,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
+  },
+  dateChipText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   label: {
     color: MomentusColors.textSecondary,
@@ -431,7 +895,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadiusTokens.control,
     paddingHorizontal: SpacingTokens.md,
     paddingVertical: SpacingTokens.sm,
-    marginTop: SpacingTokens.sm,
+    marginBottom: SpacingTokens.sm,
   },
   errorBannerText: {
     color: MomentusColors.errorRed,
@@ -476,7 +940,7 @@ const styles = StyleSheet.create({
     paddingVertical: SpacingTokens.xs,
   },
   timeBlockTag: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.6,
     marginBottom: 2,
@@ -511,7 +975,7 @@ const styles = StyleSheet.create({
     paddingVertical: SpacingTokens.xs,
   },
   timeRangeSubLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
