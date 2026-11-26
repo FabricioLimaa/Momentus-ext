@@ -349,10 +349,10 @@ export const TypographyTokens = {
     lineHeight: 16,
   },
   micro: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800' as const,
     letterSpacing: 0.5,
-    lineHeight: 14,
+    lineHeight: 15,
   },
 } as const;
 

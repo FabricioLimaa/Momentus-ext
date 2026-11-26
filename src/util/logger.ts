@@ -11,6 +11,7 @@ export type KnownLogTag =
   | 'FOCUS'
   | 'GAMIFICATION'
   | 'BACKUP'
+  | 'UI'
   | 'APP';
 
 export type LogTag = KnownLogTag | (string & {});
@@ -210,6 +211,13 @@ class MomentusLogger {
     info: (msg: string, ...params: any[]) => this.info('FOCUS', msg, ...params),
     warn: (msg: string, ...params: any[]) => this.warn('FOCUS', msg, ...params),
     error: (msg: string, ...params: any[]) => this.error('FOCUS', msg, ...params),
+  };
+
+  public readonly ui = {
+    debug: (msg: string, ...params: any[]) => this.debug('UI', msg, ...params),
+    info: (msg: string, ...params: any[]) => this.info('UI', msg, ...params),
+    warn: (msg: string, ...params: any[]) => this.warn('UI', msg, ...params),
+    error: (msg: string, ...params: any[]) => this.error('UI', msg, ...params),
   };
 }
 

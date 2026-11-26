@@ -7,7 +7,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Platform,
-  Dimensions,
+  useWindowDimensions,
   ActivityIndicator,
   Alert,
   ScrollView,
@@ -29,6 +29,7 @@ import { UserLevelInfo } from "@/domain/userLevel";
 import { UserProfile } from "@/types";
 import { AvatarWithFrame } from "@/components/momentus/AvatarWithFrame";
 import { APP_INFO } from "@/constants/appInfo";
+import { MomentusLog } from "@/util/logger";
 
 export interface WeeklySummaryStats {
   perfectDaysCount: number;
@@ -63,7 +64,7 @@ export const WeeklySummaryModal: React.FC<WeeklySummaryModalProps> = ({
   const cardRef = useRef<View>(null);
   const [isSharing, setIsSharing] = useState(false);
 
-  const screenWidth = Dimensions.get("window").width;
+  const { width: screenWidth } = useWindowDimensions();
   const cardWidth = Math.min(screenWidth - 48, 330);
   const cardHeight = Math.round(cardWidth * (16 / 9));
 
@@ -168,7 +169,7 @@ export const WeeklySummaryModal: React.FC<WeeklySummaryModalProps> = ({
         }
       }
     } catch (err: any) {
-      console.warn("Erro ao compartilhar resumo:", err);
+      MomentusLog.ui.warn("Erro ao compartilhar resumo:", err);
       Alert.alert(
         "Erro",
         "Não foi possível gerar a imagem para compartilhamento.",
@@ -527,7 +528,7 @@ const styles = StyleSheet.create({
   cardGradient: {
     flex: 1,
     paddingHorizontal: 20,
-    paddingVertical: 18,
+    paddingVertical: 16,
     justifyContent: "space-between",
     position: "relative",
     backgroundColor: "#070B18",
@@ -546,20 +547,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-start",
-    marginBottom: 6,
+    marginBottom: 8,
   },
   brandPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: 999,
     backgroundColor: "rgba(255, 255, 255, 0.06)",
     borderWidth: 1,
   },
   brandText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "900",
     letterSpacing: 0.8,
   },
@@ -579,7 +580,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
   },
   avatarCircle: {
     width: 44,
@@ -608,19 +609,19 @@ const styles = StyleSheet.create({
     color: "#F8FAFC",
     fontSize: 16,
     fontWeight: "800",
-    marginBottom: 3,
+    marginBottom: 4,
   },
   rankBadge: {
     alignSelf: "flex-start",
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
   },
   rankText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "700",
   },
   heroCard: {
@@ -631,12 +632,12 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   heroCardGradient: {
-    padding: 14,
+    padding: 16,
   },
   heroHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 12,
     marginBottom: 8,
   },
   heroIconBox: {
@@ -658,13 +659,13 @@ const styles = StyleSheet.create({
   },
   heroSubLabel: {
     color: "#94A3B8",
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "500",
   },
   heroScoreRow: {
     flexDirection: "row",
     alignItems: "baseline",
-    gap: 6,
+    gap: 8,
     marginTop: 2,
   },
   heroScoreNumber: {
@@ -688,9 +689,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.07)",
     borderRadius: 12,
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 12,
-    gap: 3,
+    gap: 4,
   },
   metricValue: {
     color: "#F8FAFC",
@@ -699,7 +700,7 @@ const styles = StyleSheet.create({
   },
   metricLabel: {
     color: "#94A3B8",
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "600",
   },
   quoteBox: {
@@ -709,13 +710,13 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 255, 255, 0.03)",
     borderRadius: 10,
     paddingVertical: 8,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     marginVertical: 4,
   },
   quoteText: {
     flex: 1,
     color: "#CBD5E1",
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "500",
     fontStyle: "italic",
     lineHeight: 14,

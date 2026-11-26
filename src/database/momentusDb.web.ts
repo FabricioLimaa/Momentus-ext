@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { DatabaseSecurityInfo } from '@/services/encryptionService';
+import { MomentusLog } from '@/util/logger';
 import {
   Category,
   HabitItem,
@@ -228,6 +229,6 @@ export async function clearEntireDatabase(): Promise<void> {
     );
     await AsyncStorage.multiRemove(keysToRemove);
   } catch (e) {
-    console.warn('Erro ao limpar banco no web:', e);
+    MomentusLog.db.warn('Erro ao limpar banco no web:', e);
   }
 }

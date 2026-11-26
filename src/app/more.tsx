@@ -26,6 +26,7 @@ import {
   useResponsiveLayout,
 } from '@/constants/theme';
 import { APP_INFO } from '@/constants/appInfo';
+import { MomentusLog } from '@/util/logger';
 import { useMomentus } from '@/context/MomentusContext';
 import { AvatarWithFrame } from '@/components/momentus/AvatarWithFrame';
 import { auth as firebaseAuth } from '@/config/firebase';
@@ -52,7 +53,7 @@ export default function MoreScreen() {
   const displayPhoto = userProfile.photoUrl || authUser?.photoURL || null;
 
   const isCloudConnected = !!authUser;
-  const appVersion = Constants.expoConfig?.version || '2.1.0';
+  const appVersion = Constants.expoConfig?.version || APP_INFO.version;
 
   const handleLogout = () => {
     triggerHaptic('impact');
@@ -78,7 +79,7 @@ export default function MoreScreen() {
         title: `Conheça o ${APP_INFO.name}`,
       });
     } catch (e) {
-      console.warn('Erro ao compartilhar app:', e);
+      MomentusLog.ui.warn('Erro ao compartilhar app:', e);
     }
   };
 
@@ -86,7 +87,7 @@ export default function MoreScreen() {
     triggerHaptic('impact');
     const subject = encodeURIComponent(`Suporte ${APP_INFO.name} - Usuário: ${displayName}`);
     const body = encodeURIComponent(
-      `Olá equipe ${APP_INFO.name},\n\nEstou entrando em contato a respeito do aplicativo:\n\n[Descreva sua dúvida ou problema]\n\nDispositivo: ${Platform.OS}\nVersão: 2.1.0\n`
+      `Olá equipe ${APP_INFO.name},\n\nEstou entrando em contato a respeito do aplicativo:\n\n[Descreva sua dúvida ou problema]\n\nDispositivo: ${Platform.OS}\nVersão: ${appVersion}\n`
     );
     Linking.openURL(`mailto:${APP_INFO.email}?subject=${subject}&body=${body}`);
   };
@@ -682,7 +683,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   brandCopyrightText: {
-    fontSize: 10,
+    fontSize: 11,
     marginTop: 2,
     textAlign: 'center',
   },

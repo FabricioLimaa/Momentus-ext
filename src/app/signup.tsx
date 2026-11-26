@@ -28,6 +28,7 @@ import {
 import { useMomentus } from '@/context/MomentusContext';
 import { registerWithEmail, getFriendlyAuthErrorMessage } from '@/services/authService';
 import { SplashScreen } from '@/components/momentus/SplashScreen';
+import { MomentusLog } from '@/util/logger';
 
 export default function SignUpScreen() {
   const insets = useSafeAreaInsets();
@@ -80,7 +81,7 @@ export default function SignUpScreen() {
       try {
         await syncCloudAction(user.uid);
       } catch (syncErr) {
-        console.warn('Erro ao sincronizar dados na nuvem:', syncErr);
+        MomentusLog.sync.warn('Erro ao sincronizar dados na nuvem:', syncErr);
       }
       setLoading(false);
       setIsPostSignUpSyncing(false);

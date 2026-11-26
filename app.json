@@ -57,7 +57,6 @@
         }
       ],
       "permissions": [
-        "NOTIFICATIONS",
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
         "READ_CALENDAR",
@@ -103,6 +102,12 @@
         {
           "configureAndroidBackup": false,
           "faceIDPermission": "O Momentus utiliza o Face ID para proteger sua sessão e chaves criptográficas locais."
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "O Momentus utiliza o Face ID ou biometria para proteger o acesso às suas rotinas."
         }
       ],
       [

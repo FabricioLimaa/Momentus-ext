@@ -148,6 +148,16 @@ export const CHANGELOG_DATA: VersionRelease[] = [
         actionLabel: 'Ver Segurança',
       },
       {
+        id: 'design-zen-accessibility',
+        icon: 'color-wand-outline',
+        tag: 'DESIGN',
+        title: 'Leitura mais confortável e toques mais precisos',
+        description:
+          'Textos, contrastes de cores e botões foram ajustados em todas as telas, inclusive nos avisos e celebrações no tema preto puro, que agora aparecem em sequência sem se sobrepor.',
+        actionRoute: '/settings',
+        actionLabel: 'Personalizar Visual',
+      },
+      {
         id: 'fix-stability-sync-light',
         icon: 'checkmark-done-circle-outline',
         tag: 'CORRECAO',

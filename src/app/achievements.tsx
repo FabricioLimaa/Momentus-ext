@@ -12,6 +12,7 @@ import {
   Share,
 } from 'react-native';
 import { APP_INFO } from '@/constants/appInfo';
+import { MomentusLog } from '@/util/logger';
 import { auth as firebaseAuth } from '@/config/firebase';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -165,7 +166,7 @@ export default function AchievementsScreen() {
         title: `Conquista Momentus: ${ach.title}`,
       });
     } catch (e) {
-      console.warn('Erro ao compartilhar conquista:', e);
+      MomentusLog.ui.warn('Erro ao compartilhar conquista:', e);
     }
   };
 
@@ -175,8 +176,7 @@ export default function AchievementsScreen() {
     if (success) {
       showCelebration(
         'Item Adquirido! 🛍️',
-        `Você comprou "${item.name}". Aproveite seu novo item!`,
-        0
+        `Você comprou "${item.name}". Aproveite seu novo item!`
       );
     } else {
       Alert.alert(
@@ -483,7 +483,7 @@ export default function AchievementsScreen() {
 
                     <View style={styles.itemInfo}>
                       <View style={styles.itemTitleRow}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 6 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, marginRight: 8 }}>
                           <Text style={[styles.itemTitle, { color: theme.textPrimary }]} numberOfLines={1}>
                             {ach.title}
                           </Text>
@@ -814,7 +814,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
     borderColor: MomentusColors.navyOutline,
-    padding: 18,
+    padding: 16,
   },
   profileTopRow: {
     flexDirection: 'row',
@@ -829,7 +829,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 14,
+    marginRight: 16,
   },
   avatarLargeText: {
     color: '#FFF',
@@ -870,7 +870,7 @@ const styles = StyleSheet.create({
     gap: 4,
     backgroundColor: 'rgba(251, 191, 36, 0.15)',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: 'rgba(251, 191, 36, 0.3)',
@@ -1043,7 +1043,7 @@ const styles = StyleSheet.create({
   },
   unlockedTagText: {
     color: MomentusColors.emeraldNeon,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: 'bold',
   },
   lockedRewardText: {
@@ -1116,18 +1116,18 @@ const styles = StyleSheet.create({
   xpProgressContainer: {
     borderTopWidth: 1,
     paddingTop: 12,
-    marginTop: 14,
+    marginTop: 16,
   },
   xpProgressHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   xpProgressTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 4,
   },
   xpProgressTitle: {
     fontSize: 11,
@@ -1144,7 +1144,7 @@ const styles = StyleSheet.create({
     height: 7,
     borderRadius: 3.5,
     overflow: 'hidden',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   xpProgressFill: {
     height: '100%',
@@ -1160,11 +1160,11 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
     marginHorizontal: LayoutTokens.pagePaddingHorizontal,
-    marginBottom: 14,
+    marginBottom: 16,
   },
   filterPill: {
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 12,
     borderWidth: 1,
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
@@ -1174,7 +1174,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   tierBadge: {
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
     paddingVertical: 1,
     borderRadius: 6,
     borderWidth: 1,
@@ -1185,7 +1185,7 @@ const styles = StyleSheet.create({
   },
   modalTierPill: {
     paddingHorizontal: 12,
-    paddingVertical: 5,
+    paddingVertical: 4,
     borderRadius: 12,
     borderWidth: 1,
     marginBottom: 12,
@@ -1200,9 +1200,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     width: '100%',
-    paddingVertical: 14,
+    paddingVertical: 16,
     borderRadius: 16,
-    marginBottom: 10,
+    marginBottom: 12,
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   modalShareBtnText: {
@@ -1245,7 +1245,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: MomentusColors.textSecondary,
     textAlign: 'center',
-    marginTop: 6,
+    marginTop: 8,
     marginBottom: 20,
   },
   modalRewardBox: {
@@ -1270,7 +1270,7 @@ const styles = StyleSheet.create({
   },
   modalStatusBox: {
     width: '100%',
-    padding: 10,
+    padding: 12,
     alignItems: 'center',
     marginBottom: 20,
   },
@@ -1282,7 +1282,7 @@ const styles = StyleSheet.create({
   modalCloseBtn: {
     backgroundColor: MomentusColors.emeraldNeon,
     width: '100%',
-    paddingVertical: 14,
+    paddingVertical: 16,
     borderRadius: 16,
     alignItems: 'center',
   },
@@ -1293,8 +1293,8 @@ const styles = StyleSheet.create({
   },
   frameListContainer: {
     width: '100%',
-    gap: 10,
-    marginBottom: 18,
+    gap: 12,
+    marginBottom: 16,
   },
   frameOptionCard: {
     flexDirection: 'row',

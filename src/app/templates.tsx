@@ -27,6 +27,7 @@ import {
   useResponsiveLayout,
 } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
+import { MomentusLog } from '@/util/logger';
 import { ApplyTemplateDialog } from '@/components/momentus/ApplyTemplateDialog';
 import { TimePickerModal } from '@/components/momentus/TimePickerModal';
 import { RoutineTemplate, TemplateItem, SharedTemplate } from '@/types';
@@ -407,7 +408,7 @@ export default function TemplatesScreen() {
         title: `Template Momentus: ${template.title}`,
       });
     } catch (err: any) {
-      console.warn('Erro ao compartilhar template:', err);
+      MomentusLog.ui.warn('Erro ao compartilhar template:', err);
     }
   };
 
@@ -1349,7 +1350,7 @@ export default function TemplatesScreen() {
                     })()}
 
                     {/* Categoria */}
-                    <Text style={[styles.timeLabel, { color: theme.textSecondary, marginTop: 10, marginBottom: 6 }]}>
+                    <Text style={[styles.timeLabel, { color: theme.textSecondary, marginTop: 12, marginBottom: 8 }]}>
                       Categoria
                     </Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
@@ -1597,7 +1598,7 @@ export default function TemplatesScreen() {
             <ScrollView
               style={styles.commModalScroll}
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ gap: 8, paddingBottom: 10 }}>
+              contentContainerStyle={{ gap: 8, paddingBottom: 12 }}>
               {selectedCommunityTemplate?.items.map((step, idx) => (
                 <View
                   key={step.id || idx}
@@ -1706,7 +1707,7 @@ const styles = StyleSheet.create({
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
+    paddingVertical: 64,
     paddingHorizontal: 24,
   },
   emptyIconCircle: {
@@ -1880,7 +1881,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: 8,
     marginTop: 8,
   },
   durationPresetsLabel: {
@@ -1889,7 +1890,7 @@ const styles = StyleSheet.create({
   },
   durationPresetChip: {
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: 6,
     borderWidth: 1,
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
@@ -2072,14 +2073,14 @@ const styles = StyleSheet.create({
   eventDurationTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 4,
     paddingHorizontal: SpacingTokens.sm,
     paddingVertical: SpacingTokens.xs,
     borderRadius: BorderRadiusTokens.sm,
     borderWidth: 1,
   },
   eventDurationTagText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
   },
   microErrorRow: {
@@ -2287,11 +2288,11 @@ const styles = StyleSheet.create({
   mainTabsNav: {
     flexDirection: 'row',
     marginHorizontal: LayoutTokens.pagePaddingHorizontal,
-    marginTop: 10,
+    marginTop: 12,
     marginBottom: 12,
     borderRadius: 14,
     borderWidth: 1,
-    padding: 3,
+    padding: 4,
     gap: 4,
   },
   mainTabBtn: {
@@ -2299,9 +2300,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: 11,
-    gap: 7,
+    gap: 8,
   },
   mainTabBtnActive: {
     shadowColor: '#000',
@@ -2325,12 +2326,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: LayoutTokens.pagePaddingHorizontal,
-    marginBottom: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    marginBottom: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderRadius: 14,
     borderWidth: 1,
-    gap: 10,
+    gap: 12,
   },
   searchTextInput: {
     flex: 1,
@@ -2343,8 +2344,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   tagChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
   },
@@ -2377,7 +2378,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
     marginBottom: 12,
-    gap: 10,
+    gap: 12,
   },
   trackIconCircle: {
     width: 34,
@@ -2400,7 +2401,7 @@ const styles = StyleSheet.create({
   },
   carouselContainer: {
     paddingHorizontal: LayoutTokens.pagePaddingHorizontal,
-    gap: 14,
+    gap: 16,
   },
   communityCard: {
     width: 280,
@@ -2494,18 +2495,18 @@ const styles = StyleSheet.create({
   commCardTitle: {
     fontSize: 15,
     fontWeight: '800',
-    marginBottom: 3,
+    marginBottom: 4,
   },
   commCardDesc: {
     fontSize: 12,
     lineHeight: 16,
   },
   commStepsPreview: {
-    gap: 6,
-    paddingTop: 10,
+    gap: 8,
+    paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.08)',
-    marginBottom: 14,
+    marginBottom: 16,
   },
   commStepRow: {
     flexDirection: 'row',
@@ -2535,8 +2536,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 9,
+    gap: 8,
+    paddingVertical: 8,
     borderRadius: 11,
   },
   commTodayBtnText: {
@@ -2549,8 +2550,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
-    paddingVertical: 9,
+    gap: 4,
+    paddingVertical: 8,
     borderRadius: 11,
     borderWidth: 1,
   },
@@ -2578,7 +2579,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   commModalHeaderLeft: {
     flex: 1,
@@ -2613,17 +2614,17 @@ const styles = StyleSheet.create({
   commModalDesc: {
     fontSize: 13,
     lineHeight: 18,
-    marginBottom: 10,
+    marginBottom: 12,
   },
   commModalTagsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 14,
+    gap: 8,
+    marginBottom: 16,
   },
   commModalTag: {
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: 8,
   },
   commModalTagText: {
@@ -2637,12 +2638,12 @@ const styles = StyleSheet.create({
   },
   commModalScroll: {
     maxHeight: 280,
-    marginBottom: 14,
+    marginBottom: 16,
   },
   commModalStepCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 10,
+    gap: 12,
     padding: 12,
     borderRadius: 14,
     borderWidth: 1,
@@ -2651,7 +2652,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    marginTop: 5,
+    marginTop: 4,
   },
   commModalStepTop: {
     flexDirection: 'row',

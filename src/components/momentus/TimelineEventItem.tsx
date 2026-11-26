@@ -188,8 +188,18 @@ export const TimelineEventItem: React.FC<TimelineEventItemProps> = ({
     }
   };
 
+  // Reavalia periodicamente (1 min) para atualizar indicador "Agora" / "Pendente"
+  const [minuteTick, setMinuteTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setMinuteTick((t) => t + 1);
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Verifica se o evento está em andamento agora ou se já encerrou no passado
   const { isOngoing, isPast } = useMemo(() => {
+    void minuteTick;
     try {
       const now = new Date();
       const currentMinutes = now.getHours() * 60 + now.getMinutes();
@@ -219,7 +229,7 @@ export const TimelineEventItem: React.FC<TimelineEventItemProps> = ({
     } catch {
       return { isOngoing: false, isPast: false };
     }
-  }, [item.timeStart, item.timeEnd, item.date]);
+  }, [item.timeStart, item.timeEnd, item.date, minuteTick]);
 
   const isPastPending = isPast && !isChecked;
 

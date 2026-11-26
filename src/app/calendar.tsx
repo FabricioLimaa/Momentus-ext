@@ -1610,7 +1610,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   iconButton: {
-    padding: 6,
+    padding: 8,
     borderRadius: 8,
     ...Platform.select({
       web: { cursor: 'pointer' },
@@ -1748,7 +1748,7 @@ const styles = StyleSheet.create({
   weekdayHeaderText: {
     width: `${100 / 7}%`,
     textAlign: 'center',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.5,
   },
@@ -1780,10 +1780,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
+    paddingVertical: 8,
   },
   weekDayName: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
     marginBottom: 2,
     letterSpacing: 0.5,
@@ -1797,7 +1797,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 2,
-    marginTop: 3,
+    marginTop: 4,
     height: 7,
   },
   pinDot: {
@@ -1910,7 +1910,7 @@ const styles = StyleSheet.create({
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 36,
+    paddingVertical: 32,
     paddingHorizontal: 20,
     borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
@@ -1990,7 +1990,7 @@ const styles = StyleSheet.create({
   emptyFilterContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 36,
+    paddingVertical: 32,
     paddingHorizontal: 20,
     borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
@@ -1999,13 +1999,13 @@ const styles = StyleSheet.create({
   emptyFilterTitle: {
     fontSize: 14,
     fontWeight: '700',
-    marginTop: 10,
+    marginTop: 12,
     textAlign: 'center',
   },
   resetFilterBtn: {
-    marginTop: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
+    marginTop: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,
     ...Platform.select({

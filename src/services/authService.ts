@@ -379,7 +379,7 @@ export async function sendPasswordReset(email: string): Promise<void> {
     await sendPasswordResetEmail(auth, email.trim());
   } catch (err) {
     if (isAndroidKeyBlockedError(err)) {
-      console.warn(
+      MomentusLog.auth.warn(
         'API Key do Firebase restrita a Android nativo ao solicitar redefinição de senha.'
       );
       return;

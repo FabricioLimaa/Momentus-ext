@@ -5,6 +5,7 @@
  */
 export const APP_INFO = {
   name: 'Momentus',
+  version: '2.1.0',
   developer: 'Fabricio Lima',
   email: 'contato@momentus.app.br',
   website: 'https://www.momentus.app.br/',

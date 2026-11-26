@@ -1344,10 +1344,10 @@ const styles = StyleSheet.create({
   barCol: {
     alignItems: 'center',
     flex: 1,
-    gap: 6,
+    gap: 8,
   },
   barCountLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
     color: MomentusColors.textSecondary,
     height: 16,
@@ -1405,7 +1405,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   catProgressItem: {
-    gap: 6,
+    gap: 8,
   },
   catProgressHeader: {
     flexDirection: 'row',
@@ -1445,12 +1445,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 3,
+    paddingTop: 4,
   },
   catMetaSubLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 4,
   },
   catMetaSubText: {
     fontSize: 11,
@@ -1476,7 +1476,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 14,
+    padding: 16,
     borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
     marginBottom: 20,
@@ -1513,7 +1513,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   storiesPill: {
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
     borderWidth: 1,
@@ -1531,7 +1531,7 @@ const styles = StyleSheet.create({
   heroCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 18,
+    padding: 16,
     borderRadius: 24,
     borderWidth: 1.5,
     marginBottom: 16,
@@ -1553,7 +1553,7 @@ const styles = StyleSheet.create({
   feedbackBadge: {
     alignSelf: 'flex-start',
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: 8,
     borderWidth: 1,
     marginBottom: 2,
@@ -1584,12 +1584,12 @@ const styles = StyleSheet.create({
   streakCol: {
     flex: 1,
     alignItems: 'center',
-    gap: 3,
+    gap: 4,
   },
   streakColHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   streakColLabel: {
     fontSize: 11,
@@ -1606,7 +1606,7 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   streakColSub: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '500',
   },
   streakDivider: {
@@ -1620,18 +1620,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
-    marginTop: 6,
+    marginTop: 8,
   },
   clearSelectionBtn: {
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
   },
   clearSelectionText: {
     fontSize: 12,
     fontWeight: '700',
   },
   selectedBarCard: {
-    marginTop: 14,
+    marginTop: 16,
     padding: 12,
     borderRadius: 14,
     borderWidth: 1,
@@ -1679,7 +1679,7 @@ const styles = StyleSheet.create({
   heatmapCard: {
     borderRadius: BorderRadiusTokens.card,
     borderWidth: 1,
-    padding: 18,
+    padding: 16,
     marginBottom: 20,
     gap: 12,
   },
@@ -1698,7 +1698,7 @@ const styles = StyleSheet.create({
   heatmapGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: 8,
     justifyContent: 'flex-start',
     marginTop: 4,
   },
@@ -1716,13 +1716,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 6,
+    marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.05)',
   },
   heatmapLegendLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '500',
   },
   heatmapLegendBoxes: {

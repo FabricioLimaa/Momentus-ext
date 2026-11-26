@@ -11,7 +11,6 @@ import {
   ActivityIndicator,
   Alert,
   LayoutAnimation,
-  UIManager,
   Image,
 } from 'react-native';
 import { router } from 'expo-router';
@@ -27,6 +26,8 @@ import {
   ComponentHeightTokens,
   TypographyTokens,
 } from '@/constants/theme';
+import { APP_INFO } from '@/constants/appInfo';
+import { MomentusLog } from '@/util/logger';
 import { useMomentus } from '@/context/MomentusContext';
 import {
   loginWithGoogle,
@@ -38,13 +39,6 @@ import { hasAcceptedTermsCloud } from '@/services/firestoreSyncService';
 import { CURRENT_TERMS_VERSION } from '@/constants/legalContent';
 import { SplashScreen } from '@/components/momentus/SplashScreen';
 import { getAppKv, setAppKv } from '@/database/momentusDb';
-
-if (
-  Platform.OS === 'android' &&
-  UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 export default function IndexScreen() {
   const insets = useSafeAreaInsets();
@@ -73,7 +67,7 @@ export default function IndexScreen() {
   const passwordInputRef = useRef<TextInput>(null);
 
   const primaryColor = settings.primaryColorHex || MomentusColors.emeraldNeon;
-  const appVersion = Constants.expoConfig?.version || '1.6.6';
+  const appVersion = Constants.expoConfig?.version || APP_INFO.version;
 
   const isIosWeb =
     Platform.OS === 'web' &&
@@ -95,7 +89,7 @@ export default function IndexScreen() {
           setShowEmailFields(true);
         }
       } catch (err) {
-        console.warn('Erro ao carregar credenciais salvas:', err);
+        MomentusLog.auth.warn('Erro ao carregar credenciais salvas:', err);
       }
     }
     loadSavedRememberMe();
@@ -132,7 +126,7 @@ export default function IndexScreen() {
         return;
       }
     } catch (err) {
-      console.warn('Erro ao verificar termos pós login:', err);
+      MomentusLog.auth.warn('Erro ao verificar termos pós login:', err);
     }
     setIsPostLoginSyncing(false);
     router.replace('/home');
@@ -180,7 +174,7 @@ export default function IndexScreen() {
         await new Promise((r) => setTimeout(r, 400));
       }
     } catch (syncErr) {
-      console.warn('Erro ou timeout ao sincronizar nuvem pós login:', syncErr);
+      MomentusLog.sync.warn('Erro ou timeout ao sincronizar nuvem pós login:', syncErr);
     }
 
     // 3. Etapa: Sincronizando conquistas e preferências
@@ -280,7 +274,7 @@ export default function IndexScreen() {
           });
         }
       } catch (prefErr) {
-        console.warn('Erro ao salvar preferência de lembrar-me:', prefErr);
+        MomentusLog.auth.warn('Erro ao salvar preferência de lembrar-me:', prefErr);
       }
 
       const user = await loginWithEmail(email.trim(), password);

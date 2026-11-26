@@ -14,6 +14,7 @@ import {
   SpacingTokens,
   BorderRadiusTokens,
   ComponentHeightTokens,
+  HitSlop,
   getContrastTextColor,
 } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
@@ -288,6 +289,9 @@ export const ApplyTemplateDialog: React.FC<ApplyTemplateDialogProps> = ({
                   <TouchableOpacity
                     onPress={prevMonth}
                     style={[styles.navButton, { backgroundColor: theme.surfaceElevated }]}
+                    hitSlop={HitSlop.toTarget(44)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Mês anterior"
                     activeOpacity={0.7}>
                     <Ionicons name="chevron-back" size={18} color={theme.textPrimary} />
                   </TouchableOpacity>
@@ -299,6 +303,9 @@ export const ApplyTemplateDialog: React.FC<ApplyTemplateDialogProps> = ({
                   <TouchableOpacity
                     onPress={nextMonth}
                     style={[styles.navButton, { backgroundColor: theme.surfaceElevated }]}
+                    hitSlop={HitSlop.toTarget(44)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Próximo mês"
                     activeOpacity={0.7}>
                     <Ionicons name="chevron-forward" size={18} color={theme.textPrimary} />
                   </TouchableOpacity>
@@ -357,7 +364,7 @@ export const ApplyTemplateDialog: React.FC<ApplyTemplateDialogProps> = ({
                 <View style={[styles.timeShiftBox, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline }]}>
                   <View style={styles.timeShiftHeaderRow}>
                     <View style={styles.timeShiftTitleCol}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: SpacingTokens.sm }}>
                         <Ionicons name="time-outline" size={16} color={theme.primary} />
                         <Text style={[styles.timeShiftTitle, { color: theme.textPrimary }]}>
                           Ajustar início da rotina
@@ -391,7 +398,7 @@ export const ApplyTemplateDialog: React.FC<ApplyTemplateDialogProps> = ({
                           <Text
                             style={[
                               styles.timeShiftChipText,
-                              { color: selectedShiftTime === t ? '#0F172A' : theme.textPrimary },
+                              { color: selectedShiftTime === t ? getContrastTextColor(theme.primary) : theme.textPrimary },
                             ]}>
                             {t}
                           </Text>
@@ -486,9 +493,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   navButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     justifyContent: 'center',
     alignItems: 'center',

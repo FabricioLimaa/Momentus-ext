@@ -25,16 +25,17 @@ function TabsNavigator() {
       !!settings.termsAccepted &&
       (settings.termsAcceptedVersion ?? 0) >= CURRENT_TERMS_VERSION;
 
-    const isExemptRoute =
+    const isPublicRoute =
       pathname === '/' ||
       pathname === '/login' ||
       pathname === '/signup' ||
       pathname === '/forgot-password' ||
-      pathname === '/legal' ||
-      pathname === '/onboarding';
+      pathname === '/legal';
 
-    // Se o usuário não estiver autenticado e tentar acessar uma rota interna, direciona para o login na raiz /
-    if (!isUserLoggedIn && !isExemptRoute) {
+    const isTermsExemptRoute = isPublicRoute || pathname === '/onboarding';
+
+    // Se o usuário não estiver autenticado e tentar acessar qualquer rota interna (incluindo /onboarding), direciona para o login na raiz /
+    if (!isUserLoggedIn && !isPublicRoute) {
       router.replace('/');
       return;
     }
@@ -45,7 +46,7 @@ function TabsNavigator() {
       return;
     }
 
-    if (isUserLoggedIn && !isTermsOk && !isExemptRoute) {
+    if (isUserLoggedIn && !isTermsOk && !isTermsExemptRoute) {
       router.replace('/legal?mandatory=true' as any);
     }
   }, [

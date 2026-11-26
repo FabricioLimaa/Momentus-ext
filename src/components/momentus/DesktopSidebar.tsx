@@ -6,9 +6,11 @@ import {
   Pressable,
   Platform,
   Image,
+  ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 import { useMomentus } from '@/context/MomentusContext';
 import {
   SpacingTokens,
@@ -124,6 +126,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
   const isCloudConnected = !!authUser;
   const displayName = userProfile.name?.trim() || authUser?.displayName?.trim() || 'Meu Espaço';
   const displayPhoto = userProfile.photoUrl || authUser?.photoURL || null;
+  const appVersion = Constants.expoConfig?.version || APP_INFO.version;
 
   const handleNavigate = (path: string) => {
     if (activePath === path) return;
@@ -140,10 +143,12 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
       <Pressable
         key={item.id}
         onPress={() => handleNavigate(item.path)}
+        accessibilityRole={Platform.OS === 'web' ? ('link' as any) : 'button'}
+        accessibilityLabel={item.label}
+        accessibilityState={{ selected: isActive }}
         {...(Platform.OS === 'web'
           ? ({
               cursor: 'pointer',
-              accessibilityRole: 'link',
               title: isCompact ? item.label : undefined,
             } as any)
           : {})}
@@ -235,14 +240,17 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
               {APP_INFO.name}
             </Text>
             <Text style={[styles.brandVersion, { color: theme.textSecondary }]}>
-              v2.1.0 • Zen
+              v{appVersion} • Zen
             </Text>
           </View>
         )}
       </View>
 
-      {/* 2. Lista de Navegação */}
-      <View style={styles.navSectionsContainer}>
+      {/* 2. Lista de Navegação com rolagem segura para telas landscape */}
+      <ScrollView
+        style={styles.navSectionsScroll}
+        contentContainerStyle={styles.navSectionsContainer}
+        showsVerticalScrollIndicator={false}>
         {/* Seção Principal */}
         <View style={styles.sectionGroup}>
           {PRIMARY_NAV_ITEMS.map(renderNavItem)}
@@ -267,12 +275,14 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
           )}
           {SYSTEM_NAV_ITEMS.map(renderNavItem)}
         </View>
-      </View>
+      </ScrollView>
 
       {/* 3. Rodapé: Mini Perfil do Usuário & Status da Nuvem */}
       <Pressable
         onPress={() => handleNavigate('/more')}
-        {...(Platform.OS === 'web' ? ({ cursor: 'pointer' } as any) : {})}
+        accessibilityRole="button"
+        accessibilityLabel={`Perfil de ${displayName}`}
+        {...(Platform.OS === 'web' ? ({ cursor: 'pointer', title: isCompact ? displayName : undefined } as any) : {})}
         style={({ hovered }: any) => [
           styles.footerUserCard,
           isCompact && styles.footerUserCardCompact,
@@ -358,8 +368,10 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginTop: 1,
   },
-  navSectionsContainer: {
+  navSectionsScroll: {
     flex: 1,
+  },
+  navSectionsContainer: {
     paddingVertical: SpacingTokens.sm,
     gap: SpacingTokens.md,
   },
@@ -367,7 +379,7 @@ const styles = StyleSheet.create({
     gap: SpacingTokens.xs,
   },
   sectionOverline: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.8,
     paddingHorizontal: SpacingTokens.md + SpacingTokens.xs,
@@ -409,7 +421,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadiusTokens.xs,
   },
   badgeText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
   },
   footerUserCard: {

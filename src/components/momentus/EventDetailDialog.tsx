@@ -7,6 +7,7 @@ import {
   SpacingTokens,
   BorderRadiusTokens,
   ComponentHeightTokens,
+  getContrastTextColor,
 } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import { getIconForMarketItem } from './TimelineEventItem';
@@ -105,7 +106,7 @@ export const EventDetailDialog: React.FC<EventDetailDialogProps> = ({
 
             {/* 4. Data e Horário */}
             {!!event.date && (
-              <View style={[styles.timeRow, { marginBottom: 6 }]}>
+              <View style={[styles.timeRow, { marginBottom: SpacingTokens.sm }]}>
                 <View style={[styles.timeIconBox, { backgroundColor: `${theme.primary}15` }]}>
                   <Ionicons name="calendar-outline" size={18} color={theme.primary} />
                 </View>
@@ -160,6 +161,8 @@ export const EventDetailDialog: React.FC<EventDetailDialogProps> = ({
               <TouchableOpacity
                 style={styles.iconButtonError}
                 onPress={onDeleteClick}
+                accessibilityRole="button"
+                accessibilityLabel="Excluir atividade"
                 activeOpacity={0.7}>
                 <Ionicons name="trash-outline" size={20} color={MomentusColors.errorRed} />
               </TouchableOpacity>
@@ -167,6 +170,8 @@ export const EventDetailDialog: React.FC<EventDetailDialogProps> = ({
               <TouchableOpacity
                 style={[styles.iconButtonPrimary, { backgroundColor: `${theme.primary}15` }]}
                 onPress={onEditClick}
+                accessibilityRole="button"
+                accessibilityLabel="Editar atividade"
                 activeOpacity={0.7}>
                 <Ionicons name="pencil-outline" size={20} color={theme.primary} />
               </TouchableOpacity>
@@ -174,8 +179,10 @@ export const EventDetailDialog: React.FC<EventDetailDialogProps> = ({
               <TouchableOpacity
                 style={[styles.closeButton, { backgroundColor: theme.primary }]}
                 onPress={onDismiss}
+                accessibilityRole="button"
+                accessibilityLabel="Fechar detalhes"
                 activeOpacity={0.8}>
-                <Text style={styles.closeButtonText}>Fechar</Text>
+                <Text style={[styles.closeButtonText, { color: getContrastTextColor(theme.primary) }]}>Fechar</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -218,7 +225,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
+    marginRight: SpacingTokens.sm,
   },
   headerSubtitle: {
     fontSize: 13,
@@ -336,17 +343,17 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   iconButtonError: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: ComponentHeightTokens.iconButton,
+    height: ComponentHeightTokens.iconButton,
+    borderRadius: ComponentHeightTokens.iconButton / 2,
     backgroundColor: 'rgba(239, 68, 68, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   iconButtonPrimary: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: ComponentHeightTokens.iconButton,
+    height: ComponentHeightTokens.iconButton,
+    borderRadius: ComponentHeightTokens.iconButton / 2,
     backgroundColor: 'rgba(52, 211, 153, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',

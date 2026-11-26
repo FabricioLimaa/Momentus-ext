@@ -1,8 +1,14 @@
 import { initializeApp, getApps, getApp, FirebaseOptions } from 'firebase/app';
 import * as firebaseAuth from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import {
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import { MomentusLog } from '@/util/logger';
 
 /**
  * Configuração oficial do Firebase (momentus-b267f).
@@ -29,8 +35,8 @@ const firebaseConfig: FirebaseOptions = {
 };
 
 if (!firebaseConfig.apiKey && __DEV__) {
-  console.warn(
-    '[Firebase] EXPO_PUBLIC_FIREBASE_API_KEY não encontrada nas variáveis de ambiente. Verifique o seu arquivo .env local.'
+  MomentusLog.sync.warn(
+    'EXPO_PUBLIC_FIREBASE_API_KEY não encontrada nas variáveis de ambiente. Verifique o seu arquivo .env local.'
   );
 }
 
@@ -61,5 +67,18 @@ export const auth = (() => {
   }
 })();
 
-// Inicializa o Cloud Firestore
-export const firestore = getFirestore(firebaseApp);
+// Inicializa o Cloud Firestore com cache offline persistente na Web (multi-aba) e fallback seguro
+export const firestore = (() => {
+  if (Platform.OS === 'web') {
+    try {
+      return initializeFirestore(firebaseApp, {
+        localCache: persistentLocalCache({
+          tabManager: persistentMultipleTabManager(),
+        }),
+      });
+    } catch {
+      return getFirestore(firebaseApp);
+    }
+  }
+  return getFirestore(firebaseApp);
+})();

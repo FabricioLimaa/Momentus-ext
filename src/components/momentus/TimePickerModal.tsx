@@ -429,7 +429,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   columnHeaderText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.8,
     paddingVertical: SpacingTokens.xs,

@@ -149,17 +149,18 @@ export default function FocusScreen() {
   // Animação de respiração suave (ciclo rítmico de 5s)
   useEffect(() => {
     if (isRunning) {
+      const useNative = Platform.OS !== 'web';
       const pulse = Animated.loop(
         Animated.sequence([
           Animated.timing(breathingAnim, {
             toValue: 1.05,
             duration: 2500,
-            useNativeDriver: true,
+            useNativeDriver: useNative,
           }),
           Animated.timing(breathingAnim, {
             toValue: 1.0,
             duration: 2500,
-            useNativeDriver: true,
+            useNativeDriver: useNative,
           }),
         ])
       );
@@ -396,7 +397,10 @@ export default function FocusScreen() {
 
   const onTimerFinished = useCallback(() => {
     triggerHaptic('success');
-    soundManager.playAchievementSound();
+    if (mode !== 'FOCUS') {
+      // Em modo FOCUS, o CelebrationModal já reproduz o som de conquista ao abrir
+      soundManager.playAchievementSound();
+    }
     soundManager.pauseSoundscape();
     cancelFocusNotification(notificationIdRef.current);
     notificationIdRef.current = null;
@@ -1000,7 +1004,7 @@ export default function FocusScreen() {
         </ScrollView>
 
         {/* Botão de Fechar */}
-        <View style={[styles.pickerActionsRow, { marginTop: 14 }]}>
+        <View style={[styles.pickerActionsRow, { marginTop: 16 }]}>
           <TouchableOpacity
             style={[styles.pickerSaveBtn, { backgroundColor: activeColor, flex: 1 }]}
             onPress={() => {
@@ -1164,7 +1168,7 @@ export default function FocusScreen() {
                     name="checkmark-circle"
                     size={14}
                     color={MomentusColors.emeraldNeon}
-                    style={{ marginLeft: 3 }}
+                    style={{ marginLeft: 4 }}
                   />
                 )}
               </View>
@@ -2536,10 +2540,10 @@ const styles = StyleSheet.create({
     paddingBottom: SpacingTokens.xl,
   },
   topBlock: {
-    gap: 6,
+    gap: 8,
   },
   bottomBlock: {
-    gap: 6,
+    gap: 8,
   },
   header: {
     flexDirection: 'row',
@@ -2709,13 +2713,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     marginTop: 4,
   },
   statSummaryItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 4,
   },
   statSummaryText: {
     fontSize: 12,
@@ -2729,8 +2733,8 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     borderRadius: 24,
     borderWidth: 1.5,
-    padding: 18,
-    gap: 10,
+    padding: 16,
+    gap: 12,
   },
   habitOptionItem: {
     flexDirection: 'row',
@@ -2763,8 +2767,8 @@ const styles = StyleSheet.create({
   habitMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginTop: 3,
+    gap: 8,
+    marginTop: 4,
   },
   habitCatTag: {
     fontSize: 11,
@@ -2801,8 +2805,8 @@ const styles = StyleSheet.create({
     maxHeight: '88%',
     borderRadius: 28,
     borderWidth: 1.5,
-    paddingHorizontal: 18,
-    paddingTop: 18,
+    paddingHorizontal: 16,
+    paddingTop: 16,
     paddingBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 12 },
@@ -2820,7 +2824,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
     paddingRight: 8,
     minWidth: 0,
     flexShrink: 1,
@@ -2853,13 +2857,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
-    marginLeft: 6,
+    marginLeft: 8,
   },
   pickerTabsRow: {
     flexDirection: 'row',
     borderRadius: 14,
     borderWidth: 1,
-    padding: 3,
+    padding: 4,
     marginBottom: 12,
   },
   pickerTabItem: {
@@ -2868,7 +2872,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
-    paddingVertical: 7,
+    paddingVertical: 8,
     paddingHorizontal: 4,
     borderRadius: 10,
   },
@@ -2890,15 +2894,15 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   pickerModalScrollContent: {
-    paddingBottom: 6,
+    paddingBottom: 8,
   },
   pickerDisplayCard: {
     borderRadius: 20,
     borderWidth: 1,
-    paddingVertical: 14,
+    paddingVertical: 16,
     paddingHorizontal: 16,
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 16,
   },
   pickerDigitalRow: {
     flexDirection: 'row',
@@ -2920,14 +2924,14 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   pickerDigitalTag: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.5,
     marginTop: 2,
   },
   pickerPeriodBadge: {
-    marginTop: 10,
-    paddingHorizontal: 14,
+    marginTop: 12,
+    paddingHorizontal: 16,
     paddingVertical: 4,
     borderRadius: 12,
   },
@@ -2942,8 +2946,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 16,
     paddingHorizontal: 8,
-    paddingVertical: 6,
-    marginBottom: 14,
+    paddingVertical: 8,
+    marginBottom: 16,
   },
   pickerStepperBtn: {
     width: 38,
@@ -3070,7 +3074,7 @@ const styles = StyleSheet.create({
   soundscapeVolumeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   soundscapeVolumeTitle: {
     fontSize: 12,
@@ -3082,7 +3086,7 @@ const styles = StyleSheet.create({
   },
   volumePresetBtn: {
     flex: 1,
-    paddingVertical: 7,
+    paddingVertical: 8,
     borderRadius: 10,
     borderWidth: 1,
     alignItems: 'center',
@@ -3173,7 +3177,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '900',
     letterSpacing: 3,
-    marginBottom: 6,
+    marginBottom: 8,
   },
   deepTimerText: {
     fontSize: 56,
@@ -3221,7 +3225,7 @@ const styles = StyleSheet.create({
   dailyGoalLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   dailyGoalTitle: {
     fontSize: 13,
@@ -3234,7 +3238,7 @@ const styles = StyleSheet.create({
   },
   dailyGoalBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: 12,
   },
   dailyGoalBadgeText: {
@@ -3255,14 +3259,14 @@ const styles = StyleSheet.create({
   autoAdvanceCard: {
     borderRadius: 16,
     borderWidth: 1,
-    padding: 14,
-    gap: 10,
+    padding: 16,
+    gap: 12,
     marginTop: 8,
   },
   autoAdvanceHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   autoAdvanceSectionTitle: {
     fontSize: 13,
@@ -3305,7 +3309,7 @@ const styles = StyleSheet.create({
     maxWidth: 360,
     borderRadius: 24,
     borderWidth: 1.5,
-    padding: 22,
+    padding: 24,
     alignItems: 'center',
     gap: 12,
     shadowColor: '#000',
@@ -3371,18 +3375,18 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 1.5,
     padding: 20,
-    gap: 14,
+    gap: 16,
     overflow: 'hidden',
   },
   goalPresetsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 12,
     justifyContent: 'space-between',
   },
   goalOptionCard: {
     width: '31%',
-    paddingVertical: 14,
+    paddingVertical: 16,
     borderRadius: 14,
     borderWidth: 1,
     alignItems: 'center',

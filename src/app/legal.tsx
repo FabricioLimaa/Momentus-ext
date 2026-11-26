@@ -86,8 +86,10 @@ export default function LegalScreen() {
   const handleBackPress = () => {
     if (isMandatory) {
       handleConfirmDecline();
-    } else {
+    } else if (router.canGoBack()) {
       router.back();
+    } else {
+      router.replace('/home');
     }
   };
 
@@ -240,7 +242,7 @@ export default function LegalScreen() {
                   name={tab.icon}
                   size={16}
                   color={isSelected ? theme.primary : theme.textSecondary}
-                  style={{ marginRight: 6 }}
+                  style={{ marginRight: 8 }}
                 />
                 <Text
                   style={[
@@ -730,7 +732,7 @@ const styles = StyleSheet.create({
   docMetaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   docMetaText: {
     fontSize: 11,
@@ -742,7 +744,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadiusTokens.sm,
   },
   docBadgeText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
   },
   docIntroBox: {
@@ -767,7 +769,7 @@ const styles = StyleSheet.create({
   },
   sectionBadge: {
     paddingHorizontal: SpacingTokens.sm,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: BorderRadiusTokens.sm,
   },
   sectionBadgeText: {
@@ -813,7 +815,7 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    marginTop: 7,
+    marginTop: 8,
   },
   bulletText: {
     fontSize: 13,
@@ -836,12 +838,12 @@ const styles = StyleSheet.create({
     marginBottom: SpacingTokens.xs,
   },
   subBadge: {
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: BorderRadiusTokens.xs,
   },
   subBadgeText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
   },
   subTitle: {
@@ -854,14 +856,14 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   subBulletsList: {
-    gap: 6,
+    gap: 8,
     marginTop: SpacingTokens.sm,
   },
   subBulletDot: {
     width: 4,
     height: 4,
     borderRadius: 2,
-    marginTop: 6,
+    marginTop: 8,
   },
   conclusionCard: {
     flexDirection: 'row',
@@ -923,7 +925,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 8,
     height: ComponentHeightTokens.buttonCompact, // 40px
     borderRadius: BorderRadiusTokens.control,
     borderWidth: 1,
@@ -944,7 +946,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   legalFooterCopyright: {
-    fontSize: 10,
+    fontSize: 11,
     marginTop: 2,
   },
   bottomBar: {

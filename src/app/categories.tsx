@@ -9,14 +9,13 @@ import {
   TextInput,
   Switch,
   Alert,
-  SafeAreaView,
   StatusBar,
   Platform,
   KeyboardAvoidingView,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMomentus } from '@/context/MomentusContext';
 import { Category } from '@/types';
 import {
@@ -810,10 +809,10 @@ export default function CategoriesScreen() {
 
                 {/* Seletor de Cores: Google Agenda & Tons Neon */}
                 <View style={styles.sectionHeaderRow}>
-                  <Text style={[styles.inputLabel, { color: theme.textPrimary, marginTop: 18 }]}>
+                  <Text style={[styles.inputLabel, { color: theme.textPrimary, marginTop: 16 }]}>
                     Cor da Categoria
                   </Text>
-                  <Text style={[styles.colorCounterLabel, { color: theme.textSecondary, marginTop: 18 }]}>
+                  <Text style={[styles.colorCounterLabel, { color: theme.textSecondary, marginTop: 16 }]}>
                     {EXTENDED_CATEGORY_COLORS.length} opções
                   </Text>
                 </View>
@@ -847,7 +846,7 @@ export default function CategoriesScreen() {
                 </View>
 
                 {/* Seletor de Ícones Universais */}
-                <View style={[styles.sectionHeaderRow, { marginTop: 18 }]}>
+                <View style={[styles.sectionHeaderRow, { marginTop: 16 }]}>
                   <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>
                     Ícone da Categoria
                   </Text>
@@ -1093,8 +1092,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     borderRadius: 12,
     borderWidth: 1,
   },
@@ -1110,11 +1109,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   linkedHabitsBox: {
-    marginTop: 10,
-    padding: 10,
+    marginTop: 12,
+    padding: 12,
     borderRadius: 8,
     borderWidth: 1,
-    gap: 6,
+    gap: 8,
   },
   linkedHabitItem: {
     flexDirection: 'row',
@@ -1134,8 +1133,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    marginTop: 10,
+    gap: 8,
+    marginTop: 12,
     paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,
@@ -1167,7 +1166,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   backButton: {
-    padding: 6,
+    padding: 8,
     width: ComponentHeightTokens.iconButton,
     height: ComponentHeightTokens.iconButton,
     justifyContent: 'center',
@@ -1260,19 +1259,19 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   systemBadge: {
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
     borderWidth: 1,
   },
   systemBadgeText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
   },
   cardActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   actionIconBtn: {
     padding: 8,
@@ -1298,25 +1297,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: 8,
   },
   metaProgressHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   metaProgressTitle: {
     fontSize: 12,
     fontWeight: '700',
   },
   goalReachedBadge: {
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
     borderWidth: 1,
   },
   goalReachedText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
   },
   metaProgressStats: {
@@ -1384,7 +1383,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: 8,
     borderWidth: 1,
   },
@@ -1437,8 +1436,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   metaPresetChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 10,
     borderWidth: 1,
   },
@@ -1453,8 +1452,8 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 14,
     borderWidth: 1,
-    padding: 10,
-    gap: 6,
+    padding: 12,
+    gap: 8,
   },
   metaStepperLabel: {
     fontSize: 11,
@@ -1480,7 +1479,7 @@ const styles = StyleSheet.create({
   metaSummaryBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 10,
@@ -1494,7 +1493,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
-    marginTop: 6,
+    marginTop: 8,
     paddingVertical: 4,
     alignItems: 'center',
   },
@@ -1519,8 +1518,8 @@ const styles = StyleSheet.create({
   stickerRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    marginTop: 6,
+    gap: 12,
+    marginTop: 8,
     paddingVertical: 4,
     alignItems: 'center',
   },
@@ -1540,7 +1539,7 @@ const styles = StyleSheet.create({
   },
   modalCancelBtn: {
     flex: 1,
-    paddingVertical: 14,
+    paddingVertical: 16,
     borderRadius: 16,
     borderWidth: 1,
     alignItems: 'center',
@@ -1552,7 +1551,7 @@ const styles = StyleSheet.create({
   },
   modalSaveBtn: {
     flex: 1,
-    paddingVertical: 14,
+    paddingVertical: 16,
     borderRadius: 16,
     alignItems: 'center',
     ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
@@ -1568,7 +1567,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadiusTokens.modal,
     borderWidth: 1,
     padding: 24,
-    gap: 14,
+    gap: 16,
   },
   deleteDialogTitle: {
     fontSize: 18,
@@ -1581,7 +1580,7 @@ const styles = StyleSheet.create({
   deleteWarningBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
@@ -1593,7 +1592,7 @@ const styles = StyleSheet.create({
   },
   modalDeleteBtn: {
     flex: 1,
-    paddingVertical: 14,
+    paddingVertical: 16,
     borderRadius: 16,
     alignItems: 'center',
     ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
@@ -1611,9 +1610,9 @@ const styles = StyleSheet.create({
   livePreviewCard: {
     borderRadius: 16,
     borderWidth: 1.5,
-    padding: 14,
-    marginBottom: 18,
-    gap: 10,
+    padding: 16,
+    marginBottom: 16,
+    gap: 12,
   },
   livePreviewHeaderRow: {
     flexDirection: 'row',
@@ -1622,12 +1621,12 @@ const styles = StyleSheet.create({
   },
   livePreviewBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: 8,
     borderWidth: 1,
   },
   livePreviewBadgeText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '900',
     letterSpacing: 0.5,
   },
@@ -1654,7 +1653,7 @@ const styles = StyleSheet.create({
   },
   livePreviewInfoCol: {
     flex: 1,
-    gap: 3,
+    gap: 4,
   },
   livePreviewName: {
     fontSize: 16,
@@ -1663,7 +1662,7 @@ const styles = StyleSheet.create({
   livePreviewMetaPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 4,
     marginTop: 2,
   },
   livePreviewMetaText: {
@@ -1689,8 +1688,8 @@ const styles = StyleSheet.create({
   },
   iconScrollGrid: {
     flexDirection: 'row',
-    gap: 10,
-    paddingVertical: 6,
+    gap: 12,
+    paddingVertical: 8,
     paddingHorizontal: 2,
   },
   iconOptionItem: {
@@ -1704,7 +1703,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   iconOptionText: {
-    fontSize: 10,
+    fontSize: 11,
     textAlign: 'center',
   },
 });

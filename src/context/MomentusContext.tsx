@@ -120,6 +120,13 @@ export interface AppTheme {
   glassBorder: string;
 }
 
+interface CelebrationState {
+  visible: boolean;
+  title: string;
+  message: string;
+  pointsEarned?: number;
+}
+
 interface MomentusContextData {
   habits: HabitItem[];
   categories: Category[];
@@ -135,12 +142,7 @@ interface MomentusContextData {
   selectedDate: string;
   setSelectedDate: (date: string) => void;
   // Celebration Lottie Actions
-  celebration: {
-    visible: boolean;
-    title: string;
-    message: string;
-    pointsEarned?: number;
-  } | null;
+  celebration: CelebrationState | null;
   showCelebration: (title: string, message: string, pointsEarned?: number) => void;
   hideCelebration: () => void;
   // Habits Actions
@@ -281,13 +283,9 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     SystemUI.setBackgroundColorAsync(theme.background).catch(() => {});
   }, [theme.background]);
 
-  // Celebration state
-  const [celebration, setCelebration] = useState<{
-    visible: boolean;
-    title: string;
-    message: string;
-    pointsEarned?: number;
-  } | null>(null);
+  // Fila imutável de celebrações (evita sobrescrita quando múltiplas conquistas ocorrem simultaneamente)
+  const [celebrationQueue, setCelebrationQueue] = useState<CelebrationState[]>([]);
+  const celebration = celebrationQueue[0] ?? null;
 
   // Reminder Modal state (equivalente ao ReminderActivity.kt)
   const [reminderPrompt, setReminderPrompt] = useState<{
@@ -388,21 +386,22 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setFocusHistoryMap({});
     setValidatedDayDates([]);
     setValidatedRoutineKeys([]);
+    setCelebrationQueue([]);
   }, []);
 
-  const showCelebration = (title: string, message: string, pointsEarned?: number) => {
-    setCelebration({ visible: true, title, message, pointsEarned });
-  };
+  const showCelebration = useCallback(
+    (title: string, message: string, pointsEarned?: number) => {
+      setCelebrationQueue((prev) => [...prev, { visible: true, title, message, pointsEarned }]);
+    },
+    []
+  );
 
-  const hideCelebration = () => {
-    setCelebration(null);
-  };
+  const hideCelebration = useCallback(() => {
+    setCelebrationQueue((prev) => prev.slice(1));
+  }, []);
 
   const formatBackupTimestamp = (): string => {
-    const now = new Date();
-    const hours = String(now.getHours()).padStart(2, '0');
-    const mins = String(now.getMinutes()).padStart(2, '0');
-    return `Hoje às ${hours}:${mins}`;
+    return new Date().toISOString();
   };
 
   // Sync sound settings with SoundManager
@@ -1722,7 +1721,6 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       );
     }
 
-    soundManager.playAchievementSound();
     triggerHaptic('success');
     return true;
   };
@@ -2431,6 +2429,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       {children}
       <WebAlertModal
         isDark={theme.isDark}
+        isOled={theme.isOled}
         primaryColor={settings.primaryColorHex || MomentusColors.emeraldNeon}
       />
       {celebration?.visible && (
@@ -2440,6 +2439,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           message={celebration.message}
           pointsEarned={celebration.pointsEarned}
           isDark={theme.isDark}
+          isOled={theme.isOled}
           primaryColor={settings.primaryColorHex || MomentusColors.emeraldNeon}
           onClose={hideCelebration}
         />

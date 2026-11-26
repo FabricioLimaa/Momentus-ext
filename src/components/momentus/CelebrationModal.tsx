@@ -14,6 +14,7 @@ import {
   SpacingTokens,
   BorderRadiusTokens,
   ComponentHeightTokens,
+  getContrastTextColor,
 } from '@/constants/theme';
 import { soundManager } from '@/util/soundManager';
 
@@ -23,6 +24,7 @@ interface CelebrationModalProps {
   message: string;
   pointsEarned?: number;
   isDark?: boolean;
+  isOled?: boolean;
   primaryColor?: string;
   onClose: () => void;
 }
@@ -33,6 +35,7 @@ export const CelebrationModal: React.FC<CelebrationModalProps> = ({
   message,
   pointsEarned,
   isDark = true,
+  isOled = false,
   primaryColor = MomentusColors.emeraldNeon,
   onClose,
 }) => {
@@ -43,7 +46,29 @@ export const CelebrationModal: React.FC<CelebrationModalProps> = ({
       soundManager.playAchievementSound();
       animationRef.current?.play();
     }
-  }, [visible]);
+  }, [visible, title, message]);
+
+  const cardBg = isOled
+    ? MomentusColors.oledSurface
+    : isDark
+      ? MomentusColors.navySurface
+      : '#FFFFFF';
+  const cardBorder = isOled
+    ? MomentusColors.oledOutline
+    : isDark
+      ? MomentusColors.navyOutline
+      : '#E2E8F0';
+  const titleColor = isOled
+    ? MomentusColors.oledTextPrimary
+    : isDark
+      ? MomentusColors.textPrimary
+      : '#0F172A';
+  const msgColor = isOled
+    ? MomentusColors.oledTextSecondary
+    : isDark
+      ? MomentusColors.textSecondary
+      : '#64748B';
+  const buttonTextColor = getContrastTextColor(primaryColor);
 
   return (
     <Modal
@@ -51,13 +76,13 @@ export const CelebrationModal: React.FC<CelebrationModalProps> = ({
       transparent
       animationType="fade"
       onRequestClose={onClose}>
-      <View style={styles.overlay}>
+      <View style={[styles.overlay, isOled && { backgroundColor: 'rgba(0, 0, 0, 0.85)' }]}>
         <View
           style={[
             styles.card,
             {
-              backgroundColor: isDark ? MomentusColors.navySurface : '#FFFFFF',
-              borderColor: isDark ? MomentusColors.navyOutline : '#E2E8F0',
+              backgroundColor: cardBg,
+              borderColor: cardBorder,
             },
           ]}>
           {/* Lottie Animation */}
@@ -76,19 +101,11 @@ export const CelebrationModal: React.FC<CelebrationModalProps> = ({
           </View>
 
           {/* Title & Message */}
-          <Text
-            style={[
-              styles.title,
-              { color: isDark ? MomentusColors.textPrimary : '#0F172A' },
-            ]}>
+          <Text style={[styles.title, { color: titleColor }]}>
             {title}
           </Text>
 
-          <Text
-            style={[
-              styles.message,
-              { color: isDark ? MomentusColors.textSecondary : '#64748B' },
-            ]}>
+          <Text style={[styles.message, { color: msgColor }]}>
             {message}
           </Text>
 
@@ -113,12 +130,12 @@ export const CelebrationModal: React.FC<CelebrationModalProps> = ({
               <Ionicons
                 name="checkmark-done-circle"
                 size={16}
-                color={isDark ? MomentusColors.textSecondary : '#64748B'}
+                color={msgColor}
               />
               <Text
                 style={[
                   styles.pointsText,
-                  { color: isDark ? MomentusColors.textSecondary : '#64748B' },
+                  { color: msgColor },
                 ]}>
                 XP diário já validado anteriormente
               </Text>
@@ -129,13 +146,15 @@ export const CelebrationModal: React.FC<CelebrationModalProps> = ({
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={onClose}
+            accessibilityRole="button"
+            accessibilityLabel="Fechar celebração"
             style={[
               styles.button,
               {
                 backgroundColor: primaryColor,
               },
             ]}>
-            <Text style={styles.buttonText}>Incrível!</Text>
+            <Text style={[styles.buttonText, { color: buttonTextColor }]}>Incrível!</Text>
           </TouchableOpacity>
         </View>
       </View>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   AlertButton,
@@ -15,10 +15,10 @@ import {
   SpacingTokens,
   BorderRadiusTokens,
   ComponentHeightTokens,
+  getContrastTextColor,
 } from '@/constants/theme';
 
-interface WebAlertState {
-  visible: boolean;
+interface WebAlertItem {
   title: string;
   message?: string;
   buttons: AlertButton[];
@@ -26,6 +26,7 @@ interface WebAlertState {
 
 interface WebAlertModalProps {
   isDark: boolean;
+  isOled?: boolean;
   primaryColor: string;
 }
 
@@ -66,66 +67,115 @@ Alert.alert = (title: string, message?: string, buttons?: AlertButton[]) => {
   }
 };
 
-export const WebAlertModal: React.FC<WebAlertModalProps> = ({ isDark, primaryColor }) => {
-  const [alertState, setAlertState] = useState<WebAlertState>({
-    visible: false,
-    title: '',
-    message: undefined,
-    buttons: [],
-  });
+export const WebAlertModal: React.FC<WebAlertModalProps> = ({
+  isDark,
+  isOled = false,
+  primaryColor,
+}) => {
+  const [activeAlert, setActiveAlert] = useState<WebAlertItem | null>(null);
+  const queueRef = useRef<WebAlertItem[]>([]);
+  const activeAlertRef = useRef<WebAlertItem | null>(null);
 
   useEffect(() => {
     showWebAlertHandler = (title: string, message?: string, buttons?: AlertButton[]) => {
-      setAlertState({
-        visible: true,
+      const nextItem: WebAlertItem = {
         title,
         message,
         buttons:
           buttons && buttons.length > 0
             ? buttons
             : [{ text: 'OK', style: 'default' }],
-      });
+      };
+
+      if (!activeAlertRef.current) {
+        activeAlertRef.current = nextItem;
+        setActiveAlert(nextItem);
+      } else {
+        queueRef.current.push(nextItem);
+      }
     };
 
     return () => {
       showWebAlertHandler = null;
+      queueRef.current = [];
+      activeAlertRef.current = null;
     };
   }, []);
 
-  if (!alertState.visible) {
+  if (!activeAlert) {
     return null;
   }
 
+  const advanceQueue = () => {
+    const next = queueRef.current.shift() || null;
+    activeAlertRef.current = next;
+    setActiveAlert(next);
+  };
+
   const handleButtonPress = (btn: AlertButton) => {
-    setAlertState((prev) => ({ ...prev, visible: false }));
+    advanceQueue();
     setTimeout(() => {
       btn.onPress?.();
     }, 10);
   };
 
-  const hasDestructive = alertState.buttons.some((b) => b.style === 'destructive');
-  const isDanger =
-    hasDestructive ||
-    /excluir|limpar|apagar|remover|atenção|erro|danger/i.test(alertState.title);
+  const handleDismiss = () => {
+    const cancelBtn = activeAlert.buttons.find((b) => b.style === 'cancel');
+    advanceQueue();
+    if (cancelBtn?.onPress) {
+      setTimeout(() => {
+        cancelBtn.onPress?.();
+      }, 10);
+    }
+  };
 
-  const iconName = isDanger ? 'trash-outline' : 'information-circle';
-  const iconColor = isDanger ? MomentusColors.errorRed : primaryColor;
-  const iconBg = isDanger ? 'rgba(239, 68, 68, 0.16)' : `${primaryColor}20`;
-  const isMultiButtonColumn = alertState.buttons.length > 2;
+  const hasDestructive = activeAlert.buttons.some((b) => b.style === 'destructive');
+  const isDeleteAction =
+    hasDestructive || /excluir|limpar|apagar|remover/i.test(activeAlert.title);
+  const isWarningOrError =
+    !isDeleteAction && /atenção|erro|danger|falha|aviso|insuficiente|bloquead/i.test(activeAlert.title);
+
+  const iconName: keyof typeof Ionicons.glyphMap = isDeleteAction
+    ? 'trash-outline'
+    : isWarningOrError
+      ? 'alert-circle-outline'
+      : 'information-circle';
+  const iconColor = isDeleteAction
+    ? MomentusColors.errorRed
+    : isWarningOrError
+      ? MomentusColors.fireStreak
+      : primaryColor;
+  const iconBg = isDeleteAction
+    ? 'rgba(239, 68, 68, 0.16)'
+    : isWarningOrError
+      ? 'rgba(245, 158, 11, 0.16)'
+      : `${primaryColor}20`;
+  const isMultiButtonColumn = activeAlert.buttons.length > 2;
+  const surfaceBg = isOled
+    ? MomentusColors.oledSurface
+    : isDark
+      ? MomentusColors.navySurface
+      : '#FFFFFF';
+  const outlineBorder = isOled
+    ? MomentusColors.oledOutline
+    : isDark
+      ? MomentusColors.navyOutline
+      : '#E2E8F0';
+  const primaryContrast = getContrastTextColor(primaryColor);
 
   return (
     <Modal
-      visible={alertState.visible}
+      visible
       transparent
       animationType="fade"
-      onRequestClose={() => setAlertState((prev) => ({ ...prev, visible: false }))}>
-      <View style={styles.overlay}>
+      onRequestClose={handleDismiss}>
+      <View style={[styles.overlay, isOled && { backgroundColor: 'rgba(0, 0, 0, 0.85)' }]}>
         <View
           style={[
             styles.card,
             {
-              backgroundColor: isDark ? MomentusColors.navySurface : '#FFFFFF',
-              borderColor: isDark ? MomentusColors.navyOutline : '#E2E8F0',
+              backgroundColor: surfaceBg,
+              borderColor: outlineBorder,
             },
           ]}>
           <View style={[styles.iconCircle, { backgroundColor: iconBg }]}>
@@ -135,27 +185,39 @@ export const WebAlertModal: React.FC<WebAlertModalProps> = ({ isDark, primaryCol
           <Text
             style={[
               styles.title,
-              { color: isDark ? MomentusColors.textPrimary : '#0F172A' },
+              {
+                color: isOled
+                  ? MomentusColors.oledTextPrimary
+                  : isDark
+                    ? MomentusColors.textPrimary
+                    : '#0F172A',
+              },
             ]}>
-            {alertState.title}
+            {activeAlert.title}
           </Text>
 
-          {!!alertState.message && (
+          {!!activeAlert.message && (
             <Text
               style={[
                 styles.message,
-                { color: isDark ? MomentusColors.textSecondary : '#64748B' },
+                {
+                  color: isOled
+                    ? MomentusColors.oledTextSecondary
+                    : isDark
+                      ? MomentusColors.textSecondary
+                      : '#64748B',
+                },
               ]}>
-              {alertState.message}
+              {activeAlert.message}
             </Text>
           )}
 
           <View
             style={[
               styles.buttonsRow,
-              isMultiButtonColumn && { flexDirection: 'column', gap: 8 },
+              isMultiButtonColumn && { flexDirection: 'column', gap: SpacingTokens.sm },
             ]}>
-            {alertState.buttons.map((btn, idx) => {
+            {activeAlert.buttons.map((btn, idx) => {
               const isCancel = btn.style === 'cancel';
               const isDestructive = btn.style === 'destructive';
 
@@ -164,6 +226,8 @@ export const WebAlertModal: React.FC<WebAlertModalProps> = ({ isDark, primaryCol
                   key={`${btn.text || 'btn'}-${idx}`}
                   activeOpacity={0.85}
                   onPress={() => handleButtonPress(btn)}
+                  accessibilityRole="button"
+                  accessibilityLabel={btn.text || 'OK'}
                   style={[
                     styles.button,
                     isMultiButtonColumn && { width: '100%', flex: 0 },
@@ -174,7 +238,7 @@ export const WebAlertModal: React.FC<WebAlertModalProps> = ({ isDark, primaryCol
                             ? 'rgba(255,255,255,0.06)'
                             : '#F1F5F9',
                           borderWidth: 1,
-                          borderColor: isDark ? MomentusColors.navyOutline : '#CBD5E1',
+                          borderColor: outlineBorder,
                         }
                       : {
                           backgroundColor: isDestructive
@@ -187,12 +251,14 @@ export const WebAlertModal: React.FC<WebAlertModalProps> = ({ isDark, primaryCol
                       styles.buttonText,
                       {
                         color: isCancel
-                          ? isDark
-                            ? MomentusColors.textPrimary
-                            : '#334155'
+                          ? isOled
+                            ? MomentusColors.oledTextPrimary
+                            : isDark
+                              ? MomentusColors.textPrimary
+                              : '#334155'
                           : isDestructive
                             ? '#FFFFFF'
-                            : '#000000',
+                            : primaryContrast,
                       },
                     ]}>
                     {btn.text || 'OK'}

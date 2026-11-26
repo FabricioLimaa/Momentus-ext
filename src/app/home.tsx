@@ -25,7 +25,7 @@ import { useMomentus } from "@/context/MomentusContext";
 import { HabitItem } from "@/types";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Image,
@@ -86,7 +86,19 @@ export default function HomeScreen() {
   const userName = resolvedName.split(" ")[0] || "Explorador";
   const displayPhoto = userProfile.photoUrl || authUser?.photoURL || null;
 
-  const todayStr = useMemo(() => getTodayDateString(), []);
+  // Reavalia a cada minuto para atualizar saudação (Bom dia/Boa tarde/Boa noite) e virada da meia-noite
+  const [minuteTick, setMinuteTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setMinuteTick((t) => t + 1);
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const todayStr = useMemo(() => {
+    void minuteTick;
+    return getTodayDateString();
+  }, [minuteTick]);
 
   // Hábitos do dia de hoje ordenados por horário de início
   const todayHabits = useMemo(() => {
@@ -125,11 +137,12 @@ export default function HomeScreen() {
 
   // Saudação por horário
   const greeting = useMemo(() => {
+    void minuteTick;
     const hour = new Date().getHours();
     if (hour < 12) return "Bom dia,";
     if (hour < 18) return "Boa tarde,";
     return "Boa noite,";
-  }, []);
+  }, [minuteTick]);
 
   // Toggle seleção múltipla
   const handleToggleSelectHabit = (id: string) => {
@@ -626,7 +639,7 @@ export default function HomeScreen() {
           contentContainerStyle={[
             styles.scrollContent,
             isLargeScreen && styles.scrollContentDesktop,
-            { paddingBottom: 110 },
+            { paddingBottom: 112 },
           ]}
           showsVerticalScrollIndicator={false}
         >

@@ -828,7 +828,7 @@ export default function SettingsScreen() {
                 </View>
 
                 {/* Antecedência de Alerta */}
-                <Text style={[styles.innerSectionLabel, { color: theme.textPrimary, marginTop: 14 }]}>
+                <Text style={[styles.innerSectionLabel, { color: theme.textPrimary, marginTop: 16 }]}>
                   Antecedência do Lembrete
                 </Text>
                 <View style={styles.pillsRow}>
@@ -860,7 +860,7 @@ export default function SettingsScreen() {
                   })}
                 </View>
 
-                <View style={[styles.cardDivider, { backgroundColor: theme.outline, marginVertical: 14 }]} />
+                <View style={[styles.cardDivider, { backgroundColor: theme.outline, marginVertical: 16 }]} />
 
                 {/* Briefing Matinal */}
                 <View style={styles.switchRow}>
@@ -958,7 +958,7 @@ export default function SettingsScreen() {
                 </View>
 
                 {/* Duração da Pausa Curta */}
-                <Text style={[styles.innerSectionLabel, { color: theme.textPrimary, marginTop: 14 }]}>
+                <Text style={[styles.innerSectionLabel, { color: theme.textPrimary, marginTop: 16 }]}>
                   Pausa Curta Padrão
                 </Text>
                 <View style={styles.pillsRow}>
@@ -986,7 +986,7 @@ export default function SettingsScreen() {
                   })}
                 </View>
 
-                <View style={[styles.cardDivider, { backgroundColor: theme.outline, marginVertical: 14 }]} />
+                <View style={[styles.cardDivider, { backgroundColor: theme.outline, marginVertical: 16 }]} />
 
                 {/* Efeitos Sonoros */}
                 <View style={styles.switchRow}>
@@ -1017,7 +1017,7 @@ export default function SettingsScreen() {
                 </View>
 
                 {/* Início da Semana */}
-                <View style={[styles.cardDivider, { backgroundColor: theme.outline, marginVertical: 14 }]} />
+                <View style={[styles.cardDivider, { backgroundColor: theme.outline, marginVertical: 16 }]} />
                 <Text style={[styles.innerSectionLabel, { color: theme.textPrimary }]}>Início da Semana</Text>
                 <View style={[styles.themeSelectorRow, { backgroundColor: theme.surfaceElevated, borderColor: theme.outline, marginTop: 8 }]}>
                   {[
@@ -1176,13 +1176,36 @@ export default function SettingsScreen() {
                 </View>
 
                 {/* Info da Conta */}
-                <View style={[styles.cloudCard, { backgroundColor: theme.surfaceElevated, marginTop: 14 }]}>
+                <View style={[styles.cloudCard, { backgroundColor: theme.surfaceElevated, marginTop: 16 }]}>
                   <Text style={[styles.cloudCardLabel, { color: primaryColorHex }]}>Conta Conectada</Text>
                   <Text style={[styles.cloudCardValue, { color: theme.textPrimary }]}>{userProfile.email || APP_INFO.email}</Text>
 
-                  <Text style={[styles.cloudCardLabel, { color: primaryColorHex, marginTop: 10 }]}>Último Backup</Text>
+                  <Text style={[styles.cloudCardLabel, { color: primaryColorHex, marginTop: SpacingTokens.sm }]}>Último Backup</Text>
                   <Text style={[styles.cloudCardValue, { color: theme.textPrimary }]}>
-                    {settings.lastBackupAt || 'Sincronização Automática Ativa'}
+                    {(() => {
+                      const raw = settings.lastBackupAt;
+                      if (!raw) return 'Sincronização Automática Ativa';
+                      const parsed = new Date(raw);
+                      if (Number.isNaN(parsed.getTime())) return raw;
+                      const now = new Date();
+                      const hh = String(parsed.getHours()).padStart(2, '0');
+                      const mm = String(parsed.getMinutes()).padStart(2, '0');
+                      const isSameDay =
+                        parsed.getFullYear() === now.getFullYear() &&
+                        parsed.getMonth() === now.getMonth() &&
+                        parsed.getDate() === now.getDate();
+                      if (isSameDay) return `Hoje às ${hh}:${mm}`;
+                      const yesterday = new Date(now);
+                      yesterday.setDate(now.getDate() - 1);
+                      const isYesterday =
+                        parsed.getFullYear() === yesterday.getFullYear() &&
+                        parsed.getMonth() === yesterday.getMonth() &&
+                        parsed.getDate() === yesterday.getDate();
+                      if (isYesterday) return `Ontem às ${hh}:${mm}`;
+                      const dd = String(parsed.getDate()).padStart(2, '0');
+                      const mo = String(parsed.getMonth() + 1).padStart(2, '0');
+                      return `${dd}/${mo} às ${hh}:${mm}`;
+                    })()}
                   </Text>
                 </View>
 
@@ -1190,7 +1213,7 @@ export default function SettingsScreen() {
                 <TouchableOpacity
                   style={[
                     styles.syncNowBtn,
-                    { backgroundColor: primaryColorHex, opacity: isSyncing ? 0.75 : 1, marginTop: 14 },
+                    { backgroundColor: primaryColorHex, opacity: isSyncing ? 0.75 : 1, marginTop: 16 },
                   ]}
                   onPress={handleSyncNow}
                   disabled={isSyncing}
@@ -1226,7 +1249,7 @@ export default function SettingsScreen() {
 
                 {/* Limpar Cache Temporário */}
                 <TouchableOpacity
-                  style={[styles.actionOutlineBtn, { borderColor: theme.outline, marginTop: 10 }]}
+                  style={[styles.actionOutlineBtn, { borderColor: theme.outline, marginTop: 12 }]}
                   onPress={handleClearCache}
                   activeOpacity={0.75}>
                   <Ionicons name="brush-outline" size={16} color={theme.textSecondary} />
@@ -1250,7 +1273,7 @@ export default function SettingsScreen() {
               <View style={styles.accordionTitleCol}>
                 <Text style={[styles.accordionTitle, { color: theme.textPrimary }]}>Sobre & Conta</Text>
                 <Text style={[styles.accordionSubtitle, { color: theme.textSecondary }]} numberOfLines={1}>
-                  Versão {Constants.expoConfig?.version || '2.1.0'} • {APP_INFO.developer}
+                  Versão {Constants.expoConfig?.version || APP_INFO.version} • {APP_INFO.developer}
                 </Text>
               </View>
               <Ionicons
@@ -1639,16 +1662,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   fontMultiplierText: {
     fontSize: 12,
     fontWeight: '800',
   },
   sampleTextBox: {
-    padding: 10,
+    padding: 12,
     borderRadius: 10,
-    marginBottom: 10,
+    marginBottom: 12,
     alignItems: 'center',
   },
   sampleText: {
@@ -1660,7 +1683,7 @@ const styles = StyleSheet.create({
   },
   fontSizeBtn: {
     flex: 1,
-    paddingVertical: 7,
+    paddingVertical: 8,
     borderRadius: 10,
     borderWidth: 1,
     alignItems: 'center',
@@ -1723,7 +1746,7 @@ const styles = StyleSheet.create({
   securityTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   securityInfoBox: {
     flexDirection: 'row',
@@ -1753,7 +1776,7 @@ const styles = StyleSheet.create({
   },
   selectionPill: {
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 10,
     borderWidth: 1,
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
@@ -1766,8 +1789,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
+    gap: 8,
+    paddingVertical: 12,
     borderRadius: 12,
     borderWidth: 1,
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
@@ -1805,16 +1828,16 @@ const styles = StyleSheet.create({
   },
   backupActionsRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 10,
+    gap: 12,
+    marginTop: 12,
   },
   backupBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
+    gap: 8,
+    paddingVertical: 12,
     borderRadius: 12,
     borderWidth: 1,
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
@@ -1838,7 +1861,7 @@ const styles = StyleSheet.create({
   linkLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
   },
   linkText: {
     fontSize: 13,
@@ -1848,8 +1871,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
+    gap: 8,
+    paddingVertical: 12,
     borderRadius: 12,
     borderWidth: 1,
     marginTop: 12,
@@ -1863,8 +1886,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
+    gap: 8,
+    paddingVertical: 12,
     marginTop: 12,
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
@@ -1883,7 +1906,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   footerTextCopyright: {
-    fontSize: 10,
+    fontSize: 11,
     marginTop: 2,
   },
   clearModalOverlay: {
@@ -1908,7 +1931,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(239, 68, 68, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 16,
   },
   clearModalTitle: {
     fontSize: 18,
@@ -1927,7 +1950,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 14,
     padding: 12,
-    marginBottom: 18,
+    marginBottom: 16,
   },
   warningItemRow: {
     flexDirection: 'row',
@@ -1940,7 +1963,7 @@ const styles = StyleSheet.create({
   },
   warningDivider: {
     height: 1,
-    marginVertical: 10,
+    marginVertical: 12,
   },
   confirmDeleteBtn: {
     flexDirection: 'row',
@@ -1948,9 +1971,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     width: '100%',
-    paddingVertical: 13,
+    paddingVertical: 12,
     borderRadius: 14,
-    marginBottom: 10,
+    marginBottom: 12,
     ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
   },
   confirmDeleteBtnText: {
@@ -1960,7 +1983,7 @@ const styles = StyleSheet.create({
   },
   cancelBtn: {
     width: '100%',
-    paddingVertical: 13,
+    paddingVertical: 12,
     borderRadius: 14,
     borderWidth: 1,
     alignItems: 'center',

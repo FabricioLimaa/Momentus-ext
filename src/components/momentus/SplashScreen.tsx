@@ -6,6 +6,7 @@ import {
   Animated,
   Image,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -38,6 +39,7 @@ export function SplashScreen({
   const [checkScale] = useState(() => new Animated.Value(0.7));
 
   useEffect(() => {
+    const useNative = Platform.OS !== 'web';
     // Loop de pulso suave
     const pulseLoop = Animated.loop(
       Animated.parallel([
@@ -45,24 +47,24 @@ export function SplashScreen({
           Animated.timing(glowScale, {
             toValue: 1.3,
             duration: 1800,
-            useNativeDriver: true,
+            useNativeDriver: useNative,
           }),
           Animated.timing(glowScale, {
             toValue: 1,
             duration: 1800,
-            useNativeDriver: true,
+            useNativeDriver: useNative,
           }),
         ]),
         Animated.sequence([
           Animated.timing(glowAlpha, {
             toValue: 0.55,
             duration: 1800,
-            useNativeDriver: true,
+            useNativeDriver: useNative,
           }),
           Animated.timing(glowAlpha, {
             toValue: 0.2,
             duration: 1800,
-            useNativeDriver: true,
+            useNativeDriver: useNative,
           }),
         ]),
       ])
@@ -74,12 +76,12 @@ export function SplashScreen({
       Animated.timing(entryFade, {
         toValue: 1,
         duration: 800,
-        useNativeDriver: true,
+        useNativeDriver: useNative,
       }),
       Animated.timing(entryTranslateY, {
         toValue: 0,
         duration: 800,
-        useNativeDriver: true,
+        useNativeDriver: useNative,
       }),
     ]).start();
 
@@ -94,7 +96,7 @@ export function SplashScreen({
         toValue: 1,
         friction: 5,
         tension: 100,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }).start();
     }
   }, [isReady, checkScale]);
