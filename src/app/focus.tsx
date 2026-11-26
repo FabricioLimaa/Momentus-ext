@@ -120,9 +120,46 @@ export default function FocusScreen() {
     setShowSoundscapeModal(true);
   };
 
-  // Modo Imersivo / Deep Focus (Tela Cheia / Relógio de Mesa)
+  // Modo Imersivo / Deep Focus (Tela Cheia OLED / Relógio de Mesa + Tela Sempre Ligada)
   const [isDeepFocus, setIsDeepFocus] = useState(false);
   const [deepControlsVisible, setDeepControlsVisible] = useState(true);
+
+  useEffect(() => {
+    if (!isDeepFocus) return;
+    let wakeLockSentinel: { release?: () => Promise<void> } | null = null;
+    let cancelled = false;
+
+    if (Platform.OS === 'web') {
+      const nav = typeof navigator !== 'undefined' ? (navigator as any) : null;
+      if (nav?.wakeLock?.request) {
+        nav.wakeLock
+          .request('screen')
+          .then((sentinel: any) => {
+            if (cancelled) {
+              sentinel?.release?.().catch(() => {});
+            } else {
+              wakeLockSentinel = sentinel;
+            }
+          })
+          .catch(() => {});
+      }
+      return () => {
+        cancelled = true;
+        wakeLockSentinel?.release?.().catch(() => {});
+      };
+    }
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const keepAwake = require('expo-keep-awake') as typeof import('expo-keep-awake');
+      keepAwake.activateKeepAwakeAsync('momentus-deep-focus').catch(() => {});
+      return () => {
+        keepAwake.deactivateKeepAwake('momentus-deep-focus').catch(() => {});
+      };
+    } catch {
+      return undefined;
+    }
+  }, [isDeepFocus]);
 
   // Zen Breath: Pausa Consciente & Respiração 4-7-8 em tela cheia
   const [showZenBreath, setShowZenBreath] = useState(false);
@@ -2149,7 +2186,7 @@ export default function FocusScreen() {
               setIsDeepFocus(false);
             }
           }}>
-          <View style={[styles.deepFocusContainer, { backgroundColor: theme.isDark ? '#040711' : '#0B1120' }]}>
+          <View style={[styles.deepFocusContainer, { backgroundColor: MomentusColors.oledBackground }]}>
             <StatusBar hidden />
             <TouchableOpacity
               activeOpacity={1}
@@ -2308,6 +2345,9 @@ export default function FocusScreen() {
                       {mode === 'FOCUS' ? 'FOCO PROFUNDO' : mode === 'SHORT_BREAK' ? 'PAUSA CURTA' : 'PAUSA LONGA'}
                     </Text>
                     <Text style={styles.deepTimerText}>{timeFormatted}</Text>
+                    <Text style={styles.deepHabitSubtext} numberOfLines={1}>
+                      {selectedHabit ? selectedHabit.title : 'Sessão Pomodoro'}
+                    </Text>
                   </View>
                 </View>
               </View>
@@ -2362,6 +2402,11 @@ export default function FocusScreen() {
                     accessibilityLabel="Avançar próximo ciclo">
                     <Ionicons name="play-skip-forward-outline" size={22} color="#FFFFFF" />
                   </TouchableOpacity>
+                </View>
+
+                <View style={styles.deepAlwaysOnRow}>
+                  <Ionicons name="sunny-outline" size={14} color="rgba(255, 255, 255, 0.55)" />
+                  <Text style={styles.deepAlwaysOnText}>Tela sempre ligada</Text>
                 </View>
 
                 <Text style={styles.deepHintText}>
@@ -3186,9 +3231,27 @@ const styles = StyleSheet.create({
     letterSpacing: -1,
     fontVariant: ['tabular-nums'],
   },
+  deepHabitSubtext: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.6)',
+    marginTop: 8,
+    maxWidth: 200,
+    textAlign: 'center',
+  },
   deepFooter: {
     alignItems: 'center',
     gap: 16,
+  },
+  deepAlwaysOnRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  deepAlwaysOnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.55)',
   },
   deepHintText: {
     fontSize: 11,

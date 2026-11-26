@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/focus_expanded_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/momentus_focus_card_bg"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="14dp"
+    android:paddingBottom="14dp">
+
+    <!-- Topo: Badge + Título à esquerda | Cronômetro ao vivo + Previsão à direita -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:paddingEnd="12dp">
+
+            <TextView
+                android:id="@+id/focus_expanded_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="FOCO PROFUNDO • AO VIVO"
+                android:textColor="#34D399"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/focus_expanded_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Sessão Pomodoro"
+                android:textColor="#F8FAFC"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:ellipsize="end" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="end">
+
+            <Chronometer
+                android:id="@+id/focus_expanded_chronometer"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:countDown="true"
+                android:textColor="#34D399"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/focus_expanded_paused_clock"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="25:00"
+                android:textColor="#94A3B8"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/focus_expanded_end_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="até 10:30"
+                android:textColor="#94A3B8"
+                android:textSize="11sp"
+                android:maxLines="1" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Barra de Progresso Nativa Horizontal -->
+    <ProgressBar
+        android:id="@+id/focus_expanded_progress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="6dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="12dp"
+        android:max="1000"
+        android:progress="0"
+        android:progressDrawable="@drawable/momentus_focus_progress" />
+
+    <!-- Botões Interativos: Pausar/Retomar e Pular -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/focus_btn_toggle"
+            android:layout_width="0dp"
+            android:layout_height="38dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/momentus_focus_btn_primary"
+            android:gravity="center"
+            android:text="⏸ Pausar"
+            android:textColor="#34D399"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:maxLines="1" />
+
+        <TextView
+            android:id="@+id/focus_btn_skip"
+            android:layout_width="0dp"
+            android:layout_height="38dp"
+            android:layout_weight="1"
+            android:background="@drawable/momentus_focus_btn_secondary"
+            android:gravity="center"
+            android:text="⏭ Pular"
+            android:textColor="#F8FAFC"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:maxLines="1" />
+    </LinearLayout>
+</LinearLayout>

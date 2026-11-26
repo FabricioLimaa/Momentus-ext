@@ -61,9 +61,9 @@ export const CHANGELOG_DATA: VersionRelease[] = [
         id: 'feat-lockscreen-focus',
         icon: 'phone-portrait-outline',
         tag: 'NOVO',
-        title: 'Seu foco visível na tela bloqueada',
+        title: 'Seu foco visível na tela bloqueada e em tela cheia',
         description:
-          'Acompanhe o tempo restante do Pomodoro direto na tela bloqueada do celular e pause ou pule o ciclo sem precisar abrir o app.',
+          'Acompanhe a contagem regressiva e a barra de progresso do Pomodoro direto na tela bloqueada com botões para pausar ou pular, ou ative o modo tela cheia com tela sempre ligada para usar o celular apoiado na mesa.',
         actionRoute: '/focus',
         actionLabel: 'Testar no Foco',
       },

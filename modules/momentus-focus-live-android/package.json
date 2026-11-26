@@ -1,0 +1,7 @@
+{
+  "name": "momentus-focus-live-android",
+  "version": "1.0.0",
+  "description": "Notificação nativa ao vivo do Modo Foco Android com Chronometer regressivo, ProgressBar nativa e controles interativos no estilo Momentus.",
+  "main": "index.ts",
+  "private": true
+}

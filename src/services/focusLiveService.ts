@@ -6,6 +6,11 @@ import {
   dismissPersistentFocusNotification,
   subscribeToFocusLiveNotificationActions,
 } from '@/services/notificationService';
+import {
+  presentAndroidNativeFocusLive,
+  dismissAndroidNativeFocusLive,
+  subscribeToAndroidNativeFocusLiveActions,
+} from '../../modules/momentus-focus-live-android';
 
 type FocusLiveActivityModule = typeof import('@/widgets/MomentusFocusLiveActivity');
 
@@ -46,6 +51,14 @@ function formatClockMmSs(seconds: number): string {
 function formatEndHourMin(endMs: number): string {
   const d = new Date(endMs);
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function buildVisualProgressBar(progress: number): string {
+  const clamped = Math.max(0, Math.min(1, progress));
+  const filled = Math.round(clamped * 10);
+  const empty = 10 - filled;
+  const pct = Math.round(clamped * 100);
+  return `${'▰'.repeat(filled)}${'▱'.repeat(empty)} ${pct}%`;
 }
 
 function getModeDisplayLabel(mode: FocusLiveSyncState['mode']): string {
@@ -135,28 +148,53 @@ export async function syncFocusLiveActivity(
     return;
   }
 
-  // 3. Android: Notificação persistente de alta prioridade com controles de reprodução
+  // 3. Android: Card Nativo Ao Vivo (Chronometer + ProgressBar nativa) com fallback imediato PUBLIC + progresso visual
   if (Platform.OS === 'android') {
     const remainingMinutesCeil = Math.max(1, Math.ceil(state.remainingSeconds / 60));
-    const syncKey = `${state.mode}|${state.isRunning}|${remainingMinutesCeil}|${habitTitle}`;
+    const progressBucket = Math.round(progress * 20); // passo de 5% para atualizar barra nativa suavemente
+    const syncKey = `${state.mode}|${state.isRunning}|${remainingMinutesCeil}|${progressBucket}|${habitTitle}`;
 
     if (!options?.forceAndroidRefresh && syncKey === lastAndroidSyncMinuteKey) {
       return;
     }
     lastAndroidSyncMinuteKey = syncKey;
 
+    const endFormatted = formatEndHourMin(effectiveEndMs);
+    const accent = state.accentColor || '#34D399';
+
+    // Tenta primeiro o módulo nativo customizado (Sugestão 2 — Chronometer regressivo + ProgressBar nativa)
+    const shownNativeCard = await presentAndroidNativeFocusLive({
+      modeLabel,
+      habitTitle,
+      remainingFormatted,
+      endTimeFormatted: endFormatted,
+      remainingSeconds: Math.max(0, Math.floor(state.remainingSeconds)),
+      progress,
+      isRunning: state.isRunning,
+      isOled: state.isOled === true,
+      accentColor: accent,
+    });
+
+    if (shownNativeCard) {
+      return;
+    }
+
+    // Fallback imediato (Sugestão 1): Notificação persistente PUBLIC na tela bloqueada + barra visual
     const emoji = !state.isRunning ? '⏸️' : state.mode === 'FOCUS' ? '⏱️' : '🌿';
+    const progressVisual = buildVisualProgressBar(progress);
     const title = state.isRunning
       ? `${emoji} ${modeLabel} • ${remainingFormatted}`
       : `${emoji} ${modeLabel} (Pausado • ${remainingFormatted})`;
 
     const body = state.isRunning
-      ? `${habitTitle} • Termina às ${formatEndHourMin(effectiveEndMs)}`
-      : `${habitTitle} • Toque em Retomar para continuar`;
+      ? `${habitTitle} • Termina às ${endFormatted}\n${progressVisual}`
+      : `${habitTitle} • Pausado\n${progressVisual}`;
 
     await presentPersistentFocusNotification({
       title,
+      subtitle: modeLabel,
       body,
+      color: accent,
       isRunning: state.isRunning,
       mode: state.mode,
     });
@@ -196,7 +234,10 @@ export async function endFocusLiveActivity(): Promise<void> {
   }
 
   if (Platform.OS === 'android') {
-    await dismissPersistentFocusNotification();
+    await Promise.all([
+      dismissAndroidNativeFocusLive(),
+      dismissPersistentFocusNotification(),
+    ]);
   }
 }
 
@@ -238,7 +279,12 @@ export function subscribeToFocusLiveActions(handlers: {
   }
 
   if (Platform.OS === 'android') {
-    return subscribeToFocusLiveNotificationActions(handlers);
+    const unsubNative = subscribeToAndroidNativeFocusLiveActions(handlers);
+    const unsubNotif = subscribeToFocusLiveNotificationActions(handlers);
+    return () => {
+      unsubNative();
+      unsubNotif();
+    };
   }
 
   return () => {};

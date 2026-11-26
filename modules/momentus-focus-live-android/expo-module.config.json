@@ -1,0 +1,8 @@
+{
+  "platforms": ["android"],
+  "android": {
+    "modules": [
+      "br.com.fabriciolima.momentus.focuslive.MomentusFocusLiveAndroidModule"
+    ]
+  }
+}

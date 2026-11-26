@@ -6,7 +6,8 @@ import { getAppKv } from '@/database/momentusDb';
 
 export const CHANNEL_INICIO = 'CHANNEL_INICIO';
 export const CHANNEL_TERMINO = 'CHANNEL_TERMINO';
-export const CHANNEL_FOCUS_LIVE = 'CHANNEL_FOCUS_LIVE';
+// V2 garante que dispositivos Android existentes recriem o canal com lockscreenVisibility PUBLIC
+export const CHANNEL_FOCUS_LIVE = 'CHANNEL_FOCUS_LIVE_V2';
 
 export const CATEGORY_HABIT_START = 'CATEGORY_HABIT_START';
 export const CATEGORY_HABIT_END = 'CATEGORY_HABIT_END';
@@ -35,6 +36,7 @@ type LocalNotificationsApi = {
   addNotificationResponseReceivedListener: typeof NotificationsTypes.addNotificationResponseReceivedListener;
   DEFAULT_ACTION_IDENTIFIER: string;
   AndroidImportance: typeof NotificationsTypes.AndroidImportance;
+  AndroidNotificationVisibility: typeof NotificationsTypes.AndroidNotificationVisibility;
   AndroidNotificationPriority: typeof NotificationsTypes.AndroidNotificationPriority;
   IosAuthorizationStatus: typeof NotificationsTypes.IosAuthorizationStatus;
   SchedulableTriggerInputTypes: typeof NotificationsTypes.SchedulableTriggerInputTypes;
@@ -81,7 +83,7 @@ function getNotifications(): LocalNotificationsApi | null {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { addNotificationResponseReceivedListener, DEFAULT_ACTION_IDENTIFIER } = require('expo-notifications/build/NotificationsEmitter');
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { AndroidImportance } = require('expo-notifications/build/NotificationChannelManager.types');
+    const { AndroidImportance, AndroidNotificationVisibility } = require('expo-notifications/build/NotificationChannelManager.types');
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { IosAuthorizationStatus } = require('expo-notifications/build/NotificationPermissions.types');
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -102,6 +104,7 @@ function getNotifications(): LocalNotificationsApi | null {
       DEFAULT_ACTION_IDENTIFIER:
         DEFAULT_ACTION_IDENTIFIER || 'expo.modules.notifications.actions.DEFAULT',
       AndroidImportance,
+      AndroidNotificationVisibility,
       AndroidNotificationPriority,
       IosAuthorizationStatus,
       SchedulableTriggerInputTypes,
@@ -274,13 +277,15 @@ export async function setupNotificationChannels(): Promise<void> {
     });
 
     await Notifications.setNotificationChannelAsync(CHANNEL_FOCUS_LIVE, {
-      name: 'Modo Foco Ativo (Persistente)',
-      description: 'Notificação persistente de alta prioridade com controles do Pomodoro',
+      name: 'Modo Foco Ativo (Tela Bloqueada)',
+      description: 'Notificação persistente visível na tela bloqueada com controles do Pomodoro',
       importance: Notifications.AndroidImportance.HIGH,
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       lightColor: '#34D399',
       sound: null,
       enableLights: false,
       enableVibrate: false,
+      showBadge: false,
     });
   } catch (error) {
     MomentusLog.notif.warn('Erro ao configurar canais de notificação:', error);
@@ -643,6 +648,8 @@ export async function cancelFocusNotification(notificationId?: string | null): P
 export async function presentPersistentFocusNotification(params: {
   title: string;
   body: string;
+  subtitle?: string;
+  color?: string;
   isRunning: boolean;
   mode: 'FOCUS' | 'SHORT_BREAK' | 'LONG_BREAK';
 }): Promise<void> {
@@ -656,7 +663,9 @@ export async function presentPersistentFocusNotification(params: {
       identifier: MOMENTUS_FOCUS_LIVE_NOTIF_ID,
       content: {
         title: params.title,
+        subtitle: params.subtitle,
         body: params.body,
+        color: params.color || '#34D399',
         sticky: true,
         autoDismiss: false,
         sound: false,
