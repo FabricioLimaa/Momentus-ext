@@ -97,7 +97,7 @@ Sempre que implementar uma nova funcionalidade, melhoria visual/UX, recurso de s
 
 1. **Atualize `CHANGELOG_DATA`** na versão atual (`isCurrent: true`) em `src/app/updates.tsx`, adicionando ou refinando o `UpdateItem` correspondente com `id` único, `icon` (Ionicons), `tag` adequada (`NOVO` | `MELHORIA` | `DESIGN` | `SEGURANCA` | `CORRECAO`), `title`, `description` concisa e `actionRoute` / `actionLabel` quando aplicável.
 2. **Mantenha `highlights` e `handleShareUpdates`** coerentes com os principais destaques atuais da versão.
-3. **Preserve o estilo Zen:** descrições diretas e claras, sem inflar a tela com entradas técnicas internas (refatorações puras de código, lint ou ajustes de CI não entram na tela de novidades).
+3. **Linguagem 100% voltada ao usuário final (Zero jargão técnico):** Escreva sempre em português natural focado no benefício prático para quem usa o app. É proibido exibir termos técnicos ou de implementação (ex.: nomes de bancos/APIs/bibliotecas como SQLCipher, AES-256, Keychain, Firestore, Offline-First, Glassmorphism, Spring, códigos hex `#000000`, `Platform.OS` ou refatorações internas).
 
 ## Fluxo Git: Commit Descritivo & Push Automático (Obrigatório)
 
