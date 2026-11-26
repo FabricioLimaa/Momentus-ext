@@ -18,7 +18,9 @@
       ],
       "infoPlist": {
         "NSCalendarsUsageDescription": "O Momentus precisa de acesso ao seu calendário para sincronizar suas rotinas e hábitos.",
-        "NSRemindersUsageDescription": "O Momentus precisa de permissão para lembretes de rotinas."
+        "NSRemindersUsageDescription": "O Momentus precisa de permissão para lembretes de rotinas.",
+        "NSSpeechRecognitionUsageDescription": "O Momentus utiliza o reconhecimento de voz para preencher automaticamente data, horário e categoria das suas rotinas.",
+        "NSMicrophoneUsageDescription": "O Momentus utiliza o microfone para criar rotinas em 1 toque por comando de voz."
       }
     },
     "android": {
@@ -60,7 +62,15 @@
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
         "READ_CALENDAR",
-        "WRITE_CALENDAR"
+        "WRITE_CALENDAR",
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
       ],
       "predictiveBackGestureEnabled": false
     },
@@ -168,7 +178,29 @@
       "developer": "Fabricio Lima",
       "contactEmail": "contato@momentus.app.br",
       "officialWebsite": "https://www.momentus.app.br/",
-      "webAccess": "https://app.momentus.app.br/"
-    }
+      "webAccess": "https://app.momentus.app.br/",
+      "router": {},
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "ExpoWidgetsTarget",
+                  "bundleIdentifier": "br.com.fabriciolima.momentus.widgets",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.br.com.fabriciolima.momentus"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "ccb122a5-0652-4406-befa-e2327dc6c1f5"
+      }
+    },
+    "owner": "momentus-company"
   }
 }
