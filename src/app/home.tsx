@@ -123,15 +123,13 @@ export default function HomeScreen() {
 
   // Toggle seleção múltipla
   const handleToggleSelectHabit = (id: string) => {
-    setSelectedHabitIds((prev) => {
-      const next = prev.includes(id)
-        ? prev.filter((item) => item !== id)
-        : [...prev, id];
-      if (next.length === 0) {
-        setIsSelectionMode(false);
-      }
-      return next;
-    });
+    const next = selectedHabitIds.includes(id)
+      ? selectedHabitIds.filter((item) => item !== id)
+      : [...selectedHabitIds, id];
+    setSelectedHabitIds(next);
+    if (next.length === 0) {
+      setIsSelectionMode(false);
+    }
   };
 
   const handleSelectAll = () => {

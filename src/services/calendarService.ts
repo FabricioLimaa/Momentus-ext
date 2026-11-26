@@ -548,10 +548,11 @@ export function deduplicateHabits(habits: HabitItem[]): {
     }
 
     const normTitle = (habit.title || '').trim().toLowerCase();
-    const dateTitleKey = `${habit.date}_${normTitle}`;
+    const normTimeStart = (habit.timeStart || '').trim();
+    const dateTitleKey = `${habit.date}_${normTimeStart}_${normTitle}`;
     const eventIdKey = habit.googleCalendarEventId ? String(habit.googleCalendarEventId) : null;
 
-    // Verifica se já existe um hábito correspondente por ID do evento Google ou por Data + Título
+    // Verifica se já existe um hábito correspondente por ID do evento Google ou por Data + Horário + Título
     const existing =
       (eventIdKey ? seenEventIds.get(eventIdKey) : null) ||
       seenDateTitles.get(dateTitleKey);

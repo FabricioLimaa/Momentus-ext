@@ -225,17 +225,40 @@ export async function setAppKv<T>(key: string, value: T): Promise<void> {
   }
 }
 
+const PRESERVED_LOGOUT_KEYS = new Set([
+  `${PREFIX_KV}auth_remember_me_prefs`,
+  '@momentus_remember_me',
+  '@momentus:remember_me',
+]);
+
 export async function clearEntireDatabase(): Promise<void> {
   try {
-    await AsyncStorage.multiRemove([
-      KEY_CATEGORIES,
-      KEY_HABITS,
-      KEY_TEMPLATES,
-      KEY_ACHIEVEMENTS,
-      KEY_MARKET,
-      `${PREFIX_KV}user_profile`,
-      `${PREFIX_KV}app_settings`,
-    ]);
+    const allKeys = await AsyncStorage.getAllKeys();
+    const momentusKeys = allKeys.filter(
+      (key) =>
+        (key.startsWith('@momentus_') || key.startsWith('@momentus:')) &&
+        !PRESERVED_LOGOUT_KEYS.has(key)
+    );
+    const keysToRemove = Array.from(
+      new Set([
+        ...momentusKeys,
+        KEY_CATEGORIES,
+        KEY_HABITS,
+        KEY_TEMPLATES,
+        KEY_ACHIEVEMENTS,
+        KEY_MARKET,
+        `${PREFIX_KV}user_profile`,
+        `${PREFIX_KV}app_settings`,
+        `${PREFIX_KV}google_access_token`,
+        `${PREFIX_KV}focus_history_map`,
+        `${PREFIX_KV}last_focus_date`,
+        `${PREFIX_KV}validated_day_dates`,
+        `${PREFIX_KV}validated_routine_keys`,
+        `${PREFIX_KV}credited_achievement_ids`,
+        `${PREFIX_KV}active_focus_timer`,
+      ])
+    );
+    await AsyncStorage.multiRemove(keysToRemove);
   } catch (e) {
     console.warn('Erro ao limpar banco no web:', e);
   }

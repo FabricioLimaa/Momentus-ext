@@ -156,18 +156,17 @@ export default function OnboardingScreen() {
   };
 
   const toggleStarterHabit = (id: string) => {
-    setSelectedStarterIds((prev) => {
-      if (prev.includes(id)) {
-        triggerHaptic('selection');
-        return prev.filter((item) => item !== id);
-      }
-      if (prev.length >= MAX_STARTER_SELECTIONS) {
-        triggerHaptic('impact');
-        return prev;
-      }
+    if (selectedStarterIds.includes(id)) {
       triggerHaptic('selection');
-      return [...prev, id];
-    });
+      setSelectedStarterIds((prev) => prev.filter((item) => item !== id));
+      return;
+    }
+    if (selectedStarterIds.length >= MAX_STARTER_SELECTIONS) {
+      triggerHaptic('impact');
+      return;
+    }
+    triggerHaptic('selection');
+    setSelectedStarterIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
   };
 
   const navigateAfterOnboarding = () => {

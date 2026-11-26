@@ -32,22 +32,24 @@ export const BiometricGuard: React.FC<BiometricGuardProps> = ({ children }) => {
   const [authError, setAuthError] = useState<string | null>(null);
 
   const backgroundTimeRef = useRef<number | null>(null);
+  const hasCheckedInitialLockRef = useRef(false);
   const [pulseAnim] = useState(() => new Animated.Value(1));
 
   // Pulse animation on lock screen icon
   useEffect(() => {
     if (isLocked) {
+      const useNative = Platform.OS !== 'web';
       const animation = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
             toValue: 1.1,
             duration: 1200,
-            useNativeDriver: true,
+            useNativeDriver: useNative,
           }),
           Animated.timing(pulseAnim, {
             toValue: 1.0,
             duration: 1200,
-            useNativeDriver: true,
+            useNativeDriver: useNative,
           }),
         ])
       );
@@ -98,13 +100,18 @@ export const BiometricGuard: React.FC<BiometricGuardProps> = ({ children }) => {
     }
   }, [triggerHaptic]);
 
-  // Initial check on load
+  // Initial check on load (executa apenas uma vez por sessão autenticada)
   useEffect(() => {
     if (!isLoaded) return;
-    if (settings.biometricLock && userProfile.isLoggedIn && Platform.OS !== 'web') {
-      setIsLocked(true);
-      authenticate();
+    if (!settings.biometricLock || !userProfile.isLoggedIn || Platform.OS === 'web') {
+      hasCheckedInitialLockRef.current = false;
+      setIsLocked(false);
+      return;
     }
+    if (hasCheckedInitialLockRef.current) return;
+    hasCheckedInitialLockRef.current = true;
+    setIsLocked(true);
+    authenticate();
   }, [isLoaded, settings.biometricLock, userProfile.isLoggedIn, authenticate]);
 
   // Handle AppState lifecycle transitions (Background -> Active)

@@ -29,17 +29,10 @@ import {
 const EVENTS_COLLECTION = "eventos";
 const CATEGORIES_COLLECTION = "categories";
 export const LEGACY_MOCK_HABIT_IDS = new Set(["h-1", "h-2", "h-3", "h-4"]);
-export const LEGACY_MOCK_HABIT_TITLES = new Set([
-  "leitura 20 minutos",
-  "treino ou caminhada",
-  "meditação mindfulness",
-  "meditacao mindfulness",
-]);
+export const LEGACY_MOCK_HABIT_TITLES = new Set<string>();
 
-export function isMockHabit(id: string, title?: string | null): boolean {
-  if (LEGACY_MOCK_HABIT_IDS.has(id)) return true;
-  if (title && LEGACY_MOCK_HABIT_TITLES.has(title.trim().toLowerCase())) return true;
-  return false;
+export function isMockHabit(id: string, _title?: string | null): boolean {
+  return LEGACY_MOCK_HABIT_IDS.has(id);
 }
 
 const TEMPLATES_COLLECTION = "templates";
@@ -484,7 +477,7 @@ export async function syncWithFirestore(
         horarioTerminoString: formatTimeToIsoLocal(habit.timeEnd || habit.timeStart),
         ordem: 0,
         categoryId: habit.categoryId,
-        templateId: habit.templateSourceId || null,
+        templateId: null,
         templateSourceId: habit.templateSourceId || null,
         googleCalendarEventId: habit.googleCalendarEventId || null,
         isDeleted: false,
@@ -509,8 +502,13 @@ export async function syncWithFirestore(
     const rawCatId = cloudItem.categoryId || canonicalOutrosId;
     const resolvedCatId = duplicateOutrosIds.has(rawCatId) ? canonicalOutrosId : rawCatId;
 
-    // Se o evento pertencer a um template, agrupa no mapa de eventos de template
-    if (cloudItem.templateId) {
+    // Somente itens sem data (data == null) e com templateId pertencem ao blueprint do template.
+    // Hábitos diários com data preenchida nunca devem ser desviados para templateEventsMap.
+    const isTemplateBlueprint =
+      Boolean(cloudItem.templateId) &&
+      (cloudItem.data === null || cloudItem.data === undefined);
+
+    if (isTemplateBlueprint) {
       const tmplId = String(cloudItem.templateId);
       if (!templateEventsMap.has(tmplId)) {
         templateEventsMap.set(tmplId, []);
@@ -1162,7 +1160,11 @@ export async function deleteTemplateFromFirestore(
     batch.delete(templateDocRef);
 
     eventsSnapshot.forEach((docSnap) => {
-      batch.delete(docSnap.ref);
+      const eventData = docSnap.data();
+      // Deleta apenas itens blueprint do template (data == null), preservando hábitos diários já aplicados
+      if (eventData?.data === null || eventData?.data === undefined) {
+        batch.delete(docSnap.ref);
+      }
     });
 
     await batch.commit();
@@ -1196,7 +1198,7 @@ export async function saveHabitToFirestore(
         horarioTerminoString: formatTimeToIsoLocal(habit.timeEnd || habit.timeStart),
         ordem: 0,
         categoryId: habit.categoryId,
-        templateId: habit.templateSourceId || null,
+        templateId: null,
         templateSourceId: habit.templateSourceId || null,
         googleCalendarEventId: habit.googleCalendarEventId || null,
         isDeleted: false,

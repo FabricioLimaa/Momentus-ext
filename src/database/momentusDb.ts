@@ -48,6 +48,8 @@ async function migrateLegacyUnencryptedDbIfNeeded(
     }
 
     let legacyDb: SQLite.SQLiteDatabase | null = null;
+    let migrationSucceeded = false;
+
     try {
       legacyDb = await SQLiteModule.openDatabaseAsync(LEGACY_DB_NAME);
       const tableCheck = await legacyDb.getFirstAsync<{ name: string }>(
@@ -78,7 +80,14 @@ async function migrateLegacyUnencryptedDbIfNeeded(
               await encryptedDb.runAsync(
                 `INSERT OR IGNORE INTO categories (id, name, color, icon, stickerId, metaMinutosSemanal)
                  VALUES (?, ?, ?, ?, ?, ?)`,
-                [c.id, c.name, c.color, c.icon ?? null, c.stickerId ?? null, c.metaMinutosSemanal ?? null]
+                [
+                  c.id,
+                  c.name ?? 'Categoria',
+                  c.color ?? '#34D399',
+                  c.icon ?? null,
+                  c.stickerId ?? null,
+                  c.metaMinutosSemanal ?? null,
+                ]
               );
             }
             for (const h of habits) {
@@ -89,13 +98,13 @@ async function migrateLegacyUnencryptedDbIfNeeded(
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                   h.id,
-                  h.title,
+                  h.title ?? 'Rotina',
                   h.description ?? null,
-                  h.timeStart,
+                  h.timeStart ?? '08:00',
                   h.timeEnd ?? null,
-                  h.categoryId,
+                  h.categoryId ?? 'cat-outros',
                   h.completed ?? 0,
-                  h.date,
+                  h.date ?? '',
                   h.streak ?? 0,
                   h.googleCalendarEventId ?? null,
                   h.saveToGoogle ?? 0,
@@ -107,7 +116,14 @@ async function migrateLegacyUnencryptedDbIfNeeded(
               await encryptedDb.runAsync(
                 `INSERT OR IGNORE INTO templates (id, title, description, icon, color, itemsJson)
                  VALUES (?, ?, ?, ?, ?, ?)`,
-                [t.id, t.title, t.description, t.icon, t.color, t.itemsJson]
+                [
+                  t.id,
+                  t.title ?? 'Modelo de Rotina',
+                  t.description ?? '',
+                  t.icon ?? 'sparkles',
+                  t.color ?? '#34D399',
+                  t.itemsJson ?? '[]',
+                ]
               );
             }
             for (const a of achievements) {
@@ -117,9 +133,9 @@ async function migrateLegacyUnencryptedDbIfNeeded(
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                   a.id,
-                  a.title,
-                  a.description,
-                  a.icon,
+                  a.title ?? 'Conquista',
+                  a.description ?? '',
+                  a.icon ?? 'trophy',
                   a.unlocked ?? 0,
                   a.unlockedAt ?? null,
                   a.progress ?? 0,
@@ -135,14 +151,14 @@ async function migrateLegacyUnencryptedDbIfNeeded(
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                   m.id,
-                  m.name,
-                  m.description,
-                  m.type,
-                  m.rarity,
+                  m.name ?? 'Item',
+                  m.description ?? '',
+                  m.type ?? 'theme',
+                  m.rarity ?? 'common',
                   m.basePrice ?? 0,
                   m.finalPrice ?? 0,
                   m.isOwned ?? 0,
-                  m.iconName,
+                  m.iconName ?? 'sparkles',
                 ]
               );
             }
@@ -157,20 +173,27 @@ async function migrateLegacyUnencryptedDbIfNeeded(
           MomentusLog.db.info('Migração de dados legados para banco SQLCipher AES-256 concluída com sucesso.');
         }
       }
-    } catch {
-      // Nenhum banco legado em texto claro legível encontrado — instalação nova
+
+      migrationSucceeded = true;
+    } catch (migrationErr) {
+      // Falha na migração: preserva momentus.db intacto para tentar novamente na próxima abertura
+      MomentusLog.db.warn('Erro na migração de dados legados para SQLCipher (arquivo legado preservado):', migrationErr);
     } finally {
       if (legacyDb) {
         await legacyDb.closeAsync().catch(() => {});
       }
-      // Remove fisicamente o arquivo legado não criptografado do disco
-      await SQLiteModule.deleteDatabaseAsync(LEGACY_DB_NAME).catch(() => {});
+      if (migrationSucceeded) {
+        // Só remove fisicamente o arquivo legado após migração 100% bem-sucedida
+        await SQLiteModule.deleteDatabaseAsync(LEGACY_DB_NAME).catch(() => {});
+      }
     }
 
-    await encryptedDb.runAsync(
-      'INSERT OR REPLACE INTO app_kv (key, value) VALUES (?, ?)',
-      [MIGRATION_FLAG_KEY, 'true']
-    );
+    if (migrationSucceeded) {
+      await encryptedDb.runAsync(
+        'INSERT OR REPLACE INTO app_kv (key, value) VALUES (?, ?)',
+        [MIGRATION_FLAG_KEY, 'true']
+      );
+    }
   } catch (err) {
     MomentusLog.db.warn('Aviso na etapa de migração para SQLCipher:', err);
   }
@@ -708,10 +731,10 @@ export async function upsertTemplateDb(template: RoutineTemplate): Promise<void>
       [
         template.id,
         template.title,
-        template.description ?? null,
-        template.icon ?? null,
-        template.color ?? null,
-        JSON.stringify(template.items),
+        template.description ?? '',
+        template.icon ?? 'sparkles',
+        template.color ?? '#34D399',
+        JSON.stringify(template.items ?? []),
       ]
     );
   }, undefined);
@@ -756,10 +779,10 @@ export async function setAllTemplatesDb(templates: RoutineTemplate[]): Promise<v
           [
             t.id,
             t.title,
-            t.description ?? null,
-            t.icon ?? null,
-            t.color ?? null,
-            JSON.stringify(t.items),
+            t.description ?? '',
+            t.icon ?? 'sparkles',
+            t.color ?? '#34D399',
+            JSON.stringify(t.items ?? []),
           ]
         );
       }
@@ -966,15 +989,20 @@ export async function setAppKv<T>(key: string, value: T): Promise<void> {
 export async function clearEntireDatabase(): Promise<void> {
   if (Platform.OS === 'web') {
     try {
-      await AsyncStorage.multiRemove([
-        '@momentus_categories',
-        '@momentus_habits',
-        '@momentus_templates',
-        '@momentus_achievements',
-        '@momentus_market_items',
-        '@momentus_kv_user_profile',
-        '@momentus_kv_app_settings',
+      const allKeys = await AsyncStorage.getAllKeys();
+      const preservedKeys = new Set([
+        '@momentus_kv_auth_remember_me_prefs',
+        '@momentus_remember_me',
+        '@momentus:remember_me',
       ]);
+      const keysToRemove = allKeys.filter(
+        (key) =>
+          (key.startsWith('@momentus_') || key.startsWith('@momentus:')) &&
+          !preservedKeys.has(key)
+      );
+      if (keysToRemove.length > 0) {
+        await AsyncStorage.multiRemove(keysToRemove);
+      }
     } catch (e) {
       MomentusLog.db.warn('Erro ao limpar banco no web:', e);
     }

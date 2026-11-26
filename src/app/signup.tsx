@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  StatusBar,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +23,7 @@ import {
   BorderRadiusTokens,
   ComponentHeightTokens,
   TypographyTokens,
+  getContrastTextColor,
 } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import { registerWithEmail, getFriendlyAuthErrorMessage } from '@/services/authService';
@@ -45,6 +47,7 @@ export default function SignUpScreen() {
   const confirmPasswordInputRef = useRef<TextInput>(null);
 
   const primaryColor = settings.primaryColorHex || MomentusColors.emeraldNeon;
+  const primaryContrast = getContrastTextColor(primaryColor);
 
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const isPasswordStrong = password.length >= 6;
@@ -110,17 +113,21 @@ export default function SignUpScreen() {
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: theme.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <StatusBar
+        barStyle={theme.isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={theme.background}
+      />
       {/* Top Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+      <View style={[styles.header, { paddingTop: insets.top + SpacingTokens.sm }]}>
         <TouchableOpacity
           onPress={handleNavigateToLogin}
           style={styles.backButton}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityRole="button"
           accessibilityLabel="Voltar">
-          <Ionicons name="arrow-back" size={24} color={MomentusColors.textPrimary} />
+          <Ionicons name="arrow-back" size={24} color={theme.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Criar Conta</Text>
+        <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Criar Conta</Text>
         <View style={styles.placeholder} />
       </View>
 
@@ -136,7 +143,7 @@ export default function SignUpScreen() {
           style={[
             styles.logoCircle,
             {
-              backgroundColor: theme.isDark ? '#001A40' : '#FFFFFF',
+              backgroundColor: theme.isDark ? (theme.isOled ? theme.surface : '#001A40') : theme.surface,
               borderColor: `${primaryColor}40`,
             },
           ]}>
@@ -155,13 +162,17 @@ export default function SignUpScreen() {
         <View style={styles.formContainer}>
           {/* Nome */}
           <View style={styles.fieldBlock}>
-            <Text style={styles.fieldLabel}>Nome Completo</Text>
-            <View style={styles.inputWrapper}>
+            <Text style={[styles.fieldLabel, { color: theme.textPrimary }]}>Nome Completo</Text>
+            <View
+              style={[
+                styles.inputWrapper,
+                { backgroundColor: theme.surface, borderColor: theme.outline },
+              ]}>
               <Ionicons name="person-outline" size={20} color={primaryColor} style={styles.inputIcon} />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: theme.textPrimary }]}
                 placeholder="Seu nome"
-                placeholderTextColor={MomentusColors.textSecondary}
+                placeholderTextColor={theme.textSecondary}
                 autoCapitalize="words"
                 autoComplete="name"
                 textContentType="name"
@@ -175,14 +186,18 @@ export default function SignUpScreen() {
 
           {/* E-mail */}
           <View style={styles.fieldBlock}>
-            <Text style={styles.fieldLabel}>E-mail</Text>
-            <View style={styles.inputWrapper}>
+            <Text style={[styles.fieldLabel, { color: theme.textPrimary }]}>E-mail</Text>
+            <View
+              style={[
+                styles.inputWrapper,
+                { backgroundColor: theme.surface, borderColor: theme.outline },
+              ]}>
               <Ionicons name="mail-outline" size={20} color={primaryColor} style={styles.inputIcon} />
               <TextInput
                 ref={emailInputRef}
-                style={styles.input}
+                style={[styles.input, { color: theme.textPrimary }]}
                 placeholder="seu.email@exemplo.com"
-                placeholderTextColor={MomentusColors.textSecondary}
+                placeholderTextColor={theme.textSecondary}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoComplete="email"
@@ -199,7 +214,7 @@ export default function SignUpScreen() {
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   accessibilityRole="button"
                   accessibilityLabel="Limpar e-mail">
-                  <Ionicons name="close-circle" size={18} color={`${MomentusColors.textSecondary}80`} />
+                  <Ionicons name="close-circle" size={18} color={`${theme.textSecondary}99`} />
                 </TouchableOpacity>
               )}
             </View>
@@ -210,14 +225,18 @@ export default function SignUpScreen() {
 
           {/* Senha */}
           <View style={styles.fieldBlock}>
-            <Text style={styles.fieldLabel}>Senha</Text>
-            <View style={styles.inputWrapper}>
+            <Text style={[styles.fieldLabel, { color: theme.textPrimary }]}>Senha</Text>
+            <View
+              style={[
+                styles.inputWrapper,
+                { backgroundColor: theme.surface, borderColor: theme.outline },
+              ]}>
               <Ionicons name="lock-closed-outline" size={20} color={primaryColor} style={styles.inputIcon} />
               <TextInput
                 ref={passwordInputRef}
-                style={styles.input}
+                style={[styles.input, { color: theme.textPrimary }]}
                 placeholder="Senha (mínimo 6 caracteres)"
-                placeholderTextColor={MomentusColors.textSecondary}
+                placeholderTextColor={theme.textSecondary}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
                 autoComplete="new-password"
@@ -236,7 +255,7 @@ export default function SignUpScreen() {
                 <Ionicons
                   name={showPassword ? 'eye-off-outline' : 'eye-outline'}
                   size={20}
-                  color={MomentusColors.textSecondary}
+                  color={theme.textSecondary}
                 />
               </TouchableOpacity>
             </View>
@@ -244,7 +263,7 @@ export default function SignUpScreen() {
               isPasswordStrong ? (
                 <View style={styles.validationRow}>
                   <Ionicons name="checkmark-circle" size={14} color={primaryColor} />
-                  <Text style={[styles.helperText, { color: primaryColor, marginLeft: 4 }]}>
+                  <Text style={[styles.helperText, { color: primaryColor, marginLeft: SpacingTokens.xs }]}>
                     Senha com tamanho adequado.
                   </Text>
                 </View>
@@ -252,24 +271,27 @@ export default function SignUpScreen() {
                 <Text style={styles.errorText}>Mínimo de 6 caracteres.</Text>
               )
             ) : (
-              <Text style={styles.helperText}>Mínimo de 6 caracteres.</Text>
+              <Text style={[styles.helperText, { color: theme.textSecondary }]}>
+                Mínimo de 6 caracteres.
+              </Text>
             )}
           </View>
 
           {/* Confirmar Senha */}
           <View style={styles.fieldBlock}>
-            <Text style={styles.fieldLabel}>Confirmar Senha</Text>
+            <Text style={[styles.fieldLabel, { color: theme.textPrimary }]}>Confirmar Senha</Text>
             <View
               style={[
                 styles.inputWrapper,
+                { backgroundColor: theme.surface, borderColor: theme.outline },
                 !passwordsMatch && { borderColor: MomentusColors.dangerRed },
               ]}>
               <Ionicons name="lock-closed-outline" size={20} color={primaryColor} style={styles.inputIcon} />
               <TextInput
                 ref={confirmPasswordInputRef}
-                style={styles.input}
+                style={[styles.input, { color: theme.textPrimary }]}
                 placeholder="Confirme sua senha"
-                placeholderTextColor={MomentusColors.textSecondary}
+                placeholderTextColor={theme.textSecondary}
                 secureTextEntry={!showConfirmPassword}
                 autoCapitalize="none"
                 autoComplete="new-password"
@@ -292,7 +314,7 @@ export default function SignUpScreen() {
                 <Ionicons
                   name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'}
                   size={20}
-                  color={MomentusColors.textSecondary}
+                  color={theme.textSecondary}
                 />
               </TouchableOpacity>
             </View>
@@ -300,7 +322,7 @@ export default function SignUpScreen() {
               passwordsMatch ? (
                 <View style={styles.validationRow}>
                   <Ionicons name="checkmark-circle" size={14} color={primaryColor} />
-                  <Text style={[styles.helperText, { color: primaryColor, marginLeft: 4 }]}>
+                  <Text style={[styles.helperText, { color: primaryColor, marginLeft: SpacingTokens.xs }]}>
                     As senhas coincidem.
                   </Text>
                 </View>
@@ -318,18 +340,18 @@ export default function SignUpScreen() {
             style={[
               styles.submitButton,
               {
-                backgroundColor: isFormValid ? primaryColor : MomentusColors.navyOutline,
+                backgroundColor: isFormValid ? primaryColor : theme.outline,
               },
             ]}
             accessibilityRole="button"
             accessibilityLabel="Criar Conta">
             {loading ? (
-              <ActivityIndicator color="#000000" />
+              <ActivityIndicator color={primaryContrast} />
             ) : (
               <Text
                 style={[
                   styles.submitButtonText,
-                  { color: isFormValid ? '#000000' : MomentusColors.textSecondary },
+                  { color: isFormValid ? primaryContrast : theme.textSecondary },
                 ]}>
                 Criar Conta
               </Text>
@@ -342,7 +364,7 @@ export default function SignUpScreen() {
             style={styles.loginLinkButton}
             accessibilityRole="button"
             accessibilityLabel="Já tem uma conta? Faça login">
-            <Text style={styles.loginLinkText}>
+            <Text style={[styles.loginLinkText, { color: theme.textSecondary }]}>
               Já tem uma conta?{' '}
               <Text style={[styles.loginLinkHighlight, { color: primaryColor }]}>
                 Faça login

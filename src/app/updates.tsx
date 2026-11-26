@@ -147,6 +147,16 @@ export const CHANGELOG_DATA: VersionRelease[] = [
         actionRoute: '/settings',
         actionLabel: 'Ver Segurança',
       },
+      {
+        id: 'fix-stability-sync-light',
+        icon: 'checkmark-done-circle-outline',
+        tag: 'CORRECAO',
+        title: 'Mais estabilidade, sincronização fiel e Modo Claro nítido',
+        description:
+          'Corrigimos a abertura do Modo Foco no navegador, garantimos que rotinas vindas de modelos ou do início rápido permaneçam sempre salvas e melhoramos a leitura no Modo Claro ao criar conta ou recuperar senha.',
+        actionRoute: '/focus',
+        actionLabel: 'Abrir Modo Foco',
+      },
     ],
   },
   {

@@ -1,15 +1,26 @@
 import { Platform } from 'react-native';
 import type { LiveActivity } from 'expo-widgets';
-import {
-  MOMENTUS_FOCUS_LIVE_ACTIVITY_NAME,
-  getMomentusFocusLiveActivity,
-  type FocusLiveActivityProps,
-} from '@/widgets/MomentusFocusLiveActivity';
+import type { FocusLiveActivityProps } from '@/widgets/MomentusFocusLiveActivity';
 import {
   presentPersistentFocusNotification,
   dismissPersistentFocusNotification,
   subscribeToFocusLiveNotificationActions,
 } from '@/services/notificationService';
+
+type FocusLiveActivityModule = typeof import('@/widgets/MomentusFocusLiveActivity');
+
+const IOS_FOCUS_LIVE_ACTIVITY_NAME = 'MomentusFocusLiveActivity';
+
+function loadIosFocusLiveActivityModule(): FocusLiveActivityModule | null {
+  if (Platform.OS !== 'ios') return null;
+  try {
+    // Carregamento lazy exclusivo para iOS para evitar avaliação de @expo/ui/swift-ui na Web/Android
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require('@/widgets/MomentusFocusLiveActivity') as FocusLiveActivityModule;
+  } catch {
+    return null;
+  }
+}
 
 export interface FocusLiveSyncState {
   mode: 'FOCUS' | 'SHORT_BREAK' | 'LONG_BREAK';
@@ -83,7 +94,8 @@ export async function syncFocusLiveActivity(
 
   // 2. iOS: Live Activity & Dynamic Island (ActivityKit via expo-widgets)
   if (Platform.OS === 'ios') {
-    const factory = getMomentusFocusLiveActivity();
+    const iosMod = loadIosFocusLiveActivityModule();
+    const factory = iosMod?.getMomentusFocusLiveActivity();
     if (!factory) return;
 
     const props: FocusLiveActivityProps = {
@@ -171,7 +183,8 @@ export async function endFocusLiveActivity(): Promise<void> {
         await activeIosActivity.end('immediate');
         activeIosActivity = null;
       }
-      const factory = getMomentusFocusLiveActivity();
+      const iosMod = loadIosFocusLiveActivityModule();
+      const factory = iosMod?.getMomentusFocusLiveActivity();
       if (factory) {
         const instances = factory.getInstances();
         await Promise.all(instances.map((inst) => inst.end('immediate').catch(() => {})));
@@ -200,8 +213,11 @@ export function subscribeToFocusLiveActions(handlers: {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { addUserInteractionListener } = require('expo-widgets') as typeof import('expo-widgets');
+      const activityName =
+        loadIosFocusLiveActivityModule()?.MOMENTUS_FOCUS_LIVE_ACTIVITY_NAME ??
+        IOS_FOCUS_LIVE_ACTIVITY_NAME;
       const sub = addUserInteractionListener((event) => {
-        if (event.source !== MOMENTUS_FOCUS_LIVE_ACTIVITY_NAME) return;
+        if (event.source !== activityName) return;
         if (event.target === 'focus_pause') {
           handlers.onPause();
         } else if (event.target === 'focus_resume') {

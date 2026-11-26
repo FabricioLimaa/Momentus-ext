@@ -93,6 +93,10 @@ export const ZenBreathModal: React.FC<ZenBreathModalProps> = ({
 
   const phaseAnimRef = useRef<Animated.CompositeAnimation | null>(null);
   const triggerHapticRef = useRef(triggerHaptic);
+  const breathStateRef = useRef({
+    phaseIndex: 0,
+    secondsLeft: BREATH_PHASES[0].durationSec,
+  });
 
   useEffect(() => {
     triggerHapticRef.current = triggerHaptic;
@@ -101,6 +105,10 @@ export const ZenBreathModal: React.FC<ZenBreathModalProps> = ({
   // Reinicia ciclo limpo ao abrir o modal
   useEffect(() => {
     if (visible) {
+      breathStateRef.current = {
+        phaseIndex: 0,
+        secondsLeft: BREATH_PHASES[0].durationSec,
+      };
       setIsBreathingActive(true);
       setPhaseIndex(0);
       setPhaseSecondsLeft(BREATH_PHASES[0].durationSec);
@@ -260,25 +268,28 @@ export const ZenBreathModal: React.FC<ZenBreathModalProps> = ({
     useNative,
   ]);
 
-  // Contador regressivo segundo a segundo de cada fase 4-7-8
+  // Contador regressivo segundo a segundo de cada fase 4-7-8 (setStates 100% puros)
   useEffect(() => {
     if (!visible || !isBreathingActive) return;
 
     const interval = setInterval(() => {
-      setPhaseSecondsLeft((prev) => {
-        if (prev > 1) return prev - 1;
+      const curr = breathStateRef.current;
+      if (curr.secondsLeft > 1) {
+        curr.secondsLeft -= 1;
+        setPhaseSecondsLeft(curr.secondsLeft);
+        return;
+      }
 
-        setPhaseIndex((currIdx) => {
-          const nextIdx = (currIdx + 1) % BREATH_PHASES.length;
-          if (nextIdx === 0) {
-            setCompletedCycles((c) => c + 1);
-          }
-          setPhaseSecondsLeft(BREATH_PHASES[nextIdx].durationSec);
-          return nextIdx;
-        });
+      const nextIdx = (curr.phaseIndex + 1) % BREATH_PHASES.length;
+      const nextDuration = BREATH_PHASES[nextIdx].durationSec;
+      curr.phaseIndex = nextIdx;
+      curr.secondsLeft = nextDuration;
 
-        return prev;
-      });
+      setPhaseIndex(nextIdx);
+      setPhaseSecondsLeft(nextDuration);
+      if (nextIdx === 0) {
+        setCompletedCycles((c) => c + 1);
+      }
     }, 1000);
 
     return () => clearInterval(interval);

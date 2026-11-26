@@ -10,6 +10,7 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  StatusBar,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,6 +22,7 @@ import {
   BorderRadiusTokens,
   ComponentHeightTokens,
   TypographyTokens,
+  getContrastTextColor,
 } from '@/constants/theme';
 import { useMomentus } from '@/context/MomentusContext';
 import { sendPasswordReset, getFriendlyAuthErrorMessage } from '@/services/authService';
@@ -28,13 +30,22 @@ import { sendPasswordReset, getFriendlyAuthErrorMessage } from '@/services/authS
 export default function ForgotPasswordScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ email?: string }>();
-  const { settings } = useMomentus();
+  const { settings, theme } = useMomentus();
 
   const [email, setEmail] = useState(params.email || '');
   const [loading, setLoading] = useState(false);
 
   const primaryColor = settings.primaryColorHex || MomentusColors.emeraldNeon;
+  const primaryContrast = getContrastTextColor(primaryColor);
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+
+  const handleGoBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/');
+    }
+  };
 
   const handleSendResetLink = async () => {
     if (!isEmailValid) {
@@ -52,7 +63,7 @@ export default function ForgotPasswordScreen() {
         [
           {
             text: 'OK',
-            onPress: () => router.back(),
+            onPress: handleGoBack,
           },
         ]
       );
@@ -64,19 +75,23 @@ export default function ForgotPasswordScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: theme.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <StatusBar
+        barStyle={theme.isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={theme.background}
+      />
       {/* Top Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+      <View style={[styles.header, { paddingTop: insets.top + SpacingTokens.sm }]}>
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={handleGoBack}
           style={styles.backButton}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityRole="button"
           accessibilityLabel="Voltar">
-          <Ionicons name="arrow-back" size={24} color={MomentusColors.textPrimary} />
+          <Ionicons name="arrow-back" size={24} color={theme.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Recuperar Senha</Text>
+        <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Recuperar Senha</Text>
         <View style={styles.placeholder} />
       </View>
 
@@ -92,19 +107,23 @@ export default function ForgotPasswordScreen() {
           <Ionicons name="mail" size={44} color={primaryColor} />
         </View>
 
-        <Text style={styles.title}>Esqueceu sua senha?</Text>
-        <Text style={styles.description}>
+        <Text style={[styles.title, { color: theme.textPrimary }]}>Esqueceu sua senha?</Text>
+        <Text style={[styles.description, { color: theme.textSecondary }]}>
           Insira seu e-mail abaixo e enviaremos um link para você redefinir sua senha com segurança.
         </Text>
 
         <View style={styles.formContainer}>
           <View style={styles.inputBlock}>
-            <View style={styles.inputWrapper}>
+            <View
+              style={[
+                styles.inputWrapper,
+                { backgroundColor: theme.surface, borderColor: theme.outline },
+              ]}>
               <Ionicons name="mail-outline" size={20} color={primaryColor} style={styles.inputIcon} />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: theme.textPrimary }]}
                 placeholder="E-mail cadastrado"
-                placeholderTextColor={MomentusColors.textSecondary}
+                placeholderTextColor={theme.textSecondary}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoComplete="email"
@@ -125,7 +144,7 @@ export default function ForgotPasswordScreen() {
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   accessibilityRole="button"
                   accessibilityLabel="Limpar e-mail">
-                  <Ionicons name="close-circle" size={18} color={`${MomentusColors.textSecondary}80`} />
+                  <Ionicons name="close-circle" size={18} color={`${theme.textSecondary}99`} />
                 </TouchableOpacity>
               )}
             </View>
@@ -141,18 +160,18 @@ export default function ForgotPasswordScreen() {
             style={[
               styles.submitButton,
               {
-                backgroundColor: isEmailValid ? primaryColor : MomentusColors.navyOutline,
+                backgroundColor: isEmailValid ? primaryColor : theme.outline,
               },
             ]}
             accessibilityRole="button"
             accessibilityLabel="Enviar link de recuperação">
             {loading ? (
-              <ActivityIndicator color="#000000" />
+              <ActivityIndicator color={primaryContrast} />
             ) : (
               <Text
                 style={[
                   styles.submitButtonText,
-                  { color: isEmailValid ? '#000000' : MomentusColors.textSecondary },
+                  { color: isEmailValid ? primaryContrast : theme.textSecondary },
                 ]}>
                 Enviar Link
               </Text>
