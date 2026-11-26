@@ -44,9 +44,8 @@ export async function saveSecureSession(data: SavedSessionData): Promise<void> {
       // Garante remoção de qualquer resquício legado em texto claro no AsyncStorage
       await AsyncStorage.removeItem(SECURE_KEY_USER).catch(() => {});
     } else if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
-      if (token) {
-        window.localStorage.setItem(SECURE_KEY_TOKEN, token);
-      }
+      // Na Web nunca duplica o JWT cru no localStorage (o Firebase Auth Web gerencia credenciais no IndexedDB)
+      window.localStorage.removeItem(SECURE_KEY_TOKEN);
       window.localStorage.setItem(SECURE_KEY_USER, userPayload);
     } else {
       // Fallback extremo apenas se o ambiente nativo não possuir SecureStore

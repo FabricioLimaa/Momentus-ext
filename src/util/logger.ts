@@ -57,10 +57,23 @@ const WEB_LEVEL_STYLES: Record<LogLevel, string> = {
 
 class MomentusLogger {
   private config: LoggerConfig = {
-    minLevel: __DEV__ ? 'DEBUG' : 'INFO',
+    minLevel: __DEV__ ? 'DEBUG' : 'WARN',
     enabled: true,
     useColors: Platform.OS !== 'web',
   };
+
+  private redactString(text: string): string {
+    if (__DEV__) return text;
+    return text
+      .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[email-redacted]')
+      .replace(/\beyJ[A-Za-z0-9_-]{12,}\.[A-Za-z0-9_-]{12,}\.[A-Za-z0-9_-]{12,}\b/g, '[token-redacted]');
+  }
+
+  private sanitizeParam(param: any): any {
+    if (__DEV__) return param;
+    if (typeof param === 'string') return this.redactString(param);
+    return param;
+  }
 
   public setMinLevel(level: LogLevel) {
     this.config.minLevel = level;
@@ -116,11 +129,13 @@ class MomentusLogger {
   public log(level: LogLevel, tag: LogTag, message: string, ...optionalParams: any[]) {
     if (!this.shouldLog(level)) return;
 
-    const { formatted, prefixStyles } = this.formatMessage(level, tag, message);
+    const safeMessage = this.redactString(message);
+    const safeParams = optionalParams.map((p) => this.sanitizeParam(p));
+    const { formatted, prefixStyles } = this.formatMessage(level, tag, safeMessage);
     const args =
       prefixStyles && prefixStyles.length > 0
-        ? [formatted, ...prefixStyles, ...optionalParams]
-        : [formatted, ...optionalParams];
+        ? [formatted, ...prefixStyles, ...safeParams]
+        : [formatted, ...safeParams];
 
     switch (level) {
       case 'DEBUG':

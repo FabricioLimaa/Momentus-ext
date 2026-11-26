@@ -264,13 +264,18 @@ export async function startVoiceCapture(
       })
     );
 
-    nativeMod.start({
-      lang: 'pt-BR',
-      interimResults: true,
-      maxAlternatives: 1,
-      continuous: false,
-      contextualStrings: contextualStrings.slice(0, 15),
-    });
+    try {
+      nativeMod.start({
+        lang: 'pt-BR',
+        interimResults: true,
+        maxAlternatives: 1,
+        continuous: false,
+        contextualStrings: contextualStrings.slice(0, 15),
+      });
+    } catch (startErr) {
+      cleanup();
+      throw startErr;
+    }
 
     return {
       started: true,

@@ -117,7 +117,13 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
     }
   }, [visible]);
 
+  const categoriesRef = useRef(categories);
   useEffect(() => {
+    categoriesRef.current = categories;
+  }, [categories]);
+
+  useEffect(() => {
+    if (!visible) return;
     setVoiceTranscript('');
     setVoiceFeedback(null);
     setVoiceError(null);
@@ -137,15 +143,19 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
       setDescription('');
       setTargetDate(initialDate || selectedDate || getTodayDateString());
       const now = new Date();
-      const h = String(now.getHours()).padStart(2, '0');
-      const nextH = String((now.getHours() + 1) % 24).padStart(2, '0');
+      const hourNum = now.getHours();
+      const h = String(hourNum).padStart(2, '0');
+      // Às 23h evita 23:00 -> 00:00 (que ativa isTimeInvalid e bloqueia o botão Salvar)
+      const endTimeStr =
+        hourNum >= 23 ? '23:55' : `${String(hourNum + 1).padStart(2, '0')}:00`;
       setTimeStart(`${h}:00`);
-      setTimeEnd(`${nextH}:00`);
-      const defaultCat = categories.find((c) => c.name.toLowerCase() === 'outros') || categories[0];
+      setTimeEnd(endTimeStr);
+      const currentCats = categoriesRef.current;
+      const defaultCat = currentCats.find((c) => c.name.toLowerCase() === 'outros') || currentCats[0];
       setSelectedCategoryId(defaultCat?.id || 'cat-outros');
       setSaveToGoogle(settings.googleCalendarSyncEnabled ?? true);
     }
-  }, [habitToEdit, visible, categories, settings.googleCalendarSyncEnabled, initialDate, selectedDate]);
+  }, [habitToEdit, visible, settings.googleCalendarSyncEnabled, initialDate, selectedDate]);
 
   const applyParsedVoicePhrase = (phrase: string) => {
     const parsed = parseVoiceHabitCommand(phrase, categories);
@@ -297,7 +307,7 @@ export const NewHabitModal: React.FC<NewHabitModalProps> = ({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.overlay}>

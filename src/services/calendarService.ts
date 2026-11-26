@@ -365,11 +365,19 @@ export async function fetchGoogleCalendarEvents(
     const token = await getGoogleCalendarAccessToken();
     if (!token) return [];
     try {
-      const minDate = targetDate
-        ? new Date(`${targetDate}T00:00:00Z`).toISOString()
-        : new Date().toISOString();
+      let startLocal: Date;
+      if (targetDate && /^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
+        const [y, m, d] = targetDate.split('-').map(Number);
+        startLocal = new Date(y, m - 1, d, 0, 0, 0, 0);
+      } else {
+        const now = new Date();
+        startLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      }
+      const endLocal = new Date(startLocal.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const minDate = startLocal.toISOString();
+      const maxDate = endLocal.toISOString();
       const res = await fetch(
-        `https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&orderBy=startTime&timeMin=${encodeURIComponent(minDate)}&maxResults=20`,
+        `https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&orderBy=startTime&timeMin=${encodeURIComponent(minDate)}&timeMax=${encodeURIComponent(maxDate)}&maxResults=50`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -618,7 +626,50 @@ export async function syncAllHabitsToCalendar(
 ): Promise<{ syncedCount: number; updatedHabits: HabitItem[] }> {
   const categoryMap = new Map<string, Category>(categories.map((c) => [c.id, c]));
 
-  if (Platform.OS !== 'web') {
+  if (Platform.OS === 'web') {
+    const token = await getGoogleCalendarAccessToken();
+    if (!token && typeof document !== 'undefined') {
+      const exportable = habits.filter((h) => h.saveToGoogle || !h.completed);
+      if (exportable.length === 0) {
+        return { syncedCount: 0, updatedHabits: habits };
+      }
+      const escapeIcs = (str: string) =>
+        str.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+      const toIcsDate = (dateStr: string, timeStr: string) => {
+        const cleanDate = dateStr.replace(/-/g, '');
+        const [hh = '08', mm = '00'] = (timeStr || '08:00').split(':');
+        return `${cleanDate}T${hh.padStart(2, '0')}${mm.padStart(2, '0')}00`;
+      };
+      const lines = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//Momentus//Rotinas//PT-BR',
+      ];
+      exportable.forEach((h) => {
+        const catName = categoryMap.get(h.categoryId)?.name || 'Momentus';
+        lines.push(
+          'BEGIN:VEVENT',
+          `UID:${h.id}@momentus.app.br`,
+          `DTSTART:${toIcsDate(h.date, h.timeStart)}`,
+          `DTEND:${toIcsDate(h.date, h.timeEnd || h.timeStart)}`,
+          `SUMMARY:${escapeIcs(h.title)}`,
+          `DESCRIPTION:${escapeIcs(h.description || `Rotina Momentus • ${catName}`)}`,
+          'END:VEVENT'
+        );
+      });
+      lines.push('END:VCALENDAR');
+      const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'momentus_rotinas.ics';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      return { syncedCount: exportable.length, updatedHabits: habits };
+    }
+  } else {
     const hasPermission = await requestDeviceCalendarPermissions();
     if (!hasPermission) {
       return { syncedCount: 0, updatedHabits: habits };

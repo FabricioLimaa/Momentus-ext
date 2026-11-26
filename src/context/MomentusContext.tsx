@@ -766,21 +766,22 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
   }, [resetLocalAccountState]);
 
-  // Persistência contínua: grava no SQLite e mantém AsyncStorage sincronizado
+  // Persistência contínua com debounce (400ms): evita write amplification em mudanças rápidas
   useEffect(() => {
     if (!isLoaded || isLoggingOutRef.current) return;
-    async function saveState() {
+    const timer = setTimeout(async () => {
+      if (isLoggingOutRef.current) return;
       try {
-        // Grava no SQLite
-        await setAllCategoriesDb(categories);
-        await setAllHabitsDb(habits);
-        await setAllTemplatesDb(templates);
-        await setAllAchievementsDb(achievements);
-        await setAllMarketItemsDb(marketItems);
-        await setAppKv('user_profile', userProfile);
-        await setAppKv('app_settings', settings);
+        await Promise.all([
+          setAllCategoriesDb(categories),
+          setAllHabitsDb(habits),
+          setAllTemplatesDb(templates),
+          setAllAchievementsDb(achievements),
+          setAllMarketItemsDb(marketItems),
+          setAppKv('user_profile', userProfile),
+          setAppKv('app_settings', settings),
+        ]);
 
-        // Mantém backup de contingência no AsyncStorage
         const data = {
           habits,
           categories,
@@ -794,11 +795,15 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       } catch (e) {
         MomentusLog.db.warn('Erro ao persistir dados do Momentus:', e);
       }
-    }
-    saveState();
+    }, 400);
+
+    return () => clearTimeout(timer);
   }, [habits, categories, templates, achievements, marketItems, userProfile, settings, isLoaded]);
 
-  const userLevel = calculateUserLevel(userProfile.totalPoints);
+  const userLevel = useMemo(
+    () => calculateUserLevel(userProfile.totalPoints),
+    [userProfile.totalPoints]
+  );
 
   useEffect(() => {
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -1110,6 +1115,38 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     const isEarly = !!(targetHabit.timeStart && parseInt(targetHabit.timeStart.split(':')[0] || '12', 10) < 8);
     const allTimeFocus = Object.values(focusHistoryMapRef.current).reduce((a, b) => a + b, 0);
+
+    // Avalia se alguma categoria com meta semanal (metaMinutosSemanal) foi atingida nos últimos 7 dias (GOAL_MASTER)
+    let hasCompletedCategoryGoal = false;
+    if (nextCompleted) {
+      const targetCat = categoriesRef.current.find((c) => c.id === targetHabit.categoryId);
+      if (targetCat?.metaMinutosSemanal && targetCat.metaMinutosSemanal > 0) {
+        const nowDate = new Date();
+        const weekAgo = new Date(nowDate);
+        weekAgo.setDate(nowDate.getDate() - 6);
+        weekAgo.setHours(0, 0, 0, 0);
+        let weeklyCatMins = 0;
+        updated.forEach((h) => {
+          if (!h.completed || h.categoryId !== targetCat.id || !h.date) return;
+          const [y, m, d] = h.date.split('-').map(Number);
+          const hd = new Date(y, m - 1, d);
+          if (hd >= weekAgo && hd <= nowDate) {
+            let dur = 30;
+            if (h.timeStart && h.timeEnd) {
+              const [sH, sM] = h.timeStart.split(':').map((v) => parseInt(v, 10) || 0);
+              const [eH, eM] = h.timeEnd.split(':').map((v) => parseInt(v, 10) || 0);
+              const diff = eH * 60 + eM - (sH * 60 + sM);
+              if (diff > 0) dur = diff;
+            }
+            weeklyCatMins += dur;
+          }
+        });
+        if (weeklyCatMins >= targetCat.metaMinutosSemanal) {
+          hasCompletedCategoryGoal = true;
+        }
+      }
+    }
+
     checkAndUnlockAchievements(
       nextStreak,
       nextTotalHabitsCompleted,
@@ -1117,7 +1154,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       allTimeFocus,
       isEarly && nextCompleted,
       isDayFullyComplete,
-      false
+      hasCompletedCategoryGoal
     );
 
     upsertHabitDb(updatedTargetHabit).catch(() => {});
@@ -1791,28 +1828,46 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }));
     setMarketItems(resetMarket);
     // 7. Zera pontuação e estatísticas preservando a sessão de autenticação se houver
-    setUserProfile((prev) => ({
+    const resetProfile: UserProfile = {
       ...INITIAL_USER_PROFILE,
-      name: prev.name,
-      email: prev.email,
-      photoUrl: prev.photoUrl,
-      isLoggedIn: prev.isLoggedIn,
+      name: userProfileRef.current.name,
+      email: userProfileRef.current.email,
+      photoUrl: userProfileRef.current.photoUrl,
+      isLoggedIn: userProfileRef.current.isLoggedIn,
       totalPoints: 0,
       currentStreak: 0,
       bestStreak: 0,
       totalCompleted: 0,
       focusMinutesToday: 0,
-    }));
+    };
+    habitsRef.current = [];
+    categoriesRef.current = INITIAL_CATEGORIES;
+    templatesRef.current = [];
+    achievementsRef.current = resetAchievements;
+    marketItemsRef.current = resetMarket;
+    userProfileRef.current = resetProfile;
+    settingsRef.current = INITIAL_SETTINGS;
+    focusHistoryMapRef.current = {};
+
+    setUserProfile(resetProfile);
     setSettings(INITIAL_SETTINGS);
     setFocusHistoryMap({});
-    setAppKv('focus_history_map', {}).catch(() => {});
-    AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
-    clearEntireDatabase().catch(() => {});
-    // 8. Grava a base inicial limpa no banco local SQLite
-    setAllCategoriesDb(INITIAL_CATEGORIES).catch(() => {});
-    setAllTemplatesDb([]).catch(() => {});
-    setAllMarketItemsDb(resetMarket).catch(() => {});
-    setAllAchievementsDb(resetAchievements).catch(() => {});
+    // 8. Aguarda limpeza total antes de gravar a base inicial limpa no banco local (evita race condition)
+    AsyncStorage.removeItem(STORAGE_KEY)
+      .catch(() => {})
+      .then(() => clearEntireDatabase())
+      .then(() =>
+        Promise.all([
+          setAppKv('focus_history_map', {}),
+          setAppKv('user_profile', resetProfile),
+          setAppKv('app_settings', INITIAL_SETTINGS),
+          setAllCategoriesDb(INITIAL_CATEGORIES),
+          setAllTemplatesDb([]),
+          setAllMarketItemsDb(resetMarket),
+          setAllAchievementsDb(resetAchievements),
+        ])
+      )
+      .catch(() => {});
     triggerHaptic('impact');
   };
 
@@ -1864,17 +1919,23 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const exportBackupAction = async (): Promise<boolean> => {
     const backupTimestamp = formatBackupTimestamp();
-    const updatedSettings = { ...settings, lastBackupAt: backupTimestamp };
-    setSettings(updatedSettings);
-    return exportMomentusBackup({
-      habits,
-      categories,
-      templates,
-      achievements,
-      marketItems,
-      userProfile,
-      settings: updatedSettings,
+    const candidateSettings = { ...settingsRef.current, lastBackupAt: backupTimestamp };
+    const exported = await exportMomentusBackup({
+      habits: habitsRef.current,
+      categories: categoriesRef.current,
+      templates: templatesRef.current,
+      achievements: achievementsRef.current,
+      marketItems: marketItemsRef.current,
+      userProfile: userProfileRef.current,
+      settings: candidateSettings,
+      focusHistoryMap: focusHistoryMapRef.current,
     });
+    if (exported) {
+      settingsRef.current = candidateSettings;
+      setSettings(candidateSettings);
+      await setAppKv('app_settings', candidateSettings).catch(() => {});
+    }
+    return exported;
   };
 
   const importBackupAction = async (): Promise<boolean> => {
@@ -1886,23 +1947,35 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       ...(data.settings || INITIAL_SETTINGS),
       lastBackupAt: backupTimestamp,
     };
+    const nextFocusHistory = data.focusHistoryMap || {};
 
-    setHabits(data.habits || []);
-    setCategories(data.categories || INITIAL_CATEGORIES);
-    setTemplates(data.templates || INITIAL_TEMPLATES);
-    setAchievements(data.achievements || INITIAL_ACHIEVEMENTS);
-    setMarketItems(data.marketItems || INITIAL_MARKET_ITEMS);
-    setUserProfile(data.userProfile || INITIAL_USER_PROFILE);
+    habitsRef.current = data.habits || [];
+    categoriesRef.current = data.categories || INITIAL_CATEGORIES;
+    templatesRef.current = data.templates || INITIAL_TEMPLATES;
+    achievementsRef.current = data.achievements || INITIAL_ACHIEVEMENTS;
+    marketItemsRef.current = data.marketItems || INITIAL_MARKET_ITEMS;
+    userProfileRef.current = data.userProfile || INITIAL_USER_PROFILE;
+    settingsRef.current = nextSettings;
+    focusHistoryMapRef.current = nextFocusHistory;
+
+    setHabits(habitsRef.current);
+    setCategories(categoriesRef.current);
+    setTemplates(templatesRef.current);
+    setAchievements(achievementsRef.current);
+    setMarketItems(marketItemsRef.current);
+    setUserProfile(userProfileRef.current);
     setSettings(nextSettings);
+    setFocusHistoryMap(nextFocusHistory);
 
     // Persiste imediatamente no SQLite e AsyncStorage
-    await setAllCategoriesDb(data.categories || INITIAL_CATEGORIES);
-    await setAllHabitsDb(data.habits || []);
-    await setAllTemplatesDb(data.templates || INITIAL_TEMPLATES);
-    await setAllAchievementsDb(data.achievements || INITIAL_ACHIEVEMENTS);
-    await setAllMarketItemsDb(data.marketItems || INITIAL_MARKET_ITEMS);
-    await setAppKv('user_profile', data.userProfile || INITIAL_USER_PROFILE);
+    await setAllCategoriesDb(categoriesRef.current);
+    await setAllHabitsDb(habitsRef.current);
+    await setAllTemplatesDb(templatesRef.current);
+    await setAllAchievementsDb(achievementsRef.current);
+    await setAllMarketItemsDb(marketItemsRef.current);
+    await setAppKv('user_profile', userProfileRef.current);
     await setAppKv('app_settings', nextSettings);
+    await setAppKv('focus_history_map', nextFocusHistory);
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ ...data, settings: nextSettings }));
 
     // Reagenda notificações para os novos hábitos importados
@@ -2229,11 +2302,11 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     syncCloudActionRef.current = syncCloudAction;
   });
 
-  // Escuta interações com notificações (botões "Concluir" e "Adiar 15 min" ou toque para abrir ReminderModal)
+  // Escuta interações com notificações (registrado uma única vez usando habitsRef para evitar re-inscrições)
   useEffect(() => {
     return subscribeToHabitNotificationResponses({
       onMarkCompleted: (habitId) => {
-        const target = habits.find((h) => h.id === habitId);
+        const target = habitsRef.current.find((h) => h.id === habitId);
         if (target && !target.completed) {
           toggleHabitRef.current(habitId);
         }
@@ -2249,7 +2322,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         });
       },
     });
-  }, [habits]);
+  }, []);
 
   // Sincroniza estado diário (próximas rotinas, streak e progresso) com Widgets Nativos (Android & iOS)
   useEffect(() => {

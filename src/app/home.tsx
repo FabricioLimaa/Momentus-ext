@@ -46,12 +46,22 @@ export default function HomeScreen() {
     categories,
     userProfile,
     userLevel,
+    focusHistoryMap,
     theme,
     isLoaded,
     toggleHabit,
     deleteHabit,
     deleteMultipleHabits,
   } = useMomentus();
+
+  const totalFocusMinutesAllTime = useMemo(
+    () =>
+      Math.max(
+        userProfile.focusMinutesToday || 0,
+        Object.values(focusHistoryMap || {}).reduce((acc, m) => acc + (m > 0 ? m : 0), 0)
+      ),
+    [focusHistoryMap, userProfile.focusMinutesToday]
+  );
 
   const { isLargeScreen } = useResponsiveLayout();
 
@@ -633,7 +643,7 @@ export default function HomeScreen() {
                 size={42}
                 frameId={userProfile.selectedAvatarFrame}
                 userLevel={userLevel}
-                totalFocusMinutes={userProfile.focusMinutesToday || 0}
+                totalFocusMinutes={totalFocusMinutesAllTime}
                 currentStreak={userProfile.currentStreak}
                 bestStreak={userProfile.bestStreak}
               />
@@ -798,7 +808,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: MomentusColors.navyBackground,
-    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
   container: {
     flex: 1,

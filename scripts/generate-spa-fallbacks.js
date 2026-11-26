@@ -13,6 +13,7 @@ const indexHtml = fs.readFileSync(indexPath, 'utf-8');
 
 // Lista de rotas do Expo Router que podem ser requisitadas diretamente pelo navegador
 const routes = [
+  'home',
   'login',
   'calendar',
   'focus',

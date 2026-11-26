@@ -282,9 +282,17 @@ export function computeProductivityInsight(
     return { ...periodResult, usedFullHistoryFallback: false };
   }
 
-  // Fallback suave para o histórico completo caso o filtro curto ainda tenha poucos dados
-  const allFocusEntries = Object.entries(focusHistoryMap).filter(([, mins]) => mins > 0);
-  const fullHistoryResult = analyzeDataset(habits, allFocusEntries);
+  // Fallback suave para o histórico completo (excluindo datas futuras) caso o filtro curto ainda tenha poucos dados
+  const pastOrTodayHabits = habits.filter((h) => {
+    const d = parseDateLocal(h.date);
+    return d !== null && d <= now;
+  });
+  const allFocusEntries = Object.entries(focusHistoryMap).filter(([dateStr, mins]) => {
+    if (mins <= 0) return false;
+    const d = parseDateLocal(dateStr);
+    return d !== null && d <= now;
+  });
+  const fullHistoryResult = analyzeDataset(pastOrTodayHabits, allFocusEntries);
   if (fullHistoryResult) {
     return { ...fullHistoryResult, usedFullHistoryFallback: true };
   }

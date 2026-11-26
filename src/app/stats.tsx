@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Platform,
   StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -271,9 +270,15 @@ export default function StatsScreen() {
         });
 
         const metaMinutosSemanal = cat.metaMinutosSemanal || null;
-        const goalProgressRate = metaMinutosSemanal && metaMinutosSemanal > 0
-          ? Math.min(100, Math.round((completedMins / metaMinutosSemanal) * 100))
-          : 0;
+        const periodWeeks = filter === 'WEEK' ? 1 : filter === 'MONTH' ? 30 / 7 : 365 / 7;
+        const effectivePeriodGoal =
+          metaMinutosSemanal && metaMinutosSemanal > 0
+            ? Math.round(metaMinutosSemanal * periodWeeks)
+            : 0;
+        const goalProgressRate =
+          effectivePeriodGoal > 0
+            ? Math.min(100, Math.round((completedMins / effectivePeriodGoal) * 100))
+            : 0;
 
         return {
           id: cat.id,
@@ -314,12 +319,16 @@ export default function StatsScreen() {
         periodFocusMinutes += (focusHistoryMap[dStr] || 0);
       }
     } else {
-      const currentYearStr = String(now.getFullYear());
-      Object.entries(focusHistoryMap).forEach(([dStr, mins]) => {
-        if (dStr.startsWith(currentYearStr)) {
-          periodFocusMinutes += mins;
-        }
-      });
+      // Alinha a janela de foco anual com os mesmos 365 dias corridos usados nos hábitos
+      for (let i = 364; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(now.getDate() - i);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const dayNum = String(d.getDate()).padStart(2, '0');
+        const dStr = `${y}-${m}-${dayNum}`;
+        periodFocusMinutes += (focusHistoryMap[dStr] || 0);
+      }
     }
 
     // Se hoje tem foco no userProfile e ainda não foi computado no map
@@ -410,6 +419,38 @@ export default function StatsScreen() {
     });
     const topCat = categories.find((c) => c.id === topCatId);
 
+    // Foco estritamente dos últimos 7 dias (independente do filtro ativo Mês/Ano)
+    let weekFocusMinutes = 0;
+    const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(now.getDate() - i);
+      const dStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      weekFocusMinutes += focusHistoryMap[dStr] || 0;
+    }
+    if ((focusHistoryMap[todayIso] || 0) === 0 && (userProfile?.focusMinutesToday || 0) > 0) {
+      weekFocusMinutes += userProfile.focusMinutesToday;
+    }
+    const weekFocusFormatted =
+      weekFocusMinutes >= 60
+        ? `${Math.floor(weekFocusMinutes / 60)}h ${weekFocusMinutes % 60 > 0 ? `${weekFocusMinutes % 60}m` : ''}`.trim()
+        : `${weekFocusMinutes} min`;
+
+    // Variação estritamente semanal (últimos 7 dias vs 7 dias anteriores)
+    const prevWeekStart = new Date(sevenDaysAgo);
+    prevWeekStart.setDate(sevenDaysAgo.getDate() - 7);
+    const prevWeekCompletedCount = habits.filter((h) => {
+      if (!h.completed) return false;
+      const d = parseHabitDate(h.date);
+      return d >= prevWeekStart && d < sevenDaysAgo;
+    }).length;
+    const weekImprovement =
+      prevWeekCompletedCount === 0
+        ? weekCompleted.length > 0
+          ? 100
+          : 0
+        : Math.round(((weekCompleted.length - prevWeekCompletedCount) / prevWeekCompletedCount) * 100);
+
     const totalDaysWithHabits = Math.max(1, Object.keys(habitsByDay).length);
     const dailyAverage = (weekCompleted.length / totalDaysWithHabits).toFixed(1);
 
@@ -417,12 +458,12 @@ export default function StatsScreen() {
       perfectDaysCount,
       totalDaysWithHabits,
       currentCount: weekCompleted.length,
-      focusFormatted: stats.focusFormatted,
+      focusFormatted: weekFocusFormatted,
       bestCategory: weekCompleted.length > 0 ? (topCat?.name || 'Geral') : '--',
-      improvement: stats.improvement,
+      improvement: weekImprovement,
       dailyAverage,
     };
-  }, [habits, categories, stats.focusFormatted, stats.improvement]);
+  }, [habits, categories, focusHistoryMap, userProfile]);
 
   const selectedBarItem = useMemo(() => {
     if (selectedBarIndex === null || !stats.chartBars[selectedBarIndex]) {
@@ -1136,6 +1177,10 @@ export default function StatsScreen() {
           stats={storiesStats}
           userProfile={userProfile}
           userLevel={userLevel}
+          totalFocusMinutes={Math.max(
+            userProfile?.focusMinutesToday || 0,
+            Object.values(focusHistoryMap || {}).reduce((acc, m) => acc + (m > 0 ? m : 0), 0)
+          )}
           primaryColor={theme.primary}
         />
       </View>
@@ -1146,7 +1191,6 @@ export default function StatsScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   container: {
     flex: 1,

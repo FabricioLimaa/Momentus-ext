@@ -1,4 +1,4 @@
-import {
+import type {
   Achievement,
   AppSettings,
   Category,
@@ -8,6 +8,8 @@ import {
   UserProfile,
 } from "@/types";
 import { Platform } from "react-native";
+import { getTodayDateString } from "@/constants/initialData";
+import { MomentusLog } from "@/util/logger";
 
 export interface MomentusBackupPayload {
   version: number;
@@ -21,6 +23,56 @@ export interface MomentusBackupPayload {
     marketItems: MarketItem[];
     userProfile: UserProfile;
     settings: AppSettings;
+    focusHistoryMap?: Record<string, number>;
+  };
+}
+
+/**
+ * Valida estrutura e campos essenciais do payload de backup para prevenir
+ * corrupção de estado em caso de arquivo adulterado ou incompatível.
+ */
+export function validateBackupPayload(raw: unknown): MomentusBackupPayload["data"] {
+  if (!raw || typeof raw !== "object") {
+    throw new Error("Arquivo de backup inválido.");
+  }
+  const payload = raw as Partial<MomentusBackupPayload>;
+  const data = payload.data;
+  if (!data || typeof data !== "object" || !Array.isArray(data.habits) || !Array.isArray(data.categories)) {
+    throw new Error("Estrutura de dados do backup incompatível.");
+  }
+
+  const validHabits = data.habits.filter(
+    (h): h is HabitItem =>
+      Boolean(h && typeof h === "object" && typeof h.id === "string" && typeof h.title === "string" && typeof h.date === "string")
+  );
+  const validCategories = data.categories.filter(
+    (c): c is Category =>
+      Boolean(c && typeof c === "object" && typeof c.id === "string" && typeof c.name === "string")
+  );
+  if (data.habits.length > 0 && validHabits.length === 0) {
+    throw new Error("Os hábitos do arquivo de backup estão corrompidos.");
+  }
+  if (data.categories.length > 0 && validCategories.length === 0) {
+    throw new Error("As categorias do arquivo de backup estão corrompidas.");
+  }
+
+  const validFocusHistory: Record<string, number> = {};
+  if (data.focusHistoryMap && typeof data.focusHistoryMap === "object") {
+    Object.entries(data.focusHistoryMap).forEach(([k, v]) => {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(k) && typeof v === "number" && Number.isFinite(v) && v >= 0) {
+        validFocusHistory[k] = v;
+      }
+    });
+  }
+
+  return {
+    ...data,
+    habits: validHabits,
+    categories: validCategories,
+    templates: Array.isArray(data.templates) ? data.templates : [],
+    achievements: Array.isArray(data.achievements) ? data.achievements : [],
+    marketItems: Array.isArray(data.marketItems) ? data.marketItems : [],
+    focusHistoryMap: validFocusHistory,
   };
 }
 
@@ -40,7 +92,7 @@ export async function exportMomentusBackup(
     };
 
     const jsonString = JSON.stringify(payload, null, 2);
-    const dateFormatted = new Date().toISOString().slice(0, 10);
+    const dateFormatted = getTodayDateString();
     const fileName = `momentus_backup_${dateFormatted}.json`;
 
     if (Platform.OS === "web" && typeof document !== "undefined") {
@@ -82,7 +134,7 @@ export async function exportMomentusBackup(
 
     return true;
   } catch (error) {
-    console.warn("Erro ao exportar backup:", error);
+    MomentusLog.db.warn("Erro ao exportar backup:", error);
     throw error;
   }
 }
@@ -108,16 +160,8 @@ export async function importMomentusBackup(): Promise<
                 return;
               }
               const text = await file.text();
-              const parsed = JSON.parse(text) as MomentusBackupPayload;
-              if (
-                !parsed?.data ||
-                !Array.isArray(parsed.data.habits) ||
-                !Array.isArray(parsed.data.categories)
-              ) {
-                reject(new Error("Estrutura de dados do backup incompatível."));
-                return;
-              }
-              resolve(parsed.data);
+              const parsed = JSON.parse(text);
+              resolve(validateBackupPayload(parsed));
             } catch (err) {
               reject(err);
             }
@@ -142,23 +186,9 @@ export async function importMomentusBackup(): Promise<
 
     const pickedFile = pickResult.result;
     const jsonContent = await pickedFile.json();
-
-    if (!jsonContent || typeof jsonContent !== "object") {
-      throw new Error("Arquivo de backup inválido.");
-    }
-
-    const payload = jsonContent as MomentusBackupPayload;
-    if (
-      !payload.data ||
-      !Array.isArray(payload.data.habits) ||
-      !Array.isArray(payload.data.categories)
-    ) {
-      throw new Error("Estrutura de dados do backup incompatível.");
-    }
-
-    return payload.data;
+    return validateBackupPayload(jsonContent);
   } catch (error) {
-    console.warn("Erro ao importar backup:", error);
+    MomentusLog.db.warn("Erro ao importar backup:", error);
     throw error;
   }
 }

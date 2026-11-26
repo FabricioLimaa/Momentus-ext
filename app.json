@@ -101,7 +101,7 @@
       [
         "expo-secure-store",
         {
-          "configureAndroidBackup": true,
+          "configureAndroidBackup": false,
           "faceIDPermission": "O Momentus utiliza o Face ID para proteger sua sessão e chaves criptográficas locais."
         }
       ],

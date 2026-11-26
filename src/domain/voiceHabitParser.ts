@@ -1,4 +1,4 @@
-import { Category } from '@/types';
+import type { Category } from '@/types';
 
 export interface ParsedVoiceHabit {
   rawTranscript: string;
@@ -176,7 +176,7 @@ export function parseVoiceHabitCommand(
   let explicitDurationMinutes: number | undefined;
   let parsedCategory: Category | undefined;
 
-  // 1. CATEGORIA EXPLÍCITA ("categoria Saúde", "na categoria Trabalho", "em Estudos")
+  // 1. CATEGORIA EXPLÍCITA ("categoria Saúde", "na categoria Trabalho", "em Saúde")
   const normalizedForCat = normalizeStr(working);
   const explicitCatMatch = normalizedForCat.match(
     /\b(?:na\s+)?(?:categoria|tag|grupo)\s+(?:de\s+|da\s+|do\s+)?([a-z0-9\s-]{2,28})/
@@ -184,31 +184,131 @@ export function parseVoiceHabitCommand(
 
   if (explicitCatMatch && explicitCatMatch.index !== undefined) {
     const candidatePhrase = explicitCatMatch[1].trim();
+    const firstWord = candidatePhrase.split(/\s+/)[0] || '';
     const matchedCat = categories.find((cat) => {
       const catNorm = normalizeStr(cat.name);
       return (
         candidatePhrase.startsWith(catNorm) ||
-        catNorm.startsWith(candidatePhrase.split(' ')[0]) ||
-        candidatePhrase.includes(catNorm)
+        (firstWord.length >= 2 && catNorm.startsWith(firstWord))
       );
     });
 
     if (matchedCat) {
       parsedCategory = matchedCat;
-      // Calcula o tamanho exato até o fim do nome da categoria dentro do match
       const catNorm = normalizeStr(matchedCat.name);
       const startIdx = explicitCatMatch.index;
       const phraseStartInMatch = explicitCatMatch[0].indexOf(candidatePhrase);
       const catPosInPhrase = candidatePhrase.indexOf(catNorm);
-      const cutLen =
-        catPosInPhrase >= 0
-          ? phraseStartInMatch + catPosInPhrase + catNorm.length
-          : explicitCatMatch[0].length;
+      // Nunca consome o restante da frase (data/horário) se o usuário falou abreviação (ex: "categoria sa amanhã às 18h")
+      const tokenLen = catPosInPhrase >= 0 ? catPosInPhrase + catNorm.length : firstWord.length;
+      const cutLen = phraseStartInMatch + tokenLen;
       working = stripRange(working, startIdx, startIdx + cutLen);
+    }
+  } else {
+    // Também reconhece "em <Categoria>" quando corresponde exatamente a uma categoria cadastrada
+    for (const cat of categories) {
+      const catNorm = normalizeStr(cat.name);
+      if (catNorm.length < 3) continue;
+      const escaped = catNorm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const emMatch = normalizedForCat.match(new RegExp(`\\bem\\s+${escaped}\\b`));
+      if (emMatch && emMatch.index !== undefined) {
+        parsedCategory = cat;
+        working = stripRange(working, emMatch.index, emMatch.index + emMatch[0].length);
+        break;
+      }
     }
   }
 
-  // 2. DURAÇÃO EXPLÍCITA ("por 45 minutos", "durante 1 hora", "de 30 min")
+  // 2. DATA (antes de horários para evitar que "dia 30/11" ou "dia 05" seja confundido com hora!)
+  const normDate = normalizeStr(working);
+  const baseDate = new Date(
+    referenceDate.getFullYear(),
+    referenceDate.getMonth(),
+    referenceDate.getDate()
+  );
+
+  const dayAfterMatch = normDate.match(/\b(?:para\s+)?depois\s+de\s+amanha\b/);
+  const tomorrowMatch = normDate.match(/\b(?:para\s+)?amanha\b/);
+  const todayMatch = normDate.match(/\b(?:para\s+)?hoje\b/);
+  const explicitDateMatch = normDate.match(
+    /\b(?:no\s+|para\s+)?(?:dia\s+)?(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/
+  );
+  const dayOnlyMatch = normDate.match(/\b(?:no\s+|para\s+)?dia\s+(\d{1,2})\b/);
+
+  if (dayAfterMatch && dayAfterMatch.index !== undefined) {
+    const target = new Date(baseDate);
+    target.setDate(target.getDate() + 2);
+    parsedDate = formatDateIso(target);
+    parsedDateLabel = 'Depois de amanhã';
+    working = stripRange(working, dayAfterMatch.index, dayAfterMatch.index + dayAfterMatch[0].length);
+  } else if (tomorrowMatch && tomorrowMatch.index !== undefined) {
+    const target = new Date(baseDate);
+    target.setDate(target.getDate() + 1);
+    parsedDate = formatDateIso(target);
+    parsedDateLabel = 'Amanhã';
+    working = stripRange(working, tomorrowMatch.index, tomorrowMatch.index + tomorrowMatch[0].length);
+  } else if (todayMatch && todayMatch.index !== undefined) {
+    parsedDate = formatDateIso(baseDate);
+    parsedDateLabel = 'Hoje';
+    working = stripRange(working, todayMatch.index, todayMatch.index + todayMatch[0].length);
+  } else if (explicitDateMatch && explicitDateMatch.index !== undefined) {
+    const d = parseInt(explicitDateMatch[1], 10);
+    const m = parseInt(explicitDateMatch[2], 10);
+    let y = explicitDateMatch[3] ? parseInt(explicitDateMatch[3], 10) : baseDate.getFullYear();
+    if (y < 100) y += 2000;
+    if (d >= 1 && d <= 31 && m >= 1 && m <= 12) {
+      const target = new Date(y, m - 1, d);
+      // Valida calendário real (rejeita 31/02 sem rollover silencioso)
+      if (target.getFullYear() === y && target.getMonth() === m - 1 && target.getDate() === d) {
+        parsedDate = formatDateIso(target);
+        parsedDateLabel = `${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}`;
+        working = stripRange(
+          working,
+          explicitDateMatch.index,
+          explicitDateMatch.index + explicitDateMatch[0].length
+        );
+      }
+    }
+  } else if (dayOnlyMatch && dayOnlyMatch.index !== undefined) {
+    const d = parseInt(dayOnlyMatch[1], 10);
+    if (d >= 1 && d <= 31) {
+      // Avança mês a mês até encontrar a próxima data válida com exatamente o dia d (evita rollover 30/Fev -> 02/Mar)
+      let foundTarget: Date | null = null;
+      for (let monthOffset = 0; monthOffset <= 12; monthOffset++) {
+        const candidate = new Date(baseDate.getFullYear(), baseDate.getMonth() + monthOffset, d);
+        if (candidate.getDate() === d && candidate >= baseDate) {
+          foundTarget = candidate;
+          break;
+        }
+      }
+      if (foundTarget) {
+        parsedDate = formatDateIso(foundTarget);
+        parsedDateLabel = `${String(foundTarget.getDate()).padStart(2, '0')}/${String(
+          foundTarget.getMonth() + 1
+        ).padStart(2, '0')}`;
+        working = stripRange(working, dayOnlyMatch.index, dayOnlyMatch.index + dayOnlyMatch[0].length);
+      }
+    }
+  } else {
+    // Verifica dias da semana ("na sexta-feira", "próxima segunda", "sábado")
+    for (const wd of WEEKDAY_MAP) {
+      const pattern = new RegExp(
+        `\\b(?:na\\s+|no\\s+|para\\s+|proxima\\s+|proximo\\s+)?(?:${wd.keys.join('|')})\\b`
+      );
+      const wdMatch = normDate.match(pattern);
+      if (wdMatch && wdMatch.index !== undefined) {
+        const diff = (wd.dayIndex - baseDate.getDay() + 7) % 7 || 7;
+        const target = new Date(baseDate);
+        target.setDate(target.getDate() + diff);
+        parsedDate = formatDateIso(target);
+        parsedDateLabel = wd.label;
+        working = stripRange(working, wdMatch.index, wdMatch.index + wdMatch[0].length);
+        break;
+      }
+    }
+  }
+
+  // 3. DURAÇÃO EXPLÍCITA ("por 45 minutos", "durante 1 hora", "Estudar 2h às 19h", "Estudar 1h")
   const normDur = normalizeStr(working);
   const durationMatch = normDur.match(
     /\b(?:por|durante)\s+(\d{1,3})\s*(h|hora|horas|min|minuto|minutos|m)\b/
@@ -220,12 +320,49 @@ export function parseVoiceHabitCommand(
       explicitDurationMinutes = unit.startsWith('h') ? qty * 60 : qty;
       working = stripRange(working, durationMatch.index, durationMatch.index + durationMatch[0].length);
     }
+  } else {
+    // Duração implícita seguida de horário explícito (ex.: "Estudar 2h às 19h")
+    const durBeforeTimeMatch = normDur.match(
+      /(?<!\b(?:das|da|de|as|a|pelas)\s)\b(\d{1,2})\s*(h|hora|horas|min|minuto|minutos)\b(?=\s+(?:as|para\s+as|pelas)\s+\d{1,2})/
+    );
+    if (durBeforeTimeMatch && durBeforeTimeMatch.index !== undefined) {
+      const qty = parseInt(durBeforeTimeMatch[1], 10);
+      const unit = durBeforeTimeMatch[2];
+      if (qty > 0) {
+        explicitDurationMinutes = unit.startsWith('h') ? qty * 60 : qty;
+        working = stripRange(
+          working,
+          durBeforeTimeMatch.index,
+          durBeforeTimeMatch.index + durBeforeTimeMatch[0].length
+        );
+      }
+    } else {
+      // Duração isolada sem preposição de horário (ex.: "Estudar 1h", "Ler 30 min")
+      // Para horas sem preposição, limita a 1–4h e exige ausência de "da manhã/tarde/noite" ou faixa horária
+      const bareMinDur = normDur.match(/\b(\d{1,3})\s*(min|minuto|minutos)\b/);
+      const bareHourDur = normDur.match(
+        /(?<!\b(?:as|a|das|da|de|para\s+as|pelas)\s)\b([1-4])\s*(h|hora|horas)\b(?!\s*(?:\d|e\s+meia|da\s+(?:manha|tarde|noite)|(?:as|ate|a|-)\s*\d))/
+      );
+      if (bareMinDur && bareMinDur.index !== undefined) {
+        const qty = parseInt(bareMinDur[1], 10);
+        if (qty > 0) {
+          explicitDurationMinutes = qty;
+          working = stripRange(working, bareMinDur.index, bareMinDur.index + bareMinDur[0].length);
+        }
+      } else if (bareHourDur && bareHourDur.index !== undefined) {
+        const qty = parseInt(bareHourDur[1], 10);
+        if (qty > 0) {
+          explicitDurationMinutes = qty * 60;
+          working = stripRange(working, bareHourDur.index, bareHourDur.index + bareHourDur[0].length);
+        }
+      }
+    }
   }
 
-  // 3. FAIXA DE HORÁRIO ("das 14h30 às 16h", "de 9h as 10h30", "18:00 até 19:30")
+  // 4. FAIXA DE HORÁRIO ("das 14h30 às 16h", "de 9h as 10h30", "18:00 até 19:30")
   const normTimeRange = normalizeStr(working);
   const rangeRegex =
-    /\b(?:das?|de)?\s*(\d{1,2})(?:[:h](\d{2})|\s*h(?:oras?)?(?:\s*e\s*(meia|\d{1,2}))?)?\s*(?:as|ate|a|-)\s*(\d{1,2})(?:[:h](\d{2})|\s*h(?:oras?)?(?:\s*e\s*(meia|\d{1,2}))?)?(?:\s+da\s+(manha|tarde|noite))?\b/;
+    /(?<!\/)\b(?:das?|de)?\s*(\d{1,2})(?:[:h](\d{2})|\s*h(?:oras?)?(?:\s*e\s*(meia|\d{1,2}))?)?\s*(?:as|ate|a|-)\s*(\d{1,2})(?:[:h](\d{2})|\s*h(?:oras?)?(?:\s*e\s*(meia|\d{1,2}))?)?(?:\s+da\s+(manha|tarde|noite))?\b/;
   const rangeMatch = normTimeRange.match(rangeRegex);
 
   if (rangeMatch && rangeMatch.index !== undefined) {
@@ -264,7 +401,7 @@ export function parseVoiceHabitCommand(
     }
   }
 
-  // 4. HORÁRIO ÚNICO ("às 18h", "as 18:30", "18h30", "7 e meia da manhã", "ao meio-dia", "à meia-noite")
+  // 5. HORÁRIO ÚNICO ("às 18h", "as 18:30", "18h30", "7 e meia da manhã", "ao meio-dia", "à meia-noite")
   if (!parsedTimeStart) {
     const normSingleTime = normalizeStr(working);
 
@@ -307,77 +444,6 @@ export function parseVoiceHabitCommand(
   // Calcula timeEnd padrão (+1h ou duração explícita) se tiver timeStart
   if (parsedTimeStart && !parsedTimeEnd) {
     parsedTimeEnd = addMinutesToTime(parsedTimeStart, explicitDurationMinutes || 60);
-  }
-
-  // 5. DATA ("depois de amanhã", "amanhã", "hoje", dia da semana, ou "dia 28/11" / "dia 28")
-  const normDate = normalizeStr(working);
-  const baseDate = new Date(
-    referenceDate.getFullYear(),
-    referenceDate.getMonth(),
-    referenceDate.getDate()
-  );
-
-  const dayAfterMatch = normDate.match(/\b(?:para\s+)?depois\s+de\s+amanha\b/);
-  const tomorrowMatch = normDate.match(/\b(?:para\s+)?amanha\b/);
-  const todayMatch = normDate.match(/\b(?:para\s+)?hoje\b/);
-  const explicitDateMatch = normDate.match(/\b(?:no\s+|para\s+)?(?:dia\s+)?(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
-  const dayOnlyMatch = normDate.match(/\b(?:no\s+|para\s+)?dia\s+(\d{1,2})\b/);
-
-  if (dayAfterMatch && dayAfterMatch.index !== undefined) {
-    const target = new Date(baseDate);
-    target.setDate(target.getDate() + 2);
-    parsedDate = formatDateIso(target);
-    parsedDateLabel = 'Depois de amanhã';
-    working = stripRange(working, dayAfterMatch.index, dayAfterMatch.index + dayAfterMatch[0].length);
-  } else if (tomorrowMatch && tomorrowMatch.index !== undefined) {
-    const target = new Date(baseDate);
-    target.setDate(target.getDate() + 1);
-    parsedDate = formatDateIso(target);
-    parsedDateLabel = 'Amanhã';
-    working = stripRange(working, tomorrowMatch.index, tomorrowMatch.index + tomorrowMatch[0].length);
-  } else if (todayMatch && todayMatch.index !== undefined) {
-    parsedDate = formatDateIso(baseDate);
-    parsedDateLabel = 'Hoje';
-    working = stripRange(working, todayMatch.index, todayMatch.index + todayMatch[0].length);
-  } else if (explicitDateMatch && explicitDateMatch.index !== undefined) {
-    const d = parseInt(explicitDateMatch[1], 10);
-    const m = parseInt(explicitDateMatch[2], 10);
-    let y = explicitDateMatch[3] ? parseInt(explicitDateMatch[3], 10) : baseDate.getFullYear();
-    if (y < 100) y += 2000;
-    if (d >= 1 && d <= 31 && m >= 1 && m <= 12) {
-      const target = new Date(y, m - 1, d);
-      parsedDate = formatDateIso(target);
-      parsedDateLabel = `${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}`;
-      working = stripRange(working, explicitDateMatch.index, explicitDateMatch.index + explicitDateMatch[0].length);
-    }
-  } else if (dayOnlyMatch && dayOnlyMatch.index !== undefined) {
-    const d = parseInt(dayOnlyMatch[1], 10);
-    if (d >= 1 && d <= 31) {
-      const target = new Date(baseDate.getFullYear(), baseDate.getMonth(), d);
-      if (target < baseDate) {
-        target.setMonth(target.getMonth() + 1);
-      }
-      parsedDate = formatDateIso(target);
-      parsedDateLabel = `${String(target.getDate()).padStart(2, '0')}/${String(target.getMonth() + 1).padStart(2, '0')}`;
-      working = stripRange(working, dayOnlyMatch.index, dayOnlyMatch.index + dayOnlyMatch[0].length);
-    }
-  } else {
-    // Verifica dias da semana ("na sexta-feira", "próxima segunda", "sábado")
-    for (const wd of WEEKDAY_MAP) {
-      const pattern = new RegExp(
-        `\\b(?:na\\s+|no\\s+|para\\s+|proxima\\s+|proximo\\s+)?(?:${wd.keys.join('|')})\\b`
-      );
-      const wdMatch = normDate.match(pattern);
-      if (wdMatch && wdMatch.index !== undefined) {
-        const diff = (wd.dayIndex - baseDate.getDay() + 7) % 7 || 7;
-        const target = new Date(baseDate);
-        target.setDate(target.getDate() + diff);
-        parsedDate = formatDateIso(target);
-        parsedDateLabel = wd.label;
-        working = stripRange(working, wdMatch.index, wdMatch.index + wdMatch[0].length);
-        break;
-      }
-    }
   }
 
   // 6. CATEGORIA IMPLÍCITA (nome exato da categoria no texto ou palavra-chave semântica)

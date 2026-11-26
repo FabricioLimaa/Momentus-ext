@@ -14,22 +14,24 @@ export interface UserLevelInfo {
 }
 
 export const calculateUserLevel = (totalPoints: number): UserLevelInfo => {
+  const safePoints = Math.max(0, Math.floor(totalPoints || 0));
+
   // Nível 1: 0 - 99 XP
-  if (totalPoints < 100) {
+  if (safePoints < 100) {
     return {
       level: 1,
       rankName: 'Iniciante Focado 🌱',
       honorTitle: 'Iniciante Focado',
-      currentXp: totalPoints,
+      currentXp: safePoints,
       nextLevelXp: 100,
-      progress: totalPoints / 100,
+      progress: safePoints / 100,
       rankColor: '#9E9E9E',
     };
   }
 
   // Nível 2: 100 - 299 XP (Nível 2 a 4)
-  if (totalPoints < 300) {
-    const current = totalPoints - 100;
+  if (safePoints < 300) {
+    const current = safePoints - 100;
     return {
       level: 2,
       rankName: 'Iniciante Focado 🌱',
@@ -42,8 +44,8 @@ export const calculateUserLevel = (totalPoints: number): UserLevelInfo => {
   }
 
   // Nível 3: 300 - 599 XP (Nível 3)
-  if (totalPoints < 600) {
-    const current = totalPoints - 300;
+  if (safePoints < 600) {
+    const current = safePoints - 300;
     return {
       level: 3,
       rankName: 'Iniciante Focado 🌱',
@@ -56,8 +58,8 @@ export const calculateUserLevel = (totalPoints: number): UserLevelInfo => {
   }
 
   // Nível 4: 600 - 999 XP (Nível 4)
-  if (totalPoints < 1000) {
-    const current = totalPoints - 600;
+  if (safePoints < 1000) {
+    const current = safePoints - 600;
     return {
       level: 4,
       rankName: 'Iniciante Focado 🌱',
@@ -70,7 +72,7 @@ export const calculateUserLevel = (totalPoints: number): UserLevelInfo => {
   }
 
   // Nível 5 em diante (Cada 500 XP = +1 nível)
-  const excess = totalPoints - 1000;
+  const excess = safePoints - 1000;
   const levelsAbove5 = Math.floor(excess / 500);
   const currentLvl = 5 + levelsAbove5;
   const xpInCurrent = excess % 500;

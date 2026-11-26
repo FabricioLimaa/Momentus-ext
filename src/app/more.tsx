@@ -33,7 +33,15 @@ import { auth as firebaseAuth } from '@/config/firebase';
 export default function MoreScreen() {
   const router = useRouter();
   const { isLargeScreen } = useResponsiveLayout();
-  const { userProfile, userLevel, logout, theme, triggerHaptic } = useMomentus();
+  const { userProfile, userLevel, focusHistoryMap, logout, theme, triggerHaptic } = useMomentus();
+  const totalFocusMinutesAllTime = React.useMemo(
+    () =>
+      Math.max(
+        userProfile.focusMinutesToday || 0,
+        Object.values(focusHistoryMap || {}).reduce((acc, m) => acc + (m > 0 ? m : 0), 0)
+      ),
+    [focusHistoryMap, userProfile.focusMinutesToday]
+  );
 
   const authUser = firebaseAuth.currentUser;
   const displayName =
@@ -126,7 +134,7 @@ export default function MoreScreen() {
                   size={58}
                   frameId={userProfile.selectedAvatarFrame}
                   userLevel={userLevel}
-                  totalFocusMinutes={userProfile.focusMinutesToday || 0}
+                  totalFocusMinutes={totalFocusMinutesAllTime}
                   currentStreak={userProfile.currentStreak}
                   bestStreak={userProfile.bestStreak}
                 />
@@ -456,7 +464,6 @@ export default function MoreScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   container: {
     flex: 1,

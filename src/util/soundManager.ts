@@ -95,6 +95,9 @@ class SoundManager {
 
   public setEnabled(value: boolean) {
     this.enabled = value;
+    if (!value) {
+      this.pauseSoundscape();
+    }
   }
 
   public isEnabled(): boolean {
@@ -214,6 +217,9 @@ class SoundManager {
     if (this.soundscapePlayer) {
       try {
         this.soundscapePlayer.pause();
+        if (typeof (this.soundscapePlayer as any).remove === 'function') {
+          (this.soundscapePlayer as any).remove();
+        }
       } catch {}
       this.soundscapePlayer = null;
     }

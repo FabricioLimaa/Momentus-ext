@@ -137,6 +137,15 @@ export default function AchievementsScreen() {
   const [isFrameModalOpen, setIsFrameModalOpen] = useState(false);
   const [achievementFilter, setAchievementFilter] = useState<'all' | 'unlocked' | 'in_progress' | 'closest'>('all');
 
+  const totalFocusMinutesAllTime = React.useMemo(
+    () =>
+      Math.max(
+        userProfile.focusMinutesToday || 0,
+        Object.values(focusHistoryMap || {}).reduce((acc, m) => acc + (m > 0 ? m : 0), 0)
+      ),
+    [focusHistoryMap, userProfile.focusMinutesToday]
+  );
+
   const handleShareAchievement = async (ach: Achievement) => {
     triggerHaptic('impact');
     const tier = getAchievementTier(ach);
@@ -221,7 +230,7 @@ export default function AchievementsScreen() {
                 size={58}
                 frameId={userProfile.selectedAvatarFrame}
                 userLevel={userLevel}
-                totalFocusMinutes={userProfile.focusMinutesToday || 0}
+                totalFocusMinutes={totalFocusMinutesAllTime}
                 currentStreak={userProfile.currentStreak}
                 bestStreak={userProfile.bestStreak}
               />
@@ -735,7 +744,7 @@ export default function AchievementsScreen() {
                 {AVATAR_FRAMES.map((frame) => {
                   const isUnlocked = frame.isUnlocked({
                     level: userLevel.level,
-                    totalFocusMinutes: userProfile.focusMinutesToday || 0,
+                    totalFocusMinutes: totalFocusMinutesAllTime,
                     currentStreak: userProfile.currentStreak,
                     bestStreak: userProfile.bestStreak,
                   });
@@ -790,7 +799,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: MomentusColors.navyBackground,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   container: {
     flex: 1,

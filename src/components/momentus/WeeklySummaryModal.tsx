@@ -47,6 +47,7 @@ interface WeeklySummaryModalProps {
   stats: WeeklySummaryStats;
   userProfile?: UserProfile | null;
   userLevel?: UserLevelInfo | null;
+  totalFocusMinutes?: number;
   primaryColor?: string;
 }
 
@@ -56,6 +57,7 @@ export const WeeklySummaryModal: React.FC<WeeklySummaryModalProps> = ({
   stats,
   userProfile,
   userLevel,
+  totalFocusMinutes,
   primaryColor = MomentusColors.emeraldNeon,
 }) => {
   const cardRef = useRef<View>(null);
@@ -268,7 +270,7 @@ export const WeeklySummaryModal: React.FC<WeeklySummaryModalProps> = ({
                     name={userName}
                     frameId={userProfile?.selectedAvatarFrame}
                     userLevel={userLevel}
-                    totalFocusMinutes={userProfile?.focusMinutesToday || 0}
+                    totalFocusMinutes={totalFocusMinutes ?? (userProfile?.focusMinutesToday || 0)}
                     currentStreak={userProfile?.currentStreak || 0}
                     bestStreak={userProfile?.bestStreak || 0}
                   />

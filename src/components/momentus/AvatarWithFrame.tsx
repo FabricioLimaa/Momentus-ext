@@ -77,6 +77,10 @@ export const AvatarWithFrame: React.FC<AvatarWithFrameProps> = ({
 }) => {
   const [imageError, setImageError] = React.useState(false);
 
+  React.useEffect(() => {
+    setImageError(false);
+  }, [photoUrl]);
+
   // Determina a moldura ativa: se passada explicitamente, ou calculada conforme o nível/progresso
   const activeFrame = React.useMemo(() => {
     if (frameId) {

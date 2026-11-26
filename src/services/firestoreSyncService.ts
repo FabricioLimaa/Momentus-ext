@@ -39,6 +39,30 @@ const TEMPLATES_COLLECTION = "templates";
 const UNLOCKED_ACHIEVEMENTS_COLLECTION = "unlocked_achievements";
 const COMPLETED_HABITS_COLLECTION = "completed_habits";
 const INVENTORY_COLLECTION = "inventory";
+const METAS_COLLECTION = "metas";
+
+const MAX_BATCH_OPS = 450;
+
+/**
+ * Executa operações de escrita no Firestore em lotes de até 450 operações (limite oficial é 500)
+ * com proteção offline (não lança exceção fatal caso o dispositivo perca conexão durante o commit).
+ */
+async function commitBatchedOps(
+  ops: Array<(batch: ReturnType<typeof writeBatch>) => void>,
+  label: string,
+): Promise<void> {
+  if (ops.length === 0) return;
+  for (let i = 0; i < ops.length; i += MAX_BATCH_OPS) {
+    const slice = ops.slice(i, i + MAX_BATCH_OPS);
+    const batch = writeBatch(firestore);
+    slice.forEach((op) => op(batch));
+    try {
+      await batch.commit();
+    } catch (err) {
+      MomentusLog.sync.warn(`Aviso no commit em lote (${label}):`, err);
+    }
+  }
+}
 
 export interface SyncResult {
   uploadedEvents: number;
@@ -320,7 +344,11 @@ export async function syncWithFirestore(
       categoriesBatch.delete(metaDocRef);
     }
   });
-  await categoriesBatch.commit();
+  try {
+    await categoriesBatch.commit();
+  } catch (err) {
+    MomentusLog.sync.warn("Aviso no commit de categorias (possível modo offline):", err);
+  }
 
   let mergedCategories: Category[] = [...cleanLocalCategories];
   cloudCategoriesMap.forEach((cloudCat, id) => {
@@ -440,12 +468,12 @@ export async function syncWithFirestore(
   const localEventsMap = new Map<string, HabitItem>(
     cleanLocalHabits.map((h) => [h.id, h]),
   );
-  const eventsBatch = writeBatch(firestore);
+  const eventOps: Array<(batch: ReturnType<typeof writeBatch>) => void> = [];
 
   // Remove hábitos mockados da nuvem se existirem
   cloudEventsMap.forEach((cloudItem, id) => {
     if (isMockHabit(id, cloudItem.titulo || cloudItem.title)) {
-      eventsBatch.delete(doc(eventsColRef, id));
+      eventOps.push((b) => b.delete(doc(eventsColRef, id)));
     }
   });
 
@@ -467,26 +495,28 @@ export async function syncWithFirestore(
     if (!cloudItem) {
       const docRef = doc(eventsColRef, habit.id);
       // Salva ESTRITAMENTE os campos esperados pelo ItemCronograma nativo
-      eventsBatch.set(docRef, {
-        id: habit.id,
-        titulo: habit.title,
-        descricao: habit.description || null,
-        data: dateToMillis(habit.date),
-        diaDaSemana: null,
-        horarioInicioString: formatTimeToIsoLocal(habit.timeStart),
-        horarioTerminoString: formatTimeToIsoLocal(habit.timeEnd || habit.timeStart),
-        ordem: 0,
-        categoryId: habit.categoryId,
-        templateId: null,
-        templateSourceId: habit.templateSourceId || null,
-        googleCalendarEventId: habit.googleCalendarEventId || null,
-        isDeleted: false,
-        lastUpdated: new Date(),
-      });
+      eventOps.push((b) =>
+        b.set(docRef, {
+          id: habit.id,
+          titulo: habit.title,
+          descricao: habit.description || null,
+          data: dateToMillis(habit.date),
+          diaDaSemana: null,
+          horarioInicioString: formatTimeToIsoLocal(habit.timeStart),
+          horarioTerminoString: formatTimeToIsoLocal(habit.timeEnd || habit.timeStart),
+          ordem: 0,
+          categoryId: habit.categoryId,
+          templateId: null,
+          templateSourceId: habit.templateSourceId || null,
+          googleCalendarEventId: habit.googleCalendarEventId || null,
+          isDeleted: false,
+          lastUpdated: new Date(),
+        })
+      );
       result.uploadedEvents++;
     }
   });
-  await eventsBatch.commit();
+  await commitBatchedOps(eventOps, "eventos");
 
   // Mapeia eventos que pertencem a templates (templateId != null ou data == null)
   const templateEventsMap = new Map<string, TemplateItem[]>();
@@ -532,6 +562,12 @@ export async function syncWithFirestore(
       return;
     }
 
+    // Extrai templateSourceId preservando IDs que contêm '_' (ex.: applied_onboarding_starter_2026-11-26)
+    const inferredTemplateSource =
+      cloudItem.templateSourceId ||
+      cloudItem.templateId ||
+      null;
+
     // Se não for evento de template, é um hábito diário
     if (!localEventsMap.has(id)) {
       const isCompleted = cloudCompletedHabitsSet.has(id);
@@ -553,12 +589,36 @@ export async function syncWithFirestore(
         streak: 0,
         googleCalendarEventId: cloudItem.googleCalendarEventId || null,
         saveToGoogle: false,
-        templateSourceId:
-          cloudItem.templateSourceId ||
-          cloudItem.templateId ||
-          (id.startsWith('applied_') ? id.split('_')[1] : null),
+        templateSourceId: inferredTemplateSource,
       });
       result.downloadedEvents++;
+    } else {
+      // Atualiza edições remotas em hábitos já existentes localmente (título, horário, descrição, categoria)
+      const localIdx = mergedHabits.findIndex((h) => h.id === id);
+      if (localIdx >= 0) {
+        const localH = mergedHabits[localIdx];
+        const isCompleted = localH.completed || cloudCompletedHabitsSet.has(id);
+        mergedHabits[localIdx] = {
+          ...localH,
+          title: cloudItem.titulo || cloudItem.title || localH.title,
+          description:
+            cloudItem.descricao !== undefined
+              ? cloudItem.descricao || undefined
+              : localH.description,
+          date: cloudItem.data ? millisToDateString(cloudItem.data) : localH.date,
+          timeStart: parseTimeString(
+            cloudItem.horarioInicioString || cloudItem.horarioInicio,
+            localH.timeStart,
+          ),
+          timeEnd: parseTimeString(
+            cloudItem.horarioTerminoString || cloudItem.horarioTermino,
+            localH.timeEnd || localH.timeStart,
+          ),
+          categoryId: resolvedCatId || localH.categoryId,
+          completed: isCompleted,
+          templateSourceId: localH.templateSourceId || inferredTemplateSource,
+        };
+      }
     }
   });
 
@@ -679,11 +739,15 @@ export async function syncWithFirestore(
     mergedAchievements = localAchievements.map((ach) => {
       if (!ach.unlocked && cloudUnlockedSet.has(ach.id)) {
         result.syncedAchievements++;
+        const cloudAch = cloudUnlockedSet.get(ach.id);
+        const realUnlockedAt = cloudAch?.dateUnlocked
+          ? millisToDateString(cloudAch.dateUnlocked)
+          : getTodayDateString();
         return {
           ...ach,
           unlocked: true,
           progress: ach.maxProgress,
-          unlockedAt: getTodayDateString(),
+          unlockedAt: realUnlockedAt,
         };
       }
       return ach;
@@ -769,7 +833,7 @@ export async function syncWithFirestore(
       const mergedPoints = cloudPoints !== null ? cloudPoints : baseProfile.totalPoints;
       const mergedStreak = Math.max(baseProfile.currentStreak, cloudStreak);
 
-      const effectiveTotalCompleted = cleanLocalHabits.filter((h) => h.completed).length;
+      const effectiveTotalCompleted = mergedHabits.filter((h) => h.completed).length;
 
       const cloudDisplayName =
         typeof cloudUserData?.display_name === "string" &&
@@ -912,6 +976,7 @@ export async function clearCloudData(userId: string): Promise<boolean> {
   const collectionsToClear = [
     EVENTS_COLLECTION,
     CATEGORIES_COLLECTION,
+    METAS_COLLECTION,
     COMPLETED_HABITS_COLLECTION,
     UNLOCKED_ACHIEVEMENTS_COLLECTION,
     TEMPLATES_COLLECTION,
@@ -923,11 +988,11 @@ export async function clearCloudData(userId: string): Promise<boolean> {
       const colRef = collection(userDocRef, collectionName);
       const snapshot = await getDocs(colRef);
       if (!snapshot.empty) {
-        const batch = writeBatch(firestore);
+        const delOps: Array<(batch: ReturnType<typeof writeBatch>) => void> = [];
         snapshot.forEach((docSnap) => {
-          batch.delete(docSnap.ref);
+          delOps.push((b) => b.delete(docSnap.ref));
         });
-        await batch.commit();
+        await commitBatchedOps(delOps, `clear_${collectionName}`);
       }
       clearedAny = true;
     } catch {
@@ -975,7 +1040,7 @@ export async function clearCloudData(userId: string): Promise<boolean> {
     await setDoc(defaultCatDocRef, {
       id: "cat-outros",
       nome: "Outros",
-      corHex: "#616161",
+      cor: "#616161",
       stickerId: null,
       metaMinutosSemanal: null,
       isDeleted: false,
@@ -988,7 +1053,7 @@ export async function clearCloudData(userId: string): Promise<boolean> {
 
 /**
  * Escuta atualizações em tempo real no Firestore para um usuário logado.
- * Escuta tanto a coleção de eventos (ItemCronograma) quanto a de conclusões (HabitoConcluido).
+ * Ignora snapshots iniciais de montagem e ecos locais (`hasPendingWrites`), com debounce de 600ms.
  */
 export function listenToFirestoreSync(
   userId: string,
@@ -1007,10 +1072,27 @@ export function listenToFirestoreSync(
     COMPLETED_HABITS_COLLECTION,
   );
 
+  let isInitialEvents = true;
+  let isInitialCompleted = true;
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const scheduleSync = () => {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null;
+      onRemoteChange();
+    }, 600);
+  };
+
   const unsubEvents = onSnapshot(
     eventsColRef,
-    () => {
-      onRemoteChange();
+    (snapshot) => {
+      if (isInitialEvents) {
+        isInitialEvents = false;
+        return;
+      }
+      if (snapshot.metadata.hasPendingWrites) return;
+      scheduleSync();
     },
     (err) => {
       MomentusLog.sync.warn("Erro no SnapshotListener de events do Firestore:", err);
@@ -1019,8 +1101,13 @@ export function listenToFirestoreSync(
 
   const unsubCompleted = onSnapshot(
     completedHabitsColRef,
-    () => {
-      onRemoteChange();
+    (snapshot) => {
+      if (isInitialCompleted) {
+        isInitialCompleted = false;
+        return;
+      }
+      if (snapshot.metadata.hasPendingWrites) return;
+      scheduleSync();
     },
     (err) => {
       MomentusLog.sync.warn("Erro no SnapshotListener de completed_habits do Firestore:", err);
@@ -1028,6 +1115,10 @@ export function listenToFirestoreSync(
   );
 
   return () => {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+      debounceTimer = null;
+    }
     try {
       unsubEvents();
       unsubCompleted();

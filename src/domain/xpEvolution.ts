@@ -58,8 +58,8 @@ function parseUnlockedAtToDateKey(unlockedAt?: string | null): string | null {
     return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
   }
 
-  // Formato PT-BR: DD/MM/YYYY
-  const brMatch = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  // Formato PT-BR: DD/MM/YYYY ou DD-MM-YYYY
+  const brMatch = trimmed.match(/^(\d{2})[/-](\d{2})[/-](\d{4})/);
   if (brMatch) {
     return `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}`;
   }
@@ -113,16 +113,34 @@ export function buildXpEvolutionSeries(
     const completedCount = dayHabits.filter((h) => h.completed).length;
     if (completedCount === 0) return;
 
-    let dayXp = completedCount * 10;
+    // 15 XP por hábito concluído (espelha MomentusContext.tsx)
+    let dayXp = completedCount * 15;
     if (dayHabits.length > 0 && completedCount === dayHabits.length) {
       dayXp += 25; // Bônus de dia 100% concluído
     }
+
+    // +20 XP por rotina de template (2+ hábitos) 100% concluída no dia
+    const routinesBySource = new Map<string, HabitItem[]>();
+    dayHabits.forEach((h) => {
+      if (!h.templateSourceId) return;
+      const list = routinesBySource.get(h.templateSourceId) || [];
+      list.push(h);
+      routinesBySource.set(h.templateSourceId, list);
+    });
+    routinesBySource.forEach((rHabits) => {
+      if (rHabits.length > 1 && rHabits.every((h) => h.completed)) {
+        dayXp += 20;
+      }
+    });
+
     dailyXpGained[dateStr] = (dailyXpGained[dateStr] || 0) + dayXp;
   });
 
   Object.entries(focusHistoryMap).forEach(([dateStr, mins]) => {
     if (mins > 0) {
-      const focusXp = 10 + Math.floor(mins / 2);
+      // Estima sessões Pomodoro (25 min) para preservar bônus de múltiplas sessões no mesmo dia
+      const estimatedSessions = Math.max(1, Math.round(mins / 25));
+      const focusXp = estimatedSessions * 10 + Math.floor(mins / 2);
       dailyXpGained[dateStr] = (dailyXpGained[dateStr] || 0) + focusXp;
     }
   });

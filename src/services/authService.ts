@@ -145,17 +145,15 @@ export async function loginWithEmail(email: string, pass: string): Promise<Momen
     return userCredential.user;
   } catch (err) {
     MomentusLog.auth.error('Falha no login com e-mail:', err);
-    if (isAppCheckBlockedError(err)) {
+    if (__DEV__ && isAppCheckBlockedError(err)) {
       MomentusLog.auth.warn(
-        'Firebase App Check bloqueou autenticação (auth/firebase-app-check-token-is-invalid). Liberando sessão local de desenvolvimento para:',
-        email
+        'Firebase App Check bloqueou autenticação em ambiente de desenvolvimento. Liberando sessão local.'
       );
       return createLocalFallbackUser(email);
     }
-    if (isAndroidKeyBlockedError(err)) {
+    if (__DEV__ && isAndroidKeyBlockedError(err)) {
       MomentusLog.auth.warn(
-        'API Key do Firebase restrita a Android nativo. Autenticando em sessão local para:',
-        email
+        'API Key do Firebase restrita a Android nativo em desenvolvimento. Autenticando em sessão local.'
       );
       return createLocalFallbackUser(email);
     }
@@ -188,17 +186,15 @@ export async function registerWithEmail(
     return userCredential.user;
   } catch (err) {
     MomentusLog.auth.error('Falha ao criar conta:', err);
-    if (isAppCheckBlockedError(err)) {
+    if (__DEV__ && isAppCheckBlockedError(err)) {
       MomentusLog.auth.warn(
-        'Firebase App Check bloqueou criação de conta (auth/firebase-app-check-token-is-invalid). Liberando sessão local de desenvolvimento para:',
-        email
+        'Firebase App Check bloqueou criação de conta em ambiente de desenvolvimento. Liberando sessão local.'
       );
       return createLocalFallbackUser(email, displayName);
     }
-    if (isAndroidKeyBlockedError(err)) {
+    if (__DEV__ && isAndroidKeyBlockedError(err)) {
       MomentusLog.auth.warn(
-        'API Key do Firebase restrita a Android nativo. Criando conta em sessão local para:',
-        email
+        'API Key do Firebase restrita a Android nativo em desenvolvimento. Criando conta em sessão local.'
       );
       return createLocalFallbackUser(email, displayName);
     }

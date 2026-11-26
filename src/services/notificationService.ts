@@ -1,7 +1,8 @@
 import type * as NotificationsTypes from 'expo-notifications';
 import { Platform } from 'react-native';
-import { HabitItem } from '@/types';
+import type { AppSettings, HabitItem } from '@/types';
 import { MomentusLog } from '@/util/logger';
+import { getAppKv } from '@/database/momentusDb';
 
 export const CHANNEL_INICIO = 'CHANNEL_INICIO';
 export const CHANNEL_TERMINO = 'CHANNEL_TERMINO';
@@ -358,20 +359,32 @@ export async function scheduleHabitNotifications(
     return {};
   }
 
+  const appSettings = await getAppKv<AppSettings>('app_settings').catch(() => null);
+  if (appSettings?.notificationsEnabled === false) {
+    return {};
+  }
+  const advanceMinutes = Math.max(0, Number(appSettings?.reminderAdvanceMinutes ?? 0) || 0);
+
   let startNotificationId: string | undefined;
   let endNotificationId: string | undefined;
 
   const now = new Date();
 
-  // 1. Agendar Início
+  // 1. Agendar Início (respeitando antecedência configurada em Ajustes)
   if (habit.timeStart) {
-    const startDate = parseLocalDateTime(habit.date, habit.timeStart);
+    const rawStartDate = parseLocalDateTime(habit.date, habit.timeStart);
+    const startDate = rawStartDate
+      ? new Date(rawStartDate.getTime() - advanceMinutes * 60 * 1000)
+      : null;
     if (startDate && startDate.getTime() > now.getTime()) {
       try {
         startNotificationId = await Notifications.scheduleNotificationAsync({
           content: {
             title: `Início: ${habit.title}`,
-            body: 'Sua rotina começou! Toque para ver opções ou use os botões abaixo. 🚀',
+            body:
+              advanceMinutes > 0
+                ? `Sua rotina começa em ${advanceMinutes} min! Prepare-se para entrar no ritmo. 🚀`
+                : 'Sua rotina começou! Toque para ver opções ou use os botões abaixo. 🚀',
             categoryIdentifier: CATEGORY_HABIT_START,
             data: {
               habitId: habit.id,
@@ -392,10 +405,10 @@ export async function scheduleHabitNotifications(
     }
   }
 
-  // 2. Agendar Término
-  const endTime = habit.timeEnd || habit.timeStart;
-  if (endTime) {
-    const endDate = parseLocalDateTime(habit.date, endTime);
+  // 2. Agendar Término somente quando há timeEnd distinto de timeStart (evita disparo duplo no mesmo segundo)
+  const hasDistinctEnd = Boolean(habit.timeEnd && habit.timeEnd !== habit.timeStart);
+  if (hasDistinctEnd && habit.timeEnd) {
+    const endDate = parseLocalDateTime(habit.date, habit.timeEnd);
     if (endDate && endDate.getTime() > now.getTime()) {
       try {
         endNotificationId = await Notifications.scheduleNotificationAsync({
@@ -423,6 +436,63 @@ export async function scheduleHabitNotifications(
   }
 
   return { startNotificationId, endNotificationId };
+}
+
+const MORNING_BRIEFING_ID = 'momentus_daily_morning_briefing';
+const EVENING_REFLECTION_ID = 'momentus_daily_evening_reflection';
+
+/**
+ * Sincroniza os lembretes recorrentes de Briefing Matinal (08:00) e Reflexão Noturna (21:00)
+ * com as preferências salvas em Ajustes.
+ */
+export async function syncDailyBriefingNotifications(settings: Partial<AppSettings>): Promise<void> {
+  const Notifications = getNotifications();
+  if (!Notifications) return;
+
+  try {
+    await Notifications.cancelScheduledNotificationAsync(MORNING_BRIEFING_ID).catch(() => {});
+    await Notifications.cancelScheduledNotificationAsync(EVENING_REFLECTION_ID).catch(() => {});
+
+    if (settings.notificationsEnabled === false) {
+      return;
+    }
+
+    if (settings.morningBriefingEnabled) {
+      await Notifications.scheduleNotificationAsync({
+        identifier: MORNING_BRIEFING_ID,
+        content: {
+          title: 'Bom dia! Suas rotinas de hoje ☀️',
+          body: 'Confira o que está planejado para o seu dia e comece com foco.',
+          sound: 'default',
+          ...(Platform.OS === 'android' ? { channelId: CHANNEL_INICIO } : {}),
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          hour: 8,
+          minute: 0,
+        },
+      }).catch(() => {});
+    }
+
+    if (settings.eveningReflectionEnabled) {
+      await Notifications.scheduleNotificationAsync({
+        identifier: EVENING_REFLECTION_ID,
+        content: {
+          title: 'Fechamento do Dia 🌙',
+          body: 'Revise seus hábitos concluídos e preserve sua sequência antes de descansar.',
+          sound: 'default',
+          ...(Platform.OS === 'android' ? { channelId: CHANNEL_TERMINO } : {}),
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          hour: 21,
+          minute: 0,
+        },
+      }).catch(() => {});
+    }
+  } catch (err) {
+    MomentusLog.notif.warn('Erro ao sincronizar lembretes diários:', err);
+  }
 }
 
 /**

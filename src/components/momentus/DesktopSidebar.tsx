@@ -111,7 +111,15 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
   isCompact = false,
 }) => {
   const router = useRouter();
-  const { theme, userProfile, userLevel } = useMomentus();
+  const { theme, userProfile, userLevel, focusHistoryMap } = useMomentus();
+  const totalFocusMinutesAllTime = React.useMemo(
+    () =>
+      Math.max(
+        userProfile.focusMinutesToday || 0,
+        Object.values(focusHistoryMap || {}).reduce((acc, m) => acc + (m > 0 ? m : 0), 0)
+      ),
+    [focusHistoryMap, userProfile.focusMinutesToday]
+  );
   const authUser = firebaseAuth?.currentUser;
   const isCloudConnected = !!authUser;
   const displayName = userProfile.name?.trim() || authUser?.displayName?.trim() || 'Meu Espaço';
@@ -281,7 +289,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
           size={isCompact ? 36 : 40}
           frameId={userProfile.selectedAvatarFrame}
           userLevel={userLevel}
-          totalFocusMinutes={userProfile.focusMinutesToday || 0}
+          totalFocusMinutes={totalFocusMinutesAllTime}
           currentStreak={userProfile.currentStreak || 0}
           bestStreak={userProfile.bestStreak || 0}
         />

@@ -41,8 +41,10 @@ export const TimePickerModal: React.FC<TimePickerModalProps> = ({
 
   const parseInitial = useCallback((timeStr: string) => {
     const parts = (timeStr || '08:00').split(':');
-    const h = Math.max(0, Math.min(23, parseInt(parts[0], 10) || 8));
-    const m = Math.max(0, Math.min(59, parseInt(parts[1], 10) || 0));
+    const parsedH = parseInt(parts[0], 10);
+    const parsedM = parseInt(parts[1], 10);
+    const h = Math.max(0, Math.min(23, Number.isNaN(parsedH) ? 8 : parsedH));
+    const m = Math.max(0, Math.min(59, Number.isNaN(parsedM) ? 0 : parsedM));
     return { h, m };
   }, []);
 
@@ -151,9 +153,10 @@ export const TimePickerModal: React.FC<TimePickerModalProps> = ({
 
   const handleSetNow = () => {
     const now = new Date();
-    const h = now.getHours();
-    const rawM = now.getMinutes();
-    const roundedM = (Math.round(rawM / 5) * 5) % 60;
+    const totalMins = now.getHours() * 60 + now.getMinutes();
+    const roundedTotal = Math.min(23 * 60 + 55, Math.round(totalMins / 5) * 5);
+    const h = Math.floor(roundedTotal / 60);
+    const roundedM = roundedTotal % 60;
     setSelectedHour(h);
     setSelectedMinute(roundedM);
     setInputText(`${String(h).padStart(2, '0')}:${String(roundedM).padStart(2, '0')}`);

@@ -31,9 +31,14 @@ import { ThemeMode } from '@/types';
 import { APP_INFO } from '@/constants/appInfo';
 import { useMomentus } from '@/context/MomentusContext';
 import { MomentusLog } from '@/util/logger';
-import { requestNotificationPermissions } from '@/services/notificationService';
+import {
+  requestNotificationPermissions,
+  cancelAllNotifications,
+  syncDailyBriefingNotifications,
+} from '@/services/notificationService';
 import { requestPinAndroidWidget } from '@/services/widgetService';
-import { getDatabaseSecurityInfo } from '@/database/momentusDb';
+import { getDatabaseSecurityInfo, getAppKv, setAppKv } from '@/database/momentusDb';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Helper de timeout seguro para proteger chamadas assíncronas contra travamentos de rede
 const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number, timeoutErrorMsg: string): Promise<T> => {
@@ -196,6 +201,10 @@ export default function SettingsScreen() {
   const handleToggleNotifications = (val: boolean) => {
     setNotificationsEnabled(val);
     updateSettings({ notificationsEnabled: val });
+    if (!val) {
+      cancelAllNotifications().catch(() => {});
+    }
+    syncDailyBriefingNotifications({ ...settings, notificationsEnabled: val }).catch(() => {});
     triggerHaptic('impact');
   };
 
@@ -208,24 +217,44 @@ export default function SettingsScreen() {
   const handleToggleMorningBriefing = (val: boolean) => {
     setMorningBriefing(val);
     updateSettings({ morningBriefingEnabled: val });
+    syncDailyBriefingNotifications({ ...settings, morningBriefingEnabled: val }).catch(() => {});
     triggerHaptic('impact');
   };
 
   const handleToggleEveningReflection = (val: boolean) => {
     setEveningReflection(val);
     updateSettings({ eveningReflectionEnabled: val });
+    syncDailyBriefingNotifications({ ...settings, eveningReflectionEnabled: val }).catch(() => {});
     triggerHaptic('impact');
   };
 
   const handleSelectFocusMinutes = (mins: number) => {
     setDefaultFocusMinutes(mins);
     updateSettings({ defaultFocusMinutes: mins });
+    getAppKv<{ focus: number; short: number; long: number }>('focus_durations')
+      .then((curr) =>
+        setAppKv('focus_durations', {
+          focus: mins,
+          short: curr?.short ?? defaultBreakMinutes,
+          long: curr?.long ?? 15,
+        })
+      )
+      .catch(() => {});
     triggerHaptic('selection');
   };
 
   const handleSelectBreakMinutes = (mins: number) => {
     setDefaultBreakMinutes(mins);
     updateSettings({ defaultBreakMinutes: mins });
+    getAppKv<{ focus: number; short: number; long: number }>('focus_durations')
+      .then((curr) =>
+        setAppKv('focus_durations', {
+          focus: curr?.focus ?? defaultFocusMinutes,
+          short: mins,
+          long: curr?.long ?? 15,
+        })
+      )
+      .catch(() => {});
     triggerHaptic('selection');
   };
 
@@ -306,7 +335,24 @@ export default function SettingsScreen() {
         {
           text: 'Limpar Agora',
           style: 'destructive',
-          onPress: () => {
+          onPress: async () => {
+            try {
+              // Limpa caches de imagem (expo-image) quando disponíveis
+              try {
+                // eslint-disable-next-line @typescript-eslint/no-require-imports
+                const expoImage = require('expo-image');
+                await expoImage?.Image?.clearDiskCache?.();
+                await expoImage?.Image?.clearMemoryCache?.();
+              } catch {}
+
+              // Remove apenas chaves temporárias de cache sem tocar em rotinas/perfil/configurações
+              const allKeys = await AsyncStorage.getAllKeys().catch(() => [] as readonly string[]);
+              const cacheKeys = allKeys.filter((k) => k.startsWith('@momentus_cache_'));
+              if (cacheKeys.length > 0) {
+                await AsyncStorage.multiRemove(cacheKeys).catch(() => {});
+              }
+            } catch {}
+
             setCacheSizeMb('0.0');
             triggerHaptic('success');
             Alert.alert('Cache Limpo! 🧹✨', 'Os arquivos temporários foram liberados com sucesso.');
@@ -1389,7 +1435,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: MomentusColors.navyBackground,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   container: {
     flex: 1,

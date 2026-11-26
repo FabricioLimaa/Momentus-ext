@@ -74,6 +74,13 @@ export const ApplyTemplateDialog: React.FC<ApplyTemplateDialogProps> = ({
   const [isTimeShiftEnabled, setIsTimeShiftEnabled] = useState(false);
   const [selectedShiftTime, setSelectedShiftTime] = useState('08:00');
 
+  // Sempre reinicia o passo ao reabrir o diálogo
+  React.useEffect(() => {
+    if (visible) {
+      setStep('CALENDAR');
+    }
+  }, [visible]);
+
   const prevMonth = () => {
     setCurrentYearMonth((prev) => {
       if (prev.month === 0) return { year: prev.year - 1, month: 11 };
@@ -94,13 +101,13 @@ export const ApplyTemplateDialog: React.FC<ApplyTemplateDialogProps> = ({
     );
   };
 
-  // Identifica datas conflitantes (que já possuem hábitos deste template)
+  // Identifica datas conflitantes (que já possuem hábitos deste mesmo template)
   const conflictingDates = selectedDates.filter((d) =>
     habits.some(
       (h) =>
         h.date === d &&
-        ((templateId && h.templateSourceId === templateId) ||
-          (templateId && h.id.startsWith(`applied_`)))
+        Boolean(templateId) &&
+        h.templateSourceId === templateId
     )
   );
 

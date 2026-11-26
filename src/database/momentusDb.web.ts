@@ -22,6 +22,15 @@ const KEY_ACHIEVEMENTS = '@momentus_achievements';
 const KEY_MARKET = '@momentus_market_items';
 const PREFIX_KV = '@momentus_kv_';
 
+// Fila de serialização para evitar race conditions em read-modify-write concorrentes no Web
+let webOpQueue: Promise<unknown> = Promise.resolve();
+
+function enqueueWebDbOp<T>(task: () => Promise<T>, fallbackValue: T): Promise<T> {
+  const next = webOpQueue.then(task, task).catch(() => fallbackValue);
+  webOpQueue = next.then(() => undefined, () => undefined);
+  return next;
+}
+
 export async function getDatabase(): Promise<null> {
   return null;
 }
@@ -44,37 +53,26 @@ export async function getAllCategories(): Promise<Category[]> {
 }
 
 export async function upsertCategoryDb(category: Category): Promise<void> {
-  try {
+  return enqueueWebDbOp(async () => {
     const current = await getAllCategories();
     const idx = current.findIndex((c) => c.id === category.id);
-    let next: Category[];
-    if (idx >= 0) {
-      next = current.map((c) => (c.id === category.id ? category : c));
-    } else {
-      next = [...current, category];
-    }
+    const next = idx >= 0 ? current.map((c) => (c.id === category.id ? category : c)) : [...current, category];
     await AsyncStorage.setItem(KEY_CATEGORIES, JSON.stringify(next));
-  } catch (e) {
-    console.warn('Erro ao salvar categoria no web:', e);
-  }
+  }, undefined);
 }
 
 export async function deleteCategoryDb(id: string): Promise<void> {
-  try {
+  return enqueueWebDbOp(async () => {
     const current = await getAllCategories();
     const next = current.filter((c) => c.id !== id);
     await AsyncStorage.setItem(KEY_CATEGORIES, JSON.stringify(next));
-  } catch (e) {
-    console.warn('Erro ao deletar categoria no web:', e);
-  }
+  }, undefined);
 }
 
 export async function setAllCategoriesDb(categories: Category[]): Promise<void> {
-  try {
+  return enqueueWebDbOp(async () => {
     await AsyncStorage.setItem(KEY_CATEGORIES, JSON.stringify(categories));
-  } catch (e) {
-    console.warn('Erro ao salvar categorias no web:', e);
-  }
+  }, undefined);
 }
 
 export async function getAllHabits(): Promise<HabitItem[]> {
@@ -87,48 +85,35 @@ export async function getAllHabits(): Promise<HabitItem[]> {
 }
 
 export async function upsertHabitDb(habit: HabitItem): Promise<void> {
-  try {
+  return enqueueWebDbOp(async () => {
     const current = await getAllHabits();
     const idx = current.findIndex((h) => h.id === habit.id);
-    let next: HabitItem[];
-    if (idx >= 0) {
-      next = current.map((h) => (h.id === habit.id ? habit : h));
-    } else {
-      next = [...current, habit];
-    }
+    const next = idx >= 0 ? current.map((h) => (h.id === habit.id ? habit : h)) : [...current, habit];
     await AsyncStorage.setItem(KEY_HABITS, JSON.stringify(next));
-  } catch (e) {
-    console.warn('Erro ao salvar hábito no web:', e);
-  }
+  }, undefined);
 }
 
 export async function deleteHabitDb(id: string): Promise<void> {
-  try {
+  return enqueueWebDbOp(async () => {
     const current = await getAllHabits();
     const next = current.filter((h) => h.id !== id);
     await AsyncStorage.setItem(KEY_HABITS, JSON.stringify(next));
-  } catch (e) {
-    console.warn('Erro ao deletar hábito no web:', e);
-  }
+  }, undefined);
 }
 
 export async function deleteMultipleHabitsDb(ids: string[]): Promise<void> {
-  try {
+  return enqueueWebDbOp(async () => {
     const idSet = new Set(ids);
     const current = await getAllHabits();
     const next = current.filter((h) => !idSet.has(h.id));
     await AsyncStorage.setItem(KEY_HABITS, JSON.stringify(next));
-  } catch (e) {
-    console.warn('Erro ao deletar múltiplos hábitos no web:', e);
-  }
+  }, undefined);
 }
 
 export async function setAllHabitsDb(habits: HabitItem[]): Promise<void> {
-  try {
+  return enqueueWebDbOp(async () => {
     await AsyncStorage.setItem(KEY_HABITS, JSON.stringify(habits));
-  } catch (e) {
-    console.warn('Erro ao salvar hábitos no web:', e);
-  }
+  }, undefined);
 }
 
 export async function getAllTemplates(): Promise<RoutineTemplate[]> {
@@ -141,37 +126,26 @@ export async function getAllTemplates(): Promise<RoutineTemplate[]> {
 }
 
 export async function upsertTemplateDb(template: RoutineTemplate): Promise<void> {
-  try {
+  return enqueueWebDbOp(async () => {
     const current = await getAllTemplates();
     const idx = current.findIndex((t) => t.id === template.id);
-    let next: RoutineTemplate[];
-    if (idx >= 0) {
-      next = current.map((t) => (t.id === template.id ? template : t));
-    } else {
-      next = [...current, template];
-    }
+    const next = idx >= 0 ? current.map((t) => (t.id === template.id ? template : t)) : [...current, template];
     await AsyncStorage.setItem(KEY_TEMPLATES, JSON.stringify(next));
-  } catch (e) {
-    console.warn('Erro ao salvar template no web:', e);
-  }
+  }, undefined);
 }
 
 export async function deleteTemplateDb(id: string): Promise<void> {
-  try {
+  return enqueueWebDbOp(async () => {
     const current = await getAllTemplates();
     const next = current.filter((t) => t.id !== id);
     await AsyncStorage.setItem(KEY_TEMPLATES, JSON.stringify(next));
-  } catch (e) {
-    console.warn('Erro ao deletar template no web:', e);
-  }
+  }, undefined);
 }
 
 export async function setAllTemplatesDb(templates: RoutineTemplate[]): Promise<void> {
-  try {
+  return enqueueWebDbOp(async () => {
     await AsyncStorage.setItem(KEY_TEMPLATES, JSON.stringify(templates));
-  } catch (e) {
-    console.warn('Erro ao salvar templates no web:', e);
-  }
+  }, undefined);
 }
 
 export async function getAllAchievements(): Promise<Achievement[]> {
@@ -184,11 +158,9 @@ export async function getAllAchievements(): Promise<Achievement[]> {
 }
 
 export async function setAllAchievementsDb(achievements: Achievement[]): Promise<void> {
-  try {
+  return enqueueWebDbOp(async () => {
     await AsyncStorage.setItem(KEY_ACHIEVEMENTS, JSON.stringify(achievements));
-  } catch (e) {
-    console.warn('Erro ao salvar conquistas no web:', e);
-  }
+  }, undefined);
 }
 
 export async function getAllMarketItems(): Promise<MarketItem[]> {
@@ -201,11 +173,9 @@ export async function getAllMarketItems(): Promise<MarketItem[]> {
 }
 
 export async function setAllMarketItemsDb(items: MarketItem[]): Promise<void> {
-  try {
+  return enqueueWebDbOp(async () => {
     await AsyncStorage.setItem(KEY_MARKET, JSON.stringify(items));
-  } catch (e) {
-    console.warn('Erro ao salvar itens da loja no web:', e);
-  }
+  }, undefined);
 }
 
 export async function getAppKv<T>(key: string): Promise<T | null> {
@@ -218,11 +188,9 @@ export async function getAppKv<T>(key: string): Promise<T | null> {
 }
 
 export async function setAppKv<T>(key: string, value: T): Promise<void> {
-  try {
+  return enqueueWebDbOp(async () => {
     await AsyncStorage.setItem(`${PREFIX_KV}${key}`, JSON.stringify(value));
-  } catch (e) {
-    console.warn('Erro ao salvar app_kv no web:', e);
-  }
+  }, undefined);
 }
 
 const PRESERVED_LOGOUT_KEYS = new Set([

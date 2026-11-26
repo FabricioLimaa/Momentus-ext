@@ -120,8 +120,13 @@ export default function IndexScreen() {
 
   const navigatePostLogin = async (uid: string) => {
     try {
+      const localSettings = await getAppKv<{ termsAccepted?: boolean; termsAcceptedVersion?: number }>('app_settings').catch(() => null);
+      const localAccepted =
+        Boolean(localSettings?.termsAccepted) &&
+        (localSettings?.termsAcceptedVersion ?? 0) >= CURRENT_TERMS_VERSION;
+
       const { accepted, version } = await hasAcceptedTermsCloud(uid);
-      if (!accepted || version < CURRENT_TERMS_VERSION) {
+      if ((!accepted || version < CURRENT_TERMS_VERSION) && !localAccepted) {
         setIsPostLoginSyncing(false);
         router.replace('/legal?mandatory=true' as any);
         return;

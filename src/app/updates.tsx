@@ -151,11 +151,11 @@ export const CHANGELOG_DATA: VersionRelease[] = [
         id: 'fix-stability-sync-light',
         icon: 'checkmark-done-circle-outline',
         tag: 'CORRECAO',
-        title: 'Mais estabilidade, sincronização fiel e Modo Claro nítido',
+        title: 'Mais precisão, estabilidade e conforto no dia a dia',
         description:
-          'Corrigimos a abertura do Modo Foco no navegador, garantimos que rotinas vindas de modelos ou do início rápido permaneçam sempre salvas e melhoramos a leitura no Modo Claro ao criar conta ou recuperar senha.',
-        actionRoute: '/focus',
-        actionLabel: 'Abrir Modo Foco',
+          'Aprimoramos o reconhecimento de datas e horários por voz, alinhamos metas e resumo semanal nas Estatísticas, conectamos preferências de lembretes e foco em Ajustes, e melhoramos a fluidez e o espaçamento no Android e no navegador.',
+        actionRoute: '/stats',
+        actionLabel: 'Ver Estatísticas',
       },
     ],
   },
@@ -710,7 +710,6 @@ export default function UpdateNotesScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   container: {
     flex: 1,

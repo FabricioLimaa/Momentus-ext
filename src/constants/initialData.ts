@@ -1,4 +1,4 @@
-import { Category, HabitItem, RoutineTemplate, Achievement, MarketItem, UserProfile, AppSettings } from '@/types';
+import type { Category, HabitItem, RoutineTemplate, Achievement, MarketItem, UserProfile, AppSettings } from '@/types';
 
 // Paleta oficial de 11 cores do Google Calendar usada no app Android
 export const GOOGLE_CALENDAR_COLORS = [
@@ -110,10 +110,12 @@ export const calculateStreakFromCompletedDays = (
   completedDays: string[],
   todayStr: string
 ): number => {
-  if (completedDays.length === 0) return 0;
+  // Ignora datas futuras (> todayStr) para que tarefas concluídas antecipadamente não quebrem a sequência atual
+  const validDays = Array.from(new Set(completedDays.filter((d) => d && d <= todayStr))).sort();
+  if (validDays.length === 0) return 0;
 
   const yesterdayStr = getPreviousDateStr(todayStr);
-  const lastCompleted = completedDays[completedDays.length - 1];
+  const lastCompleted = validDays[validDays.length - 1];
   if (lastCompleted !== todayStr && lastCompleted !== yesterdayStr) {
     return 0;
   }
@@ -121,8 +123,8 @@ export const calculateStreakFromCompletedDays = (
   let streak = 0;
   let expectedDateStr: string | null = null;
 
-  for (let i = completedDays.length - 1; i >= 0; i--) {
-    const curDateStr = completedDays[i];
+  for (let i = validDays.length - 1; i >= 0; i--) {
+    const curDateStr = validDays[i];
     if (expectedDateStr === null) {
       streak = 1;
       expectedDateStr = getPreviousDateStr(curDateStr);

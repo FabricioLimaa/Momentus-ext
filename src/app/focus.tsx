@@ -57,10 +57,13 @@ export default function FocusScreen() {
     toggleHabit,
     addFocusMinutes,
     userProfile,
+    settings,
     theme,
     showCelebration,
     triggerHaptic,
   } = useMomentus();
+
+  const initialSettingsRef = useRef(settings);
 
   const { isLargeScreen } = useResponsiveLayout();
 
@@ -167,93 +170,111 @@ export default function FocusScreen() {
     }
   }, [isRunning, breathingAnim]);
 
+  const autoAdvanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Modo Zen: reduz suavemente a opacidade de elementos periféricos durante o foco
   useEffect(() => {
     Animated.timing(zenAnim, {
       toValue: isRunning ? 0.35 : 1,
       duration: 400,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   }, [isRunning, zenAnim]);
 
-  // Carrega configurações salvas do SQLite
+  // Carrega configurações salvas do SQLite e restaura sessão ativa sem race condition
   useEffect(() => {
-    getAppKv<{ focus: number; short: number; long: number }>('focus_durations').then((saved) => {
-      if (saved) {
-        const f = Number(saved.focus) || 25;
-        const s = Number(saved.short) || 5;
-        const l = Number(saved.long) || 15;
-        setFocusDurationMinutes(f);
-        setShortBreakMinutes(s);
-        setLongBreakMinutes(l);
-        setTimeLeft(f * 60);
-        setTotalSeconds(f * 60);
-      }
-    });
+    let isCancelled = false;
 
-    getAppKv<boolean>('focus_ticking_enabled').then((saved) => {
-      if (typeof saved === 'boolean') {
-        setTickingEnabled(saved);
-      }
-    });
+    async function hydrateFocusState() {
+      const [
+        savedDurations,
+        savedTicking,
+        savedSoundscape,
+        savedVol,
+        savedAutoBreaks,
+        savedAutoFocus,
+        savedGoal,
+        activeTimer,
+      ] = await Promise.all([
+        getAppKv<{ focus: number; short: number; long: number }>('focus_durations').catch(() => null),
+        getAppKv<boolean>('focus_ticking_enabled').catch(() => null),
+        getAppKv<SoundscapeType>('focus_soundscape').catch(() => null),
+        getAppKv<number>('focus_soundscape_volume').catch(() => null),
+        getAppKv<boolean>('focus_auto_start_breaks').catch(() => null),
+        getAppKv<boolean>('focus_auto_start_focus').catch(() => null),
+        getAppKv<number>('focus_daily_goal').catch(() => null),
+        getAppKv<{
+          endTime: number;
+          mode: FocusMode;
+          selectedHabitId?: string | null;
+          totalSeconds: number;
+        }>('active_focus_timer').catch(() => null),
+      ]);
 
-    getAppKv<SoundscapeType>('focus_soundscape').then((saved) => {
-      if (saved) {
-        setSoundscape(saved);
-        soundManager.setSoundscape(saved, false);
-      }
-    });
+      if (isCancelled) return;
 
-    getAppKv<number>('focus_soundscape_volume').then((savedVol) => {
+      const initSettings = initialSettingsRef.current;
+      const f = Number(savedDurations?.focus) || initSettings.defaultFocusMinutes || 25;
+      const s = Number(savedDurations?.short) || initSettings.defaultBreakMinutes || 5;
+      const l = Number(savedDurations?.long) || 15;
+      setFocusDurationMinutes(f);
+      setShortBreakMinutes(s);
+      setLongBreakMinutes(l);
+
+      if (typeof savedTicking === 'boolean') {
+        setTickingEnabled(savedTicking);
+      }
+      if (savedSoundscape) {
+        setSoundscape(savedSoundscape);
+        soundManager.setSoundscape(savedSoundscape, false);
+      }
       if (typeof savedVol === 'number') {
         setSoundscapeVolume(savedVol);
         soundManager.setSoundscapeVolume(savedVol);
       }
-    });
-
-    getAppKv<boolean>('focus_auto_start_breaks').then((saved) => {
-      if (typeof saved === 'boolean') {
-        setAutoStartBreaks(saved);
+      if (typeof savedAutoBreaks === 'boolean') {
+        setAutoStartBreaks(savedAutoBreaks);
+      } else if (typeof initSettings.autoStartBreaks === 'boolean') {
+        setAutoStartBreaks(initSettings.autoStartBreaks);
       }
-    });
-
-    getAppKv<boolean>('focus_auto_start_focus').then((saved) => {
-      if (typeof saved === 'boolean') {
-        setAutoStartFocus(saved);
+      if (typeof savedAutoFocus === 'boolean') {
+        setAutoStartFocus(savedAutoFocus);
       }
-    });
-
-    getAppKv<number>('focus_daily_goal').then((savedGoal) => {
       if (typeof savedGoal === 'number' && savedGoal > 0) {
         setDailyFocusGoal(savedGoal);
       }
-    });
 
-    // Restaura sessão de foco ativa caso o usuário tenha trocado de aba ou recarregado
-    getAppKv<{
-      endTime: number;
-      mode: FocusMode;
-      selectedHabitId?: string | null;
-      totalSeconds: number;
-    }>('active_focus_timer').then((active) => {
-      if (active && active.endTime) {
-        const now = Date.now();
-        const remainingMs = active.endTime - now;
-        const remainingSec = Math.ceil(remainingMs / 1000);
+      // Só aplica duração padrão se NÃO houver sessão ativa para restaurar
+      let restoredActive = false;
+      if (activeTimer && activeTimer.endTime) {
+        const remainingSec = Math.ceil((activeTimer.endTime - Date.now()) / 1000);
         if (remainingSec > 0) {
-          setMode(active.mode);
-          if (active.selectedHabitId) setSelectedHabitId(active.selectedHabitId);
-          setTotalSeconds(active.totalSeconds);
+          restoredActive = true;
+          setMode(activeTimer.mode);
+          if (activeTimer.selectedHabitId) setSelectedHabitId(activeTimer.selectedHabitId);
+          setTotalSeconds(activeTimer.totalSeconds);
           setTimeLeft(remainingSec);
-          endTimeRef.current = active.endTime;
+          endTimeRef.current = activeTimer.endTime;
           setIsRunning(true);
         } else {
           setAppKv('active_focus_timer', null).catch(() => {});
         }
       }
-    });
+
+      if (!restoredActive) {
+        setTimeLeft(f * 60);
+        setTotalSeconds(f * 60);
+      }
+    }
+
+    hydrateFocusState();
 
     return () => {
+      isCancelled = true;
+      if (autoAdvanceTimeoutRef.current) {
+        clearTimeout(autoAdvanceTimeoutRef.current);
+        autoAdvanceTimeoutRef.current = null;
+      }
       soundManager.pauseSoundscape();
     };
   }, []);
@@ -414,7 +435,9 @@ export default function FocusScreen() {
       // Pilar 4: Auto-Avanço Contínuo (inicia pausa automaticamente)
       if (autoStartBreaksRef.current) {
         const nextSecs = getDurationForMode(nextMode);
-        setTimeout(() => {
+        if (autoAdvanceTimeoutRef.current) clearTimeout(autoAdvanceTimeoutRef.current);
+        autoAdvanceTimeoutRef.current = setTimeout(() => {
+          autoAdvanceTimeoutRef.current = null;
           startTimerDirectly(nextMode, nextSecs);
         }, 800);
       }
@@ -426,7 +449,9 @@ export default function FocusScreen() {
       // Pilar 4: Auto-Avanço Contínuo (inicia próximo foco automaticamente)
       if (autoStartFocusRef.current) {
         const nextSecs = getDurationForMode('FOCUS');
-        setTimeout(() => {
+        if (autoAdvanceTimeoutRef.current) clearTimeout(autoAdvanceTimeoutRef.current);
+        autoAdvanceTimeoutRef.current = setTimeout(() => {
+          autoAdvanceTimeoutRef.current = null;
           startTimerDirectly('FOCUS', nextSecs);
         }, 800);
       }
@@ -639,9 +664,8 @@ export default function FocusScreen() {
     setAppKv('active_focus_timer', null).catch(() => {});
 
     if (mode === 'FOCUS') {
-      const nextSessions = completedSessions + 1;
-      setCompletedSessions(nextSessions);
-      if (nextSessions % 4 === 0) {
+      // Pular uma sessão de foco NÃO deve inflar completedSessions
+      if (completedSessions > 0 && completedSessions % 4 === 0) {
         switchMode('LONG_BREAK');
       } else {
         switchMode('SHORT_BREAK');
@@ -2491,7 +2515,6 @@ export default function FocusScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   scrollView: {
     flex: 1,
