@@ -626,8 +626,11 @@ export async function deleteMultipleHabitsDb(ids: string[]): Promise<void> {
   }
 
   return enqueueDbOperation(async (db) => {
-    const placeholders = ids.map(() => '?').join(',');
-    await db.runAsync(`DELETE FROM habits WHERE id IN (${placeholders})`, ids);
+    await db.withTransactionAsync(async () => {
+      for (const id of ids) {
+        await db.runAsync('DELETE FROM habits WHERE id = ?', [id]);
+      }
+    });
   }, undefined);
 }
 

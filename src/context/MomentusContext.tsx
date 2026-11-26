@@ -316,8 +316,10 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Trava para evitar execuções duplicadas e concorrentes de sincronização com o Firestore
   const inFlightSyncPromiseRef = useRef<Promise<void> | null>(null);
   const lastLoadedUid = useRef<string | null>(null);
-  // Rastreador de hábitos deletados na sessão para prevenir ressuscitação em corridas de sincronização
+  // Rastreador de hábitos deletados na sessão (nunca re-admitidos em syncs concorrentes)
+  // e fila persistente de exclusões pendentes de confirmação no Firestore
   const deletedHabitIdsRef = useRef<Set<string>>(new Set());
+  const pendingCloudDeleteIdsRef = useRef<Set<string>>(new Set());
   // Rastreador de conquistas cujos pontos de XP já foram creditados ao saldo
   const creditedAchievementIdsRef = useRef<Set<string>>(new Set());
   // Trava para evitar execuções concorrentes de sincronização com o Google Agenda
@@ -374,6 +376,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     validatedDayDatesRef.current = [];
     validatedRoutineKeysRef.current = [];
     deletedHabitIdsRef.current = new Set();
+    pendingCloudDeleteIdsRef.current = new Set();
     creditedAchievementIdsRef.current = new Set();
 
     setHabits([]);
@@ -443,7 +446,10 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         const legacyMigrated = await getAppKv<boolean>('legacy_async_migrated');
         const savedPendingDeletedIds = await getAppKv<string[]>('pending_deleted_habit_ids');
         if (Array.isArray(savedPendingDeletedIds) && savedPendingDeletedIds.length > 0) {
-          savedPendingDeletedIds.forEach((id) => deletedHabitIdsRef.current.add(id));
+          savedPendingDeletedIds.forEach((id) => {
+            deletedHabitIdsRef.current.add(id);
+            pendingCloudDeleteIdsRef.current.add(id);
+          });
         }
 
         // Migração legada do AsyncStorage roda APENAS uma única vez quando o banco SQLite ainda não foi migrado
@@ -1256,6 +1262,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const deleteHabit = (id: string) => {
     deletedHabitIdsRef.current.add(id);
+    pendingCloudDeleteIdsRef.current.add(id);
     const prevHabits = habitsRef.current;
     const habitToDelete = prevHabits.find((h) => h.id === id);
     if (habitToDelete) {
@@ -1282,7 +1289,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setUserProfile(nextProfile);
 
     deleteHabitDb(id).catch(() => {});
-    setAppKv('pending_deleted_habit_ids', Array.from(deletedHabitIdsRef.current)).catch(() => {});
+    setAppKv('pending_deleted_habit_ids', Array.from(pendingCloudDeleteIdsRef.current)).catch(() => {});
     triggerHaptic('impact');
 
     const currentUserId = firebaseAuth.currentUser?.uid;
@@ -1294,16 +1301,22 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       deleteHabitFromFirestore(currentUserId, id)
         .then((ok) => {
           if (ok) {
-            deletedHabitIdsRef.current.delete(id);
-            setAppKv('pending_deleted_habit_ids', Array.from(deletedHabitIdsRef.current)).catch(() => {});
+            pendingCloudDeleteIdsRef.current.delete(id);
+            setAppKv('pending_deleted_habit_ids', Array.from(pendingCloudDeleteIdsRef.current)).catch(() => {});
           }
         })
         .catch((err) => MomentusLog.sync.warn('Erro ao excluir hábito no Firestore:', err));
     }
   };
 
-  const deleteMultipleHabits = (ids: string[]) => {
-    ids.forEach((id) => deletedHabitIdsRef.current.add(id));
+  const deleteMultipleHabits = (rawIds: string[]) => {
+    const ids = Array.from(new Set(rawIds.filter(Boolean)));
+    if (ids.length === 0) return;
+
+    ids.forEach((id) => {
+      deletedHabitIdsRef.current.add(id);
+      pendingCloudDeleteIdsRef.current.add(id);
+    });
     const idSet = new Set(ids);
     const prevHabits = habitsRef.current;
     const toDelete = prevHabits.filter((h) => idSet.has(h.id));
@@ -1331,7 +1344,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setUserProfile(nextProfile);
 
     deleteMultipleHabitsDb(ids).catch(() => {});
-    setAppKv('pending_deleted_habit_ids', Array.from(deletedHabitIdsRef.current)).catch(() => {});
+    setAppKv('pending_deleted_habit_ids', Array.from(pendingCloudDeleteIdsRef.current)).catch(() => {});
     triggerHaptic('impact');
 
     const currentUserId = firebaseAuth.currentUser?.uid;
@@ -1343,8 +1356,8 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       deleteMultipleHabitsFromFirestore(currentUserId, ids)
         .then((ok) => {
           if (ok) {
-            ids.forEach((id) => deletedHabitIdsRef.current.delete(id));
-            setAppKv('pending_deleted_habit_ids', Array.from(deletedHabitIdsRef.current)).catch(() => {});
+            ids.forEach((id) => pendingCloudDeleteIdsRef.current.delete(id));
+            setAppKv('pending_deleted_habit_ids', Array.from(pendingCloudDeleteIdsRef.current)).catch(() => {});
           }
         })
         .catch((err) => MomentusLog.sync.warn('Erro ao excluir múltiplos hábitos no Firestore:', err));
@@ -2217,12 +2230,12 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       };
 
       // Antes de baixar da nuvem, garante que exclusões locais pendentes sejam aplicadas no Firestore
-      const pendingDeletes = Array.from(deletedHabitIdsRef.current);
+      const pendingDeletes = Array.from(pendingCloudDeleteIdsRef.current);
       if (pendingDeletes.length > 0) {
         const deletedOk = await deleteMultipleHabitsFromFirestore(uid, pendingDeletes);
         if (deletedOk) {
-          pendingDeletes.forEach((id) => deletedHabitIdsRef.current.delete(id));
-          await setAppKv('pending_deleted_habit_ids', Array.from(deletedHabitIdsRef.current)).catch(() => {});
+          pendingDeletes.forEach((id) => pendingCloudDeleteIdsRef.current.delete(id));
+          await setAppKv('pending_deleted_habit_ids', Array.from(pendingCloudDeleteIdsRef.current)).catch(() => {});
         }
       }
 
