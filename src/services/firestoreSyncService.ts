@@ -1310,8 +1310,8 @@ export async function saveHabitToFirestore(
 export async function deleteHabitFromFirestore(
   userId: string,
   habitId: string,
-): Promise<void> {
-  if (!userId || userId === "local_user") return;
+): Promise<boolean> {
+  if (!userId || userId === "local_user") return false;
   try {
     const userDocRef = doc(firestore, "users", userId);
     const eventDocRef = doc(collection(userDocRef, EVENTS_COLLECTION), habitId);
@@ -1321,32 +1321,36 @@ export async function deleteHabitFromFirestore(
     batch.delete(eventDocRef);
     batch.delete(compDocRef);
     await batch.commit();
+    return true;
   } catch (err) {
     MomentusLog.sync.warn("Erro ao excluir hábito do Firestore:", err);
+    return false;
   }
 }
 
 /**
- * Exclui múltiplos eventos no Firestore em lote (batch).
+ * Exclui múltiplos eventos no Firestore em lotes seguros (chunking <= 450 ops).
  */
 export async function deleteMultipleHabitsFromFirestore(
   userId: string,
   habitIds: string[],
-): Promise<void> {
-  if (!userId || userId === "local_user" || habitIds.length === 0) return;
+): Promise<boolean> {
+  if (!userId || userId === "local_user" || habitIds.length === 0) return false;
   try {
     const userDocRef = doc(firestore, "users", userId);
     const eventsCol = collection(userDocRef, EVENTS_COLLECTION);
     const compCol = collection(userDocRef, COMPLETED_HABITS_COLLECTION);
 
-    const batch = writeBatch(firestore);
+    const ops: Array<(batch: ReturnType<typeof writeBatch>) => void> = [];
     habitIds.forEach((id) => {
-      batch.delete(doc(eventsCol, id));
-      batch.delete(doc(compCol, id));
+      ops.push((b) => b.delete(doc(eventsCol, id)));
+      ops.push((b) => b.delete(doc(compCol, id)));
     });
-    await batch.commit();
+    await commitBatchedOps(ops, "delete_multiple_habits");
+    return true;
   } catch (err) {
     MomentusLog.sync.warn("Erro ao excluir múltiplos hábitos no Firestore:", err);
+    return false;
   }
 }
 

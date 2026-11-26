@@ -25,6 +25,12 @@ interface BiometricGuardProps {
   children: React.ReactNode;
 }
 
+// Estado de sessão no escopo de módulo: impede prompt biométrico duplicado
+// em remontagens (React 19/StrictMode/Expo Router) ou transições de AppState do próprio BiometricPrompt.
+let sessionUnlocked = false;
+let activeAuthPromise: Promise<boolean> | null = null;
+let lastPromptFinishedAt = 0;
+
 export const BiometricGuard: React.FC<BiometricGuardProps> = ({ children }) => {
   const { settings, theme, userProfile, isLoaded, triggerHaptic } = useMomentus();
   const [isLocked, setIsLocked] = useState(false);
@@ -60,32 +66,59 @@ export const BiometricGuard: React.FC<BiometricGuardProps> = ({ children }) => {
 
   const authenticate = useCallback(async () => {
     if (Platform.OS === 'web') {
+      sessionUnlocked = true;
       setIsLocked(false);
       return;
     }
 
+    // Se já houver um BiometricPrompt ativo em andamento, aguarda a mesma promessa em vez de abrir um 2º prompt
+    if (activeAuthPromise) {
+      setIsAuthenticating(true);
+      const ok = await activeAuthPromise;
+      setIsAuthenticating(false);
+      if (ok) {
+        setIsLocked(false);
+        setAuthError(null);
+      }
+      return;
+    }
+
+    const runAuth = async (): Promise<boolean> => {
+      try {
+        const hasHardware = await LocalAuthentication.hasHardwareAsync();
+        const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+
+        if (!hasHardware || !isEnrolled) {
+          sessionUnlocked = true;
+          return true;
+        }
+
+        const result = await LocalAuthentication.authenticateAsync({
+          promptMessage: 'Desbloqueie o Momentus para acessar suas rotinas',
+          cancelLabel: 'Cancelar',
+          fallbackLabel: 'Usar Senha do Dispositivo',
+          disableDeviceFallback: false,
+        });
+
+        if (result.success) {
+          sessionUnlocked = true;
+          return true;
+        }
+        return false;
+      } catch {
+        return false;
+      } finally {
+        lastPromptFinishedAt = Date.now();
+      }
+    };
+
     try {
       setIsAuthenticating(true);
       setAuthError(null);
+      activeAuthPromise = runAuth();
+      const success = await activeAuthPromise;
 
-      const hasHardware = await LocalAuthentication.hasHardwareAsync();
-      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-
-      if (!hasHardware || !isEnrolled) {
-        // Sem hardware biométrico cadastrado, libera o app para evitar bloqueio permanente
-        setIsLocked(false);
-        setIsAuthenticating(false);
-        return;
-      }
-
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Desbloqueie o Momentus para acessar suas rotinas',
-        cancelLabel: 'Cancelar',
-        fallbackLabel: 'Usar Senha do Dispositivo',
-        disableDeviceFallback: false,
-      });
-
-      if (result.success) {
+      if (success) {
         setIsLocked(false);
         setAuthError(null);
         triggerHaptic('success');
@@ -93,18 +126,23 @@ export const BiometricGuard: React.FC<BiometricGuardProps> = ({ children }) => {
         triggerHaptic('impact');
         setAuthError('Autenticação não concluída. Toque para tentar novamente.');
       }
-    } catch {
-      setAuthError('Erro ao autenticar. Toque para tentar novamente.');
     } finally {
+      activeAuthPromise = null;
       setIsAuthenticating(false);
     }
   }, [triggerHaptic]);
 
-  // Initial check on load (executa apenas uma vez por sessão autenticada)
+  // Initial check on load (executa apenas uma vez por sessão autenticada, inclusive em remontagens)
   useEffect(() => {
     if (!isLoaded) return;
     if (!settings.biometricLock || !userProfile.isLoggedIn || Platform.OS === 'web') {
       hasCheckedInitialLockRef.current = false;
+      sessionUnlocked = false;
+      setIsLocked(false);
+      return;
+    }
+    if (sessionUnlocked) {
+      hasCheckedInitialLockRef.current = true;
       setIsLocked(false);
       return;
     }
@@ -119,6 +157,11 @@ export const BiometricGuard: React.FC<BiometricGuardProps> = ({ children }) => {
     if (Platform.OS === 'web') return;
 
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      // Ignora transições de AppState disparadas pelo próprio BiometricPrompt nativo
+      if (activeAuthPromise || Date.now() - lastPromptFinishedAt < 1500) {
+        return;
+      }
+
       if (nextAppState === 'background') {
         backgroundTimeRef.current = Date.now();
       } else if (nextAppState === 'active') {
@@ -132,6 +175,7 @@ export const BiometricGuard: React.FC<BiometricGuardProps> = ({ children }) => {
           lastBg &&
           Date.now() - lastBg > 15000
         ) {
+          sessionUnlocked = false;
           setIsLocked(true);
           authenticate();
         }

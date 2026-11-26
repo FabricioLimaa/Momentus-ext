@@ -440,10 +440,25 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         const dbMarketItems = await getAllMarketItems();
         const dbUserProfile = await getAppKv<UserProfile>('user_profile');
         const dbSettings = await getAppKv<AppSettings>('app_settings');
+        const legacyMigrated = await getAppKv<boolean>('legacy_async_migrated');
+        const savedPendingDeletedIds = await getAppKv<string[]>('pending_deleted_habit_ids');
+        if (Array.isArray(savedPendingDeletedIds) && savedPendingDeletedIds.length > 0) {
+          savedPendingDeletedIds.forEach((id) => deletedHabitIdsRef.current.add(id));
+        }
 
-        // Carrega também estado prévio do AsyncStorage para migração suave
-        const savedAsync = await AsyncStorage.getItem(STORAGE_KEY);
+        // Migração legada do AsyncStorage roda APENAS uma única vez quando o banco SQLite ainda não foi migrado
+        const shouldCheckLegacy =
+          !legacyMigrated &&
+          dbHabits.length === 0 &&
+          dbCategories.length === 0 &&
+          !dbSettings;
+        const savedAsync = shouldCheckLegacy ? await AsyncStorage.getItem(STORAGE_KEY) : null;
         const legacyParsed = savedAsync ? JSON.parse(savedAsync) : null;
+
+        if (!legacyMigrated) {
+          await setAppKv('legacy_async_migrated', true).catch(() => {});
+          await AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
+        }
 
         // Configurações e aceite dos termos: prioriza o que está persistido localmente e nunca reseta
         const effectiveSettings: AppSettings = dbSettings || legacyParsed?.settings || INITIAL_SETTINGS;
@@ -544,9 +559,18 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
         const LEGACY_MOCK_HABIT_IDS = new Set(['h-1', 'h-2', 'h-3', 'h-4']);
 
-        const rawHab: HabitItem[] = dbHabits.length > 0 ? dbHabits : (legacyParsed?.habits || []);
+        const rawHab: HabitItem[] =
+          dbHabits.length > 0
+            ? dbHabits
+            : shouldCheckLegacy && Array.isArray(legacyParsed?.habits)
+            ? legacyParsed.habits
+            : [];
         const filteredHab = rawHab
-          .filter((h: HabitItem) => !LEGACY_MOCK_HABIT_IDS.has(h.id))
+          .filter(
+            (h: HabitItem) =>
+              !LEGACY_MOCK_HABIT_IDS.has(h.id) &&
+              !deletedHabitIdsRef.current.has(h.id)
+          )
           .map((h: HabitItem) =>
             duplicateOutrosIds.has(h.categoryId)
               ? { ...h, categoryId: canonicalOutrosId }
@@ -780,17 +804,6 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           setAppKv('user_profile', userProfile),
           setAppKv('app_settings', settings),
         ]);
-
-        const data = {
-          habits,
-          categories,
-          templates,
-          achievements,
-          marketItems,
-          userProfile,
-          settings,
-        };
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       } catch (e) {
         MomentusLog.db.warn('Erro ao persistir dados do Momentus:', e);
       }
@@ -1269,6 +1282,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setUserProfile(nextProfile);
 
     deleteHabitDb(id).catch(() => {});
+    setAppKv('pending_deleted_habit_ids', Array.from(deletedHabitIdsRef.current)).catch(() => {});
     triggerHaptic('impact');
 
     const currentUserId = firebaseAuth.currentUser?.uid;
@@ -1277,9 +1291,14 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         totalCompleted: remainingCompleted,
         currentStreak: remainingStreak,
       }).catch(() => {});
-      deleteHabitFromFirestore(currentUserId, id).catch((err) =>
-        MomentusLog.sync.warn('Erro ao excluir hábito no Firestore:', err)
-      );
+      deleteHabitFromFirestore(currentUserId, id)
+        .then((ok) => {
+          if (ok) {
+            deletedHabitIdsRef.current.delete(id);
+            setAppKv('pending_deleted_habit_ids', Array.from(deletedHabitIdsRef.current)).catch(() => {});
+          }
+        })
+        .catch((err) => MomentusLog.sync.warn('Erro ao excluir hábito no Firestore:', err));
     }
   };
 
@@ -1312,6 +1331,7 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setUserProfile(nextProfile);
 
     deleteMultipleHabitsDb(ids).catch(() => {});
+    setAppKv('pending_deleted_habit_ids', Array.from(deletedHabitIdsRef.current)).catch(() => {});
     triggerHaptic('impact');
 
     const currentUserId = firebaseAuth.currentUser?.uid;
@@ -1320,9 +1340,14 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         totalCompleted: remainingCompleted,
         currentStreak: remainingStreak,
       }).catch(() => {});
-      deleteMultipleHabitsFromFirestore(currentUserId, ids).catch((err) =>
-        MomentusLog.sync.warn('Erro ao excluir múltiplos hábitos no Firestore:', err)
-      );
+      deleteMultipleHabitsFromFirestore(currentUserId, ids)
+        .then((ok) => {
+          if (ok) {
+            ids.forEach((id) => deletedHabitIdsRef.current.delete(id));
+            setAppKv('pending_deleted_habit_ids', Array.from(deletedHabitIdsRef.current)).catch(() => {});
+          }
+        })
+        .catch((err) => MomentusLog.sync.warn('Erro ao excluir múltiplos hábitos no Firestore:', err));
     }
   };
 
@@ -2190,6 +2215,16 @@ export const MomentusProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         photoUrl: authUser?.photoURL ?? latestProfile.photoUrl,
         isLoggedIn: true,
       };
+
+      // Antes de baixar da nuvem, garante que exclusões locais pendentes sejam aplicadas no Firestore
+      const pendingDeletes = Array.from(deletedHabitIdsRef.current);
+      if (pendingDeletes.length > 0) {
+        const deletedOk = await deleteMultipleHabitsFromFirestore(uid, pendingDeletes);
+        if (deletedOk) {
+          pendingDeletes.forEach((id) => deletedHabitIdsRef.current.delete(id));
+          await setAppKv('pending_deleted_habit_ids', Array.from(deletedHabitIdsRef.current)).catch(() => {});
+        }
+      }
 
       const activeHabitsToSync = habitsRef.current.filter(
         (h) => !deletedHabitIdsRef.current.has(h.id)
