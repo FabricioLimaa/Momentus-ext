@@ -259,7 +259,6 @@ export async function setupNotificationChannels(): Promise<void> {
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#34D399', // Emerald Neon
-      sound: 'default',
       enableLights: true,
       enableVibrate: true,
     });
@@ -270,7 +269,6 @@ export async function setupNotificationChannels(): Promise<void> {
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#38BDF8', // Sky/Cyan Blue
-      sound: 'default',
       enableLights: true,
       enableVibrate: true,
     });
@@ -391,7 +389,7 @@ export async function scheduleHabitNotifications(
               habitTitle: habit.title,
               type: 'START',
             },
-            sound: 'default',
+            sound: true,
             ...(Platform.OS === 'android' ? { channelId: CHANNEL_INICIO } : {}),
           },
           trigger: {
@@ -421,7 +419,7 @@ export async function scheduleHabitNotifications(
               habitTitle: habit.title,
               type: 'END',
             },
-            sound: 'default',
+            sound: true,
             ...(Platform.OS === 'android' ? { channelId: CHANNEL_TERMINO } : {}),
           },
           trigger: {
@@ -463,7 +461,7 @@ export async function syncDailyBriefingNotifications(settings: Partial<AppSettin
         content: {
           title: 'Bom dia! Suas rotinas de hoje ☀️',
           body: 'Confira o que está planejado para o seu dia e comece com foco.',
-          sound: 'default',
+          sound: true,
           ...(Platform.OS === 'android' ? { channelId: CHANNEL_INICIO } : {}),
         },
         trigger: {
@@ -480,7 +478,7 @@ export async function syncDailyBriefingNotifications(settings: Partial<AppSettin
         content: {
           title: 'Fechamento do Dia 🌙',
           body: 'Revise seus hábitos concluídos e preserve sua sequência antes de descansar.',
-          sound: 'default',
+          sound: true,
           ...(Platform.OS === 'android' ? { channelId: CHANNEL_TERMINO } : {}),
         },
         trigger: {
@@ -519,7 +517,7 @@ export async function snoozeHabitNotification(
           habitTitle,
           type: 'START',
         },
-        sound: 'default',
+        sound: true,
         ...(Platform.OS === 'android' ? { channelId: CHANNEL_INICIO } : {}),
       },
       trigger: {
@@ -596,7 +594,7 @@ export async function scheduleFocusNotification(
       content: {
         title,
         body,
-        sound: 'default',
+        sound: true,
         ...(Platform.OS === 'android' ? { channelId: CHANNEL_TERMINO } : {}),
         data: {
           type: 'FOCUS_TIMER_FINISHED',
